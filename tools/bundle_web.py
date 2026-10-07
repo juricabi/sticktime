@@ -5,6 +5,7 @@ web/simulator.html  - complete offline page (fengari inlined), open it directly
 web/artifact.html   - same page as body content, fengari from jsDelivr (for hosting)
 """
 import base64
+import json
 import pathlib
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -25,7 +26,12 @@ def main():
     lua_bw = read(ROOT / "sdcard/SCRIPTS/TOOLS/FPVSimBW/core.lua")
     # the Lite with its test hooks (inert on a radio), so the emulator can be automated
     lua_lite = read(ROOT / "test/build/fpvlite_test.lua")
-    for s in (lua_color, lua_bw, lua_lite):
+    # the Lite reads its tracks from the SD card: /SCRIPTS/TOOLS/FPVLite/t1.txt ...
+    tdir = ROOT / "sdcard/SCRIPTS/TOOLS/FPVLite"
+    tracks = {"/SCRIPTS/TOOLS/FPVLite/" + p.name: read(p) for p in sorted(tdir.glob("t*.txt"))}
+    assert tracks, "no FPV Sim Lite track files (run build.py)"
+    lite_tracks = json.dumps(tracks, indent=0)
+    for s in (lua_color, lua_bw, lua_lite, lite_tracks):
         assert "</script" not in s.lower()
     parts = {
         "STYLE": read(SRC / "style.css"),
@@ -35,6 +41,7 @@ def main():
         "LUA_COLOR": lua_color,
         "LUA_BW": lua_bw,
         "LUA_LITE": lua_lite,
+        "LITE_TRACKS": lite_tracks,
         "ROBOTO400": b64(W / "vendor/roboto-latin-400-normal.woff2"),
         "ROBOTO700": b64(W / "vendor/roboto-latin-700-normal.woff2"),
     }

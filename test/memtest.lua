@@ -14,6 +14,18 @@ radio.new(W, H)
 -- a loader in /SCRIPTS/TOOLS loads its core with loadScript from the SD card folder
 local root = string.match(path, "^(.*)/SCRIPTS/TOOLS/")
 if root then radio.sdroot(root) end
+-- a radio that has been used before: a save file with settings and bests for every track
+local saves = { ["FPVLite"] = { "/SCRIPTS/TOOLS/FPVLite/data.txt", "FPVLITE2 mode=2 wind=1 quad=1 track=1 laps=3 rates=2 " ..
+  "twr=5 tilt=20", "l%d=4810 r%d=14120 f%d=1200 g%d=12" }, ["FPVSimBW"] = { "/SCRIPTS/TOOLS/FPVSimBW.dat", "FPVSIM2 " ..
+  "track=1 quad=1 ai=2 wind=0 mode=2 rm=850 fps=0 sticks=1 tilt=30 rc=150 map=1 re=45 ym=700 wash=0 laps=3 skill=1 " ..
+  "rates=4 yc=130 ye=40 fov=100 twr=6", "l%d=4321 r%d=9876 g%d=7 f%d=300" } }
+for name, sv in pairs(saves) do
+  if string.find(path, name, 1, true) then
+    local s = sv[2]
+    for t = 1, 7 do s = s .. " " .. string.format(sv[3], t, t, t, t) end
+    radio.setfile(sv[1], s)
+  end
+end
 local base = radio.mem()
 radio.resetpeak()
 local ok, err = radio.load(path, true)
@@ -62,16 +74,17 @@ okRun, runErr = pcall(function()
       end
     end
   else
-    -- the Lite as shipped (no hooks), through its menus: 4 tracks x 3 modes
-    for t = 1, 4 do
-      for m = 1, 3 do
+    -- the Lite as shipped (no hooks), through its menus: 7 tracks x 4 modes, Track is item 5
+    for t = 1, 7 do
+      for m = 1, 4 do
         for _ = 2, m do key(NEXT) end
         key(ENTER)                                      -- start mode m
         fly()
         key(EXIT) key(NEXT) key(NEXT) key(ENTER)        -- pause, "Menu"
       end
-      key(NEXT) key(NEXT) key(NEXT) key(ENTER) key(INC) key(ENTER)   -- next track
-      key(PREV) key(PREV) key(PREV)
+      for _ = 1, 4 do key(NEXT) end
+      key(ENTER) key(INC) key(ENTER)                    -- next track
+      for _ = 1, 4 do key(PREV) end
     end
   end
 end)

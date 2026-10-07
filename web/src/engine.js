@@ -389,8 +389,10 @@ const EdgeTX = (() => {
       lua.lua_newtable(L);
       setfn('open', () => {
         const path = str(1), mode = lua.lua_isnoneornil(L, 2) ? 'r' : str(2);
-        if (mode[0] === 'r' && !self.sd.has(path)) { lua.lua_pushnil(L); return 1; }
-        const f = { path, mode, pos: 0, data: mode[0] === 'w' ? '' : (self.sd.get(path) || '') };
+        // reads: the SD card's own files first, then the bundled ones (FPV Sim Lite's tracks)
+        const has = self.sd.has(path) || self.files[path] !== undefined;
+        if (mode[0] === 'r' && !has) { lua.lua_pushnil(L); return 1; }
+        const f = { path, mode, pos: 0, data: mode[0] === 'w' ? '' : (self.sd.has(path) ? self.sd.get(path) : self.files[path] || '') };
         if (mode[0] === 'a') f.pos = f.data.length;
         const id = fid++;
         files.set(id, f);
@@ -417,6 +419,13 @@ const EdgeTX = (() => {
         return 0;
       });
       lua.lua_setglobal(L, to_luastring('io'));
+
+      // collectgarbage: fengari leaves memory to JavaScript's GC (lua_gc is not implemented)
+      global('collectgarbage', () => {
+        const opt = lua.lua_isnoneornil(L, 1) ? 'collect' : str(1);
+        if (opt === 'count') { lua.lua_pushnumber(L, 0); return 1; }
+        lua.lua_pushinteger(L, 0); return 1;
+      });
 
       // loadScript(path [, mode [, env]]): scripts from the virtual SD card
       global('loadScript', () => {

@@ -99,6 +99,33 @@ def main():
                 page.evaluate(f"sim.key('{k}'); sim.step(1, 50)")
             save(page, f"{rid}_15settings")
             page.evaluate("sim.test('set', 'ai', 0)")
+        # FPV Sim Lite (reads its tracks from the SD card): every track, freestyle and gate rush
+        if "tx12" in RADIOS or "x9d" in RADIOS:
+            page.evaluate("sim.script('lite')")
+            for rid in [r for r in ("tx12", "x9d") if r in RADIOS]:
+                page.evaluate(f"sim.radio('{rid}')")
+                page.evaluate("sim.pause(true); sim.engine.displayDelay = false")
+                err = page.evaluate("sim.step(10, 50)")
+                if err:
+                    print(rid, "lite ERROR", json.dumps(err)[:2000]); continue
+                save(page, f"lite_{rid}_01menu")
+                stats(page, rid, "lite menu")
+                for t, gate, back in ((1, 1, 14), (2, 3, 12), (3, 4, 12), (4, 2, 10), (5, 3, 10), (6, 4, 14), (7, 2, 14)):
+                    err = view(page, t, gate, back, 0, 0.5, -6, 0)
+                    if err: print(rid, "lite track", t, "ERROR", err); break
+                    info = page.evaluate("sim.test('info')")
+                    save(page, f"lite_{rid}_t{t}")
+                    stats(page, rid, f"lite t{t}")
+                    print(f"   track {t} {info[7]}: pillars {info[8]}, boxes {info[11]}")
+                page.evaluate("sim.test('track', 7); sim.test('start', 3); sim.step(10, 50); sim.test('state', 4); sim.test('pose', -20, 20, -20, 45, 0, 0)")
+                page.evaluate("sim.sticks(0, 1, 0.2, 0); sim.step(12, 50); sim.sticks(1, 0, 0.2, 0); sim.step(10, 50); sim.sticks(0, 0, 0.3, 0); sim.step(3, 50)")
+                save(page, f"lite_{rid}_freestyle")
+                stats(page, rid, "lite free")
+                page.evaluate("sim.test('track', 5); sim.test('start', 4); sim.step(70, 50); sim.sticks(0, 0.2, 0.3, 0); sim.step(20, 50)")
+                save(page, f"lite_{rid}_rush")
+                err = stats(page, rid, "lite rush")["err"]
+                if err: print(rid, "lite ERROR", err)
+            page.evaluate("sim.script('auto')")
         page.screenshot(path=str(OUT / "page.png"))
         b.close()
         print("worst frame estimate per radio (ms):", {k: v for k, v in worst.items()})

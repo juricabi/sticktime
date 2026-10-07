@@ -81,7 +81,7 @@ def build(variant: str, cfg: dict, strip: bool) -> str:
             continue
         if keep:
             out.append(line)
-    text = placeholders("\n".join(out) + "\n", cfg)
+    text = fold(placeholders("\n".join(out) + "\n", cfg))
     left = re.findall(r"@[A-Z]+@", text)
     if left:
         sys.exit(f"unreplaced placeholders in {variant}: {sorted(set(left))}")
@@ -95,6 +95,32 @@ def build(variant: str, cfg: dict, strip: bool) -> str:
             lines.append(s if i > 0 else line)
         text = "\n".join(lines) + "\n"
     return text
+
+
+def fold(text: str) -> str:
+    """Lines marked --#fold declare constants (local A, B = 1, 2): drop the line and write the
+    values where the names are used, outside strings. On radios with little memory every local
+    that functions use costs an upvalue per function; a literal costs nothing extra."""
+    names, out = {}, []
+    for line in text.splitlines():
+        m = re.match(r"^\s*local\s+([\w\s,]+?)\s*=\s*([-\d.,\s]+?)\s*--#fold", line)
+        if m:
+            ks = [k.strip() for k in m.group(1).split(",")]
+            vs = [v.strip() for v in m.group(2).split(",")]
+            assert len(ks) == len(vs), line
+            names.update(zip(ks, vs))
+            continue
+        out.append(line)
+    if not names:
+        return text
+    pat = re.compile(r"\b(" + "|".join(sorted(names, key=len, reverse=True)) + r")\b")
+    res = []
+    for line in out:
+        parts = re.split(r'("(?:[^"\\]|\\.)*")', line)
+        for i in range(0, len(parts), 2):
+            parts[i] = pat.sub(lambda mm: names[mm.group(1)], parts[i])
+        res.append("".join(parts))
+    return "\n".join(res) + "\n"
 
 
 def placeholders(text: str, cfg: dict) -> str:
@@ -125,8 +151,30 @@ def precompile(src: pathlib.Path):
     print(f"{out.relative_to(ROOT)}: {out.stat().st_size} bytes (EdgeTX 2.11+ bytecode)")
 
 
+def lite_tracks(cfg: dict):
+    """src/fpvlite_tracks.txt -> the names for the Lite's script, and FPVLite/t<n>.txt files
+    (seed, trees, gates, "/", structures) that the Lite reads when a track is picked."""
+    names = []
+    for line in (ROOT / "src" / "fpvlite_tracks.txt").read_text(encoding="utf-8").splitlines():
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        name, seed, trees, gates, boxes = [f.strip() for f in line.split("|")]
+        names.append(name)
+        data = " ".join(f"{seed} {trees} {gates}".split())
+        if boxes:
+            data += " / " + " ".join(boxes.split())
+        # the Lite reads at most 700 bytes of a track file (io.read(f, 700): one buffer that size)
+        assert len(data) < 700, f"Lite track {name}: {len(data)} bytes, the Lite reads at most 699"
+        (OUT / "FPVLite" / f"t{len(names)}.txt").write_text(data + "\n", encoding="utf-8")
+    cfg["TRACKNAMES"] = ", ".join(f'"{n}"' for n in names)
+    cfg["NTRACKS"] = str(len(names))
+    print(f"sdcard/SCRIPTS/TOOLS/FPVLite/t1-{len(names)}.txt: {len(names)} tracks")
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
+    (OUT / "FPVLite").mkdir(exist_ok=True)
+    lite_tracks(VARIANTS["LITE"])
     for variant, cfg in VARIANTS.items():
         text = build(variant, cfg, strip=cfg.get("strip", False))
         path = OUT / cfg["file"]

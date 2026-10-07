@@ -80,7 +80,7 @@
     const r = app.radio;
     const eng = new Engine(fengari, r, {
       colorFonts, bwFonts: BW_FONTS, sd: app.sd,
-      files: { '/SCRIPTS/TOOLS/FPVSimBW/core.lua': LUA.bw, '/SCRIPTS/TOOLS/FPVLite/core.lua': LUA.lite },
+      files: Object.assign({ '/SCRIPTS/TOOLS/FPVSimBW/core.lua': LUA.bw, '/SCRIPTS/TOOLS/FPVLite/core.lua': LUA.lite }, LITE_TRACKS),
       onTone: tone, onHaptic: haptic,
       onSave: () => store.set('sd', Object.fromEntries(app.sd)),
     });

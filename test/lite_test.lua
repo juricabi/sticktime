@@ -1,7 +1,9 @@
 -- Headless test of FPV Sim Lite (Lua 5.3 with EdgeTX's number settings, or Lua 5.2).
 -- Usage: lua lite_test.lua build/fpvlite_test.lua [W H]
--- Menus and settings, time trials and practice on every track with an autopilot, gate rush,
--- crashes, pause, save and reload, B&W drawing rules, VM instructions per frame.
+-- Menus and settings, time trials on all seven tracks with an autopilot (gates, hoops, arches,
+-- flags, dive gates, the Bando's doors), practice with wind, freestyle tricks and combos, gate
+-- rush, crashes into the ground, a gate and a wall, pause, save and reload, B&W drawing rules,
+-- VM instructions per frame.
 local path, W, H = arg[1], tonumber(arg[2] or 128), tonumber(arg[3] or 64)
 local floor = math.floor
 local atan2 = math.atan2 or math.atan
@@ -32,7 +34,12 @@ end
 local tones = 0
 function playTone() tones = tones + 1 end
 function playHaptic() end
+-- the SD card: the track files from the repository, then what the script writes
 local SD = {}
+for t = 1, 9 do
+  local fh = io.open("../sdcard/SCRIPTS/TOOLS/FPVLite/t" .. t .. ".txt", "r")
+  if fh then SD["/SCRIPTS/TOOLS/FPVLite/t" .. t .. ".txt"] = fh:read("*a") fh:close() end
+end
 io = {
   open = function(p, m) if m == "r" and not SD[p] then return nil end return { p = p, m = m, d = (m == "r") and SD[p] or "", pos = 1 } end,
   read = function(f, n) local s = string.sub(f.d, f.pos, f.pos + n - 1) f.pos = f.pos + #s return s end,
@@ -99,7 +106,7 @@ local FLY, CRASHED, READY, PAUSED, DONE, MENU, SETUP = 4, 5, 6, 7, 8, 1, 2
 local function autopilot(target)
   local _, s = state()
   local px, py, pz, vx, vy, vz, fx, fz = s[1], s[2], s[3], s[4], s[5], s[6], s[7], s[9]
-  local cx, cy, cz, nx, ny, nz, k = T.gate(target or s[18])
+  local _, _, _, nx, ny, nz, k, cx, cy, cz = T.gate(target or s[18])          -- aim point
   local d = (px - cx) * nx + (py - cy) * ny + (pz - cz) * nz
   if target and d > 0 then nx, nz, d = -nx, -nz, -d end
   local lead = math.min(14, math.max(0, -d * 0.55))
@@ -129,7 +136,7 @@ steps(5)
 for _ = 1, 7 do frame(EVT_VIRTUAL_NEXT) end
 for _ = 1, 7 do frame(EVT_VIRTUAL_PREV) end
 if state() ~= MENU then fail("not in the menu") end
-for _ = 1, 3 do frame(EVT_VIRTUAL_NEXT) end           -- Track
+for _ = 1, 4 do frame(EVT_VIRTUAL_NEXT) end           -- Track
 frame(EVT_VIRTUAL_ENTER)
 frame(EVT_VIRTUAL_INC) frame(EVT_VIRTUAL_INC)
 if T.S.track ~= 3 then fail("track +2 should be 3, is " .. T.S.track) end
@@ -141,7 +148,7 @@ frame(EVT_VIRTUAL_ENTER)
 if state() ~= SETUP then fail("settings did not open") end
 local before = {}
 for k, v in pairs(T.S) do before[k] = v end
-for i = 1, 6 do
+for i = 1, 7 do
   frame(EVT_VIRTUAL_ENTER)
   frame(EVT_VIRTUAL_INC) frame(0)
   frame(EVT_VIRTUAL_DEC) frame(EVT_VIRTUAL_DEC) frame(0)
@@ -185,8 +192,9 @@ for t = 1, NT do
   local _, _, gm, lap, total = T.info()
   local bl, br = T.best(t)
   local name = select(8, T.info())
-  print(string.format("track %d %-11s time trial: finished=%s laps=%d total=%.2fs best lap %.2fs crashes=%d",
-    t, name, tostring(state() == DONE), lap, total / 100, bl / 100, crashes))
+  local nb = select(12, T.info())
+  print(string.format("track %d %-11s time trial: finished=%s laps=%d total=%.2fs best lap %.2fs crashes=%d%s",
+    t, name, tostring(state() == DONE), lap, total / 100, bl / 100, crashes, nb > 0 and (" structures=" .. nb) or ""))
   if state() ~= DONE then fail("track " .. t .. ": time trial not finished") end
   if crashes > 0 then fail("track " .. t .. ": autopilot crashed " .. crashes .. " times") end
   if br <= 0 or bl <= 0 or br < bl * 2 then fail("track " .. t .. ": best race/lap not recorded right") end
@@ -195,7 +203,8 @@ for t = 1, NT do
   if state() ~= MENU then fail("EXIT on the results should go to the menu") end
 end
 
--- practice: laps keep counting
+-- practice in strong wind: laps keep counting
+T.set("wind", 2)
 T.track(1)
 T.start(2)
 steps(70)
@@ -204,21 +213,73 @@ for _ = 1, 2400 do
   frame(0)
 end
 local _, _, _, plap = T.info()
-if plap < 3 then fail("practice: only " .. plap .. " laps in 120 s") end
+if plap < 3 then fail("practice in wind: only " .. plap .. " laps in 120 s") end
+T.set("wind", 0)
 
--- 3. gate rush: random gates either way, 30 s plus bonuses, ends by itself
-T.track(2)
+-- freestyle: no countdown; a roll in acro is a trick, the combo is banked 2.5 s later
+T.set("mode", 1)
+T.track(1)
 T.start(3)
+steps(2)
+if state() ~= READY then fail("freestyle should start without a countdown (state " .. state() .. ")") end
+sticks.thr = 0
+steps(8)
+if state() ~= FLY then fail("freestyle: stick did not start flying") end
+T.pose(0, 25, 20, 0, 0, 0)
+sticks.ail, sticks.thr = 1024, 100
+steps(14)
+local sc, chn = select(10, T.info())
+if chn < 1 then fail("freestyle: no trick after a full roll (combo " .. chn .. ")") end
+sticks.ail = 0
+sticks.thr = 300
+steps(70)
+sc, chn = select(10, T.info())
+local _, _, _, bf = T.best(1)
+print(string.format("freestyle: score %d after a roll, best combo %d", sc, bf))
+if sc < 100 or chn > 0 or bf ~= sc then fail("freestyle: combo not banked (score " .. sc .. ", best " .. bf .. ")") end
+-- a crash loses the combo in progress
+T.pose(0, 25, 20, 0, 0, 0)
+sticks.ail, sticks.thr = 1024, 100
+steps(14)
+T.pose(0, 1, 20, 0, -80, 0)
+T.vel(0, -15, 0)
+sticks.ail, sticks.thr = 0, -1024
+steps(6)
+local sc2, chn2 = select(10, T.info())
+if state() ~= CRASHED or chn2 ~= 0 or sc2 ~= sc then fail("freestyle: a crash should lose the combo") end
+steps(40)
+T.set("mode", 2)
+idle()
+frame(EVT_VIRTUAL_EXIT) frame(EVT_VIRTUAL_NEXT) frame(EVT_VIRTUAL_NEXT) frame(EVT_VIRTUAL_ENTER)
+
+-- the Bando: flying into a wall is a crash
+T.track(7)
+T.start(2)
+steps(70)
+T.pose(-6, 2, 28, 0, 0, 0)
+T.vel(0, 0, 10)
+sticks.thr = 0
+steps(15)
+if state() ~= CRASHED then fail("no crash into the Bando's wall (state " .. state() .. ")") end
+idle()
+steps(40)
+frame(EVT_VIRTUAL_EXIT) frame(EVT_VIRTUAL_NEXT) frame(EVT_VIRTUAL_NEXT) frame(EVT_VIRTUAL_ENTER)
+
+-- 3. gate rush: random gates either way (no flags), 30 s plus bonuses, ends by itself
+T.track(4)
+T.start(4)
 steps(70)
 local rushSteps = 0
 while state() ~= DONE and rushSteps < 4000 do
   local _, s = state()
+  local k = select(7, T.gate(s[18]))
+  if k == 6 or k == 7 then fail("gate rush picked a flag") break end
   if state() == FLY then autopilot(s[18]) else idle() end
   frame(0)
   rushSteps = rushSteps + 1
 end
 local _, _, _, _, _, rn = T.info()
-local _, _, bg = T.best(2)
+local _, _, bg = T.best(4)
 print(string.format("gate rush: %d gates in %.1f s, best %d", rn, rushSteps / 20, bg))
 if state() ~= DONE then fail("gate rush did not end") end
 if rn < 4 or bg ~= rn then fail("gate rush: " .. rn .. " gates, best " .. bg) end
@@ -258,11 +319,11 @@ if state() ~= 3 then fail("Restart did not restart the countdown (state " .. sta
 frame(EVT_VIRTUAL_EXIT) frame(EVT_VIRTUAL_NEXT) frame(EVT_VIRTUAL_NEXT) frame(EVT_VIRTUAL_ENTER)
 if state() ~= MENU then fail("Menu did not go to the menu") end
 -- pick track 3 in the menu (saved), then EXIT in the main menu closes the tool
-for _ = 1, 3 do frame(EVT_VIRTUAL_NEXT) end
+for _ = 1, 4 do frame(EVT_VIRTUAL_NEXT) end
 frame(EVT_VIRTUAL_ENTER)
 while T.S.track ~= 3 do frame(EVT_VIRTUAL_INC) end
 frame(EVT_VIRTUAL_ENTER)
-for _ = 1, 3 do frame(EVT_VIRTUAL_PREV) end
+for _ = 1, 4 do frame(EVT_VIRTUAL_PREV) end
 if frame(EVT_VIRTUAL_EXIT) ~= 1 then fail("EXIT in the menu should close the tool") end
 
 -- 6. saved and loaded again by a new instance
@@ -277,19 +338,33 @@ if not saved then fail("nothing saved") else
   end
   if T2.S.track ~= 3 then fail("track not restored") end
   for t = 1, NT do
-    local a1, a2, a3 = T.best(t)
-    local b1, b2, b3 = T2.best(t)
-    if floor(a1) ~= b1 or floor(a2) ~= b2 or a3 ~= b3 then fail("bests of track " .. t .. " not restored") end
+    local a1, a2, a3, a4 = T.best(t)
+    local b1, b2, b3, b4 = T2.best(t)
+    if floor(a1) ~= b1 or floor(a2) ~= b2 or a3 ~= b3 or a4 ~= b4 then fail("bests of track " .. t .. " not restored") end
   end
   print("saved: " .. saved)
 end
 -- a broken save file is ignored
-SD["/SCRIPTS/TOOLS/FPVLite/data.txt"] = "FPVLITE1 track=99 twr=13 mode=x laps=-1 l1=abc"
+SD["/SCRIPTS/TOOLS/FPVLite/data.txt"] = "FPVLITE2 track=99 twr=13 mode=x laps=-1 l1=abc"
 FPVSIM_TEST = {}
 local s3 = f()
 s3.init()
 if FPVSIM_TEST.S.track ~= 1 or FPVSIM_TEST.S.twr ~= 5 then fail("bad save values were not rejected") end
 s3.run(0)
+-- a save of the first Lite (four tracks, the 4th was the Grand Prix, now the 6th)
+SD["/SCRIPTS/TOOLS/FPVLite/data.txt"] = "FPVLITE1 track=4 twr=6 rates=3 l1=4810 r1=10120 g1=3 l4=8000 r4=16500 g4=7"
+FPVSIM_TEST = {}
+local s4 = f()
+s4.init()
+local T4 = FPVSIM_TEST
+local a1, a2, a3, a4 = T4.best(6)                 -- lap, race, gate rush, combo
+local c1, c2, c3, c4 = T4.best(4)
+local d1, d2, d3 = T4.best(1)
+if T4.S.track ~= 6 or T4.S.twr ~= 6 or T4.S.rates ~= 3 or a1 ~= 8000 or a2 ~= 16500 or a3 ~= 7 or a4 ~= 0
+  or c1 ~= 0 or c2 ~= 0 or c3 ~= 0 or c4 ~= 0 or d1 ~= 4810 or d2 ~= 10120 or d3 ~= 3 then
+  fail("a save of the first Lite was not read right")
+end
+s4.run(0)
 
 print(string.format("%s %s %dx%d  frames %d  instr/frame avg %d max %d  lines %d  off-screen lines %d  tones %d",
   _VERSION, string.match(path, "[^/]+$"), W, H, frames, floor(instrSum / frames), instrMax, st.lines, st.bad, tones))

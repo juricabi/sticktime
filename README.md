@@ -9,7 +9,7 @@ A real 3D FPV quad simulator that runs **on your radio** as an EdgeTX Lua tool, 
 | ![Slalom](docs/tx16s-slalom.png) | ![NV14](docs/nv14-race.png) | ![MK3](docs/mk3-bando.png) |
 | **Settings: quad, power, rates** | **TX12 MkII / Zorro / Boxer (128×64)** | **X9D+ 2019 / X9E (212×64 grey)** |
 | ![Settings](docs/tx16s-settings.png) | ![TX12](docs/tx12-race.png) | ![X9D](docs/x9d-race.png) |
-| **FPV Sim Lite · X7, TX12 MkI, X-Lite (128×64)** | **FPV Sim Lite · X9D, X9D+ (212×64)** | **FPV Sim Lite · menu** |
+| **FPV Sim Lite · X7, TX12 MkI, X-Lite (128×64) · Hoop Forest** | **FPV Sim Lite · X9D, X9D+ (212×64) · the Bando** | **FPV Sim Lite · menu** |
 | ![Lite on 128x64](docs/lite-tx12.png) | ![Lite on 212x64](docs/lite-x9d.png) | ![Lite menu](docs/lite-menu.png) |
 
 ## Features
@@ -28,14 +28,14 @@ A real 3D FPV quad simulator that runs **on your radio** as an EdgeTX Lua tool, 
 - **Saved per track:** best lap, best race, best combo and best Gate Rush score, plus all settings.
 - **Color radios.** Filled sky and ground at any attitude, horizon haze, distance fog, mountains, shaded structures, an FPV-style OSD (lap timer, best lap, race clock, position, speed, altitude, throttle bar, next-gate marker and arrow), minimap with AI pilots, optional stick view and FPS. Touch works on touch radios.
 - **B&W radios.** The same game in wireframe 3D, with greyscale ground on 212×64 screens.
-- **FPV Sim Lite** for B&W radios with little memory (STM32F2: X7, X9D, X9D+, X9 Lite, X-Lite, TX12 MkI, T12, T8, T-Lite, T-Pro, LR3 Pro). The same flight model and quads, four tracks with gates, high gates and dive gates, **Time trial**, **Practice** and **Gate Rush**, best times per track, and the main settings: quad, power, flight mode, rates, camera tilt and laps. AI pilots, Freestyle and the Bando are left out: they don't fit in that memory.
+- **FPV Sim Lite** for B&W radios with little memory (STM32F2: X7, X9D, X9D+, X9 Lite, X-Lite, TX12 MkI, T12, T8, T-Lite, T-Pro, LR3 Pro). The same flight model and quads, all seven tracks with every obstacle (the Bando, hoops and flags included), **Time trial**, **Practice**, **Freestyle** with combos and **Gate Rush**, wind, greyscale ground on 212×64 screens, best lap, race, combo and Gate Rush score per track, and the main settings: quad, power, flight mode, rates (Soft, Normal, Fast), camera tilt, laps and wind. Left out to fit in that memory: the AI pilots, custom rates and prop wash. The tracks are small text files (`FPVLite/t1.txt` to `t7.txt`) that the game reads when you pick one.
 
 ## Install
 
 1. Copy from this repository's `sdcard/SCRIPTS/TOOLS/` to `/SCRIPTS/TOOLS/` on the radio's SD card:
    - **Color radios:** `FPVSim.lua`
    - **B&W radios with an STM32F4** (see the table below): `FPVSimBW.lua` **and** the `FPVSimBW` folder
-   - **Older B&W radios (STM32F2):** `FPVLite.lua` **and** the `FPVLite` folder. FPV Sim Lite runs on the other B&W radios too.
+   - **Older B&W radios (STM32F2):** `FPVLite.lua` **and** the `FPVLite` folder (the game and its seven track files). FPV Sim Lite runs on the other B&W radios too.
 2. On the radio open **SYS → Tools** and start **FPV Sim** (or **FPV Sim BW**, **FPV Sim Lite**). The first start on a color radio takes a few seconds while EdgeTX compiles the script.
 
 The B&W versions need **EdgeTX 2.11 or newer** (see below). The color version also runs on older EdgeTX.
@@ -60,7 +60,9 @@ What the games need, measured on EdgeTX's own Lua core with a model of the radio
 | | Lua memory while playing | Peak heap use | Fits in |
 |---|---|---|---|
 | FPV Sim BW | about 78 KB | 66 KB + 34 KB CCM | X9D+ 2019 (the smallest F4 heap): 114 KB + 34 KB CCM |
-| FPV Sim Lite | about 35 KB | 41 KB + 10 KB pools | X9D, X9D+ (the smallest F2 heap): 63 KB + 10 KB pools |
+| FPV Sim Lite | about 43 KB | 48 KB + 10 KB pools | X9D, X9D+ (the smallest F2 heap): 63 KB + 10 KB pools |
+
+The Lite still runs with a 49.5 KB heap, so about 14 KB of the X9D+'s memory stays free. To get there it reads each track from its file only when you pick it, parses the numbers without making a string for each one, and runs a full garbage collection before the flight starts.
 
 ## Controls
 
@@ -96,7 +98,7 @@ EdgeTX calls a tool script's `run()` at most every 50 ms, so the target is a ste
 - **Lines over fills.** `lcd.drawLine` is native Bresenham, but a filled triangle costs one LVGL call per scanline. Sky and ground use one rectangle plus one thin wedge triangle at any roll angle. Gate bars, hoop segments and small wall faces are filled with 1 px "ruled" lines along their shorter side, and big faces become a triangle fan clipped to the view.
 - **Lua side.** World data is stored as arrays of numbers, hot values live in locals and upvalues, no tables are created per frame, and objects are depth-sorted with an insertion sort. Collisions use a per-frame broad phase. Far gates switch to a single outline and far hoops to six segments.
 - **Draw order.** With walls, the tower or containers in view, depth order is not enough: a long wall's center can be far away while its near end covers everything behind it. For each pair that overlaps on screen and involves a structure, the script finds a plane that separates their bounding boxes and draws the object on the far side of it first, then a topological sort puts everything in order. A ray-cast test over hundreds of camera poses at the Bando finds no pair drawn in the wrong order.
-- **Measured per frame:** about 15–85k Lua VM instructions on color screens, 7–27k for FPV Sim BW and 9–20k for the Lite. The emulator estimates 15–18 ms per frame on a TX16S-class radio for the open tracks and 33–41 ms in the busiest Bando views, and 7–11 ms for the Lite on an STM32F2 radio (no FPU), inside the 50 ms budget.
+- **Measured per frame:** about 15–85k Lua VM instructions on color screens and 7–27k on B&W screens, for FPV Sim BW and the Lite alike (the Lite up to 45k looking down over the whole Bando). The emulator estimates 15–18 ms per frame on a TX16S-class radio for the open tracks and 33–41 ms in the busiest Bando views, and 4–11 ms for the Lite on an STM32F2 radio with no FPU (17 ms over the whole Bando), inside the 50 ms budget.
 - **Color `drawLine` quirk.** On every EdgeTX version the color `lcd.drawLine` silently drops the whole line if either end is past the right or bottom edge (`x > LCD_W` or `y > LCD_H`). Negative values are clipped by the firmware. The script clips the right and bottom edges itself, and the tests fail on any line the firmware would drop.
 - **EdgeTX Lua quirk.** EdgeTX builds Lua 5.3 with `LUA_FLOORN2I`, and releases before the 2026-08-30 fix (#7611) also floor floats in int/float equality, so `0.02 ~= 0` is `false` on those radios. The script never compares a float with an integer literal.
 - **B&W quirks.** `lcd.drawLine` on B&W radios refuses any point outside the screen and draws in XOR mode unless `FORCE` is set, so lines are clipped in Lua and drawn with `FORCE`.
@@ -127,8 +129,10 @@ Open `web/simulator.html` in Chrome, Edge or Firefox. It runs the real `.lua` fi
 ```
 src/fpvsim.lua          single source for the color and B&W versions (--#if COLOR / --#if BW blocks)
 src/fpvlite.lua         FPV Sim Lite (--#if TEST: hooks for the tests, left out of the radio file)
+src/fpvlite_tracks.txt  the Lite's tracks, one line each (build.py writes FPVLite/t1.txt ... t7.txt)
 src/bwloader.lua        the B&W loaders (precompiled core.luac first)
 build.py                -> sdcard/SCRIPTS/TOOLS/FPVSim.lua, FPVSimBW.lua + FPVSimBW/, FPVLite.lua + FPVLite/
+                        (lines marked --#fold are constants, written into the code that uses them)
 web/src/                emulator: engine.js (EdgeTX API + LCD), app.js (UI), style.css, index.html
 tools/bundle_web.py     -> web/simulator.html (offline, single file) and web/artifact.html
 tools/build_etxlua.sh   builds Lua 5.3 with EdgeTX's number settings (native and 32-bit) for the tests
@@ -138,12 +142,15 @@ tools/tune_physics.py   steady-state check of the flight model (top speed, punch
 test/harness.lua        headless EdgeTX mock: autopilot races with AI pilots on every track, flags, hoops,
                         dive gates, freestyle combos, gate rush, menus, crashes, v1 save migration
 test/order_check.lua    ray-cast check of the draw order at the Bando from random camera poses
-test/lite_test.lua      the Lite: menus, settings, time trials on every track with an autopilot, gate rush,
-                        crashes, pause, saving (as a radio with +/- keys, without the libraries B&W lacks)
-test/memtest.lua        memory of the B&W versions through their loaders on F2 / F4 radio models
+test/lite_test.lua      the Lite: menus, settings, time trials on every track with an autopilot, freestyle,
+                        gate rush, wind, the Bando's walls, crashes, pause, saving, the first Lite's saves (as
+                        a radio with +/- keys, without the libraries B&W lacks)
+test/memtest.lua        memory of the B&W versions through their loaders on F2 / F4 radio models, with the
+                        save file of a radio that has played every track
 test/run_all.sh         runs the harness for every screen size (Lua 5.3, plus Lua 5.2 via lupa), the
-                        draw-order check and the loader
-test/web_shots.py       Playwright screenshots of every radio and mode in the emulator, with load estimates
+                        draw-order check, the Lite tests, the loaders and the memory tests
+test/web_shots.py       Playwright screenshots of every radio and mode in the emulator (the Lite too), with
+                        load estimates
 ```
 
 ```

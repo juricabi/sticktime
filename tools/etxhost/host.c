@@ -32,6 +32,7 @@
 #include "lgc.h"
 #include "lobject.h"
 #include "lro_defs.h"
+#include "lfunc.h"
 
 /* ------------------------------------------------------------------ allocator model */
 enum { K_HEAP = 0, K_BIN1, K_BIN2, K_CCM };
@@ -322,7 +323,6 @@ static int radW = 128, radH = 64;
 static long radClock = 0;                          /* ms */
 static int radStick[4] = { 0, 0, -1024, 0 };
 static long lcdCalls = 0, lcdBad = 0, lcdLines = 0;
-static char fileData[2048]; static size_t fileLen = 0; static int fileExists = 0;
 
 static int r_getTime(lua_State *L) { lua_pushinteger(L, radClock / 10); return 1; }
 static int r_getValue(lua_State *L) {
@@ -350,29 +350,69 @@ static int r_line(lua_State *L) {                  /* B&W: every point must be o
   }
   return 0;
 }
-/* io on one in-memory file; io.open allocates a FatFs FIL in the Lua heap like the radio */
-typedef struct { int mode; size_t pos; char fil[548]; } RFile;
+/* io on a small in-memory SD card: files the script writes, and files read from the real
+   folder given by radio.sdroot(); io.open allocates a FatFs FIL in the Lua heap like the radio */
+#define NFILES 16
+static struct { char path[160]; char data[4096]; size_t len; int used; } vfs[NFILES];
+static char sdRoot[400] = ".";
+static int vfsFind(const char *p, int create) {
+  int i, free_ = -1;
+  for (i = 0; i < NFILES; i++) {
+    if (vfs[i].used && !strcmp(vfs[i].path, p)) return i;
+    if (!vfs[i].used && free_ < 0) free_ = i;
+  }
+  if (!create || free_ < 0) return -1;
+  vfs[free_].used = 1; vfs[free_].len = 0;
+  snprintf(vfs[free_].path, sizeof(vfs[free_].path), "%s", p);
+  return free_;
+}
+typedef struct { int mode; int idx; size_t pos; char fil[544]; } RFile;
 static int r_open(lua_State *L) {
-  const char *m = luaL_optstring(L, 2, "r");
-  if (m[0] == 'r' && !fileExists) return 0;
+  const char *p = luaL_checkstring(L, 1), *m = luaL_optstring(L, 2, "r");
+  int i = vfsFind(p, 0);
+  if (m[0] == 'r') {
+    if (i < 0) {
+      char full[600];
+      snprintf(full, sizeof(full), "%s%s", sdRoot, p);
+      FILE *f = fopen(full, "rb");
+      if (!f) return 0;
+      i = vfsFind(p, 1);
+      if (i < 0) { fclose(f); return 0; }
+      vfs[i].len = fread(vfs[i].data, 1, sizeof(vfs[i].data) - 1, f);
+      fclose(f);
+    }
+  } else {
+    i = vfsFind(p, 1);
+    if (i < 0) return 0;
+    vfs[i].len = 0;
+  }
   RFile *f = (RFile *)lua_newuserdata(L, sizeof(RFile));
-  f->mode = m[0]; f->pos = 0;
-  if (m[0] == 'w') { fileLen = 0; fileExists = 1; }
+  f->mode = m[0]; f->idx = i; f->pos = 0;
   return 1;
 }
-static int r_read(lua_State *L) {
+static int r_read(lua_State *L) {                 /* like EdgeTX's read_chars: a buffer of n bytes */
   RFile *f = (RFile *)lua_touserdata(L, 1);
-  size_t n = (size_t)luaL_checkinteger(L, 2);
+  size_t n = (size_t)luaL_checkinteger(L, 2), nr;
+  luaL_Buffer b;
+  char *p;
   if (!f) return 0;
-  if (f->pos + n > fileLen) n = fileLen - f->pos;
-  lua_pushlstring(L, fileData + f->pos, n); f->pos += n;
+  luaL_buffinit(L, &b);
+  p = luaL_prepbuffsize(&b, n);
+  nr = vfs[f->idx].len - f->pos;
+  if (nr > n) nr = n;
+  memcpy(p, vfs[f->idx].data + f->pos, nr);
+  f->pos += nr;
+  luaL_addsize(&b, nr);
+  luaL_pushresult(&b);
   return 1;
 }
 static int r_write(lua_State *L) {
+  RFile *f = (RFile *)lua_touserdata(L, 1);
   int i, n = lua_gettop(L);
+  if (!f) return 0;
   for (i = 2; i <= n; i++) {
     size_t l; const char *d = luaL_checklstring(L, i, &l);
-    if (fileLen + l < sizeof(fileData)) { memcpy(fileData + fileLen, d, l); fileLen += l; }
+    if (vfs[f->idx].len + l < sizeof(vfs[f->idx].data)) { memcpy(vfs[f->idx].data + vfs[f->idx].len, d, l); vfs[f->idx].len += l; }
   }
   return 0;
 }
@@ -380,7 +420,6 @@ static int r_close(lua_State *L) { (void)L; return 0; }
 
 /* loadScript(file [, mode]): like the radio, .luac for "b", .lua for "t", "bt" = binary first
    (the radio takes the newer of the two; release files are made so that is the binary) */
-static char sdRoot[400] = ".";
 static int r_loadScript(lua_State *L) {
   const char *fn = luaL_checkstring(L, 1), *mode = luaL_optstring(L, 2, "bt");
   char base[600], path[620];
@@ -497,6 +536,7 @@ static int d_new(lua_State *L) {                   /* radio.new(W, H): a fresh r
   while (heapFree) { Free *f = heapFree; heapFree = f->next; free(f); }
   while (ccmFree) { Free *f = ccmFree; ccmFree = f->next; free(f); } ccmInit = 0;
   lcdCalls = lcdBad = lcdLines = 0;
+  memset(vfs, 0, sizeof(vfs));
   Lrad = lua_newstate(modelAlloc, NULL);
   if (!Lrad) return luaL_error(L, "no radio state");
   luaL_requiref(Lrad, "_G", luaopen_base, 1);      /* _G with the ROM tables behind it */
@@ -550,6 +590,11 @@ static int d_call(lua_State *L) {
   lua_pushboolean(L, 1);
   n = xmove(Lrad, L, 2, top);
   lua_settop(Lrad, 0);
+  if (!strcmp(name, "init")) {                     /* EdgeTX drops init() once it has run */
+    lua_getglobal(Lrad, "__script");
+    if (lua_istable(Lrad, -1)) { lua_pushnil(Lrad); lua_setfield(Lrad, -2, "init"); }
+    lua_settop(Lrad, 0);
+  }
   return n + 1;
 }
 
@@ -582,22 +627,74 @@ static int d_lcd(lua_State *L) {
   lua_pushinteger(L, lcdCalls); lua_pushinteger(L, lcdLines); lua_pushinteger(L, lcdBad);
   return 3;
 }
-static int d_file(lua_State *L) {
-  if (!fileExists) return 0;
-  lua_pushlstring(L, fileData, fileLen);
+static int d_file(lua_State *L) {                  /* radio.file(path): what the script wrote */
+  int i = vfsFind(luaL_checkstring(L, 1), 0);
+  if (i < 0) return 0;
+  lua_pushlstring(L, vfs[i].data, vfs[i].len);
   return 1;
 }
-static int d_setfile(lua_State *L) {
-  size_t l; const char *d = luaL_optlstring(L, 1, NULL, &l);
-  if (!d) { fileExists = 0; fileLen = 0; return 0; }
-  if (l >= sizeof(fileData)) l = sizeof(fileData) - 1;
-  memcpy(fileData, d, l); fileLen = l; fileExists = 1;
+static int d_setfile(lua_State *L) {               /* radio.setfile(path, data | nil) */
+  const char *p = luaL_checkstring(L, 1);
+  size_t l; const char *d = luaL_optlstring(L, 2, NULL, &l);
+  int i = vfsFind(p, d != NULL);
+  if (i < 0) return 0;
+  if (!d) { vfs[i].used = 0; return 0; }
+  if (l >= sizeof(vfs[i].data)) l = sizeof(vfs[i].data) - 1;
+  memcpy(vfs[i].data, d, l); vfs[i].len = l;
   return 0;
 }
 static int d_sdroot(lua_State *L) { snprintf(sdRoot, sizeof(sdRoot), "%s", luaL_checkstring(L, 1)); return 0; }
 static int d_heap(lua_State *L) { heapSize = (unsigned)luaL_checkinteger(L, 1); if (lua_isinteger(L, 2)) model = (int)lua_tointeger(L, 2); return 0; }
 
+/* radio.census(): what the radio state holds, by object type (sizes as Lua accounts them) */
+static int d_census(lua_State *L) {
+  global_State *g = G(Lrad);
+  GCObject *o;
+  long n[10] = {0}, b[10] = {0};
+  long code = 0, kc = 0, upd = 0, protos = 0, cl = 0, clup = 0, strs = 0, tabs = 0, tarr = 0, thash = 0;
+  for (o = g->allgc; o; o = o->next) {
+    switch (o->tt) {
+      case LUA_TSHRSTR: case LUA_TLNGSTR: {
+        TString *ts = gco2ts(o);
+        size_t len = o->tt == LUA_TSHRSTR ? ts->shrlen : ts->u.lnglen;
+        strs++; b[0] += sizeof(TString) + len + 1; break;
+      }
+      case LUA_TTABLE: {
+        Table *t = gco2t(o);
+        tabs++; tarr += t->sizearray; thash += isdummy(t) ? 0 : (1 << t->lsizenode);
+        b[1] += sizeof(Table) + sizeof(TValue) * t->sizearray + (isdummy(t) ? 0 : sizeof(Node) * (1 << t->lsizenode));
+        break;
+      }
+      case LUA_TLCL: {
+        LClosure *c = gco2lcl(o);
+        cl++; clup += c->nupvalues; b[2] += sizeLclosure(c->nupvalues); break;
+      }
+      case LUA_TPROTO: {
+        Proto *f = gco2p(o);
+        protos++; code += f->sizecode; kc += f->sizek; upd += f->sizeupvalues;
+        b[3] += sizeof(Proto) + sizeof(Instruction) * f->sizecode + sizeof(TValue) * f->sizek + sizeof(Proto *) * f->sizep +
+                sizeof(Upvaldesc) * f->sizeupvalues + sizeof(int) * f->sizelineinfo + sizeof(LocVar) * f->sizelocvars;
+        break;
+      }
+      case LUA_TUSERDATA: b[4] += sizeludata(gco2u(o)->len); n[4]++; break;
+      default: b[5] += 32; n[5]++;
+    }
+  }
+  lua_createtable(L, 0, 16);
+#define F(k, v) lua_pushinteger(L, v); lua_setfield(L, -2, k)
+  F("strings", strs); F("stringBytes", b[0]);
+  F("tables", tabs); F("tableBytes", b[1]); F("tableArray", tarr); F("tableHash", thash);
+  F("closures", cl); F("closureUpvals", clup); F("closureBytes", b[2]);
+  F("protos", protos); F("protoBytes", b[3]); F("instructions", code); F("constants", kc); F("upvalDescs", upd);
+  F("userdata", n[4]); F("userdataBytes", b[4]); F("other", n[5]);
+  F("sizeofProto", sizeof(Proto)); F("sizeofUpVal", sizeof(UpVal)); F("sizeofTable", sizeof(Table)); F("sizeofNode", sizeof(Node));
+  F("sizeofTString", sizeof(TString)); F("sizeofUpvaldesc", sizeof(Upvaldesc));
+#undef F
+  return 1;
+}
+
 LROT_BEGIN(driverlib, NULL, 0)
+  LROT_FUNCENTRY(census, d_census)
   LROT_FUNCENTRY(new, d_new)
   LROT_FUNCENTRY(load, d_load)
   LROT_FUNCENTRY(call, d_call)

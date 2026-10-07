@@ -94,10 +94,10 @@ with sync_playwright() as p:
     radio(page, "tx12")
     page.evaluate("sim.step(10, 50)")
     shot(page, "lite-menu", 4)
-    race_view(page, 2, 1, 20, -0.5, 1.6, -10, -8, 10, mode=1, ai=None)
+    race_view(page, 5, 2, 9, 0.3, 0.4, -8, -8, 10, mode=1, ai=None)          # Hoop Forest
     shot(page, "lite-tx12", 4)
     radio(page, "x9d")
-    race_view(page, 1, 1, 18, 0.5, 1.2, 12, -8, 10, mode=1, ai=None)
+    race_view(page, 7, 2, 15, -1.5, 0.6, 6, -20, 10, mode=1, ai=None)        # the Bando
     shot(page, "lite-x9d", 3)
     page.evaluate("sim.script('auto')")
     b.close()
