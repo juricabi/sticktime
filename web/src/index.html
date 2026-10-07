@@ -1,0 +1,165 @@
+<title>EdgeTX FPV Sim</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+{{STYLE}}
+</style>
+
+<header class="top">
+  <div class="brand">
+    <div class="brand-mark" aria-hidden="true"></div>
+    <div><h1>FPV Sim</h1><small>EdgeTX Lua · in the browser</small></div>
+  </div>
+  <div class="controls">
+    <label class="field"><span>Radio</span><select id="radioSel" aria-label="Radio screen"></select></label>
+    <label class="field"><span>Script</span>
+      <select id="scriptSel" aria-label="Script">
+        <option value="auto">FPV Sim (matches radio)</option>
+        <option value="color">FPVSim.lua (color)</option>
+        <option value="bw">FPVSimBW.lua (B&amp;W)</option>
+      </select>
+    </label>
+    <button class="btn" id="restartBtn" type="button" title="Restart the script (R)">Restart</button>
+    <button class="btn" id="soundBtn" type="button" aria-pressed="false">Sound off</button>
+    <label class="btn file-btn" title="Run any EdgeTX tool script">Open .lua<input type="file" id="fileIn" accept=".lua,.txt"></label>
+    <button class="btn" id="copyBtn" type="button" title="Copy the running script to the clipboard">Copy .lua</button>
+  </div>
+</header>
+
+<div class="layout">
+  <section class="stage" id="stage" aria-label="Radio">
+    <div class="mat-scale" aria-hidden="true">10 mm grid</div>
+    <div class="radio" id="radio">
+      <div class="radio-row">
+        <div class="gimbal" id="gL">
+          <div class="gimbal-pad" aria-label="Left gimbal"><div class="stick"></div></div>
+          <div class="gimbal-label" id="gLlabel">Throttle · Yaw</div>
+        </div>
+        <div class="screen-wrap">
+          <div class="lcd-label"><span id="lcdName">TX16S</span><span id="lcdRes">480×272</span></div>
+          <div class="bezel">
+            <canvas id="lcd" width="480" height="272" aria-label="Radio screen"></canvas>
+            <div class="overlay" id="overlay" hidden>
+              <div>
+                <strong id="ovTitle">Script error</strong>
+                <pre id="ovMsg"></pre>
+                <button class="btn primary" id="ovBtn" type="button">Restart script</button>
+              </div>
+            </div>
+          </div>
+          <div class="keys" role="group" aria-label="Radio keys">
+            <button class="key" type="button" data-key="exit" title="Esc / Backspace (hold to close)">Exit</button>
+            <button class="key" type="button" data-key="prev" title="Up / Left arrow, mouse wheel">◀ Prev</button>
+            <button class="key enter" type="button" data-key="enter" title="Enter">Enter</button>
+            <button class="key" type="button" data-key="next" title="Down / Right arrow, mouse wheel">Next ▶</button>
+            <button class="key" type="button" data-key="menu" title="M">Menu</button>
+          </div>
+        </div>
+        <div class="gimbal" id="gR">
+          <div class="gimbal-pad" aria-label="Right gimbal"><div class="stick"></div></div>
+          <div class="gimbal-label" id="gRlabel">Pitch · Roll</div>
+        </div>
+      </div>
+    </div>
+    <p class="mat-note">Drag the gimbals, or fly with <kbd>W</kbd><kbd>S</kbd> throttle, <kbd>A</kbd><kbd>D</kbd> yaw and the arrow keys for pitch and roll (<kbd>Shift</kbd> for full stick). On color screens you can also tap the screen.</p>
+  </section>
+
+  <aside class="panel">
+    <div class="card" id="loadCard">
+      <h2>Radio load <small id="cpuName">STM32F429</small></h2>
+      <div class="load-head">
+        <div class="big"><span id="loadMs">0.0</span> <small>ms / frame</small></div>
+        <span class="pill ok" id="loadPill">20 fps on radio</span>
+      </div>
+      <div class="load-bar" id="loadBar" title="Budget: 50 ms (the radio calls run() at most 20 times a second)"><i></i></div>
+      <p class="note">Estimate for one <code>run()</code> call on the radio, against the 50 ms budget of its 20 Hz UI loop.</p>
+      <dl class="stats">
+        <dt>Lua VM instructions</dt><dd id="stInstr">–</dd>
+        <dt>lcd calls</dt><dd id="stCalls">–</dd>
+        <dt>Lines</dt><dd id="stLines">–</dd>
+        <dt>Triangles</dt><dd id="stTris">–</dd>
+        <dt>Rectangles</dt><dd id="stRects">–</dd>
+        <dt>Text</dt><dd id="stText">–</dd>
+        <dt>Browser</dt><dd id="stEmu">–</dd>
+      </dl>
+      <label class="field" style="margin-top:10px"><span>CPU</span>
+        <select id="cpuSel" aria-label="CPU model">
+          <option value="F4">STM32F429 · TX16S class</option>
+          <option value="H7">STM32H750 · TX15 / MK3 class</option>
+          <option value="BW">STM32F4 · B&amp;W radios</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="card">
+      <h2>Sticks</h2>
+      <div class="toggles">
+        <div class="toggle"><span>Stick mode</span>
+          <div class="seg" id="modeSeg" role="group" aria-label="Stick mode">
+            <button type="button" data-mode="1">1</button><button type="button" data-mode="2">2</button><button type="button" data-mode="3">3</button><button type="button" data-mode="4">4</button>
+          </div>
+        </div>
+        <div class="toggle"><span>Input</span>
+          <div class="seg" id="inputSeg" role="group" aria-label="Input source">
+            <button type="button" data-input="mix">Keys + gimbals</button><button type="button" data-input="pad">Radio / gamepad</button>
+          </div>
+        </div>
+      </div>
+      <div id="padBox">
+        <p class="note" id="padStatus">Plug in the radio, choose USB Joystick on it, then move a stick.</p>
+        <div class="axes">
+          <div class="axis" data-fn="thr"><span>Throttle</span><div class="meter"><i></i></div><select aria-label="Throttle axis"></select><label><input type="checkbox" aria-label="Invert throttle">inv</label></div>
+          <div class="axis" data-fn="rud"><span>Yaw</span><div class="meter"><i></i></div><select aria-label="Yaw axis"></select><label><input type="checkbox" aria-label="Invert yaw">inv</label></div>
+          <div class="axis" data-fn="ele"><span>Pitch</span><div class="meter"><i></i></div><select aria-label="Pitch axis"></select><label><input type="checkbox" aria-label="Invert pitch">inv</label></div>
+          <div class="axis" data-fn="ail"><span>Roll</span><div class="meter"><i></i></div><select aria-label="Roll axis"></select><label><input type="checkbox" aria-label="Invert roll">inv</label></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Keys</h2>
+      <table class="keymap">
+        <tr><td>Throttle</td><td><kbd>W</kbd> up · <kbd>S</kbd> down (stays put)</td></tr>
+        <tr><td>Yaw</td><td><kbd>A</kbd> · <kbd>D</kbd></td></tr>
+        <tr><td>Pitch / roll</td><td>arrow keys, <kbd>Shift</kbd> = full stick</td></tr>
+        <tr><td>Enter</td><td><kbd>Enter</kbd></td></tr>
+        <tr><td>Exit / pause</td><td><kbd>Esc</kbd> (hold = close script)</td></tr>
+        <tr><td>Rotary</td><td>arrows, <kbd>+</kbd> <kbd>−</kbd>, mouse wheel</td></tr>
+        <tr><td>Emulator</td><td><kbd>R</kbd> restart · <kbd>P</kbd> pause</td></tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>Emulation</h2>
+      <div class="toggles">
+        <label class="toggle" for="rateChk"><span>Real radio refresh (20 Hz)</span><input type="checkbox" id="rateChk"></label>
+        <label class="toggle" for="ghostChk"><span>Slow B&amp;W LCD (ghosting)</span><input type="checkbox" id="ghostChk"></label>
+        <label class="toggle" for="pauseChk"><span>Pause</span><input type="checkbox" id="pauseChk"></label>
+      </div>
+      <p class="note" style="margin-top:8px">The radio calls a tool script's <code>run()</code> at most every 50 ms, so the sim is built for 20 fps.</p>
+    </div>
+  </aside>
+</div>
+
+<footer class="credits">
+  Runs the real EdgeTX scripts in a Lua 5.3 VM (fengari, MIT). LCD text uses Roboto (OFL) like color radios, and the public-domain X11 fixed fonts for B&amp;W screens. Idea inspired by <a href="https://github.com/alexeystn/lua-fpv-sim" target="_blank" rel="noopener">lua-fpv-sim</a> by Alexey Stankevich.
+</footer>
+
+{{FENGARI_TAG}}
+<script>
+{{BWFONTS}}
+</script>
+<script>
+{{ENGINE}}
+</script>
+<script type="text/plain" id="lua-color">
+{{LUA_COLOR}}</script>
+<script type="text/plain" id="lua-bw">
+{{LUA_BW}}</script>
+<script>
+const ROBOTO = { r: "{{ROBOTO400}}", b: "{{ROBOTO700}}" };
+</script>
+<script>
+{{APP}}
+</script>
