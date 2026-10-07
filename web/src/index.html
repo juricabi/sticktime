@@ -17,8 +17,8 @@
       <select id="scriptSel" aria-label="Script">
         <option value="auto">Auto (made for the screen)</option>
         <option value="color">StickTime.lua (color screens)</option>
-        <option value="bw">StickTimeBW.lua (B&amp;W screens)</option>
-        <option value="lite">StickTime Lite (B&amp;W, low memory)</option>
+        <option value="bw">StickTimeBW.lua (B&amp;W look, any screen)</option>
+        <option value="lite">StickTime Lite (B&amp;W, low memory, any screen)</option>
       </select>
     </label>
     <button class="btn" id="restartBtn" type="button" title="Restart the script (R)">Restart</button>
@@ -165,6 +165,10 @@
 {{LUA_BW}}</script>
 <script type="text/plain" id="lua-lite">
 {{LUA_LITE}}</script>
+<script type="text/plain" id="lua-bwcolor">
+{{LUA_BWCOLOR}}</script>
+<script type="text/plain" id="lua-litecolor">
+{{LUA_LITECOLOR}}</script>
 <script>
 const LITE_TRACKS = {{LITE_TRACKS}};
 </script>

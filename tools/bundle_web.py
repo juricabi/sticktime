@@ -26,12 +26,15 @@ def main():
     lua_bw = read(ROOT / "sdcard/SCRIPTS/TOOLS/StickTimeBW/core.lua")
     # the Lite with its test hooks (inert on a radio), so the emulator can be automated
     lua_lite = read(ROOT / "test/build/sticktime_lite_test.lua")
+    # on color screens the B&W loaders run color.lua, which loads the same core
+    lua_bwcolor = read(ROOT / "sdcard/SCRIPTS/TOOLS/StickTimeBW/color.lua")
+    lua_litecolor = read(ROOT / "sdcard/SCRIPTS/TOOLS/StickTimeLite/color.lua")
     # the Lite reads its tracks from the SD card: /SCRIPTS/TOOLS/StickTimeLite/t1.txt ...
     tdir = ROOT / "sdcard/SCRIPTS/TOOLS/StickTimeLite"
     tracks = {"/SCRIPTS/TOOLS/StickTimeLite/" + p.name: read(p) for p in sorted(tdir.glob("t*.txt"))}
     assert tracks, "no StickTime Lite track files (run build.py)"
     lite_tracks = json.dumps(tracks, indent=0)
-    for s in (lua_color, lua_bw, lua_lite, lite_tracks):
+    for s in (lua_color, lua_bw, lua_lite, lua_bwcolor, lua_litecolor, lite_tracks):
         assert "</script" not in s.lower()
     parts = {
         "STYLE": read(SRC / "style.css"),
@@ -41,6 +44,8 @@ def main():
         "LUA_COLOR": lua_color,
         "LUA_BW": lua_bw,
         "LUA_LITE": lua_lite,
+        "LUA_BWCOLOR": lua_bwcolor,
+        "LUA_LITECOLOR": lua_litecolor,
         "LITE_TRACKS": lite_tracks,
         "ROBOTO400": b64(W / "vendor/roboto-latin-400-normal.woff2"),
         "ROBOTO700": b64(W / "vendor/roboto-latin-700-normal.woff2"),

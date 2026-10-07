@@ -5,7 +5,9 @@
   const $ = (id) => document.getElementById(id);
   const { Engine, ColorFonts, RADIOS, CPU } = EdgeTX;
   const lua = (id) => $(id).textContent.replace(/^\n/, '');
-  const LUA = { color: lua('lua-color'), bw: lua('lua-bw'), lite: lua('lua-lite') };
+  // bwcolor / litecolor: the B&W loaders' color.lua, which runs the B&W core on a color screen
+  const LUA = { color: lua('lua-color'), bw: lua('lua-bw'), lite: lua('lua-lite'),
+                bwcolor: lua('lua-bwcolor'), litecolor: lua('lua-litecolor') };
 
   const store = {
     // (the key prefix is from StickTime's old name, FPV Sim: kept so saved settings stay)
@@ -75,7 +77,10 @@
   function scriptFor() {
     if (app.custom) return { text: app.custom.text, name: app.custom.name };
     const kind = app.script === 'auto' ? (app.radio.color ? 'color' : 'bw') : app.script;
-    return { text: LUA[kind], name: kind === 'color' ? 'StickTime.lua' : kind === 'lite' ? 'StickTimeLite/core.lua' : 'StickTimeBW/core.lua' };
+    const dir = kind === 'lite' ? 'StickTimeLite/' : 'StickTimeBW/';
+    // on a color screen the B&W loader runs <dir>color.lua, which loads <dir>core.lua
+    if (kind !== 'color' && app.radio.color) return { text: LUA[kind + 'color'], name: dir + 'color.lua' };
+    return { text: LUA[kind], name: kind === 'color' ? 'StickTime.lua' : dir + 'core.lua' };
   }
 
   function boot() {
@@ -439,8 +444,8 @@
   // ------------------------------------------------------------ wiring
   function setupUI() {
     const rs = $('radioSel');
-    // the screens by kind: StickTime runs on color screens (the PC screen too), StickTime BW
-    // and StickTime Lite on black & white ones
+    // the screens by kind: StickTime runs on color screens (the PC screen too); StickTime BW
+    // and StickTime Lite are made for black & white ones and also run on color screens
     for (const [label, color] of [['Color screens', true], ['Black & white screens', false]]) {
       const g = document.createElement('optgroup');
       g.label = label;
@@ -452,10 +457,10 @@
       rs.appendChild(g);
     }
     const ss = $('scriptSel');
-    // A script only runs on its kind of screen. Picking a script that doesn't fit the screen
-    // moves to the last screen of its kind; picking a screen that doesn't fit the script
-    // switches the script to Auto (the one made for that screen).
-    const COLOR_SCRIPT = { color: true, bw: false, lite: false };
+    // StickTime.lua only runs on color screens: picking it with a B&W screen moves to the last
+    // color screen, and picking a B&W screen while it is selected switches the script to Auto
+    // (the one made for that screen). StickTime BW and Lite run on any screen.
+    const COLOR_SCRIPT = { color: true };
     const last = { true: store.get('lastColor', 'tx16s'), false: store.get('lastBW', 'tx12') };
     const setRadio = (id) => {
       app.radio = RADIOS.find((r) => r.id === id) || app.radio;
@@ -470,7 +475,8 @@
       if (!app.custom && color !== undefined && color !== app.radio.color) {
         if (by === 'radio') setScript('auto'); else setRadio(last[color]);
       }
-      app.cpu = app.script === 'lite' ? 'F2' : null;      // the Lite is for STM32F2 radios
+      // the Lite on a B&W screen: an STM32F2 radio; on a color screen, that radio's own CPU
+      app.cpu = app.script === 'lite' && !app.radio.color ? 'F2' : null;
     };
     setRadio(app.radio.id);
     setScript(app.script);

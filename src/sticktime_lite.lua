@@ -1,6 +1,6 @@
 local toolName = "TNS|StickTime Lite|TNE"
 --[[ ======================================================================
-  StickTime Lite v1.3  -  the small edition of StickTime for B&W radios.
+  StickTime Lite v1.4  -  the small edition of StickTime for B&W radios.
   Made for radios with little memory (STM32F2: X7, X9D, X9D+, X9 Lite,
   X-Lite, TX12 MkI, T12, T8, T-Lite, T-Pro, LR3 Pro). Runs on every
   black & white EdgeTX radio with EdgeTX 2.11 or newer.
@@ -23,6 +23,7 @@ local sqrt, sin, cos, floor = math.sqrt, math.sin, math.cos, math.floor
 local getValue, getTime, drawLine, drawText, playTone = getValue, getTime, lcd.drawLine, lcd.drawText, playTone
 local XM, YM, CX, CY = LCD_W - 1, LCD_H - 1, LCD_W / 2, LCD_H / 2
 local SOLID, DOTTED, BLK, SML, INV = SOLID, DOTTED, FORCE, SMLSIZE, INVERS
+local U = STICKTIME_UI or 1          -- menus and HUD grow with a color radio's fonts (color.lua)
 
 -- states; game modes (gm): 1 time trial, 2 practice, 3 freestyle, 4 gate rush
 local MENU, SETUP, COUNT, FLY, CRASHED, READY, PAUSED, DONE = 1, 2, 3, 4, 5, 6, 7, 8   --#fold
@@ -60,7 +61,7 @@ local OPTS = {
 -- Betaflight "actual" rates: roll/pitch center, max (deg/s), expo %, then yaw (Soft, Normal, Fast);
 -- racer, freestyle: prop pitch speed (m/s), rotor drag, side and top drag, motor and rate lag (s)
 local RATES = nums("70 400 35 70 350 30 100 600 50 100 500 40 150 850 45 130 700 40")
-local QP = nums("86 .22 .009 .028 .02 .012 66 .205 .0082 .026 .025 .016")
+local QP = nums("90 .55 .009 .028 .02 .012 68 .48 .0082 .026 .025 .016")
 
 -- tracks: the names; each track's gates and structures are in StickTimeLite/t<number>.txt (made
 -- by build.py from src/sticktime_lite_tracks.txt) and only read when the track is picked
@@ -504,7 +505,7 @@ physics = function(dt)
     local vu, vr, vf = ax_ * ux + vy * uy + az_ * uz, ax_ * rx + vy * ry + az_ * rz, ax_ * fx + vy * fy + az_ * fz
     local Ta = Tm - vu * sqrt(Tm) * sTx / VP
     Ta = Ta > Tm * 1.25 and Tm * 1.25 or Ta < 0 and 0 or Ta
-    local kh = KH * sqrt(Tm / Tmax + 0.02)
+    local kh = KH * sqrt(Tm * 0.0204 + 0.02)   -- rotor drag: 0.0204 = 1 / (5 G)
     local au = Ta - KU * (vu < 0 and -vu or vu) * vu
     local ar = -(kh + KS * (vr < 0 and -vr or vr)) * vr
     local af = -(kh + KS * (vf < 0 and -vf or vf)) * vf
@@ -721,24 +722,25 @@ local function optIdx(o)
 end
 
 local function box(y)
-  lcd.drawFilledRectangle(8, y, XM - 15, YM + 1 - y * 2, ERASE)
-  lcd.drawRectangle(8, y, XM - 15, YM + 1 - y * 2, BLK)
+  y = y * U
+  lcd.drawFilledRectangle(8 * U, y, XM + 1 - 16 * U, YM + 1 - y * 2, ERASE)
+  lcd.drawRectangle(8 * U, y, XM + 1 - 16 * U, YM + 1 - y * 2, BLK)
 end
 
 render = function()
   if state == MENU or state == SETUP then
     lcd.clear()
-    local n, y, t = #MAIN, 15, S.track
+    local n, y, t = #MAIN, 15 * U, S.track
     if state == MENU then
-      drawText(1, 0, "StickTime", MIDSIZE)
+      drawText(U, 0, "StickTime", MIDSIZE)
       drawText(XM, 0, "LITE", SML + RIGHT)
     else
-      drawText(1, 0, "SETTINGS", SML + INV)
-      n, y = #OPTS + 1, 9
+      drawText(U, 0, "SETTINGS", SML + INV)
+      n, y = #OPTS + 1, 9 * U
     end
     -- the list, scrolled to keep the focus in view; on the right the track's bests (time trial,
     -- lap, combo, gates) or the setting's value
-    local rows = floor((YM + 1 - y) / 8)
+    local rows = floor((YM + 1 - y) / (8 * U))
     if rows > n then rows = n end
     if focus - scroll > rows then scroll = focus - rows end
     if focus <= scroll then scroll = focus - 1 end
@@ -754,9 +756,9 @@ render = function()
         local j = optIdx(o)
         v = type(o[4]) == "table" and o[4][j] or o[3][j] .. (o[4] or "")
       end
-      drawText(2, y, l, SML + ((editing and state == SETUP) and 0 or f))
-      if v then drawText(XM - 1, y, v, SML + RIGHT + ((editing and state == SETUP) and f or 0)) end
-      y = y + 8
+      drawText(2 * U, y, l, SML + ((editing and state == SETUP) and 0 or f))
+      if v then drawText(XM - U, y, v, SML + RIGHT + ((editing and state == SETUP) and f or 0)) end
+      y = y + 8 * U
     end
     return
   end
@@ -876,21 +878,21 @@ render = function()
   end
   if state == DONE then
     box(4)
-    drawText(12, 7, newBest and "NEW RECORD!" or gm == 4 and "TIME UP" or "FINISHED", SML + INV)
-    drawText(12, 17, gm == 4 and "Gates " .. rn .. "  best " .. BG[S.track] or "Total " .. timeStr(total), SML)
-    if gm < 3 then drawText(12, 26, "Best lap " .. timeStr(BL[S.track]), SML) end
-    drawText(12, YM - 15, "ENTER again  EXIT menu", SML)
+    drawText(12 * U, 7 * U, newBest and "NEW RECORD!" or gm == 4 and "TIME UP" or "FINISHED", SML + INV)
+    drawText(12 * U, 17 * U, gm == 4 and "Gates " .. rn .. "  best " .. BG[S.track] or "Total " .. timeStr(total), SML)
+    if gm < 3 then drawText(12 * U, 26 * U, "Best lap " .. timeStr(BL[S.track]), SML) end
+    drawText(12 * U, YM - 15 * U, "ENTER again  EXIT menu", SML)
     return
   end
   do
   -- HUD: lap time and lap, or score and combo, or time left and gates
   if gm == 3 then
-    lcd.drawNumber(1, 1, sc, SML + LEFT)
-    if chn > 0 then drawText(XM, 1, "x" .. chn .. " " .. ch, SML + RIGHT) end
+    lcd.drawNumber(U, U, sc, SML + LEFT)
+    if chn > 0 then drawText(XM, U, "x" .. chn .. " " .. ch, SML + RIGHT) end
   else
     local l = gm < 3
-    lcd.drawNumber(1, 1, l and floor((lapStart and gt - lapStart or 0) / 10) or floor(rt * 10), PREC1 + SML + LEFT)
-    drawText(XM, 1, l and ((lap > 0 and lap or 1) .. (gm == 1 and "/" .. S.laps or "")) or rn .. "", SML + RIGHT)
+    lcd.drawNumber(U, U, l and floor((lapStart and gt - lapStart or 0) / 10) or floor(rt * 10), PREC1 + SML + LEFT)
+    drawText(XM, U, l and ((lap > 0 and lap or 1) .. (gm == 1 and "/" .. S.laps or "")) or rn .. "", SML + RIGHT)
     -- next gate off screen: a marker at the edge on its side
     local i = nextGate
     local dx, dy, dz = AX[i] - kx, AY[i] - ky, AZ[i] - kz
@@ -899,29 +901,30 @@ render = function()
       if Z < 0 and X * X + Y * Y < 1 then X, Y = 0, -1 end
       local l2 = sqrt(X * X + Y * Y) + 0.0001
       local ex, ey = X / l2, -Y / l2
-      local k = (CX - 6) / ((ex < 0 and -ex or ex) + 0.0001)
-      local k2 = (CY - 6) / ((ey < 0 and -ey or ey) + 0.0001)
+      local k = (CX - 6 * U) / ((ex < 0 and -ex or ex) + 0.0001)
+      local k2 = (CY - 6 * U) / ((ey < 0 and -ey or ey) + 0.0001)
       if k2 < k then k = k2 end
       local tx, ty = CX + ex * k, CY + ey * k
-      line2(tx, ty, tx - ex * 5 - ey * 3, ty - ey * 5 + ex * 3, SOLID, BLK)
-      line2(tx, ty, tx - ex * 5 + ey * 3, ty - ey * 5 - ex * 3, SOLID, BLK)
+      local a, b, c, d = ex * 5 * U, ey * 5 * U, ey * 3 * U, ex * 3 * U
+      line2(tx, ty, tx - a - c, ty - b + d, SOLID, BLK)
+      line2(tx, ty, tx - a + c, ty - b - d, SOLID, BLK)
     end
   end
-  local th = floor(sT * 30)
-  if th > 0 then lcd.drawFilledRectangle(0, YM - th, 2, th, BLK) end
-  drawLine(CX - 4, CY, CX - 2, CY, SOLID, BLK)
-  drawLine(CX + 2, CY, CX + 4, CY, SOLID, BLK)
-  if msg and gt - msgT < 200 then drawText(CX, 10, msg, SML + CENTER) end
+  local th = floor(sT * 30 * U)
+  if th > 0 then lcd.drawFilledRectangle(0, YM - th, 2 * U, th, BLK) end
+  drawLine(CX - 4 * U, CY, CX - 2 * U, CY, SOLID, BLK)
+  drawLine(CX + 2 * U, CY, CX + 4 * U, CY, SOLID, BLK)
+  if msg and gt - msgT < 200 then drawText(CX, 10 * U, msg, SML + CENTER) end
   end
   if state == COUNT then
-    drawText(CX - 4, CY - 16, 3 - floor((gt - tState) / 100) .. "", DBLSIZE)
+    drawText(CX, CY - 16 * U, 3 - floor((gt - tState) / 100) .. "", DBLSIZE + CENTER)
   elseif state == CRASHED then
-    drawText(CX - 24, CY - 8, "CRASH", DBLSIZE + INV)
+    drawText(CX, CY - 8 * U, "CRASH", DBLSIZE + INV + CENTER)
   elseif state == READY then
-    drawText(CX - 14, CY - 14, "READY", SML + INV)
+    drawText(CX, CY - 14 * U, "READY", SML + INV + CENTER)
   elseif state == PAUSED then
     box(10)
-    for i = 1, 3 do drawText(22, 6 + i * 11, PAUSE[i], i == focus and INV or 0) end
+    for i = 1, 3 do drawText(22 * U, (6 + i * 11) * U, PAUSE[i], i == focus and INV or 0) end
   end
 end
 

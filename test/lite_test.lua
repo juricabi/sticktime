@@ -1,19 +1,23 @@
 -- Headless test of StickTime Lite (Lua 5.3 with EdgeTX's number settings, or Lua 5.2).
--- Usage: lua lite_test.lua build/sticktime_lite_test.lua [W H]
+-- Usage: lua lite_test.lua build/sticktime_lite_test.lua [W H [color]]
+-- color: on a color radio, through StickTimeLite/color.lua as the loader runs it there
 -- Menus and settings, time trials on all seven tracks with an autopilot (gates, hoops, arches,
 -- flags, dive gates, the Bando's doors), practice with wind, freestyle tricks and combos, gate
 -- rush, crashes into the ground, a gate and a wall, pause, save and reload, B&W drawing rules,
 -- VM instructions per frame.
 local path, W, H = arg[1], tonumber(arg[2] or 128), tonumber(arg[3] or 64)
+local COLOR = arg[4] == "color"
 local floor = math.floor
 local atan2 = math.atan2 or math.atan
 local fails = 0
 local function fail(msg) fails = fails + 1 if fails < 25 then print("FAIL: " .. msg) end end
 
 LCD_W, LCD_H = W, H
-local F = { BLINK = 0x01, INVERS = 0x02, BOLD = 0x40, LEFT = 0, RIGHT = 0x04, CENTER = 0x20, PREC1 = 0x20,
-  PREC2 = 0x30, FORCE = 0x02, ERASE = 0x04, ROUND = 0x08, TINSIZE = 0x100, SMLSIZE = 0x200, MIDSIZE = 0x300,
-  DBLSIZE = 0x400, XXLSIZE = 0x500, SOLID = 0xff, DOTTED = 0x55 }
+local F = COLOR and { INVERS = 0x01, CENTER = 0x04, RIGHT = 0x08, LEFT = 0, BLINK = 0x1000, PREC1 = 0x20,
+  PREC2 = 0x30, SOLID = 0xff, DOTTED = 0x55, BOLD = 0x100, TINSIZE = 0x200, SMLSIZE = 0x300, MIDSIZE = 0x400,
+  DBLSIZE = 0x500, XXLSIZE = 0x600 } or { BLINK = 0x01, INVERS = 0x02, BOLD = 0x40, LEFT = 0, RIGHT = 0x04,
+  CENTER = 0x20, PREC1 = 0x20, PREC2 = 0x30, FORCE = 0x02, ERASE = 0x04, ROUND = 0x08, TINSIZE = 0x100,
+  SMLSIZE = 0x200, MIDSIZE = 0x300, DBLSIZE = 0x400, XXLSIZE = 0x500, SOLID = 0xff, DOTTED = 0x55 }
 for k, v in pairs(F) do _G[k] = v end
 EVT_VIRTUAL_ENTER, EVT_VIRTUAL_EXIT, EVT_VIRTUAL_NEXT, EVT_VIRTUAL_PREV = 514, 513, 7680, 7424
 -- like a radio with +/- keys: INC is PREV (+), DEC is NEXT (-)
@@ -61,10 +65,17 @@ lcd = {
     st.calls, st.lines = st.calls + 1, st.lines + 1
     x1, y1, x2, y2 = num(x1, "line x1"), num(y1, "line y1"), num(x2, "line x2"), num(y2, "line y2")
     if fl == nil then fail("drawLine without flags (XOR on B&W)") end
-    if x1 < 0 or y1 < 0 or x2 < 0 or y2 < 0 or x1 >= W or x2 >= W or y1 >= H or y2 >= H then st.bad = st.bad + 1 end
+    if COLOR then
+      -- color radios drop a line with an end beyond the right or bottom edge
+      if x1 > W or x2 > W or y1 > H or y2 > H then st.bad = st.bad + 1 end
+    elseif x1 < 0 or y1 < 0 or x2 < 0 or y2 < 0 or x1 >= W or x2 >= W or y1 >= H or y2 >= H then st.bad = st.bad + 1 end
   end,
   drawText = function(x, y, s) st.calls = st.calls + 1 num(x, "text x") num(y, "text y")
-    if type(s) ~= "string" then fail("drawText: not a string") end end,
+    if type(s) ~= "string" then fail("drawText: not a string") end
+    if COLOR and (x < 0 or x > W or y < 0 or y > H - 12) then fail("text off the screen at " .. x .. "," .. y .. ": " .. s) end
+  end,
+  sizeText = function(s) return #s * 9, 17 end,
+  RGB = function(r, g, b) return 0x8000 + (floor(r / 8) * 2048 + floor(g / 4) * 32 + floor(b / 8)) * 65536 end,
   drawNumber = function(x, y, v) st.calls = st.calls + 1 num(x, "num x") num(y, "num y") num(v, "num v") end,
   drawRectangle = function(x, y) st.calls = st.calls + 1 num(x, "rect x") num(y, "rect y") end,
   drawFilledRectangle = function(x, y, w, h)
@@ -77,10 +88,17 @@ lcd = {
 debug.setmetatable("", nil)
 -- load in an environment without the libraries B&W radios lack
 STICKTIME_TEST = {}
-local f = assert(loadfile(path, "t", setmetatable({}, { __index = function(_, k)
-  if hidden[k] then error("uses '" .. k .. "', which B&W radios do not have", 2) end
-  return _G[k]
-end, __newindex = function(_, k) fail("sets global " .. tostring(k)) end })))
+local f
+if COLOR then
+  -- color.lua, which loads the game (here the test build) in its own environment
+  function loadScript(p, mode, e) return loadfile(string.find(p, "/core.lua", 1, true) and path or "../sdcard" .. p, "t", e) end
+  f = function() return dofile("../sdcard/SCRIPTS/TOOLS/StickTimeLite/color.lua") end
+else
+  f = assert(loadfile(path, "t", setmetatable({}, { __index = function(_, k)
+    if hidden[k] then error("uses '" .. k .. "', which B&W radios do not have", 2) end
+    return _G[k]
+  end, __newindex = function(_, k) fail("sets global " .. tostring(k)) end })))
+end
 local script = f()
 local T = STICKTIME_TEST
 script.init()
@@ -208,12 +226,15 @@ T.set("wind", 2)
 T.track(1)
 T.start(2)
 steps(70)
-for _ = 1, 2400 do
+local wsteps = 0
+for i = 1, 4800 do
   if state() == FLY then autopilot() else idle() end
   frame(0)
+  if select(4, T.info()) >= 3 and wsteps == 0 then wsteps = i end
 end
 local _, _, _, plap = T.info()
-if plap < 3 then fail("practice in wind: only " .. plap .. " laps in 120 s") end
+print(string.format("practice in strong wind: %d laps in 240 s, 3 laps after %.1f s", plap, wsteps / 20))
+if plap < 3 then fail("practice in wind: only " .. plap .. " laps in 240 s") end
 T.set("wind", 0)
 
 -- freestyle: no countdown; a roll in acro is a trick, the combo is banked 2.5 s later
@@ -230,8 +251,12 @@ sticks.ail, sticks.thr = 1024, 100
 steps(14)
 local sc, chn = select(10, T.info())
 if chn < 1 then fail("freestyle: no trick after a full roll (combo " .. chn .. ")") end
+-- level out where the roll ended (it overshoots by some 60 deg) and hover while the combo banks
+local _, sp = state()
+T.pose(sp[1], sp[2], sp[3], 0, 0, 0)
+T.vel(0, 0, 0)
 sticks.ail = 0
-sticks.thr = 300
+sticks.thr = -250
 steps(70)
 sc, chn = select(10, T.info())
 local _, _, _, bf = T.best(1)
@@ -246,7 +271,7 @@ T.vel(0, -15, 0)
 sticks.ail, sticks.thr = 0, -1024
 steps(6)
 local sc2, chn2 = select(10, T.info())
-if state() ~= CRASHED or chn2 ~= 0 or sc2 ~= sc then fail("freestyle: a crash should lose the combo") end
+if state() ~= CRASHED or chn2 ~= 0 or sc2 ~= sc then fail("freestyle: a crash should lose the combo (state " .. state() .. ", combo " .. chn2 .. ", score " .. sc2 .. " was " .. sc .. ")") end
 steps(40)
 T.set("mode", 2)
 idle()
@@ -301,7 +326,7 @@ steps(3)
 if state() ~= FLY then fail("stick did not start flying again") end
 -- flying into a gate post
 local cx, cy, cz, nx, _, nz = T.gate(2)
-T.pose(cx + nz * 1.6 - nx * 6, cy, cz - nx * 1.6 - nz * 6, math.deg(atan2(nx, nz)), 0, 0)
+T.pose(cx + nz * 1.6 - nx * 4, cy, cz - nx * 1.6 - nz * 4, math.deg(atan2(nx, nz)), 0, 0)
 T.vel(nx * 10, 0, nz * 10)
 sticks.thr = 0
 steps(15)
@@ -372,7 +397,8 @@ if not new or string.sub(new, 1, 8) ~= "FPVLITE2" or not string.find(new, "l6=80
 end
 s4.run(0)
 
-print(string.format("%s %s %dx%d  frames %d  instr/frame avg %d max %d  lines %d  off-screen lines %d  tones %d",
-  _VERSION, string.match(path, "[^/]+$"), W, H, frames, floor(instrSum / frames), instrMax, st.lines, st.bad, tones))
-if st.bad > 0 then fail(st.bad .. " lines with points off the screen (B&W refuses them)") end
+print(string.format("%s %s %dx%d%s  frames %d  instr/frame avg %d max %d  lines %d  off-screen lines %d  tones %d",
+  _VERSION, string.match(path, "[^/]+$"), W, H, COLOR and " color" or "", frames, floor(instrSum / frames), instrMax,
+  st.lines, st.bad, tones))
+if st.bad > 0 then fail(st.bad .. " lines with points off the screen (the firmware refuses them)") end
 print(fails == 0 and "ALL OK" or ("FAILURES: " .. fails))

@@ -1,7 +1,9 @@
 #!/bin/bash
-# Build EdgeTX main with firmware/edgetx-fast-lua.patch for one color radio:
-# while a Lua tool is open, the UI loop runs every 20 ms instead of 50 ms and each frame
-# goes to the screen as soon as it is drawn. Normal radio use is unchanged.
+# Build EdgeTX main with firmware/edgetx-fast-lua.patch for one color radio: while a Lua
+# tool is open, the UI loop runs every 20 ms instead of 50 ms, each frame goes to the screen
+# as soon as it is drawn, and its lines, rectangles and triangles are drawn straight into the
+# canvas. On the V12 the Lua interpreter also runs from ITCM and frames go to the screen in
+# the background. See README.md, Faster firmware.
 #
 #   tools/build_firmware.sh v12        (any target name from EdgeTX's tools/build-common.sh)
 #

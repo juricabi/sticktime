@@ -1,6 +1,6 @@
 local toolName = "TNS|@TOOLNAME@|TNE"
 --[[ ======================================================================
-  @TITLE@ v1.3  -  a real 3D FPV quad simulator that runs on your radio
+  @TITLE@ v1.4  -  a real 3D FPV quad simulator that runs on your radio
   @VARIANT@
 
   Install : @INSTALL@
@@ -29,6 +29,8 @@ local fillTri = lcd.drawFilledTriangle
 --#if BW
 local XM, YM = W - 1, H - 1
 local BLK = FORCE          -- B&W default draw mode is XOR: FORCE sets pixels black
+-- menus and HUD grow with the fonts on a color radio (StickTimeBW/color.lua sets it); 1 on B&W
+local U = STICKTIME_UI or 1
 --#endif
 
 local EV = {
@@ -50,10 +52,10 @@ local OPTS = {
   { "Flight mode", "mode", { 1, 2 }, { "Acro", "Angle" } },
   { "Rates", "rates", { 1, 2, 3, 4 }, { "Soft", "Normal", "Fast", "Custom" } },
   { "R/P center", "rc", nil, nil, "@DPS@", 20, 500, 10 },
-  { "R/P max", "rm", nil, nil, "@DPS@", 100, 1800, 50 },
+  { "R/P max", "rm", nil, nil, "@DPS@", 100, 1800, 10 },
   { "R/P expo", "re", nil, nil, nil, 0, 95, 5 },
   { "Yaw center", "yc", nil, nil, "@DPS@", 20, 500, 10 },
-  { "Yaw max", "ym", nil, nil, "@DPS@", 100, 1800, 50 },
+  { "Yaw max", "ym", nil, nil, "@DPS@", 100, 1800, 10 },
   { "Yaw expo", "ye", nil, nil, nil, 0, 95, 5 },
   { "Camera tilt", "tilt", nil, nil, "@DEG@", 0, 60, 5 },
   { "Field of view", "fov", nil, nil, "@DEG@", 70, 130, 10 },
@@ -73,7 +75,7 @@ local RATES = { { 70, 400, 35, 70, 350, 30 }, { 100, 600, 50, 100, 500, 40 }, { 
 local RKEYS = { rc = 1, rm = 2, re = 3, yc = 4, ym = 5, ye = 6 }
 -- quad profiles (racer, freestyle): prop pitch speed m/s, rotor drag, side and top
 -- drag, motor and rate response time (s) of a well-tuned quad, prop wash strength
-local QP = { vp = { 86, 66 }, kh = { 0.22, 0.205 }, ks = { 0.009, 0.0082 }, ku = { 0.028, 0.026 },
+local QP = { vp = { 90, 68 }, kh = { 0.55, 0.48 }, ks = { 0.009, 0.0082 }, ku = { 0.028, 0.026 },
              tm = { 0.02, 0.025 }, tr = { 0.012, 0.016 }, pw = { 0.5, 1 } }
 
 -- -------------------------------------------------------------- tracks
@@ -395,7 +397,7 @@ local state, prevState, pausedFrom, gmode = MENU, MENU, FLY, 1
 local gt, lastT, tState, tStart = 0, 0, 0, 0                          -- game clock in 10 ms ticks
 local lapStart, lap, nextGate, lastGate = nil, 0, 1, 0
 local R = { laps = {}, n = 0, total = 0, newLap = false, newRace = false, newBest = false, msg = nil, msgT = 0, good = true,
-            ready = 0, crashes = 0, cd = -1, fps = 0, fpsN = 0, fpsT = 0,
+            ready = 0, crashes = 0, cd = -1, fps = 0, fpsN = 0, fpsT = 0, fpsX = "", runS = 0, showS = 0,
             pk = 0, pos = 1, sc = 0, ch = 0, chn = 0, cht = 0, prox = 9, rn = 0, rt = 0, smp = 0,
             fi = 5, pt = 0 }                                  -- frame interval, sim time (10 ms ticks)
 
@@ -676,10 +678,11 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
       local vu = ax_ * ux + vy * uy + az_ * uz
       local vr = ax_ * rx + vy * ry + az_ * rz
       local vf = ax_ * fx + vy * fy + az_ * fz
-      -- props lose thrust with inflow speed; rotor drag in the prop plane; quadratic body drag
+      -- props lose thrust with inflow speed; rotor drag in the prop plane (grows with the air
+      -- the props move, so with thrust: the same at hover for any power); quadratic body drag
       local Ta = Tm - vu * sqrt(Tm) * sTx / VP
       if Ta > Tm * 1.25 then Ta = Tm * 1.25 elseif Ta < 0 then Ta = 0 end
-      local kh = KH * sqrt(Tm / Tmax + 0.02)
+      local kh = KH * sqrt(Tm * 0.0204 + 0.02)   -- 0.0204 = 1 / (5 G)
       local au = Ta - KU * (vu < 0 and -vu or vu) * vu
       local ar = -(kh + KS * (vr < 0 and -vr or vr)) * vr
       local af = -(kh + KS * (vf < 0 and -vf or vf)) * vf
@@ -2098,9 +2101,9 @@ local line2
     local dx, dy, dz = AI.x[a] - kpx, AI.y[a] - kpy, AI.z[a] - kpz
     local s = F / z
     local sx, sy = floor(CX + (dx * krx + dy * kry + dz * krz) * s), floor(CY - (dx * kux + dy * kuy + dz * kuz) * s)
-    if sx >= 1 and sx <= XM - 2 and sy >= 4 and sy <= YM - 2 then
-      fillRect(sx - 1, sy, 3, 2, BLK)
-      drawLine(sx, sy - 3, sx, sy - 2, SOLID, BLK)
+    if sx >= U and sx <= XM - 2 * U and sy >= 4 * U and sy <= YM - 2 * U then
+      fillRect(sx - U, sy, 3 * U, 2 * U, BLK)
+      drawLine(sx, sy - 3 * U, sx, sy - 2 * U, SOLID, BLK)
     end
   end
 
@@ -2451,7 +2454,7 @@ local render, hitTest, pauseHit, initUI
       drawSticks(CX - s - 2, VY + VH - m - s, s, 4)
     end
     if TOUCH then pauseButton(W / 2 - floor(11 * SC + 3), m, floor(22 * SC + 6)) end
-    if S.fps == 1 then txt(W / 2, VY + VH - m - hS - (S.sticks == 1 and floor(VH * 0.16) + 2 or 0), R.fps .. " fps", SMLSIZE + CENTER + C.dim) end
+    if S.fps == 1 then txt(W / 2, VY + VH - m - hS - (S.sticks == 1 and floor(VH * 0.16) + 2 or 0), R.fps .. " fps" .. R.fpsX, SMLSIZE + CENTER + C.dim) end
   end
 
   -- portrait radios (320x480): 4:3 FPV view on top, instrument panel below
@@ -2485,7 +2488,7 @@ local render, hitTest, pauseHit, initUI
     fillRect(m, ty, tw, 8, C.panel)
     fillRect(m, ty, floor(tw * sT), 8, sT > 0.7 and C.bad or C.accent)
     if TOUCH then pauseButton(m, H - m - 38, 38) end
-    if S.fps == 1 then drawText(m + 48, H - m - hS, R.fps .. " fps", SMLSIZE + C.dim) end
+    if S.fps == 1 then drawText(m + 48, H - m - hS, R.fps .. " fps" .. R.fpsX, SMLSIZE + C.dim) end
   end
 
   local function bigCenter(s, col, sub)
@@ -2683,17 +2686,17 @@ end)()
   local function drawHUD()
     if gmode <= 2 then
       local l, lt = lapClock()
-      drawNumber(1, 1, floor(lt / 10), PREC1 + SMLSIZE + LEFT)
+      drawNumber(U, U, floor(lt / 10), PREC1 + SMLSIZE + LEFT)
       local s = l .. ""
       if gmode == 1 then s = s .. "/" .. S.laps end
       if gmode == 1 and AI.n > 0 then s = "P" .. R.pos .. " L" .. s end
-      drawText(XM, 1, s, SMLSIZE + RIGHT)
+      drawText(XM, U, s, SMLSIZE + RIGHT)
     elseif gmode == 3 then
-      drawNumber(1, 1, R.sc, SMLSIZE + LEFT)
-      if R.chn > 0 then drawText(XM, 1, "x" .. R.chn .. " " .. R.ch, SMLSIZE + RIGHT) end
+      drawNumber(U, U, R.sc, SMLSIZE + LEFT)
+      if R.chn > 0 then drawText(XM, U, "x" .. R.chn .. " " .. R.ch, SMLSIZE + RIGHT) end
     else
-      drawNumber(1, 1, floor(R.rt * 10), PREC1 + SMLSIZE + LEFT)
-      drawText(XM, 1, R.rn .. "", SMLSIZE + RIGHT)
+      drawNumber(U, U, floor(R.rt * 10), PREC1 + SMLSIZE + LEFT)
+      drawText(XM, U, R.rn .. "", SMLSIZE + RIGHT)
     end
     if gmode ~= 3 then
       local i = nextGate
@@ -2709,25 +2712,26 @@ end)()
         if Z < 0 and ex * ex + ey * ey < 1 then ex, ey = 0, 1 end
         local l = sqrt(ex * ex + ey * ey) + 0.0001
         ex, ey = ex / l, ey / l
-        local k = (CX - 6) / ((ex < 0 and -ex or ex) + 0.0001)
-        local k2 = (CY - 6) / ((ey < 0 and -ey or ey) + 0.0001)
+        local k = (CX - 6 * U) / ((ex < 0 and -ex or ex) + 0.0001)
+        local k2 = (CY - 6 * U) / ((ey < 0 and -ey or ey) + 0.0001)
         if k2 < k then k = k2 end
         local tx, ty = CX + ex * k, CY + ey * k
-        line2(tx, ty, tx - ex * 5 - ey * 3, ty - ey * 5 + ex * 3, SOLID, BLK)
-        line2(tx, ty, tx - ex * 5 + ey * 3, ty - ey * 5 - ex * 3, SOLID, BLK)
+        local a, b, c, d = ex * 5 * U, ey * 5 * U, ey * 3 * U, ex * 3 * U
+        line2(tx, ty, tx - a - c, ty - b + d, SOLID, BLK)
+        line2(tx, ty, tx - a + c, ty - b - d, SOLID, BLK)
       end
     end
-    local th = floor(sT * 30)
-    if th > 0 then fillRect(0, YM - th, 2, th, BLK) end
-    drawLine(CX - 4, CY, CX - 2, CY, SOLID, BLK)
-    drawLine(CX + 2, CY, CX + 4, CY, SOLID, BLK)
-    if S.fps == 1 then drawNumber(XM, YM - 6, R.fps, SMLSIZE + RIGHT) end
+    local th = floor(sT * 30 * U)
+    if th > 0 then fillRect(0, YM - th, 2 * U, th, BLK) end
+    drawLine(CX - 4 * U, CY, CX - 2 * U, CY, SOLID, BLK)
+    drawLine(CX + 2 * U, CY, CX + 4 * U, CY, SOLID, BLK)
+    if S.fps == 1 then drawNumber(XM, YM + 2 - 8 * U, R.fps, SMLSIZE + RIGHT) end
   end
 
   local function drawList(title, n, label, value, y, rh)
     if title then
-      drawText(1, 0, title, SMLSIZE + INVERS)
-      y = 9
+      drawText(U, 0, title, SMLSIZE + INVERS)
+      y = 9 * U
     end
     local rows = floor((H - y) / rh)
     if rows > n then rows = n end
@@ -2737,8 +2741,8 @@ end)()
       local i = scroll + r
       local ry = y + (r - 1) * rh
       local v = value and value(i)
-      drawText(2, ry + 1, label(i), SMLSIZE + ((i == focus and not (editing and v)) and INVERS or 0))
-      if v then drawText(XM - 1, ry + 1, v, SMLSIZE + RIGHT + ((i == focus and editing) and INVERS or 0)) end
+      drawText(2 * U, ry + U, label(i), SMLSIZE + ((i == focus and not (editing and v)) and INVERS or 0))
+      if v then drawText(XM - U, ry + U, v, SMLSIZE + RIGHT + ((i == focus and editing) and INVERS or 0)) end
     end
   end
 
@@ -2760,10 +2764,10 @@ end)()
     if state == MENU or (state == SETUP and prevState == MENU) then
       lcd.clear()
       if state == MENU then
-        drawText(1, 0, "StickTime", MIDSIZE)
-        drawList(nil, #MAIN_ITEMS, mainLabel, mainValue, 13, 8)
+        drawText(U, 0, "StickTime", MIDSIZE)
+        drawList(nil, #MAIN_ITEMS, mainLabel, mainValue, 13 * U, 8 * U)
       else
-        drawList("SETTINGS", #OPTS + 1, setLabel, setValue, 0, 9)
+        drawList("SETTINGS", #OPTS + 1, setLabel, setValue, 0, 9 * U)
       end
       return
     end
@@ -2771,44 +2775,45 @@ end)()
     render3D()
     if state == SETUP then
       fillRect(0, 0, W, H, ERASE)
-      drawList("SETTINGS", #OPTS + 1, setLabel, setValue, 0, 9)
+      drawList("SETTINGS", #OPTS + 1, setLabel, setValue, 0, 9 * U)
       return
     end
     drawHUD()
     if state == COUNT then
-      drawText(CX - 4, CY - 16, tostring(3 - floor((gt - tState) / 100)), DBLSIZE)
+      drawText(CX, CY - 16 * U, tostring(3 - floor((gt - tState) / 100)), DBLSIZE + CENTER)
     elseif state == CRASHED then
-      drawText(CX - 24, CY - 8, "CRASH", DBLSIZE + INVERS)
+      drawText(CX, CY - 8 * U, "CRASH", DBLSIZE + INVERS + CENTER)
     elseif state == READY then
-      drawText(CX - 14, CY - 14, "READY", SMLSIZE + INVERS)
+      drawText(CX, CY - 14 * U, "READY", SMLSIZE + INVERS + CENTER)
     elseif state == PAUSED then
-      fillRect(14, 6, W - 28, H - 12, ERASE)
-      lcd.drawRectangle(14, 6, W - 28, H - 12, BLK)
+      fillRect(14 * U, 6 * U, W - 28 * U, H - 12 * U, ERASE)
+      lcd.drawRectangle(14 * U, 6 * U, W - 28 * U, H - 12 * U, BLK)
       for i = 1, #PAUSE_ITEMS do
-        drawText(22, 10 + (i - 1) * 11, PAUSE_ITEMS[i], i == focus and INVERS or 0)
+        drawText(22 * U, (10 + (i - 1) * 11) * U, PAUSE_ITEMS[i], i == focus and INVERS or 0)
       end
     elseif state == DONE then
-      fillRect(8, 4, W - 16, H - 8, ERASE)
-      lcd.drawRectangle(8, 4, W - 16, H - 8, BLK)
+      fillRect(8 * U, 4 * U, W - 16 * U, H - 8 * U, ERASE)
+      lcd.drawRectangle(8 * U, 4 * U, W - 16 * U, H - 8 * U, BLK)
+      local x = 12 * U
       if gmode == 4 then
-        drawText(12, 7, R.newBest and "NEW RECORD!" or "TIME UP", SMLSIZE + INVERS)
-        drawText(12, 17, "Gates " .. R.rn, SMLSIZE)
-        drawText(12, 26, "Best " .. BEST.g[S.track], SMLSIZE)
+        drawText(x, 7 * U, R.newBest and "NEW RECORD!" or "TIME UP", SMLSIZE + INVERS)
+        drawText(x, 17 * U, "Gates " .. R.rn, SMLSIZE)
+        drawText(x, 26 * U, "Best " .. BEST.g[S.track], SMLSIZE)
       else
-        drawText(12, 7, R.newRace and "NEW RECORD!" or "FINISHED", SMLSIZE + INVERS)
-        drawText(12, 17, "Total " .. timeStr(R.total), SMLSIZE)
+        drawText(x, 7 * U, R.newRace and "NEW RECORD!" or "FINISHED", SMLSIZE + INVERS)
+        drawText(x, 17 * U, "Total " .. timeStr(R.total), SMLSIZE)
         local b = 0
         for i = 1, R.n do
           if b == 0 or R.laps[i] < b then b = R.laps[i] end
         end
-        drawText(12, 26, "Best lap " .. timeStr(b), SMLSIZE)
-        if AI.n > 0 then drawText(12, 35, place(R.pos) .. " of " .. (AI.n + 1), SMLSIZE) end
+        drawText(x, 26 * U, "Best lap " .. timeStr(b), SMLSIZE)
+        if AI.n > 0 then drawText(x, 35 * U, place(R.pos) .. " of " .. (AI.n + 1), SMLSIZE) end
       end
-      drawText(12, H - 16, "ENTER again  EXIT menu", SMLSIZE)
+      drawText(x, H - 16 * U, "ENTER again  EXIT menu", SMLSIZE)
     end
     if R.msg and state == FLY then
       if gt - R.msgT < 200 then
-        drawText(CX, 10, R.msg, SMLSIZE + CENTER)
+        drawText(CX, 10 * U, R.msg, SMLSIZE + CENTER)
       else
         R.msg = nil
       end
@@ -2999,7 +3004,20 @@ local function run(event, touch)
   update(dts)
   render()
   R.fpsN = R.fpsN + 1
+--#if COLOR
+  -- the StickTime firmware (firmware/) reports how long run() and putting the frame on the
+  -- screen took: shown next to the fps, averaged over the same second
+  local ru, su = TOOL_RUN_US, TOOL_SHOW_US
+  if ru and su then R.runS, R.showS = R.runS + ru, R.showS + su end
+--#endif
   if now - R.fpsT >= 100 then
+--#if COLOR
+    if ru and su then
+      local k = 0.001 / R.fpsN
+      R.fpsX = fmt("  game %d ms  lcd %d ms", floor(R.runS * k + 0.5), floor(R.showS * k + 0.5))
+      R.runS, R.showS = 0, 0
+    end
+--#endif
     R.fps, R.fpsN, R.fpsT = R.fpsN, 0, now
   end
   return 0

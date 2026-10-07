@@ -126,6 +126,29 @@ def main():
                 err = stats(page, rid, "lite rush")["err"]
                 if err: print(rid, "lite ERROR", err)
             page.evaluate("sim.script('auto')")
+        # StickTime BW and Lite on color screens (their color.lua): menu, flying, settings
+        for script, rid in (("bw", "tx16s"), ("bw", "pa01"), ("lite", "tx16s"), ("lite", "pa01")):
+            if rid not in RADIOS:
+                continue
+            page.evaluate(f"sim.radio('{rid}'); sim.script('{script}')")
+            page.evaluate("sim.pause(true); sim.engine.displayDelay = false")
+            name = page.evaluate("document.getElementById('scriptSel').value + ' on ' + sim.app.radio.id")
+            err = page.evaluate("sim.step(10, 50)")
+            if err:
+                print(name, "ERROR", json.dumps(err)[:2000]); continue
+            save(page, f"{script}color_{rid}_01menu")
+            stats(page, rid, f"{script}c menu")
+            err = view(page, 7, 2, 14, 0, 0.5, -4, 0)
+            if err: print(name, "ERROR", err); continue
+            save(page, f"{script}color_{rid}_02bando")
+            stats(page, rid, f"{script}c bando")
+            page.evaluate("sim.key('exit'); sim.step(2, 50)")
+            save(page, f"{script}color_{rid}_03pause")
+            page.evaluate(f"sim.radio('{rid}'); sim.pause(true); sim.engine.displayDelay = false; sim.step(5, 50)")
+            for k in ("next",) * 5 + ("enter",) + ("next",) * 3:
+                page.evaluate(f"sim.key('{k}'); sim.step(1, 50)")
+            save(page, f"{script}color_{rid}_04settings")
+        page.evaluate("sim.script('auto')")
         page.screenshot(path=str(OUT / "page.png"))
         b.close()
         print("worst frame estimate per radio (ms):", {k: v for k, v in worst.items()})

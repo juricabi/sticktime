@@ -41,6 +41,13 @@ lite() {
 lite "$($LUA53 lite_test.lua build/sticktime_lite_test.lua 128 64 2>&1)"
 lite "$($LUA53 lite_test.lua build/sticktime_lite_test.lua 212 64 2>&1)"
 lite "$(python3 run52.py build/sticktime_lite_test.lua lite 128 64 lite_test.lua 2>&1)"
+# the B&W game and the Lite on color screens, through their color.lua (native resolution,
+# B&W-style drawing in color, menus scaled to the color fonts)
+for v in "480 272" "320 240" "800 480" "320 480"; do
+  set -- $v
+  check "$($LUA53 harness.lua "$S/StickTimeBW/color.lua" bwcolor $1 $2 2>&1)"
+  lite "$($LUA53 lite_test.lua build/sticktime_lite_test.lua $1 $2 color 2>&1)"
+done
 # the B&W loaders and the precompiled bytecode (32-bit EdgeTX-config Lua)
 if [ -x ../.tools/etxlua53_m32 ]; then
   out=$(../.tools/etxlua53_m32 loader_test.lua 2>&1) && echo "$out" | tail -1 || { echo "$out"; fail=1; }

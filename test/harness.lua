@@ -1,10 +1,12 @@
 -- Headless EdgeTX mock for the StickTime scripts (runs under Lua 5.2 / 5.3).
--- Usage: lua harness.lua <script.lua> <color|bw> [W H]
+-- Usage: lua harness.lua <script.lua> <color|bw|bwcolor> [W H]
+-- bwcolor: StickTime BW on a color radio, through StickTimeBW/color.lua (give that file)
 -- Flies full races with an autopilot on every track, races AI pilots, plays
 -- Freestyle and Gate Rush, exercises every menu, checks API arguments the way
 -- the firmware would see them and reports VM instructions per frame.
 local path, kind, W, H = arg[1], arg[2] or "color", tonumber(arg[3] or 480), tonumber(arg[4] or 272)
-local COLOR = kind == "color"
+local COLOR = kind ~= "bw"           -- a color radio
+local GAME_COLOR = kind == "color"   -- the color game (else StickTime BW)
 local floor = math.floor
 local fails = 0
 local function fail(msg) fails = fails + 1; if fails < 25 then print("FAIL: " .. msg) end end
@@ -52,9 +54,9 @@ io = {
   write = function(f, ...) for _, s in ipairs({ ... }) do f.d = f.d .. tostring(s) end end,
   close = function(f) if f.m ~= "r" then SD[f.p] = f.d end end,
 }
-local DATA = COLOR and "/SCRIPTS/TOOLS/StickTime.dat" or "/SCRIPTS/TOOLS/StickTimeBW.dat"
+local DATA = GAME_COLOR and "/SCRIPTS/TOOLS/StickTime.dat" or "/SCRIPTS/TOOLS/StickTimeBW.dat"
 -- a version 1 save file of FPV Sim (StickTime's old name): the new script must migrate it
-local OLD = COLOR and "/SCRIPTS/TOOLS/FPVSim.dat" or "/SCRIPTS/TOOLS/FPVSimBW.dat"
+local OLD = GAME_COLOR and "/SCRIPTS/TOOLS/FPVSim.dat" or "/SCRIPTS/TOOLS/FPVSimBW.dat"
 SD[OLD] = "FPVSIM 2 1 3 30 100 3 5 1 1 0 4321 9876 5555 11111 0 0\n"
 
 -- lcd with argument checks (what the C API would do)
@@ -94,11 +96,18 @@ function lcd.drawFilledTriangle(x1, y1, x2, y2, x3, y3, f)
   if hi >= lo then stat.rows = stat.rows + hi - lo + 1 end
   if math.max(a, b, c) - math.min(a, b, c) > 20000 then fail("huge triangle " .. a .. " " .. b .. " " .. c) end
 end
-function lcd.drawText(x, y, s, f) stat.calls = stat.calls + 1 num(x, "text x") num(y, "text y") if type(s) ~= "string" then fail("text not string") end end
+function lcd.drawText(x, y, s, f)
+  stat.calls = stat.calls + 1 x, y = num(x, "text x"), num(y, "text y")
+  if type(s) ~= "string" then fail("text not string") end
+  -- the B&W game on a color screen: its menus and HUD must stay on the screen
+  if kind == "bwcolor" and (x < 0 or x > W or y < 0 or y > H - 12) then fail("text off the screen at " .. x .. "," .. y .. ": " .. s) end
+end
 function lcd.drawNumber(x, y, v, f) stat.calls = stat.calls + 1 num(x, "num x") num(y, "num y") num(v, "num v") end
 function lcd.sizeText(s, f) return #s * 9, (f and f >= 0x500) and 37 or 19 end
 function lcd.RGB(r, g, b) return ((floor(r) * 0 + 1) * 0x10000) + 0x8000 end
 STICKTIME_TEST = {}
+-- the B&W game's files, as color.lua loads them (the source: the 32-bit core.luac is for radios)
+function loadScript(p, mode, e) return loadfile("../sdcard" .. p, "t", e) end
 
 -- ------------------------------------------------------------------- load
 -- EdgeTX gives strings no metatable: s:sub() style calls fail on a radio, so here too
@@ -203,7 +212,7 @@ local function idleSticks() sticks.ail, sticks.ele, sticks.rud, sticks.thr = 0, 
 
 -- ------------------------------------------------------------ scenarios
 -- 1. menus: walk every item, open settings, change every option both ways
-local OPTN = COLOR and 20 or 18
+local OPTN = GAME_COLOR and 20 or 18
 steps(20)
 for i = 1, 9 do frame(EVT_VIRTUAL_NEXT) frame(0) end
 for i = 1, 9 do frame(EVT_VIRTUAL_PREV) frame(0) end
@@ -225,7 +234,7 @@ if state() ~= 1 then fail("settings exit did not return to menu, state " .. stat
 frame(EVT_VIRTUAL_PREV)
 frame(EVT_VIRTUAL_ENTER) frame(EVT_VIRTUAL_INC) frame(EVT_VIRTUAL_INC) frame(EVT_VIRTUAL_INC) frame(EVT_VIRTUAL_ENTER)
 if T.S.track ~= 5 then fail("track edit should move 2 -> 5 (track " .. T.S.track .. ")") end
-if COLOR then frame(EVT_TOUCH_TAP, { x = 40, y = 100 }) end   -- tap somewhere in the menu
+if GAME_COLOR then frame(EVT_TOUCH_TAP, { x = 40, y = 100 }) end   -- tap somewhere in the menu
 T.state(1)
 
 -- 2. full autopilot races on every track (angle mode, 3 AI pilots)
@@ -287,7 +296,7 @@ for m = 2, 4 do
     if f == 307 then ev = EVT_VIRTUAL_ENTER end           -- settings from pause
     if f == 310 then ev = EVT_VIRTUAL_EXIT end            -- back to pause
     if f == 312 then ev = EVT_VIRTUAL_EXIT end            -- resume
-    if COLOR and f == 500 then frame(EVT_TOUCH_TAP, { x = floor(W / 2), y = 10 }) end
+    if GAME_COLOR and f == 500 then frame(EVT_TOUCH_TAP, { x = floor(W / 2), y = 10 }) end
     frame(ev)
   end
 end

@@ -1,6 +1,6 @@
 local toolName = "TNS|StickTime|TNE"
 --[[ ======================================================================
-  StickTime v1.3  -  a real 3D FPV quad simulator that runs on your radio
+  StickTime v1.4  -  a real 3D FPV quad simulator that runs on your radio
   Color version - every EdgeTX color radio (480x272, 480x320, 320x480, 320x240, 800x480)
 
   Install : copy this file to /SCRIPTS/TOOLS/ on the radio SD card and
@@ -44,10 +44,10 @@ local OPTS = {
   { "Flight mode", "mode", { 1, 2 }, { "Acro", "Angle" } },
   { "Rates", "rates", { 1, 2, 3, 4 }, { "Soft", "Normal", "Fast", "Custom" } },
   { "R/P center", "rc", nil, nil, "°/s", 20, 500, 10 },
-  { "R/P max", "rm", nil, nil, "°/s", 100, 1800, 50 },
+  { "R/P max", "rm", nil, nil, "°/s", 100, 1800, 10 },
   { "R/P expo", "re", nil, nil, nil, 0, 95, 5 },
   { "Yaw center", "yc", nil, nil, "°/s", 20, 500, 10 },
-  { "Yaw max", "ym", nil, nil, "°/s", 100, 1800, 50 },
+  { "Yaw max", "ym", nil, nil, "°/s", 100, 1800, 10 },
   { "Yaw expo", "ye", nil, nil, nil, 0, 95, 5 },
   { "Camera tilt", "tilt", nil, nil, "°", 0, 60, 5 },
   { "Field of view", "fov", nil, nil, "°", 70, 130, 10 },
@@ -65,7 +65,7 @@ local RATES = { { 70, 400, 35, 70, 350, 30 }, { 100, 600, 50, 100, 500, 40 }, { 
 local RKEYS = { rc = 1, rm = 2, re = 3, yc = 4, ym = 5, ye = 6 }
 -- quad profiles (racer, freestyle): prop pitch speed m/s, rotor drag, side and top
 -- drag, motor and rate response time (s) of a well-tuned quad, prop wash strength
-local QP = { vp = { 86, 66 }, kh = { 0.22, 0.205 }, ks = { 0.009, 0.0082 }, ku = { 0.028, 0.026 },
+local QP = { vp = { 90, 68 }, kh = { 0.55, 0.48 }, ks = { 0.009, 0.0082 }, ku = { 0.028, 0.026 },
              tm = { 0.02, 0.025 }, tr = { 0.012, 0.016 }, pw = { 0.5, 1 } }
 
 -- -------------------------------------------------------------- tracks
@@ -383,7 +383,7 @@ local state, prevState, pausedFrom, gmode = MENU, MENU, FLY, 1
 local gt, lastT, tState, tStart = 0, 0, 0, 0                          -- game clock in 10 ms ticks
 local lapStart, lap, nextGate, lastGate = nil, 0, 1, 0
 local R = { laps = {}, n = 0, total = 0, newLap = false, newRace = false, newBest = false, msg = nil, msgT = 0, good = true,
-            ready = 0, crashes = 0, cd = -1, fps = 0, fpsN = 0, fpsT = 0,
+            ready = 0, crashes = 0, cd = -1, fps = 0, fpsN = 0, fpsT = 0, fpsX = "", runS = 0, showS = 0,
             pk = 0, pos = 1, sc = 0, ch = 0, chn = 0, cht = 0, prox = 9, rn = 0, rt = 0, smp = 0,
             fi = 5, pt = 0 }                                  -- frame interval, sim time (10 ms ticks)
 
@@ -664,10 +664,11 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
       local vu = ax_ * ux + vy * uy + az_ * uz
       local vr = ax_ * rx + vy * ry + az_ * rz
       local vf = ax_ * fx + vy * fy + az_ * fz
-      -- props lose thrust with inflow speed; rotor drag in the prop plane; quadratic body drag
+      -- props lose thrust with inflow speed; rotor drag in the prop plane (grows with the air
+      -- the props move, so with thrust: the same at hover for any power); quadratic body drag
       local Ta = Tm - vu * sqrt(Tm) * sTx / VP
       if Ta > Tm * 1.25 then Ta = Tm * 1.25 elseif Ta < 0 then Ta = 0 end
-      local kh = KH * sqrt(Tm / Tmax + 0.02)
+      local kh = KH * sqrt(Tm * 0.0204 + 0.02)   -- 0.0204 = 1 / (5 G)
       local au = Ta - KU * (vu < 0 and -vu or vu) * vu
       local ar = -(kh + KS * (vr < 0 and -vr or vr)) * vr
       local af = -(kh + KS * (vf < 0 and -vf or vf)) * vf
@@ -2179,7 +2180,7 @@ local render, hitTest, pauseHit, initUI
       drawSticks(CX - s - 2, VY + VH - m - s, s, 4)
     end
     if TOUCH then pauseButton(W / 2 - floor(11 * SC + 3), m, floor(22 * SC + 6)) end
-    if S.fps == 1 then txt(W / 2, VY + VH - m - hS - (S.sticks == 1 and floor(VH * 0.16) + 2 or 0), R.fps .. " fps", SMLSIZE + CENTER + C.dim) end
+    if S.fps == 1 then txt(W / 2, VY + VH - m - hS - (S.sticks == 1 and floor(VH * 0.16) + 2 or 0), R.fps .. " fps" .. R.fpsX, SMLSIZE + CENTER + C.dim) end
   end
 
   -- portrait radios (320x480): 4:3 FPV view on top, instrument panel below
@@ -2213,7 +2214,7 @@ local render, hitTest, pauseHit, initUI
     fillRect(m, ty, tw, 8, C.panel)
     fillRect(m, ty, floor(tw * sT), 8, sT > 0.7 and C.bad or C.accent)
     if TOUCH then pauseButton(m, H - m - 38, 38) end
-    if S.fps == 1 then drawText(m + 48, H - m - hS, R.fps .. " fps", SMLSIZE + C.dim) end
+    if S.fps == 1 then drawText(m + 48, H - m - hS, R.fps .. " fps" .. R.fpsX, SMLSIZE + C.dim) end
   end
 
   local function bigCenter(s, col, sub)
@@ -2578,7 +2579,16 @@ local function run(event, touch)
   update(dts)
   render()
   R.fpsN = R.fpsN + 1
+  -- the StickTime firmware (firmware/) reports how long run() and putting the frame on the
+  -- screen took: shown next to the fps, averaged over the same second
+  local ru, su = TOOL_RUN_US, TOOL_SHOW_US
+  if ru and su then R.runS, R.showS = R.runS + ru, R.showS + su end
   if now - R.fpsT >= 100 then
+    if ru and su then
+      local k = 0.001 / R.fpsN
+      R.fpsX = fmt("  game %d ms  lcd %d ms", floor(R.runS * k + 0.5), floor(R.showS * k + 0.5))
+      R.runS, R.showS = 0, 0
+    end
     R.fps, R.fpsN, R.fpsT = R.fpsN, 0, now
   end
   return 0

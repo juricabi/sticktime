@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 """Steady-state check of the quad model used in src/sticktime.lua.
-Usage: tools/tune_physics.py [KH=0.205 VP=66 KQS=0.0082 KQU=0.026]
+Usage: tools/tune_physics.py [KH=0.48 VP=68 KQS=0.0082 KQU=0.026]
 
 Model (mass-normalised, body axes r/u/f):
   T  = Tmax*(0.015 + 0.985*thr^1.6)       motor thrust, lagged with TAU_M
   Ta = T - vu*sqrt(T*Tmax)/VP            props lose thrust with axial airspeed (pitch speed ~ rpm)
-  kh = KH*sqrt(T/Tmax + 0.02)            rotor drag in the prop plane
+  kh = KH*sqrt(T/(5g) + 0.02)            rotor drag in the prop plane (same at hover for any TWR)
   a  = u*(Ta - KQU|vu|vu) + r*(-kh vr - KQS|vr|vr) + f*(-kh vf - KQS|vf|vf) - g
 """
 import math
 import sys
 
 G = 9.81
-# racer profile in src/sticktime.lua (QP); freestyle: KH=0.205 VP=66 KQS=0.0082 KQU=0.026
-P = dict(KQS=0.009, KQU=0.028, KH=0.22, VP=86.0)
+# racer profile in src/sticktime.lua (QP); freestyle: KH=0.48 VP=68 KQS=0.0082 KQU=0.026
+P = dict(KQS=0.009, KQU=0.028, KH=0.55, VP=90.0)
 
 
 def accel(v, th, thr, twr, p):
@@ -29,7 +29,7 @@ def accel(v, th, thr, twr, p):
     if vu < 0:
         Ta = min(Ta, T * 1.25)
     Ta = max(0.0, Ta)
-    kh = p["KH"] * math.sqrt(T / Tmax + 0.02)
+    kh = p["KH"] * math.sqrt(T / (5 * G) + 0.02)
     au = Ta - p["KQU"] * abs(vu) * vu
     af = -kh * vf - p["KQS"] * abs(vf) * vf
     return uy * au + fy * af - G, uz * au + fz * af
@@ -56,6 +56,17 @@ def top_speed(twr, p):
     return best
 
 
+def slide_half_life(twr, p, v0=15.0):
+    """level at hover thrust, sliding sideways at v0: seconds until half that speed is left
+    (a real 5-inch quad: about 2 s, mostly rotor drag)"""
+    kh = p["KH"] * math.sqrt(1 / 5 + 0.02)
+    v, t, h = v0, 0.0, 0.001
+    while v > v0 / 2:
+        v -= (kh + p["KQS"] * v) * v * h
+        t += h
+    return t
+
+
 def main():
     p = dict(P)
     for a in sys.argv[1:]:
@@ -73,7 +84,8 @@ def main():
             ay, az = accel(v, math.radians(-60), 1.0, twr, p)
             v[0] += ay * h; v[1] += az * h; t += h
         print(f"TWR {twr}: hover {hover*100:4.1f}%  top {vz*3.6:5.1f} km/h at {deg} deg  punch-out {climb*3.6:5.1f} km/h  "
-              f"flat fall {-fall*3.6:5.1f} km/h  brake {vz*3.6:3.0f}->18 km/h in {t:.2f}s")
+              f"flat fall {-fall*3.6:5.1f} km/h  brake {vz*3.6:3.0f}->18 km/h in {t:.2f}s  "
+              f"slide half-life {slide_half_life(twr, p):.2f}s")
 
 
 if __name__ == "__main__":

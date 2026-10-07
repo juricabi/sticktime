@@ -90,6 +90,11 @@ const EdgeTX = (() => {
     pc: [32, 32, 18, 26, 48, 64, 128, 96],
   };
   const FONT_BOLD = [false, true, false, false, false, true, true, true];
+  // what lcd.sizeText reports as the height (the fonts' line height) on EdgeTX, same order
+  const LINE_H = {
+    std: [21, 20, 12, 17, 29, 40, 69, 51], sml: [17, 16, 10, 14, 23, 33, 52, 38], lrg: [27, 28, 17, 23, 42, 55, 95, 70],
+    pc: [42, 40, 24, 34, 58, 80, 138, 102],
+  };
 
   // ---------------------------------------------------------- color fonts
   // Glyph masks rasterised once per size with canvas (Roboto, like EdgeTX)
@@ -431,7 +436,8 @@ const EdgeTX = (() => {
         lua.lua_pushinteger(L, 0); return 1;
       });
 
-      // loadScript(path [, mode [, env]]): scripts from the virtual SD card
+      // loadScript(path [, mode [, env]]): scripts from the virtual SD card; env becomes the
+      // chunk's _ENV, as in EdgeTX
       global('loadScript', () => {
         const path = str(1);
         const src = self.files[path] !== undefined ? self.files[path] : self.sd.get(path);
@@ -439,6 +445,10 @@ const EdgeTX = (() => {
         if (lauxlib.luaL_loadbuffer(L, to_luastring(src), null, to_luastring('@' + path.replace(/^.*\//, ''))) !== lua.LUA_OK) {
           const msg = lua.lua_tostring(L, -1); lua.lua_pop(L, 1);
           lua.lua_pushnil(L); lua.lua_pushstring(L, msg); return 2;
+        }
+        if (lua.lua_type(L, 3) === lua.LUA_TTABLE) {
+          lua.lua_pushvalue(L, 3);
+          if (!lua.lua_setupvalue(L, -2, 1)) lua.lua_pop(L, 1);
         }
         return 1;
       });
@@ -642,7 +652,7 @@ const EdgeTX = (() => {
       setfn('sizeText', () => {
         const flags = u32(opt(2, 0)); const f = textFace(flags);
         const m = fonts.measure(str(1), f.px, f.bold);
-        lua.lua_pushinteger(L, m.w); lua.lua_pushinteger(L, m.h); return 2;
+        lua.lua_pushinteger(L, m.w); lua.lua_pushinteger(L, LINE_H[px][(flags >> 8) & 0xF] || m.h); return 2;
       });
       setfn('drawNumber', () => { const flags = opt(4, 0); drawStr(int(1), int(2), numStr(int(3), flags), flags); });
       setfn('drawTimer', () => {
