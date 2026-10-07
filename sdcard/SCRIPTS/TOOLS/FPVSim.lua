@@ -2411,8 +2411,9 @@ local handleEvent
         return mainSelect(tapI, tapF)
       end
       if editing then
-        if event == EV.INC or event == EV.NEXT then stepTrack(1)
-        elseif event == EV.DEC or event == EV.PREV then stepTrack(-1)
+        -- INC / DEC only: on radios with +/- keys NEXT is the minus key
+        if event == EV.INC then stepTrack(1)
+        elseif event == EV.DEC then stepTrack(-1)
         elseif event == EV.ENTER or event == EV.EXIT then editing = false end
         return 0
       end
@@ -2432,8 +2433,8 @@ local handleEvent
         focus = tapI
         if tapI == n then event = EV.EXIT else optStep(OPTS[tapI], tapF < 0.4 and -1 or 1) end
       elseif editing then
-        if event == EV.INC or event == EV.NEXT then optStep(OPTS[focus], 1)
-        elseif event == EV.DEC or event == EV.PREV then optStep(OPTS[focus], -1)
+        if event == EV.INC then optStep(OPTS[focus], 1)
+        elseif event == EV.DEC then optStep(OPTS[focus], -1)
         elseif event == EV.ENTER or event == EV.EXIT then editing = false end
         return 0
       else

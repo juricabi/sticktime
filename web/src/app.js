@@ -4,7 +4,8 @@
   'use strict';
   const $ = (id) => document.getElementById(id);
   const { Engine, ColorFonts, RADIOS, CPU } = EdgeTX;
-  const LUA = { color: $('lua-color').textContent.replace(/^\n/, ''), bw: $('lua-bw').textContent.replace(/^\n/, '') };
+  const lua = (id) => $(id).textContent.replace(/^\n/, '');
+  const LUA = { color: lua('lua-color'), bw: lua('lua-bw'), lite: lua('lua-lite') };
 
   const store = {
     get(k, d) { try { const v = localStorage.getItem('fpvsim.' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
@@ -72,13 +73,14 @@
   function scriptFor() {
     if (app.custom) return { text: app.custom.text, name: app.custom.name };
     const kind = app.script === 'auto' ? (app.radio.color ? 'color' : 'bw') : app.script;
-    return { text: LUA[kind], name: kind === 'color' ? 'FPVSim.lua' : 'core.lua' };
+    return { text: LUA[kind], name: kind === 'color' ? 'FPVSim.lua' : kind === 'lite' ? 'FPVLite/core.lua' : 'FPVSimBW/core.lua' };
   }
 
   function boot() {
     const r = app.radio;
     const eng = new Engine(fengari, r, {
-      colorFonts, bwFonts: BW_FONTS, sd: app.sd, files: { '/SCRIPTS/TOOLS/FPVSimBW/core.lua': LUA.bw },
+      colorFonts, bwFonts: BW_FONTS, sd: app.sd,
+      files: { '/SCRIPTS/TOOLS/FPVSimBW/core.lua': LUA.bw, '/SCRIPTS/TOOLS/FPVLite/core.lua': LUA.lite },
       onTone: tone, onHaptic: haptic,
       onSave: () => store.set('sd', Object.fromEntries(app.sd)),
     });
@@ -405,13 +407,27 @@
       rs.appendChild(o);
     }
     rs.value = app.radio.id;
-    rs.addEventListener('change', () => { app.radio = RADIOS.find((r) => r.id === rs.value); store.set('radio', app.radio.id); app.cpu = null; boot(); });
     const ss = $('scriptSel');
+    // the Lite is for B&W radios (STM32F2 class): pick one for it, and its CPU for the estimate
+    const liteFits = () => {
+      if (app.script !== 'lite') return;
+      if (app.radio.color) { app.radio = RADIOS.find((r) => r.id === 'tx12'); rs.value = app.radio.id; store.set('radio', app.radio.id); }
+      app.cpu = 'F2';
+    };
+    rs.addEventListener('change', () => {
+      app.radio = RADIOS.find((r) => r.id === rs.value); store.set('radio', app.radio.id); app.cpu = null;
+      if (app.script === 'lite' && app.radio.color) { app.script = 'auto'; ss.value = 'auto'; store.set('script', 'auto'); }
+      liteFits();
+      boot();
+    });
     ss.value = app.script;
     ss.addEventListener('change', () => {
       if (ss.value === 'custom') return;
-      app.script = ss.value; app.custom = null; store.set('script', app.script); boot();
+      app.script = ss.value; app.custom = null; store.set('script', app.script); app.cpu = null;
+      liteFits();
+      boot();
     });
+    liteFits();
     $('restartBtn').addEventListener('click', boot);
     $('ovBtn').addEventListener('click', boot);
     $('soundBtn').addEventListener('click', () => {
@@ -506,6 +522,7 @@
     get app() { return app; },
     get engine() { return app.engine; },
     radio(id) { $('radioSel').value = id; $('radioSel').dispatchEvent(new Event('change')); },
+    script(id) { $('scriptSel').value = id; $('scriptSel').dispatchEvent(new Event('change')); },
     sticks(a, e, t, r) { stick.ail = a; stick.ele = e; stick.thr = t; stick.rud = r; },
     key, pause(p) { app.paused = p; },
     touch(type, x, y) { app.engine.touch(type, { x, y, startX: x, startY: y, slideX: 0, slideY: 0, tapCount: 1 }); },

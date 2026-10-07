@@ -1,18 +1,20 @@
 local toolName = "TNS|@TOOLNAME@|TNE"
 --[[ ======================================================================
-  @TITLE@ v1.1  -  loader for black & white radios
+  @TITLE@ v1.2  -  loader for black & white radios
 
-  The game itself is in /SCRIPTS/TOOLS/FPVSimBW/core.lua (copy that
-  folder too). B&W radios have little RAM, and a script compiled on the
-  radio keeps its debug info in memory for that run. So this loader lets
-  EdgeTX compile the game once (it saves FPVSimBW/core.luac), drops that
-  copy and runs the saved bytecode, which needs about half the memory.
+  The game itself is in /SCRIPTS/TOOLS/@DIR@/ (copy that folder too):
+  core.luac, precompiled for EdgeTX 2.11 and newer, and its source
+  core.lua. B&W radios have little RAM: compiling the game on the radio
+  needs far more memory than running it, and a script compiled on the
+  radio keeps its debug info for that run. So this loader takes the
+  precompiled core.luac when it can. Otherwise EdgeTX compiles core.lua
+  (and saves core.luac); that copy is dropped and core.luac is loaded.
+  If you edit core.lua, delete core.luac.
 ====================================================================== ]]
-local CORE = "/SCRIPTS/TOOLS/FPVSimBW/core.lua"
-local f, err = loadScript(CORE)
+local CORE = "/SCRIPTS/TOOLS/@DIR@/core.lua"
+local f = loadScript(CORE, "b") or loadScript(CORE)
 f = nil
 collectgarbage()
-f, err = loadScript(CORE, "b")
-if not f then f, err = loadScript(CORE) end
-if not f then error("FPV Sim: cannot load " .. CORE .. " " .. tostring(err)) end
+f = loadScript(CORE, "b") or loadScript(CORE)
+if not f then error("@TITLE@: cannot load " .. CORE) end
 return f()

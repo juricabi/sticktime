@@ -46,10 +46,22 @@ VARIANTS = {
         "FOV": "100",
         "TREES": "8",
         "DATAFILE": "FPVSimBW.dat",
+        "DIR": "FPVSimBW",
         "DEG": "",
         "DPS": "",
         "LATK": "0.003",
         "REFW": "128",
+    },
+    # the small edition for B&W radios with little memory (STM32F2): its own source
+    "LITE": {
+        "src": "fpvlite.lua",
+        "file": "FPVLite/core.lua",
+        "loader": "FPVLite.lua",
+        "test": "test/build/fpvlite_test.lua",   # with the FPVSIM_TEST hooks (--#if TEST)
+        "strip": True,
+        "TOOLNAME": "FPV Sim Lite",
+        "TITLE": "FPV Sim Lite",
+        "DIR": "FPVLite",
     },
 }
 
@@ -57,7 +69,8 @@ VARIANTS = {
 def build(variant: str, cfg: dict, strip: bool) -> str:
     out = []
     keep = True
-    for n, line in enumerate(SRC.read_text(encoding="utf-8").splitlines(), 1):
+    src = ROOT / "src" / cfg.get("src", "fpvsim.lua")
+    for n, line in enumerate(src.read_text(encoding="utf-8").splitlines(), 1):
         s = line.strip()
         m = re.match(r"^--#if\s+(\w+)$", s)
         if m:
@@ -92,14 +105,20 @@ def placeholders(text: str, cfg: dict) -> str:
 
 
 def precompile(src: pathlib.Path):
-    """Lua 5.3 bytecode in EdgeTX's format (32-bit ints and floats), stripped."""
-    lua = ROOT / ".tools" / "etxlua53_m32"
-    if not lua.exists():
-        print("  (no .tools/etxlua53_m32: skipping the precompiled .luac)")
-        return
+    """Lua 5.3 bytecode in EdgeTX's format (32-bit ints and floats), stripped. Made by EdgeTX's
+    own Lua (tools/build_etxhost.sh) when it is built, else by the 32-bit EdgeTX-config Lua."""
     out = src.with_suffix(".luac")
-    code = f"local f = assert(loadfile({str(src)!r})) local o = assert(io.open({str(out)!r}, 'wb')) o:write(string.dump(f, true)) o:close()"
-    subprocess.run([str(lua), "-e", code], check=True)
+    host, m32 = ROOT / ".tools" / "etxhost", ROOT / ".tools" / "etxlua53_m32"
+    if host.exists():
+        code = ROOT / ".tools" / "dump.lua"
+        code.write_text("local f = assert(etx.loadfile(arg[1])) etx.writefile(arg[2], string.dump(f, true))\n")
+        subprocess.run([str(host), str(code), str(src), str(out)], check=True, env={**os.environ, "ETX_MODEL": "host"})
+    elif m32.exists():
+        code = f"local f = assert(loadfile({str(src)!r})) local o = assert(io.open({str(out)!r}, 'wb')) o:write(string.dump(f, true)) o:close()"
+        subprocess.run([str(m32), "-e", code], check=True)
+    else:
+        print("  (no .tools/etxhost or .tools/etxlua53_m32: skipping the precompiled .luac)")
+        return
     # same time or newer than the source: EdgeTX then loads the binary ("bt" mode)
     st = src.stat()
     os.utime(out, (st.st_atime, st.st_mtime + 2))
@@ -109,11 +128,16 @@ def precompile(src: pathlib.Path):
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     for variant, cfg in VARIANTS.items():
-        text = build(variant, cfg, strip=False)
+        text = build(variant, cfg, strip=cfg.get("strip", False))
         path = OUT / cfg["file"]
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")
         print(f"{path.relative_to(ROOT)}: {len(text.encode())} bytes, {text.count(chr(10))} lines")
+        if "test" in cfg:
+            tp = ROOT / cfg["test"]
+            tp.parent.mkdir(parents=True, exist_ok=True)
+            tp.write_text(build("TEST", cfg, strip=True), encoding="utf-8")
+            precompile(tp)
         if "loader" in cfg:
             lt = placeholders((ROOT / "src" / "bwloader.lua").read_text(encoding="utf-8"), cfg)
             lp = OUT / cfg["loader"]

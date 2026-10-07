@@ -28,7 +28,9 @@ def radio(page, rid):
 
 def race_view(page, track, gate, back, side, up, roll, pitch, speed, mode=2, lap_secs=9.4, ai=0):
     """Start a race, put the quad `back` m before `gate` heading through it, moving."""
-    page.evaluate(f"sim.test('set', 'ai', {ai}); sim.test('track', {track}); sim.test('start', {mode}); sim.step(70, 50)")
+    if ai is not None:
+        page.evaluate(f"sim.test('set', 'ai', {ai})")
+    page.evaluate(f"sim.test('track', {track}); sim.test('start', {mode}); sim.step(70, 50)")
     gx, gy, gz, nx, ny, nz, k, ax, ay, az = page.evaluate(f"sim.test('gate', {gate})")[:10]
     if k == 3:
         nx, nz = 0, 1
@@ -86,5 +88,17 @@ with sync_playwright() as p:
         radio(page, rid)
         race_view(page, *args)
         shot(page, f"{rid}-race", sc)
+
+    # FPV Sim Lite: X7 / TX12 MkI class (128x64) and X9D+ (212x64 grey)
+    page.evaluate("sim.script('lite')")
+    radio(page, "tx12")
+    page.evaluate("sim.step(10, 50)")
+    shot(page, "lite-menu", 4)
+    race_view(page, 2, 1, 20, -0.5, 1.6, -10, -8, 10, mode=1, ai=None)
+    shot(page, "lite-tx12", 4)
+    radio(page, "x9d")
+    race_view(page, 1, 1, 18, 0.5, 1.2, 12, -8, 10, mode=1, ai=None)
+    shot(page, "lite-x9d", 3)
+    page.evaluate("sim.script('auto')")
     b.close()
 print("saved", sorted(x.name for x in DOCS.glob("*.png")))

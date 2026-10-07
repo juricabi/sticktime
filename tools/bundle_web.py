@@ -23,7 +23,9 @@ def b64(p):
 def main():
     lua_color = read(ROOT / "sdcard/SCRIPTS/TOOLS/FPVSim.lua")
     lua_bw = read(ROOT / "sdcard/SCRIPTS/TOOLS/FPVSimBW/core.lua")
-    for s in (lua_color, lua_bw):
+    # the Lite with its test hooks (inert on a radio), so the emulator can be automated
+    lua_lite = read(ROOT / "test/build/fpvlite_test.lua")
+    for s in (lua_color, lua_bw, lua_lite):
         assert "</script" not in s.lower()
     parts = {
         "STYLE": read(SRC / "style.css"),
@@ -32,6 +34,7 @@ def main():
         "APP": read(SRC / "app.js"),
         "LUA_COLOR": lua_color,
         "LUA_BW": lua_bw,
+        "LUA_LITE": lua_lite,
         "ROBOTO400": b64(W / "vendor/roboto-latin-400-normal.woff2"),
         "ROBOTO700": b64(W / "vendor/roboto-latin-700-normal.woff2"),
     }

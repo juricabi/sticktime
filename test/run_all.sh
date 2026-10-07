@@ -33,8 +33,36 @@ for v in "480 272" "320 480" "800 480"; do
   echo "order $1x$2: $(echo "$out" | grep -o 'separating planes [0-9]* wrong pairs') | $(echo "$out" | tail -1)"
   [ "$(echo "$out" | tail -1)" = "ALL OK" ] || fail=1
 done
-# the B&W loader and the precompiled bytecode (32-bit EdgeTX-config Lua)
+# FPV Sim Lite (the build with test hooks): 128x64 and 212x64, and Lua 5.2
+lite() {
+  echo "$(echo "$1" | grep -E "^Lua ") | $(echo "$1" | tail -1)"
+  [ "$(echo "$1" | tail -1)" = "ALL OK" ] || fail=1
+}
+lite "$($LUA53 lite_test.lua build/fpvlite_test.lua 128 64 2>&1)"
+lite "$($LUA53 lite_test.lua build/fpvlite_test.lua 212 64 2>&1)"
+lite "$(python3 run52.py build/fpvlite_test.lua lite 128 64 lite_test.lua 2>&1)"
+# the B&W loaders and the precompiled bytecode (32-bit EdgeTX-config Lua)
 if [ -x ../.tools/etxlua53_m32 ]; then
-  out=$(../.tools/etxlua53_m32 loader_test.lua 2>&1) && echo "$out" || { echo "$out"; fail=1; }
+  out=$(../.tools/etxlua53_m32 loader_test.lua 2>&1) && echo "$out" | tail -1 || { echo "$out"; fail=1; }
+fi
+# memory on EdgeTX's own Lua with the radio's allocator (tools/build_etxhost.sh), through the
+# loaders: the Lite on an STM32F2 X9D+ (63.3 KB heap), the full B&W game on an STM32F4
+# X9D+ 2019 (113.6 KB heap + 34 KB CCM), the smallest heaps of each kind
+if [ -x ../.tools/etxhost ]; then
+  sd=$(mktemp -d)
+  mkdir -p "$sd/SCRIPTS/TOOLS/FPVLite"
+  cp "$S/FPVLite.lua" "$sd/SCRIPTS/TOOLS/"
+  cp build/fpvlite_test.lua "$sd/SCRIPTS/TOOLS/FPVLite/core.lua"
+  cp build/fpvlite_test.luac "$sd/SCRIPTS/TOOLS/FPVLite/core.luac"
+  mem() {
+    echo "memory $1: $(echo "$2" | head -1 | sed 's/^.*TOOLS\///') | $(echo "$2" | tail -1)"
+    [ "$(echo "$2" | tail -1)" = "MEM OK" ] || fail=1
+  }
+  for wh in "128 64" "212 64"; do
+    set -- $wh
+    mem F2 "$(ETX_MODEL=f2 ETX_HEAP=63300 ../.tools/etxhost -radio memtest.lua "$sd/SCRIPTS/TOOLS/FPVLite.lua" $1 $2 2>&1)"
+    mem F4 "$(ETX_MODEL=f4 ETX_HEAP=113600 ETX_CCM=34816 ../.tools/etxhost -radio memtest.lua "$S/FPVSimBW.lua" $1 $2 2>&1)"
+  done
+  rm -rf "$sd"
 fi
 exit $fail

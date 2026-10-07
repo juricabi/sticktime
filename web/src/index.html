@@ -18,6 +18,7 @@
         <option value="auto">FPV Sim (matches radio)</option>
         <option value="color">FPVSim.lua (color)</option>
         <option value="bw">FPVSimBW.lua (B&amp;W)</option>
+        <option value="lite">FPV Sim Lite (B&amp;W, low memory)</option>
       </select>
     </label>
     <button class="btn" id="restartBtn" type="button" title="Restart the script (R)">Restart</button>
@@ -90,6 +91,7 @@
           <option value="F4">STM32F429 · TX16S class</option>
           <option value="H7">STM32H750 · TX15 / MK3 class</option>
           <option value="BW">STM32F4 · B&amp;W radios</option>
+          <option value="F2">STM32F2 · X7 / X9D+ class</option>
         </select>
       </label>
     </div>
@@ -160,6 +162,8 @@
 {{LUA_COLOR}}</script>
 <script type="text/plain" id="lua-bw">
 {{LUA_BW}}</script>
+<script type="text/plain" id="lua-lite">
+{{LUA_LITE}}</script>
 <script>
 const ROBOTO = { r: "{{ROBOTO400}}", b: "{{ROBOTO700}}" };
 </script>
