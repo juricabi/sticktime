@@ -1,0 +1,36 @@
+---
+name: Release
+# Push a tag like v1.5 to publish a release: the SD card zip (StickTime-1.5-sdcard.zip, built
+# from sdcard/) with the notes in docs/releases/v1.5.md.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Publish the release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v7
+
+      - name: SD card zip
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          zip=StickTime-$version-sdcard.zip
+          (cd sdcard && zip -qr "../$zip" SCRIPTS)
+          echo "zip=$zip" >> "$GITHUB_ENV"
+          echo "title=StickTime $version" >> "$GITHUB_ENV"
+          test -f "docs/releases/$GITHUB_REF_NAME.md"
+
+      - name: Publish
+        uses: softprops/action-gh-release@v3
+        with:
+          name: ${{ env.title }}
+          body_path: docs/releases/${{ github.ref_name }}.md
+          files: ${{ env.zip }}
+          make_latest: true
