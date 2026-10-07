@@ -9,6 +9,7 @@
 
 const EdgeTX = (() => {
   const RADIOS = [
+    { id: 'pc', label: '1280×720  PC screen · 60 fps, no radio limits', w: 1280, h: 720, color: true, fonts: 'pc', cpu: 'H7', pc: true },
     { id: 'tx16s', label: '480×272  TX16S · T16 · T18 · X10 · X12S · V16', w: 480, h: 272, color: true, fonts: 'std', cpu: 'F4' },
     { id: 'tx15', label: '480×320  TX15 · T15 · PL18 · ST16 · GX15 · T22', w: 480, h: 320, color: true, fonts: 'std', cpu: 'H7' },
     { id: 'nv14', label: '320×480  NV14 · EL18 · NB4+ (portrait)', w: 320, h: 480, color: true, fonts: 'std', cpu: 'F4' },
@@ -80,6 +81,7 @@ const EdgeTX = (() => {
   // color font sizes (px) per screen class: STD, BOLD, XXS, XS, L, XL, XXL, LXL
   const FONT_PX = {
     std: [16, 16, 9, 13, 24, 32, 64, 48], sml: [13, 13, 8, 10, 19, 25, 48, 36], lrg: [22, 22, 12, 18, 33, 44, 88, 66],
+    pc: [32, 32, 18, 26, 48, 64, 128, 96],
   };
   const FONT_BOLD = [false, true, false, false, false, true, true, true];
 
@@ -259,6 +261,14 @@ const EdgeTX = (() => {
       if (r !== 0) this.exited = true;
     }
 
+    // set (number) or clear (null) a global inside the running script
+    setGlobal(name, value) {
+      const { lua, to_luastring } = this.fe;
+      if (!this.L) return;
+      if (typeof value === 'number') lua.lua_pushnumber(this.L, value); else lua.lua_pushnil(this.L);
+      lua.lua_setglobal(this.L, to_luastring(name));
+    }
+
     // call FPVSIM_TEST.<name>(...) inside the script (automation / tests)
     callTest(name, ...args) {
       const { lua, to_luastring } = this.fe;
@@ -418,9 +428,10 @@ const EdgeTX = (() => {
         return 1;
       });
 
-      // extra globals (e.g. test hooks)
+      // extra globals (e.g. test hooks, FPVSIM_LAT)
       for (const k in globals) {
         if (globals[k] === 'table') { lua.lua_newtable(L); lua.lua_setglobal(L, to_luastring(k)); }
+        else if (typeof globals[k] === 'number') { lua.lua_pushnumber(L, globals[k]); lua.lua_setglobal(L, to_luastring(k)); }
       }
 
       // ---- lcd

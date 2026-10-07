@@ -1,6 +1,6 @@
 local toolName = "TNS|FPV Sim BW|TNE"
 --[[ ======================================================================
-  FPV Sim BW v1.1  -  a real 3D FPV quad simulator that runs on your radio
+  FPV Sim BW v1.2  -  a real 3D FPV quad simulator that runs on your radio
   Black & white version - 128x64 and 212x64 radios with an STM32F4 (TX12 MkII, Zorro, Boxer,
   Pocket, MT12, GX12, X9D+ 2019, X9E, T14, T20 ...)
 
@@ -38,7 +38,7 @@ local MENU, SETUP, COUNT, FLY, CRASHED, READY, PAUSED, DONE = 1, 2, 3, 4, 5, 6, 
 
 -- ------------------------------------------------------------ settings
 local S = { track = 1, quad = 1, twr = 5, mode = 1, rates = 2, rc = 100, rm = 600, re = 50, yc = 100, ym = 500, ye = 40,
-            tilt = 20, fov = 100, laps = 3, ai = 2, skill = 2, wind = 0, map = 1, sticks = 0, fps = 0 }
+            tilt = 20, fov = 100, laps = 3, ai = 2, skill = 2, wind = 0, wash = 0, map = 1, sticks = 0, fps = 0 }
 -- rows: label, key, then either a value list (+ names, suffix) or nil, nil, suffix, min, max, step
 local OPTS = {
   { "Quad", "quad", { 1, 2 }, { "Racer", "Freestyle" } },
@@ -57,21 +57,23 @@ local OPTS = {
   { "Opponents", "ai", { 0, 1, 2, 3 } },
   { "AI skill", "skill", { 1, 2, 3 }, { "Easy", "Medium", "Hard" } },
   { "Wind", "wind", { 0, 1, 2 }, { "Off", "Light", "Strong" } },
+  { "Prop wash", "wash", { 0, 1 }, { "Off", "On" } },
   { "Show FPS", "fps", { 0, 1 }, { "Off", "On" } },
 }
 -- Betaflight "actual" rate presets: roll/pitch center, max (deg/s), expo %, then yaw
 local RATES = { { 70, 400, 35, 70, 350, 30 }, { 100, 600, 50, 100, 500, 40 }, { 150, 850, 45, 130, 700, 40 } }
 local RKEYS = { rc = 1, rm = 2, re = 3, yc = 4, ym = 5, ye = 6 }
 -- quad profiles (racer, freestyle): prop pitch speed m/s, rotor drag, side and top
--- drag, motor and rate response time (s), prop wash
+-- drag, motor and rate response time (s) of a well-tuned quad, prop wash strength
 local QP = { vp = { 86, 60 }, kh = { 0.22, 0.18 }, ks = { 0.009, 0.0072 }, ku = { 0.028, 0.024 },
-             tm = { 0.022, 0.045 }, tr = { 0.018, 0.035 }, pw = { 0.5, 1 } }
+             tm = { 0.02, 0.03 }, tr = { 0.012, 0.02 }, pw = { 0.5, 1 } }
 
 -- -------------------------------------------------------------- tracks
 -- gates: x, z, type, yaw (deg), center height (0 = default). Types: 1 gate, 2 high gate,
 -- 3 dive gate (flat, fly down through it), 4 hoop, 5 arch, 6 flag (pass on its right),
 -- 7 flag (pass on its left), 8 gap in a structure.
--- boxes: x, z, half size x, half size z, bottom, top, kind (1 concrete, 2 red, 3 blue)
+-- boxes: x, z, half size x, half size z, bottom, top, kind (1 concrete, 2 red, 3 blue).
+-- Boxes must not intersect: the renderer orders them with separating planes.
 local TRACKS = {
   { "Meadow", 11, { 0,0,1,0,0, 6,34,1,20,0, 26,58,2,70,0, 56,52,1,120,0, 66,22,1,180,0, 52,-8,2,230,0, 24,-22,1,270,0 } },
   { "Figure 8", 23, { -14,10,1,0,0, 6,46,2,40,0, 18,68,1,0,0, 0,88,1,-90,0, -18,68,1,180,0, 18,16,1,180,0, 0,-4,1,-90,0 } },
@@ -83,12 +85,12 @@ local TRACKS = {
                          48,-14,3,247,0, 24,-24,4,300,2.2 }, nil, 2 },
   { "Grand Prix", 71, { 0,0,5,0,0, 0,40,1,0,0, 10,80,2,20,6, 36,104,4,70,3, 64,106,6,100,0, 88,96,7,120,0, 110,76,3,180,0,
                         112,44,1,180,0, 104,14,4,200,2.2, 84,-8,2,250,8, 56,-18,1,270,0, 30,-28,4,290,3 } },
-  { "Bando", 83, { 0,0,1,0,0, 0,34,8,0,1.8, 0,46,8,0,1.8, 20,66,4,60,4, 40,88,3,146,0, 56,64,1,180,0, 43.75,10,8,180,1.3,
+  { "Bando", 83, { 0,0,1,0,0, 0,34,8,0,1.8, 0,46,8,0,1.8, 20,66,4,60,4, 40,88,3,146,0, 56,64,1,180,0, 43.95,10,8,180,1.3,
                    22,-16,4,250,2.5 },
-    { -6.1,34,3.9,0.25,0,7,1, 6.1,34,3.9,0.25,0,7,1, 0,34,2.2,0.25,3.6,7,1,
-      -6.1,46,3.9,0.25,0,7,1, 6.1,46,3.9,0.25,0,7,1, 0,46,2.2,0.25,3.6,7,1,
-      -10,40,0.25,6.25,0,7,1, 10,35.775,0.25,2.025,0,7,1, 10,44.225,0.25,2.025,0,7,1, 10,40,0.25,2.2,3.6,7,1,
-      46,64,2,2,0,24,1, 34,10,1.25,3,0,2.6,2, 40.5,10,1.25,3,0,2.6,3, 47,10,1.25,3,0,2.6,2,
+    { -6.225,34,4.025,0.25,0,7,1, 6.225,34,4.025,0.25,0,7,1, 0,34,2.2,0.25,3.6,7,1,
+      -6.225,46,4.025,0.25,0,7,1, 6.225,46,4.025,0.25,0,7,1, 0,46,2.2,0.25,3.6,7,1,
+      -10,40,0.25,5.75,0,7,1, 10,36.025,0.25,1.775,0,7,1, 10,43.975,0.25,1.775,0,7,1, 10,40,0.25,2.2,3.6,7,1,
+      46,64,2,2,0,24,1, 33.6,10,1.25,3,0,2.6,2, 40.5,10,1.25,3,0,2.6,3, 47.4,10,1.25,3,0,2.6,2,
       -30,20,3,1.25,0,5.2,3, -36,50,4,4,0,3,1 } },
 }
 local NT = #TRACKS
@@ -363,13 +365,20 @@ local gt, lastT, tState, tStart = 0, 0, 0, 0                          -- game cl
 local lapStart, lap, nextGate, lastGate = nil, 0, 1, 0
 local R = { laps = {}, n = 0, total = 0, newLap = false, newRace = false, newBest = false, msg = nil, msgT = 0, good = true,
             ready = 0, crashes = 0, cd = -1, fps = 0, fpsN = 0, fpsT = 0,
-            pk = 0, pos = 1, sc = 0, ch = 0, chn = 0, cht = 0, prox = 9, rn = 0, rt = 0, smp = 0 }
+            pk = 0, pos = 1, sc = 0, ch = 0, chn = 0, cht = 0, prox = 9, rn = 0, rt = 0, smp = 0,
+            fi = 5, pt = 0 }                                  -- frame interval, sim time (10 ms ticks)
 
 local function timeStr(cs)
   cs = floor(cs)
   local s = floor(cs / 100)
   if s >= 60 then return fmt("%d:%02d.%02d", floor(s / 60), s % 60, cs % 100) end
   return fmt("%d.%02d", s, cs % 100)
+end
+
+-- HUD clocks: lap number, lap time, race time (ticks); frozen once the race is over
+local function lapClock()
+  if gmode == 1 and state == DONE and R.n > 0 then return S.laps, R.laps[R.n], R.total end
+  return lap > 0 and lap or 1, lapStart and gt - lapStart or 0, gt - tStart
 end
 
 local function beep(f, d, flags)
@@ -388,6 +397,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
   local grounded = true
   local nearG, nearP, nearB = {}, {}, {}
   local Tm = 0                                   -- motor thrust (lags the throttle)
+  local wob1, wob2 = 0, 0                        -- prop wash wobble (rad/s)
   local seed = 7
 
   rnd = function()
@@ -566,14 +576,20 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
       wr, wp = rate(sA, P.rc, P.rm, P.re), -rate(sE, P.rc, P.rm, P.re)
     end
     local wy = rate(sR, P.yc, P.ym, P.ye)
-    local T = Tmax * (0.04 + 0.96 * sT ^ 1.6)
-    -- prop wash: descending into your own downwash shakes the quad
-    local vu0 = vx * ux + vy * uy + vz * uz
-    if vu0 < -2 and sT > 0.2 then
-      local a = (-vu0 - 2) * 0.2
-      if a > 1 then a = 1 end
-      a = a * sT * P.pw * 5
-      wr, wp = wr + (rnd() - 0.5) * a, wp + (rnd() - 0.5) * a
+    local T = Tmax * (0.015 + 0.985 * sT ^ 1.6)        -- 1.5% at idle, like DShot idle on a tuned quad
+    -- prop wash (setting, off by default): descending into your own downwash
+    -- makes the quad wobble. Smoothed noise, so it reads as a wobble, not jitter.
+    if S.wash == 1 then
+      local vu0 = vx * ux + vy * uy + vz * uz
+      if vu0 < -2 and sT > 0.2 then
+        local a = (-vu0 - 2) * 0.2
+        if a > 1 then a = 1 end
+        a = a * sT * P.pw * 2.5
+        wob1, wob2 = wob1 * 0.6 + (rnd() - 0.5) * a, wob2 * 0.6 + (rnd() - 0.5) * a
+        wr, wp = wr + wob1, wp + wob2
+      else
+        wob1, wob2 = 0, 0
+      end
     end
     if grounded and T < G * 1.02 then
       -- resting on the ground: stays level, can only yaw
@@ -902,11 +918,13 @@ local CX, CY = VX + VW / 2, VY + VH / 2
 local SC = VW / 128
 local F, tanH = 160, 1.4
 
--- FPV camera, rendered where the quad will be when the frame reaches the screen:
--- 0.015 s ahead (color screens show a frame one 50 ms cycle after it is drawn)
+-- FPV camera, rendered where the quad will be when the frame reaches the screen. Color
+-- screens show a frame one script cycle after it is drawn (50 ms on stock EdgeTX), so the
+-- prediction follows the measured frame interval and stays right on faster firmware too.
+-- FPVSIM_LAT (seconds) overrides it, e.g. in the emulator when frames show at once.
 local function fpvCamera()
   local c, s = P.tc, P.ts
-  local d = (state == FLY or state == DONE) and 0.015 or 0
+  local d = (state == FLY or state == DONE) and (FPVSIM_LAT or R.fi * 0.003) or 0
   local a1, a2, a3, b1, b2, b3, e1, e2, e3 = rx, ry, rz, ux, uy, uz, fx, fy, fz
   if d > 0 then rotate(P.wr * d, P.wp * d, P.wy * d) end
   kpx, kpy, kpz = px + vx * d, py + vy * d, pz + vz * d
@@ -946,57 +964,62 @@ local function applySettings()
   F = (VW / 2) / tanH
 end
 
--- visible objects sorted far -> near (painter's algorithm).
--- ids: gates 1..NG, trees -i, boxes 1000+b, AI pilots 2000+a
-local ordZ, ordI, nOrd = {}, {}, 0
-local function collectObjects(maxZ)
-  nOrd = 0
-  local n1 = NG + NP
-  local n2 = n1 + BX.n
-  for n = 1, n2 + (gmode == 1 and AI.n or 0) do
-    local id, X, Y, Z, rad = n, 0, 0, 0, 4
-    if n <= NG then
-      X, Y, Z = gx[n] - kpx, gy[n] - kpy, gz[n] - kpz
-      local sh = GSH[gk[n]]
-      if sh == 3 then rad = 9
-      elseif sh == 4 then
-        -- a gap's highlight goes on top of the walls around it
-        X, Y, Z = X - kfx * 2, Y - kfy * 2, Z - kfz * 2
-      end
-    elseif n <= n1 then
-      local i = n - NG
-      if qk[i] == 1 then
-        X, Y, Z = qx[i] - kpx, qh[i] * 0.4 - kpy, qz[i] - kpz
-        rad = qh[i]
-      else
-        Z = -1e9
-      end
-      id = -i
-    elseif n <= n2 then
-      local b = n - n1
-      local x0, x1, y0, y1, z0, z1 = BX.x0[b], BX.x1[b], BX.y0[b], BX.y1[b], BX.z0[b], BX.z1[b]
-      X, Y, Z = (x0 + x1) * 0.5 - kpx, (y0 + y1) * 0.5 - kpy, (z0 + z1) * 0.5 - kpz
-      rad = (x1 - x0 + y1 - y0 + z1 - z0) * 0.5
-      id = 1000 + b
-    else
-      local a = n - n2
-      X, Y, Z = AI.x[a] - kpx, AI.y[a] - kpy, AI.z[a] - kpz
-      rad = 1
-      id = 2000 + a
-    end
-    local z = X * kfx + Y * kfy + Z * kfz
-    if z > -rad and z < maxZ then
-      local x = X * krx + Y * kry + Z * krz
-      if x < 0 then x = -x end
-      if z < 4 or x < z * tanH + rad then
-        local j = nOrd
-        while j > 0 and ordZ[j] < z do
-          ordZ[j + 1], ordI[j + 1] = ordZ[j], ordI[j]
-          j = j - 1
+-- visible objects, drawn far -> near (painter's algorithm). ids: gates 1..NG, trees -i,
+-- boxes 1000+b, AI pilots 2000+a. ordP holds the draw order (indices into the ord* arrays).
+local ordZ, ordI, ordP, nOrd = {}, {}, {}, 0
+local collectObjects
+do
+
+  collectObjects = function(maxZ)
+    nOrd = 0
+    local n1 = NG + NP
+    local n2 = n1 + BX.n
+    local boxes = false
+    for n = 1, n2 + (gmode == 1 and AI.n or 0) do
+      local id, X, Y, Z, rad = n, 0, 0, 0, 4
+      if n <= NG then
+        X, Y, Z = gx[n] - kpx, gy[n] - kpy, gz[n] - kpz
+        local k = gk[n]
+        if GSH[k] == 3 then rad = 9 elseif k == 2 or k == 3 then rad = 7 end
+      elseif n <= n1 then
+        local i = n - NG
+        if qk[i] == 1 then
+          X, Y, Z = qx[i] - kpx, qh[i] * 0.4 - kpy, qz[i] - kpz
+          rad = qh[i]
+        else
+          Z = -1e9
         end
-        ordZ[j + 1], ordI[j + 1] = z, id
-        nOrd = nOrd + 1
+        id = -i
+      elseif n <= n2 then
+        local b = n - n1
+        local x0, x1, y0, y1, z0, z1 = BX.x0[b], BX.x1[b], BX.y0[b], BX.y1[b], BX.z0[b], BX.z1[b]
+        X, Y, Z = (x0 + x1) * 0.5 - kpx, (y0 + y1) * 0.5 - kpy, (z0 + z1) * 0.5 - kpz
+        rad = (x1 - x0 + y1 - y0 + z1 - z0) * 0.5
+        id = 1000 + b
+      else
+        local a = n - n2
+        X, Y, Z = AI.x[a] - kpx, AI.y[a] - kpy, AI.z[a] - kpz
+        rad = 1
+        id = 2000 + a
       end
+      local z = X * kfx + Y * kfy + Z * kfz
+      if z > -rad and z < maxZ then
+        local x = X * krx + Y * kry + Z * krz
+        if (x < 0 and -x or x) < z * tanH + rad or z < 4 then
+          local o = nOrd + 1
+          nOrd = o
+          ordZ[o], ordI[o] = z, id
+        end
+      end
+    end
+    -- no structures in view: plain depth order (insertion sort)
+    for o = 1, nOrd do
+      local z, j = ordZ[o], o - 1
+      while j > 0 and ordZ[ordP[j]] < z do
+        ordP[j + 1] = ordP[j]
+        j = j - 1
+      end
+      ordP[j + 1] = o
     end
   end
 end
@@ -1243,11 +1266,12 @@ local line2
     drawGrid()
     collectObjects(90)
     for j = 1, nOrd do
-      local id = ordI[j]
-      if id < 0 then drawTree(-id, ordZ[j])
-      elseif id < 1000 then drawGate(id, ordZ[j])
-      elseif id < 2000 then drawBox(id - 1000, ordZ[j])
-      else drawAI(id - 2000, ordZ[j]) end
+      local o = ordP[j]
+      local id, z = ordI[o], ordZ[o]
+      if id < 0 then drawTree(-id, z)
+      elseif id < 1000 then drawGate(id, z)
+      elseif id < 2000 then drawBox(id - 1000, z)
+      else drawAI(id - 2000, z) end
     end
   end
 end)()
@@ -1392,8 +1416,9 @@ local render, hitTest, pauseHit, initUI
 
   local function drawHUD()
     if gmode <= 2 then
-      drawNumber(1, 1, floor(lapStart and (gt - lapStart) / 10 or 0), PREC1 + SMLSIZE + LEFT)
-      local s = (lap > 0 and lap or 1) .. ""
+      local l, lt = lapClock()
+      drawNumber(1, 1, floor(lt / 10), PREC1 + SMLSIZE + LEFT)
+      local s = l .. ""
       if gmode == 1 then s = s .. "/" .. S.laps end
       if gmode == 1 and AI.n > 0 then s = "P" .. R.pos .. " L" .. s end
       drawText(XM, 1, s, SMLSIZE + RIGHT)
@@ -1666,7 +1691,8 @@ local function init()
     end
     TEST.vel = function(a, b, c) vx, vy, vz = a, b, c end
     TEST.lapclock = function(t)
-      lapStart, tStart = gt - t, gt - t - 640
+      -- first lap running for t ticks, and no "GO!" banner (for screenshots)
+      lapStart, tStart, R.msgT = gt - t, gt - t, gt - 1000
       if lap < 1 then lap = 1 end
     end
     TEST.next = function(i) nextGate, lastGate = i, (i - 2) % NG + 1 end
@@ -1676,6 +1702,7 @@ local function init()
     TEST.best = function(t) return BEST.l[t], BEST.r[t], BEST.g[t], BEST.f[t] end
     TEST.box = function(b) return BX.x0[b], BX.x1[b], BX.y0[b], BX.y1[b], BX.z0[b], BX.z1[b] end
     TEST.S = S
+    TEST.order = function() return nOrd, ordP, ordI, TEST.bounds, kpx, kpy, kpz end
   end
 end
 
@@ -1684,11 +1711,21 @@ local function run(event, touch)
   local dtk = now - lastT
   lastT = now
   if dtk > 10 then dtk = 10 elseif dtk < 0 then dtk = 0 end
-  if state == PAUSED or state == SETUP then dtk = 0 end
+  -- frame interval in 10 ms ticks, smoothed: getTime() only ticks every 10 ms, so when the
+  -- firmware runs the script faster than 20 fps the raw steps jitter (0, 1, 2, 3 ticks...)
+  R.fi = R.fi + (dtk - R.fi) * 0.2
+  local paused = state == PAUSED or state == SETUP
+  if paused then dtk = 0 end
   gt = gt + dtk
+  -- simulation time advances by the smoothed interval, kept within a tick of the clock
+  local pt = R.pt + (paused and 0 or R.fi)
+  if pt > gt + 1 then pt = gt + 1 elseif pt < gt - 1 then pt = gt - 1 end
+  local dts = (pt - R.pt) * 0.01
+  if dts < 0 then dts = 0 end
+  R.pt = pt
   readSticks()
   if handleEvent(event or 0, touch) ~= 0 then return 1 end
-  update(dtk / 100)
+  update(dts)
   render()
   R.fpsN = R.fpsN + 1
   if now - R.fpsT >= 100 then

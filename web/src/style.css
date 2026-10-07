@@ -216,3 +216,9 @@ kbd { font: 500 11px/1 var(--font-mono); padding: 2px 5px; border-radius: 4px; b
 .note.warn { color: var(--warn); }
 footer.credits { margin-top: 22px; font-size: 12px; color: var(--muted); max-width: 900px; }
 footer.credits a { color: inherit; }
+
+/* fullscreen screen (PC mode and radios): fill the display, keep the aspect */
+.bezel:fullscreen { display: flex; align-items: center; justify-content: center; background: #000; padding: 0; border: 0; border-radius: 0; }
+.bezel:fullscreen #lcd { width: 100vw !important; height: 100vh !important; max-width: none; object-fit: contain; image-rendering: auto; }
+.pc-note { display: none; }
+#loadCard.pc .pc-note { display: block; }

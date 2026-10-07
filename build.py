@@ -32,7 +32,7 @@ VARIANTS = {
         "DATAFILE": "FPVSim.dat",
         "DEG": "°",
         "DPS": "°/s",
-        "LAT": "0.055",
+        "LATK": "0.011",
         "REFW": "480",
     },
     "BW": {
@@ -48,7 +48,7 @@ VARIANTS = {
         "DATAFILE": "FPVSimBW.dat",
         "DEG": "",
         "DPS": "",
-        "LAT": "0.015",
+        "LATK": "0.003",
         "REFW": "128",
     },
 }

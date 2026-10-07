@@ -3,7 +3,7 @@
 Usage: tools/tune_physics.py [KH=0.18 VP=60 KQS=0.0072 KQU=0.024]
 
 Model (mass-normalised, body axes r/u/f):
-  T  = Tmax*(0.04 + 0.96*thr^1.6)       motor thrust, lagged with TAU_M
+  T  = Tmax*(0.015 + 0.985*thr^1.6)       motor thrust, lagged with TAU_M
   Ta = T - vu*sqrt(T*Tmax)/VP            props lose thrust with axial airspeed (pitch speed ~ rpm)
   kh = KH*sqrt(T/Tmax + 0.02)            rotor drag in the prop plane
   a  = u*(Ta - KQU|vu|vu) + r*(-kh vr - KQS|vr|vr) + f*(-kh vf - KQS|vf|vf) - g
@@ -19,7 +19,7 @@ P = dict(KQS=0.009, KQU=0.028, KH=0.22, VP=86.0)
 def accel(v, th, thr, twr, p):
     """v: (vy, vz) world velocity, th: nose-down tilt (rad). returns world accel (ay, az)."""
     Tmax = twr * G
-    T = Tmax * (0.04 + 0.96 * thr ** 1.6)
+    T = Tmax * (0.015 + 0.985 * thr ** 1.6)
     # body axes in the y-z plane: u = (cos th, sin th), f = (-sin th, cos th)
     uy, uz, fy, fz = math.cos(th), math.sin(th), -math.sin(th), math.cos(th)
     vy, vz = v
@@ -62,7 +62,7 @@ def main():
         k, v = a.split("=")
         p[k] = float(v)
     for twr in (3, 5, 8, 12):
-        hover = ((1 / twr - 0.04) / 0.96) ** (1 / 1.6)
+        hover = ((1 / twr - 0.015) / 0.985) ** (1 / 1.6)
         climb = settle(0.0, 1.0, twr, p)[0]
         fall = settle(0.0, 0.0, twr, p)[0]
         deg, vz, vy = top_speed(twr, p)

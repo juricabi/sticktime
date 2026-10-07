@@ -83,7 +83,8 @@
       onSave: () => store.set('sd', Object.fromEntries(app.sd)),
     });
     eng.stickMode = app.mode - 1;
-    eng.displayDelay = app.delay;
+    // PC mode: big screen, 60 fps, frames shown at once (no radio display delay)
+    eng.displayDelay = !r.pc && app.delay;
     app.engine = eng;
     canvas.width = r.w; canvas.height = r.h;
     img = ctx.createImageData(r.w, r.h);
@@ -91,7 +92,12 @@
     $('lcdName').textContent = r.label.split('  ')[1].split(' · ')[0];
     $('lcdRes').textContent = r.w + '×' + r.h + (r.color ? ' color' : r.depth > 1 ? ' grey' : ' mono');
     const s = scriptFor();
-    eng.load(s.text, s.name, { FPVSIM_TEST: 'table' });
+    const globals = { FPVSIM_TEST: 'table' };
+    if (r.color && !eng.displayDelay) globals.FPVSIM_LAT = 0;   // nothing to predict when frames show at once
+    eng.load(s.text, s.name, globals);
+    $('rateChk').disabled = !!r.pc;
+    $('delayChk').disabled = !!r.pc;
+    $('loadCard').classList.toggle('pc', !!r.pc);
     sizeCanvas();
     showOverlay();
     draw();
@@ -205,6 +211,7 @@
     else if (k === 'm' || k === 'M') key('menu');
     else if (k === 'r' || k === 'R') boot();
     else if (k === 'p' || k === 'P') togglePause();
+    else if (k === 'f' || k === 'F') toggleFullscreen();
   });
   window.addEventListener('keyup', (e) => {
     const k = e.key;
@@ -344,10 +351,11 @@
 
   // ---------------------------------------------------------- main loop
   let last = performance.now(), acc = 0, emuFps = 0, emuN = 0, emuT = last, emuMs = 0;
+  const frameMs = () => (app.radio.pc ? 1000 / 60 : app.rate);
   function frame() {
     const t0 = performance.now();
     app.engine.sticks = { ail: stick.ail * 1024, ele: stick.ele * 1024, thr: stick.thr * 1024, rud: stick.rud * 1024 };
-    app.engine.frame(app.rate);
+    app.engine.frame(frameMs());
     emuMs = emuMs * 0.8 + (performance.now() - t0) * 0.2;
     emuN++;
   }
@@ -361,7 +369,8 @@
     if (!app.paused && e && !e.error && !e.exited) {
       acc += dt;
       let n = 0;
-      while (acc >= app.rate && n < 3) { frame(); acc -= app.rate; n++; }
+      const fm = frameMs();
+      while (acc >= fm && n < 3) { frame(); acc -= fm; n++; }
       if (n === 3) acc = 0;
       if (n) {
         draw();
@@ -371,6 +380,15 @@
     if (ts - emuT >= 1000) { emuFps = emuN; emuN = 0; emuT = ts; }
     updateStats();
     requestAnimationFrame(loop);
+  }
+
+  // fullscreen for the screen (handy in PC mode); F toggles it
+  function toggleFullscreen() {
+    const el = document.querySelector('.bezel');
+    try {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else if (el.requestFullscreen) el.requestFullscreen();
+    } catch (e) { /* blocked in this frame */ }
   }
 
   function togglePause() {
@@ -467,7 +485,12 @@
     $('rateChk').checked = app.rate === 50;
     $('rateChk').addEventListener('change', () => { app.rate = $('rateChk').checked ? 50 : 1000 / 60; store.set('rate', app.rate); });
     $('delayChk').checked = app.delay;
-    $('delayChk').addEventListener('change', () => { app.delay = $('delayChk').checked; store.set('delay', app.delay); if (app.engine) app.engine.displayDelay = app.delay; });
+    $('delayChk').addEventListener('change', () => {
+      app.delay = $('delayChk').checked; store.set('delay', app.delay);
+      const e = app.engine;
+      if (e && !app.radio.pc) { e.displayDelay = app.delay; e.setGlobal('FPVSIM_LAT', app.delay ? null : 0); }
+    });
+    $('fsBtn').addEventListener('click', toggleFullscreen);
     $('ghostChk').checked = app.ghost;
     $('ghostChk').addEventListener('change', () => { app.ghost = $('ghostChk').checked; store.set('ghost', app.ghost); });
     $('pauseChk').addEventListener('change', () => { app.paused = $('pauseChk').checked; });

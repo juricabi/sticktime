@@ -130,21 +130,26 @@ local function counted(f, ...)
   return r, n
 end
 
-local maxInstr, sumInstr, frames, maxRows, sumRows = 0, 0, 0, 0, 0
+-- FRAME_MS=20 simulates firmware that calls run() faster than stock EdgeTX (50 ms)
+local FRAME_MS = tonumber(os.getenv and os.getenv("FRAME_MS") or "") or 50
+local FPS = math.floor(1000 / FRAME_MS + 0.5)
+local maxInstr, sumInstr, frames, maxRows, sumRows = 0, 0.0, 0, 0, 0.0   -- float sums: 32-bit ints overflow on long runs
 local function frame(ev, touch)
-  clock = clock + 50
+  clock = clock + FRAME_MS
   stat.lines, stat.tris, stat.rows = 0, 0, 0
   local ok, r, n = pcall(counted, script.run, ev or 0, touch)
   if not ok then fail("run error: " .. tostring(r)) return 0 end
   frames = frames + 1
-  sumInstr = sumInstr + n
+  sumInstr = sumInstr + n * 1.0
   if n > maxInstr then maxInstr = n end
-  sumRows = sumRows + stat.rows
+  sumRows = sumRows + stat.rows * 1.0
   if stat.rows > maxRows then maxRows = stat.rows end
   return r
 end
 
 local function state() local t = { T.get() } return t[16], t end
+-- run frames for n * 50 ms of radio time
+local function steps(n) for i = 1, math.max(1, math.floor(n * 50 / FRAME_MS + 0.5)) do frame(0) end end
 
 -- ------------------------------------------------------------ autopilot
 -- angle mode: steer toward a lead point on the gate axis, hold the aim height
@@ -181,7 +186,7 @@ local function autopilot(target)
   sticks.ail = math.max(-0.6, math.min(0.6, -vs * 0.15 + herr * 0.25)) * 1024
   local _, twr = T.info()
   local tilt = math.min(0.8, math.abs(sticks.ele / 1024) * 0.9)
-  local hover = ((1 / twr - 0.04) / 0.96) ^ (1 / 1.6) / math.cos(tilt)
+  local hover = ((1 / twr - 0.015) / 0.985) ^ (1 / 1.6) / math.cos(tilt)
   local t = hover + (ty - py) * 0.08 - vy * 0.1
   sticks.thr = (math.max(0, math.min(1, t)) * 2 - 1) * 1024
 end
@@ -190,8 +195,8 @@ local function idleSticks() sticks.ail, sticks.ele, sticks.rud, sticks.thr = 0, 
 
 -- ------------------------------------------------------------ scenarios
 -- 1. menus: walk every item, open settings, change every option both ways
-local OPTN = COLOR and 19 or 17
-for i = 1, 20 do frame(0) end
+local OPTN = COLOR and 20 or 18
+steps(20)
 for i = 1, 9 do frame(EVT_VIRTUAL_NEXT) frame(0) end
 for i = 1, 9 do frame(EVT_VIRTUAL_PREV) frame(0) end
 -- Settings is item 6: from item 1 press NEXT 5 times
@@ -227,7 +232,7 @@ for track = 1, NT do
   idleSticks()
   local t0 = clock
   local done = false
-  for f = 1, 20 * 260 do
+  for f = 1, FPS * 260 do
     local st = state()
     if st == 4 then autopilot() else idleSticks() end
     if st == 8 then done = true break end
@@ -246,7 +251,7 @@ for track = 1, NT do
   if not done then fail("track " .. track .. ": race not finished (laps " .. nl .. ", last gate " .. lg .. ", crashes " .. crashes .. ")") end
   if crashes > 0 then fail("track " .. track .. ": autopilot crashed " .. crashes .. " times") end
   -- let the AI pilots finish, the result screen keeps the player's place
-  for f = 1, 20 * 60 do frame(0) end
+  steps(20 * 60)
   frame(EVT_VIRTUAL_EXIT)
   frame(0)
 end
@@ -255,6 +260,7 @@ T.set("ai", 0)
 -- 3. acro stress: random sticks, crashes, respawns, pause/resume/restart in every mode
 T.set("mode", 1)
 T.set("wind", 2)
+T.set("wash", 1)
 T.set("quad", 2)
 T.track(7)
 local seed = 7
@@ -278,6 +284,7 @@ for m = 2, 4 do
   end
 end
 T.set("wind", 0)
+T.set("wash", 0)
 T.set("quad", 1)
 -- poses: straight up, straight down, inverted, inside a gate, inside a wall
 for _, p in ipairs({ { 0, 5, 0, 0, 90, 0 }, { 0, 5, 0, 0, -90, 0 }, { 0, 5, 0, 45, 0, 180 }, { 0, 1.35, 0, 0, 0, 0 },
@@ -291,43 +298,43 @@ end
 -- 4. dive gate: drop straight through it from above (track 3, gate 5)
 T.track(3)
 T.start(2)
-for i = 1, 70 do frame(0) end
+steps(70)
 T.state(4)
 T.next(5)
 local gx5, gy5, gz5 = T.gate(5)
 T.pose(gx5, gy5 + 3, gz5, 0, 0, 0)
 idleSticks()
-for i = 1, 30 do frame(0) end
+steps(30)
 local _, s5 = state()
 if s5[18] ~= 6 then fail("dive gate not registered (next gate " .. s5[18] .. ", state " .. s5[16] .. ")") else print("dive gate: pass registered") end
 T.state(4)
 T.next(5)
 T.pose(gx5 + 2.1, gy5 + 3, gz5, 0, 0, 0)
-for i = 1, 30 do frame(0) end
+steps(30)
 if state() ~= 5 and state() ~= 6 then fail("hitting the dive gate frame should crash (state " .. state() .. ")") else print("dive gate frame: crash registered") end
 
 -- 5. flags and hoops: wrong side of a flag does not count, the hoop rim crashes
 T.track(4)
 T.start(2)
-for i = 1, 70 do frame(0) end
+steps(70)
 do
   local cx, cy, cz, nx, ny, nz, k, ax, ay, az = T.gate(2)      -- flag, pass on its right (+x)
   local pole = cx - 6
   T.state(4) T.next(2)
   T.pose(pole - 3, 2, cz - 3, 0, 0, 0) T.vel(0, 0, 8)
   sticks.thr = -150
-  for i = 1, 12 do frame(0) end
+  steps(12)
   local _, s = state()
   if s[18] ~= 2 then fail("passing a flag on the wrong side should not count") end
   T.state(4) T.next(2)
   T.pose(pole + 3, 2, cz - 3, 0, 0, 0) T.vel(0, 0, 8)
-  for i = 1, 12 do frame(0) end
+  steps(12)
   _, s = state()
   if s[18] ~= 3 then fail("passing a flag on the right side should count (next " .. s[18] .. ")") else print("flag: sides checked") end
   cx, cy, cz = T.gate(6)                                        -- hoop
   T.state(4) T.next(6)
   T.pose(cx + 1.3, cy, cz - 3, 0, 0, 0) T.vel(0, 0, 8)
-  for i = 1, 12 do frame(0) end
+  steps(12)
   if state() ~= 5 and state() ~= 6 then fail("hitting the hoop rim should crash (state " .. state() .. ")") else print("hoop rim: crash registered") end
 end
 idleSticks()
@@ -336,20 +343,20 @@ idleSticks()
 T.track(7)
 T.set("mode", 1)
 T.start(3)
-for i = 1, 8 do frame(0) end
+steps(8)
 T.state(4)
 T.pose(-20, 25, -20, 45, 0, 0)
 sticks.thr, sticks.ele, sticks.ail, sticks.rud = 200, 1024, 0, 0     -- full back pitch: back flips
-for i = 1, 14 do frame(0) end
+steps(14)
 sticks.ele, sticks.ail = 0, 1024                                     -- full roll right
-for i = 1, 14 do frame(0) end
+steps(14)
 sticks.ail = 0
 local _, _, _, _, _, sc, _, _, chn = T.info()
 if chn < 2 then fail("freestyle: flips and rolls should build a combo (tricks " .. chn .. ")") end
 T.pose(-20, 25, -20, 45, 0, 0)
 idleSticks()
 sticks.thr = 0
-for i = 1, 80 do frame(0) end
+steps(80)
 _, _, _, _, _, sc, _, _, chn = T.info()
 if sc <= 0 then fail("freestyle: the combo should be banked into the score") else print("freestyle: score " .. sc) end
 -- gap shot through the ruin door
@@ -358,7 +365,7 @@ do
   T.state(4)
   T.pose(cx, cy, cz - 4, 0, 0, 0) T.vel(0, 0, 9)
   sticks.thr = 0
-  for i = 1, 6 do frame(0) end
+  steps(6)
   _, _, _, _, _, sc, _, _, chn = T.info()
   if chn < 1 then fail("freestyle: flying through a gap should count as a trick") end
 end
@@ -369,7 +376,7 @@ T.track(1)
 T.set("mode", 2)
 T.start(4)
 local rushDone = false
-for f = 1, 20 * 240 do
+for f = 1, FPS * 240 do
   local st, s = state()
   if st == 4 then autopilot(s[18]) else idleSticks() end
   if st == 8 then rushDone = true break end
@@ -393,7 +400,7 @@ if stat.rejected > 0 then fail(stat.rejected .. " lines would be rejected by the
 
 collectgarbage()
 print(string.format("%s %s %dx%d  frames %d  instr/frame (incl. mock lcd) avg %d max %d  tri rows avg %d max %d  rejected lines %d",
-  _VERSION, kind, W, H, frames, sumInstr / frames, maxInstr, sumRows / frames, maxRows, stat.rejected))
+  _VERSION, kind, W, H, frames, math.floor(sumInstr / frames), maxInstr, math.floor(sumRows / frames), maxRows, stat.rejected))
 print(string.format("memory: script loaded+init %.1f KB, now %.1f KB", memInit - mem0, collectgarbage("count") - mem0))
 for _, r in ipairs(results) do
   print(string.format("track %d %-12s finished=%s laps=%d total=%.2fs lap1=%.2f lap2=%.2f crashes=%d place %d/%d, AI finished %d (sim %.0fs)",

@@ -54,6 +54,7 @@
             <button class="key enter" type="button" data-key="enter" title="Enter">Enter</button>
             <button class="key" type="button" data-key="next" title="Down / Right arrow, mouse wheel">Next ▶</button>
             <button class="key" type="button" data-key="menu" title="M">Menu</button>
+            <button class="key" type="button" id="fsBtn" title="F">Fullscreen</button>
           </div>
         </div>
         <div class="gimbal" id="gR">
@@ -74,6 +75,7 @@
       </div>
       <div class="load-bar" id="loadBar" title="Budget: 50 ms (the radio calls run() at most 20 times a second)"><i></i></div>
       <p class="note">Estimate for one <code>run()</code> call on the radio, against the 50 ms budget of its 20 Hz UI loop.</p>
+      <p class="note pc-note">PC screen: runs at 60 fps with no radio limits, for playing and testing. The estimate still shows what an H7 radio would need for this frame.</p>
       <dl class="stats">
         <dt>Lua VM instructions</dt><dd id="stInstr">–</dd>
         <dt>lcd calls</dt><dd id="stCalls">–</dd>
@@ -126,7 +128,7 @@
         <tr><td>Enter</td><td><kbd>Enter</kbd></td></tr>
         <tr><td>Exit / pause</td><td><kbd>Esc</kbd> (hold = close script)</td></tr>
         <tr><td>Rotary</td><td>arrows, <kbd>+</kbd> <kbd>−</kbd>, mouse wheel</td></tr>
-        <tr><td>Emulator</td><td><kbd>R</kbd> restart · <kbd>P</kbd> pause</td></tr>
+        <tr><td>Emulator</td><td><kbd>R</kbd> restart · <kbd>P</kbd> pause · <kbd>F</kbd> fullscreen</td></tr>
       </table>
     </div>
 

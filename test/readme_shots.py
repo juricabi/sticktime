@@ -53,7 +53,7 @@ with sync_playwright() as p:
     page.evaluate("sim.test('set', 'ai', 3); sim.test('set', 'skill', 3); sim.test('track', 6); sim.test('start', 1); sim.sticks(0, 0, -1, 0)")
     page.evaluate("sim.step(60, 50); sim.step(52, 50)")
     ax, ay, az = page.evaluate("sim.test('ai', 2)")[:3]
-    page.evaluate(f"sim.test('pose', {ax + 1.2}, {ay + 0.9}, {az - 6.5}, 0, -8, -12); sim.test('state', 4); sim.test('lapclock', 0); sim.step(1, 50)")
+    page.evaluate(f"sim.test('pose', {ax + 1.2}, {ay + 0.9}, {az - 6.5}, 0, -8, -12); sim.test('state', 4); sim.test('lapclock', 262); sim.step(1, 50)")
     shot(page, "tx16s-race")
     race_view(page, 7, 2, 18, -3, 1.2, 8, -4, 10)
     shot(page, "tx16s-bando")
