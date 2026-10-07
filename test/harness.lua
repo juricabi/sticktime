@@ -100,6 +100,8 @@ function lcd.RGB(r, g, b) return ((floor(r) * 0 + 1) * 0x10000) + 0x8000 end
 FPVSIM_TEST = {}
 
 -- ------------------------------------------------------------------- load
+-- EdgeTX gives strings no metatable: s:sub() style calls fail on a radio, so here too
+debug.setmetatable("", nil)
 local chunk, err = loadfile(path)
 if not chunk then print("LOAD ERROR " .. err) os.exit(1) end
 collectgarbage() collectgarbage()
@@ -407,5 +409,5 @@ for _, r in ipairs(results) do
     r.track, r.name, tostring(r.done), r.laps, (r.total or 0) / 100, (r.lap1 or 0) / 100, (r.lap2 or 0) / 100, r.crashes or -1,
     r.pos, r.nai + 1, r.aiDone, r.secs))
 end
-print("saved: " .. tostring(saved):gsub("\n", ""))
+print("saved: " .. string.gsub(tostring(saved), "\n", ""))
 print(fails == 0 and "ALL OK" or (fails .. " FAILURES"))

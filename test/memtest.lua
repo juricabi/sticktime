@@ -34,24 +34,44 @@ local function frame(ev, a, e, t, r)
   if not ok2 then error("run: " .. tostring(res)) end
 end
 local peakLua, okRun, runErr = 0, true, nil
+local ENTER, EXIT, NEXT, PREV, INC = 514, 513, 7680, 7424, 7680
+local function fly()
+  for i = 1, 200 do
+    -- some throttle and pitch, alternating roll: flies, passes or hits things, crashes
+    frame(0, (i // 40) % 2 == 0 and 200 or -200, 300, 250, 0)
+    local l = radio.mem()
+    if l > peakLua then peakLua = l end
+  end
+end
+local function key(e) frame(e) frame(0) end
 okRun, runErr = pcall(function()
   local ok3, e3 = radio.call("init")
   if not ok3 then error("init: " .. tostring(e3)) end
   for i = 1, 5 do frame(0) end
-  local okT, _, nt = pcall(radio.call, "T.ntracks")
-  local okM, _, nm = pcall(radio.call, "T.nmodes")
-  if not okT then nt, nm = 7, 4 end              -- the full game has no such hooks
-  for t = 1, nt do
-    for m = 1, nm do
-      radio.call("T.track", t)
-      radio.call("T.start", m)
-      for i = 1, 200 do
-        -- some throttle and pitch, alternating roll: flies, passes or hits things, crashes
-        frame(0, (i // 40) % 2 == 0 and 200 or -200, 300, 250, 0)
-        local l = radio.mem()
-        if l > peakLua then peakLua = l end
+  if pcall(radio.call, "T.info") then
+    -- test hooks: every track and mode directly (the full game has 7 tracks, 4 modes)
+    local okT, _, nt = pcall(radio.call, "T.ntracks")
+    local _, _, nm = pcall(radio.call, "T.nmodes")
+    if not okT then nt, nm = 7, 4 end
+    for t = 1, nt do
+      for m = 1, nm do
+        radio.call("T.track", t)
+        radio.call("T.start", m)
+        fly()
+        key(EXIT) key(EXIT) key(EXIT)                   -- pause, menu
       end
-      frame(513) frame(0) frame(513) frame(0) frame(513) frame(0)    -- pause, menu
+    end
+  else
+    -- the Lite as shipped (no hooks), through its menus: 4 tracks x 3 modes
+    for t = 1, 4 do
+      for m = 1, 3 do
+        for _ = 2, m do key(NEXT) end
+        key(ENTER)                                      -- start mode m
+        fly()
+        key(EXIT) key(NEXT) key(NEXT) key(ENTER)        -- pause, "Menu"
+      end
+      key(NEXT) key(NEXT) key(NEXT) key(ENTER) key(INC) key(ENTER)   -- next track
+      key(PREV) key(PREV) key(PREV)
     end
   end
 end)

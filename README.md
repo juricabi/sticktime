@@ -59,8 +59,8 @@ What the games need, measured on EdgeTX's own Lua core with a model of the radio
 
 | | Lua memory while playing | Peak heap use | Fits in |
 |---|---|---|---|
-| FPV Sim BW | about 78 KB | 65 KB + 34 KB CCM | X9D+ 2019 (the smallest F4 heap): 114 KB + 34 KB CCM |
-| FPV Sim Lite | about 42 KB | 47 KB + 10 KB pools | X9D, X9D+ (the smallest F2 heap): 63 KB + 10 KB pools |
+| FPV Sim BW | about 78 KB | 66 KB + 34 KB CCM | X9D+ 2019 (the smallest F4 heap): 114 KB + 34 KB CCM |
+| FPV Sim Lite | about 35 KB | 41 KB + 10 KB pools | X9D, X9D+ (the smallest F2 heap): 63 KB + 10 KB pools |
 
 ## Controls
 

@@ -66,6 +66,8 @@ lcd = {
   end,
 }
 
+-- EdgeTX gives strings no metatable: s:sub() style calls fail on a radio, so here too
+debug.setmetatable("", nil)
 -- load in an environment without the libraries B&W radios lack
 FPVSIM_TEST = {}
 local f = assert(loadfile(path, "t", setmetatable({}, { __index = function(_, k)
@@ -290,6 +292,6 @@ if FPVSIM_TEST.S.track ~= 1 or FPVSIM_TEST.S.twr ~= 5 then fail("bad save values
 s3.run(0)
 
 print(string.format("%s %s %dx%d  frames %d  instr/frame avg %d max %d  lines %d  off-screen lines %d  tones %d",
-  _VERSION, path:match("[^/]+$"), W, H, frames, floor(instrSum / frames), instrMax, st.lines, st.bad, tones))
+  _VERSION, string.match(path, "[^/]+$"), W, H, frames, floor(instrSum / frames), instrMax, st.lines, st.bad, tones))
 if st.bad > 0 then fail(st.bad .. " lines with points off the screen (B&W refuses them)") end
 print(fails == 0 and "ALL OK" or ("FAILURES: " .. fails))

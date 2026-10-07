@@ -159,9 +159,6 @@ local lap, nextGate, lastGate, lapStart, total = 0, 1, 0, nil, 0
 local rn, rt, newBest, msg, msgT, cd = 0, 0, false, nil, 0, -1
 local P = {}                                                           -- rates and quad in use
 local tc, ts, F = 0.94, 0.34, 54                                       -- camera tilt, focal length
-local function beep(f, d)
-if playTone then playTone(f, d, 0, 0) end
-end
 local function timeStr(cs)
 local s = floor(cs / 100)
 return string.format("%d:%02d.%d", floor(s / 60), s % 60, floor(cs % 100 / 10))
@@ -215,14 +212,11 @@ else
 place(spx, DR, spz, shx, shz)
 end
 end
-local function show(s)
-msg, msgT = s, gt
-end
 local function finish()
 state, tState = DONE, gt
 save()
-beep(1800, 120)
-beep(2400, 300)
+playTone(1800, 120, 0, 0)
+playTone(2400, 300, 0, 0)
 end
 local function gatePassed(i, fwd)
 if state == DONE or i ~= nextGate then return end
@@ -234,19 +228,19 @@ rt = rt + b
 lastGate = i
 nextGate = floor(rnd() * (NG - 1)) + 1
 if nextGate >= i then nextGate = nextGate + 1 end
-show("+" .. floor(b * 10) / 10 .. "s")
-beep(1300 + rn * 30, 60)
+msg, msgT = "+" .. floor(b * 10) / 10 .. "s", gt
+playTone(1300 + rn * 30, 60, 0, 0)
 return
 end
 if not fwd then return end
 lastGate, nextGate = i, i % NG + 1
-if i > 1 then beep(1300 + i * 60, 60) return end
+if i > 1 then playTone(1300 + i * 60, 60, 0, 0) return end
 if lapStart then
 local lt, t = gt - lapStart, S.track
-show((BL[t] < 1 or lt < BL[t]) and "BEST " .. timeStr(lt) or "LAP " .. timeStr(lt))
+msg, msgT = ((BL[t] < 1 or lt < BL[t]) and "BEST " or "LAP ") .. timeStr(lt), gt
 if BL[t] < 1 or lt < BL[t] then BL[t] = lt end
 lap = lap + 1
-beep(2200, 160)
+playTone(2200, 160, 0, 0)
 if gm == 1 and lap > S.laps then
 total, lap = gt - tStart, S.laps
 if BR[t] < 1 or total < BR[t] then BR[t], newBest = total, true end
@@ -256,7 +250,7 @@ end
 save()
 else
 lap = 1
-beep(1600, 80)
+playTone(1600, 80, 0, 0)
 end
 lapStart = gt
 end
@@ -367,17 +361,17 @@ if state == COUNT then
 local n = floor((gt - tState) / 100)
 if n ~= cd then
 cd = n
-beep(n < 3 and 1000 or 2000, n < 3 and 120 or 400)
+playTone(n < 3 and 1000 or 2000, n < 3 and 120 or 400, 0, 0)
 end
 if n >= 3 then
 state, tStart = FLY, gt
-show("GO!")
+msg, msgT = "GO!", gt
 end
 elseif state == FLY or state == DONE then
 if physics(dt) then
 if state == DONE then respawn() else
 state, tState = CRASHED, gt
-beep(260, 400)
+playTone(260, 400, 0, 0)
 if playHaptic then playHaptic(60, 0) end
 end
 end
@@ -432,7 +426,58 @@ X2, Y2, Z2 = X2 + (X1 - X2) * t, Y2 + (Y1 - Y2) * t, 0.2
 end
 line2(CX + X1 * F / Z1, CY - Y1 * F / Z1, CX + X2 * F / Z2, CY - Y2 * F / Z2, pat, fl)
 end
-local function render3D()
+local focus, scroll, editing = 1, 0, false
+local MAIN = { "Time trial", "Practice", "Gate rush", "Track", "Settings", "Exit" }
+local PAUSE = { "Resume", "Restart", "Menu" }
+local function optIdx(o)
+for j = 1, #o[3] do
+if o[3][j] == S[o[2]] then return j end
+end
+return 1
+end
+local function box(y)
+lcd.drawFilledRectangle(8, y, XM - 15, YM + 1 - y * 2, ERASE)
+lcd.drawRectangle(8, y, XM - 15, YM + 1 - y * 2, BLK)
+end
+local function render()
+if state == MENU or state == SETUP then
+lcd.clear()
+local n, y = #MAIN, 15
+if state == MENU then
+local t = S.track
+drawText(1, 0, "FPV SIM", MIDSIZE)
+drawText(XM, 0, "LITE", SML + RIGHT)
+local b = (focus == 1 and BR or BL)[t]
+drawText(XM, 7, "best " .. (focus == 3 and BG[t] .. " gates" or b > 0 and timeStr(b) or "--"), SML + RIGHT)
+else
+drawText(1, 0, "SETTINGS", SML + INV)
+n, y = #OPTS + 1, 9
+end
+local rows = floor((YM + 1 - y) / 8)
+if rows > n then rows = n end
+if focus - scroll > rows then scroll = focus - rows end
+if focus <= scroll then scroll = focus - 1 end
+for r = 1, rows do
+local i = scroll + r
+local o, f = OPTS[i], i == focus and INV or 0
+local l = OPTS[i] and OPTS[i][1] or "Back"
+if state == MENU then
+l = MAIN[i]
+if i == 4 then
+l = TRACKS[S.track * 3 - 2]
+l = editing and "< " .. l .. " >" or "Track: " .. l
+end
+end
+drawText(2, y, l, SML + ((editing and state == SETUP) and 0 or f))
+if state == SETUP and o then
+local j = optIdx(o)
+drawText(XM - 1, y, type(o[4]) == "table" and o[4][j] or o[3][j] .. (o[4] or ""), SML + RIGHT + (editing and f or 0))
+end
+y = y + 8
+end
+return
+end
+do
 local d = (state == FLY or state == DONE) and fi * 0.003 or 0
 local a1, a2, a3, b1, b2, b3, e1, e2, e3 = rx, ry, rz, ux, uy, uz, fx, fy, fz
 rotate(wr0 * d, wp0 * d, wy0 * d)
@@ -489,7 +534,15 @@ end
 end
 end
 end
-local function hud()
+if state == DONE then
+box(4)
+drawText(12, 7, newBest and "NEW RECORD!" or gm == 3 and "TIME UP" or "FINISHED", SML + INV)
+drawText(12, 17, gm == 3 and "Gates " .. rn .. "  best " .. BG[S.track] or "Total " .. timeStr(total), SML)
+if gm < 3 then drawText(12, 26, "Best lap " .. timeStr(BL[S.track]), SML) end
+drawText(12, YM - 15, "ENTER again  EXIT menu", SML)
+return
+end
+do
 local l = gm < 3
 lcd.drawNumber(1, 1, l and floor((lapStart and gt - lapStart or 0) / 10) or floor(rt * 10), PREC1 + SML + LEFT)
 drawText(XM, 1, l and ((lap > 0 and lap or 1) .. (gm == 1 and "/" .. S.laps or "")) or rn .. "", SML + RIGHT)
@@ -513,67 +566,6 @@ drawLine(CX - 4, CY, CX - 2, CY, SOLID, BLK)
 drawLine(CX + 2, CY, CX + 4, CY, SOLID, BLK)
 if msg and gt - msgT < 200 then drawText(CX, 10, msg, SML + CENTER) end
 end
-local focus, scroll, editing = 1, 0, false
-local MAIN = { "Time trial", "Practice", "Gate rush", "Track", "Settings", "Exit" }
-local PAUSE = { "Resume", "Restart", "Menu" }
-local function optIdx(o)
-for j = 1, #o[3] do
-if o[3][j] == S[o[2]] then return j end
-end
-return 1
-end
-local function label(i)
-if state == MENU then
-if i ~= 4 then return MAIN[i] end
-local t = TRACKS[S.track * 3 - 2]
-return editing and "< " .. t .. " >" or "Track: " .. t
-end
-return OPTS[i] and OPTS[i][1] or "Back"
-end
-local function box(y)
-lcd.drawFilledRectangle(8, y, XM - 15, YM + 1 - y * 2, ERASE)
-lcd.drawRectangle(8, y, XM - 15, YM + 1 - y * 2, BLK)
-end
-local function render()
-if state == MENU or state == SETUP then
-lcd.clear()
-local n, y = #MAIN, 15
-if state == MENU then
-local t = S.track
-drawText(1, 0, "FPV SIM", MIDSIZE)
-drawText(XM, 0, "LITE", SML + RIGHT)
-local b = (focus == 1 and BR or BL)[t]
-drawText(XM, 7, "best " .. (focus == 3 and BG[t] .. " gates" or b > 0 and timeStr(b) or "--"), SML + RIGHT)
-else
-drawText(1, 0, "SETTINGS", SML + INV)
-n, y = #OPTS + 1, 9
-end
-local rows = floor((YM + 1 - y) / 8)
-if rows > n then rows = n end
-if focus - scroll > rows then scroll = focus - rows end
-if focus <= scroll then scroll = focus - 1 end
-for r = 1, rows do
-local i = scroll + r
-local o, f = OPTS[i], i == focus and INV or 0
-drawText(2, y, label(i), SML + ((editing and state == SETUP) and 0 or f))
-if state == SETUP and o then
-local j = optIdx(o)
-drawText(XM - 1, y, type(o[4]) == "table" and o[4][j] or o[3][j] .. (o[4] or ""), SML + RIGHT + (editing and f or 0))
-end
-y = y + 8
-end
-return
-end
-render3D()
-if state == DONE then
-box(4)
-drawText(12, 7, newBest and "NEW RECORD!" or gm == 3 and "TIME UP" or "FINISHED", SML + INV)
-drawText(12, 17, gm == 3 and "Gates " .. rn .. "  best " .. BG[S.track] or "Total " .. timeStr(total), SML)
-if gm < 3 then drawText(12, 26, "Best lap " .. timeStr(BL[S.track]), SML) end
-drawText(12, YM - 15, "ENTER again  EXIT menu", SML)
-return
-end
-hud()
 if state == COUNT then
 drawText(CX - 4, CY - 16, 3 - floor((gt - tState) / 100) .. "", DBLSIZE)
 elseif state == CRASHED then

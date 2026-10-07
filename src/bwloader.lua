@@ -7,14 +7,17 @@ local toolName = "TNS|@TOOLNAME@|TNE"
   core.lua. B&W radios have little RAM: compiling the game on the radio
   needs far more memory than running it, and a script compiled on the
   radio keeps its debug info for that run. So this loader takes the
-  precompiled core.luac when it can. Otherwise EdgeTX compiles core.lua
-  (and saves core.luac); that copy is dropped and core.luac is loaded.
+  precompiled core.luac. Only without it EdgeTX compiles core.lua (and
+  saves core.luac); that copy is dropped and core.luac is loaded.
   If you edit core.lua, delete core.luac.
 ====================================================================== ]]
 local CORE = "/SCRIPTS/TOOLS/@DIR@/core.lua"
-local f = loadScript(CORE, "b") or loadScript(CORE)
-f = nil
-collectgarbage()
-f = loadScript(CORE, "b") or loadScript(CORE)
+local f = loadScript(CORE, "b")
+if not f then
+  f = loadScript(CORE)
+  f = nil
+  collectgarbage()
+  f = loadScript(CORE, "b") or loadScript(CORE)
+end
 if not f then error("@TITLE@: cannot load " .. CORE) end
 return f()
