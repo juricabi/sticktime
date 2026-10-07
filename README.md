@@ -165,7 +165,8 @@ tools/bundle_web.py     -> web/simulator.html (offline, single file) and web/art
 .github/workflows/pages.yml
                         publishes web/simulator.html as the project site (GitHub Pages)
 .github/workflows/release.yml
-                        a tag vX.Y publishes a release: StickTime-X.Y-sdcard.zip + docs/releases/vX.Y.md
+                        publishing a release vX.Y on GitHub attaches StickTime-X.Y-sdcard.zip and uses
+                        docs/releases/vX.Y.md as its notes
 tools/build_etxlua.sh   builds Lua 5.3 with EdgeTX's number settings (native and 32-bit) for the tests
 tools/build_etxhost.sh  builds tools/etxhost/host.c: EdgeTX's own Lua core (32-bit) with a model of the B&W
                         radios' Lua allocator; makes the core.luac files and runs test/memtest.lua

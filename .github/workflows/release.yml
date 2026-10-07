@@ -1,36 +1,40 @@
 ---
 name: Release
-# Push a tag like v1.5 to publish a release: the SD card zip (StickTime-1.5-sdcard.zip, built
-# from sdcard/) with the notes in docs/releases/v1.5.md.
+# Publish a release on GitHub with a tag like v1.5 (Releases > Draft a new release): this
+# attaches the SD card zip (StickTime-1.5-sdcard.zip, built from sdcard/ at that tag) and,
+# when docs/releases/v1.5.md exists, uses it as the title and notes.
 on:
-  push:
-    tags:
-      - 'v*'
+  release:
+    types:
+      - published
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to (re)attach the SD card zip to, e.g. v1.5'
+        required: true
 
 permissions:
   contents: write
 
 jobs:
   release:
-    name: Publish the release
+    name: Attach the SD card zip
     runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - name: Check out the repo
+      - name: Check out the release
         uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
 
-      - name: SD card zip
+      - name: Build and attach
         run: |
-          version=${GITHUB_REF_NAME#v}
+          version=${TAG#v}
           zip=StickTime-$version-sdcard.zip
           (cd sdcard && zip -qr "../$zip" SCRIPTS)
-          echo "zip=$zip" >> "$GITHUB_ENV"
-          echo "title=StickTime $version" >> "$GITHUB_ENV"
-          test -f "docs/releases/$GITHUB_REF_NAME.md"
-
-      - name: Publish
-        uses: softprops/action-gh-release@v3
-        with:
-          name: ${{ env.title }}
-          body_path: docs/releases/${{ github.ref_name }}.md
-          files: ${{ env.zip }}
-          make_latest: true
+          gh release upload "$TAG" "$zip" --clobber --repo "$GITHUB_REPOSITORY"
+          if [ -f "docs/releases/$TAG.md" ]; then
+            gh release edit "$TAG" --title "StickTime $version" --notes-file "docs/releases/$TAG.md" --repo "$GITHUB_REPOSITORY"
+          fi
