@@ -1,4 +1,4 @@
-<title>EdgeTX FPV Sim</title>
+<title>StickTime FPV Sim</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
@@ -233,16 +233,16 @@ footer.credits a { color: inherit; }
 <header class="top">
   <div class="brand">
     <div class="brand-mark" aria-hidden="true"></div>
-    <div><h1>FPV Sim</h1><small>EdgeTX Lua · in the browser</small></div>
+    <div><h1>StickTime</h1><small>EdgeTX FPV sim · in the browser</small></div>
   </div>
   <div class="controls">
     <label class="field"><span>Radio</span><select id="radioSel" aria-label="Radio screen"></select></label>
     <label class="field"><span>Script</span>
       <select id="scriptSel" aria-label="Script">
-        <option value="auto">FPV Sim (matches radio)</option>
-        <option value="color">FPVSim.lua (color)</option>
-        <option value="bw">FPVSimBW.lua (B&amp;W)</option>
-        <option value="lite">FPV Sim Lite (B&amp;W, low memory)</option>
+        <option value="auto">StickTime (matches radio)</option>
+        <option value="color">StickTime.lua (color)</option>
+        <option value="bw">StickTimeBW.lua (B&amp;W)</option>
+        <option value="lite">StickTime Lite (B&amp;W, low memory)</option>
       </select>
     </label>
     <button class="btn" id="restartBtn" type="button" title="Restart the script (R)">Restart</button>
@@ -655,13 +655,13 @@ const EdgeTX = (() => {
       lua.lua_setglobal(this.L, to_luastring(name));
     }
 
-    // call FPVSIM_TEST.<name>(...) inside the script (automation / tests)
+    // call STICKTIME_TEST.<name>(...) inside the script (automation / tests)
     callTest(name, ...args) {
       const { lua, to_luastring } = this.fe;
       const L = this.L;
       if (!L) return null;
       const top0 = lua.lua_gettop(L);
-      lua.lua_getglobal(L, to_luastring('FPVSIM_TEST'));
+      lua.lua_getglobal(L, to_luastring('STICKTIME_TEST'));
       if (!lua.lua_istable(L, -1)) { lua.lua_settop(L, top0); return null; }
       lua.lua_getfield(L, -1, to_luastring(name));
       lua.lua_remove(L, -2);
@@ -773,7 +773,7 @@ const EdgeTX = (() => {
       lua.lua_newtable(L);
       setfn('open', () => {
         const path = str(1), mode = lua.lua_isnoneornil(L, 2) ? 'r' : str(2);
-        // reads: the SD card's own files first, then the bundled ones (FPV Sim Lite's tracks)
+        // reads: the SD card's own files first, then the bundled ones (StickTime Lite's tracks)
         const has = self.sd.has(path) || self.files[path] !== undefined;
         if (mode[0] === 'r' && !has) { lua.lua_pushnil(L); return 1; }
         const f = { path, mode, pos: 0, data: mode[0] === 'w' ? '' : (self.sd.has(path) ? self.sd.get(path) : self.files[path] || '') };
@@ -823,7 +823,7 @@ const EdgeTX = (() => {
         return 1;
       });
 
-      // extra globals (e.g. test hooks, FPVSIM_LAT)
+      // extra globals (e.g. test hooks, STICKTIME_LAT)
       for (const k in globals) {
         if (globals[k] === 'table') { lua.lua_newtable(L); lua.lua_setglobal(L, to_luastring(k)); }
         else if (typeof globals[k] === 'number') { lua.lua_pushnumber(L, globals[k]); lua.lua_setglobal(L, to_luastring(k)); }
@@ -1213,9 +1213,9 @@ if (typeof module !== 'undefined') module.exports = EdgeTX;
 
 </script>
 <script type="text/plain" id="lua-color">
-local toolName = "TNS|FPV Sim|TNE"
+local toolName = "TNS|StickTime|TNE"
 --[[ ======================================================================
-  FPV Sim v1.2  -  a real 3D FPV quad simulator that runs on your radio
+  StickTime v1.3  -  a real 3D FPV quad simulator that runs on your radio
   Color version - every EdgeTX color radio (480x272, 480x320, 320x480, 320x240, 800x480)
 
   Install : copy this file to /SCRIPTS/TOOLS/ on the radio SD card and
@@ -1510,7 +1510,8 @@ local BEST = { l = {}, r = {}, g = {}, f = {} }   -- per track: best lap, race, 
 for t = 1, NT do BEST.l[t], BEST.r[t], BEST.g[t], BEST.f[t] = 0, 0, 0, 0 end
 local loadData, saveData
 do
-local DATA = "/SCRIPTS/TOOLS/FPVSim.dat"
+local DATA = "/SCRIPTS/TOOLS/StickTime.dat"
+local OLD = "/SCRIPTS/TOOLS/FPVSim.dat"                 -- the save under the old name, FPV Sim
 
 local DEF = {}
 for k, v in pairs(S) do DEF[k] = v end
@@ -1534,7 +1535,8 @@ local function validate()
 end
 
 loadData = function()
-  local f = io.open(DATA, "r")
+  local f, old = io.open(DATA, "r"), false
+  if not f then f, old = io.open(OLD, "r"), true end
   if not f then return end
   local s = io.read(f, 1024)
   io.close(f)
@@ -1566,6 +1568,7 @@ loadData = function()
     end
   end
   validate()
+  if old then saveData() end                       -- under the new name right away
 end
 
 saveData = function()
@@ -2152,10 +2155,11 @@ local F, tanH = 160, 1.4
 -- FPV camera, rendered where the quad will be when the frame reaches the screen. Color
 -- screens show a frame one script cycle after it is drawn (50 ms on stock EdgeTX), so the
 -- prediction follows the measured frame interval and stays right on faster firmware too.
--- FPVSIM_LAT (seconds) overrides it, e.g. in the emulator when frames show at once.
+-- STICKTIME_LAT (seconds) overrides it, e.g. in the emulator when frames show at once
+-- (FPVSIM_LAT: its name before the rename to StickTime).
 local function fpvCamera()
   local c, s = P.tc, P.ts
-  local d = (state == FLY or state == DONE) and (FPVSIM_LAT or R.fi * 0.011) or 0
+  local d = (state == FLY or state == DONE) and (STICKTIME_LAT or FPVSIM_LAT or R.fi * 0.011) or 0
   local a1, a2, a3, b1, b2, b3, e1, e2, e3 = rx, ry, rz, ux, uy, uz, fx, fy, fz
   if d > 0 then rotate(P.wr * d, P.wp * d, P.wy * d) end
   kpx, kpy, kpz = px + vx * d, py + vy * d, pz + vz * d
@@ -2386,7 +2390,7 @@ do
       ordP[j + 1] = o
     end
   end
-  if FPVSIM_TEST then FPVSIM_TEST.bounds = OB end
+  if STICKTIME_TEST then STICKTIME_TEST.bounds = OB end
 end
 
 local C = {}            -- colors (color radios) / grey levels (B&W)
@@ -3448,9 +3452,9 @@ local render, hitTest, pauseHit, initUI
   local function drawMenu()
     local x, w = menuBox()
     local y = MG
-    txt(x + MG, y, "FPV SIM", DBLSIZE + C.white)
-    local tw = lcd.sizeText and lcd.sizeText("FPV SIM ", DBLSIZE) or floor(120 * SC)
-    txt(x + MG + tw, y + hX - hS - 4, "3D quad racer", SMLSIZE + C.accent2)
+    txt(x + MG, y, "StickTime", DBLSIZE + C.white)
+    local tw = lcd.sizeText and lcd.sizeText("StickTime ", DBLSIZE) or floor(150 * SC)
+    txt(x + MG + tw, y + hX - hS - 4, "FPV simulator", SMLSIZE + C.accent2)
     local info = bestInfo()
     if PORTRAIT then
       -- 3D view stays clear on top, the menu fills the instrument panel
@@ -3698,7 +3702,7 @@ local function init()
   selectTrack(S.track)
   lastT = getTime()
   R.fpsT = lastT
-  local TEST = FPVSIM_TEST
+  local TEST = STICKTIME_TEST
   if TEST then
     TEST.get = function() return px, py, pz, vx, vy, vz, fx, fy, fz, ux, uy, uz, rx, ry, rz, state, lap, nextGate, NG, gt end
     TEST.gate = function(i) return gx[i], gy[i], gz[i], gnx[i], gny[i], gnz[i], gk[i], AX[i], AY[i], AZ[i] end
@@ -3763,13 +3767,13 @@ end
 return { init = init, run = run }
 </script>
 <script type="text/plain" id="lua-bw">
-local toolName = "TNS|FPV Sim BW|TNE"
+local toolName = "TNS|StickTime BW|TNE"
 --[[ ======================================================================
-  FPV Sim BW v1.2  -  a real 3D FPV quad simulator that runs on your radio
+  StickTime BW v1.3  -  a real 3D FPV quad simulator that runs on your radio
   Black & white version - 128x64 and 212x64 radios with an STM32F4 (TX12 MkII, Zorro, Boxer,
   Pocket, MT12, GX12, X9D+ 2019, X9E, T14, T20 ...)
 
-  Install : copy FPVSimBW.lua and the FPVSimBW folder to /SCRIPTS/TOOLS/ and
+  Install : copy StickTimeBW.lua and the StickTimeBW folder to /SCRIPTS/TOOLS/ and
             start it from SYS > TOOLS (or SD card browser > Execute).
   Fly     : your sticks fly the quad (acro or angle mode). The radio
             handles stick mode 1-4. EXIT = pause/back, ENTER = select,
@@ -4044,7 +4048,8 @@ local BEST = { l = {}, r = {}, g = {}, f = {} }   -- per track: best lap, race, 
 for t = 1, NT do BEST.l[t], BEST.r[t], BEST.g[t], BEST.f[t] = 0, 0, 0, 0 end
 local loadData, saveData
 do
-local DATA = "/SCRIPTS/TOOLS/FPVSimBW.dat"
+local DATA = "/SCRIPTS/TOOLS/StickTimeBW.dat"
+local OLD = "/SCRIPTS/TOOLS/FPVSimBW.dat"                 -- the save under the old name, FPV Sim
 
 local DEF = {}
 for k, v in pairs(S) do DEF[k] = v end
@@ -4068,7 +4073,8 @@ local function validate()
 end
 
 loadData = function()
-  local f = io.open(DATA, "r")
+  local f, old = io.open(DATA, "r"), false
+  if not f then f, old = io.open(OLD, "r"), true end
   if not f then return end
   local s = io.read(f, 1024)
   io.close(f)
@@ -4100,6 +4106,7 @@ loadData = function()
     end
   end
   validate()
+  if old then saveData() end                       -- under the new name right away
 end
 
 saveData = function()
@@ -4686,10 +4693,11 @@ local F, tanH = 160, 1.4
 -- FPV camera, rendered where the quad will be when the frame reaches the screen. Color
 -- screens show a frame one script cycle after it is drawn (50 ms on stock EdgeTX), so the
 -- prediction follows the measured frame interval and stays right on faster firmware too.
--- FPVSIM_LAT (seconds) overrides it, e.g. in the emulator when frames show at once.
+-- STICKTIME_LAT (seconds) overrides it, e.g. in the emulator when frames show at once
+-- (FPVSIM_LAT: its name before the rename to StickTime).
 local function fpvCamera()
   local c, s = P.tc, P.ts
-  local d = (state == FLY or state == DONE) and (FPVSIM_LAT or R.fi * 0.003) or 0
+  local d = (state == FLY or state == DONE) and (STICKTIME_LAT or FPVSIM_LAT or R.fi * 0.003) or 0
   local a1, a2, a3, b1, b2, b3, e1, e2, e3 = rx, ry, rz, ux, uy, uz, fx, fy, fz
   if d > 0 then rotate(P.wr * d, P.wp * d, P.wy * d) end
   kpx, kpy, kpz = px + vx * d, py + vy * d, pz + vz * d
@@ -5252,12 +5260,12 @@ local render, hitTest, pauseHit, initUI
     if state == MENU or (state == SETUP and prevState == MENU) then
       lcd.clear()
       if state == MENU then
-        drawText(1, 0, "FPV SIM", MIDSIZE)
-        drawText(XM, 1, TRACKS[S.track][1], SMLSIZE + RIGHT)
+        drawText(1, 0, "StickTime", MIDSIZE)
+        drawText(XM, 0, TRACKS[S.track][1], SMLSIZE + RIGHT)
         drawList(nil, #MAIN_ITEMS, mainLabel, nil, 13, 8)
         local t = S.track
         local b = "best " .. (BEST.l[t] > 0 and timeStr(BEST.l[t]) or "--")
-        if focus == 3 then b = "best " .. BEST.f[t] elseif focus == 4 then b = "best " .. BEST.g[t] .. " gates" end
+        if focus == 3 then b = "best " .. BEST.f[t] elseif focus == 4 then b = "best " .. BEST.g[t] .. (XM > 127 and " gates" or "") end
         drawText(XM, 7, b, SMLSIZE + RIGHT)
       else
         drawList("SETTINGS", #OPTS + 1, setLabel, setValue, 0, 9)
@@ -5438,7 +5446,7 @@ local function init()
   selectTrack(S.track)
   lastT = getTime()
   R.fpsT = lastT
-  local TEST = FPVSIM_TEST
+  local TEST = STICKTIME_TEST
   if TEST then
     TEST.get = function() return px, py, pz, vx, vy, vz, fx, fy, fz, ux, uy, uz, rx, ry, rz, state, lap, nextGate, NG, gt end
     TEST.gate = function(i) return gx[i], gy[i], gz[i], gnx[i], gny[i], gnz[i], gk[i], AX[i], AY[i], AZ[i] end
@@ -5503,14 +5511,14 @@ end
 return { init = init, run = run }
 </script>
 <script type="text/plain" id="lua-lite">
-local toolName = "TNS|FPV Sim Lite|TNE"
+local toolName = "TNS|StickTime Lite|TNE"
 --[[ ======================================================================
-FPV Sim Lite v1.2  -  the small edition of FPV Sim for B&W radios.
+StickTime Lite v1.3  -  the small edition of StickTime for B&W radios.
 Made for radios with little memory (STM32F2: X7, X9D, X9D+, X9 Lite,
 X-Lite, TX12 MkI, T12, T8, T-Lite, T-Pro, LR3 Pro). Runs on every
 black & white EdgeTX radio with EdgeTX 2.11 or newer.
-Install : copy FPVLite.lua and the FPVLite folder to /SCRIPTS/TOOLS/,
-then start it from SYS > TOOLS.
+Install : copy StickTimeLite.lua and the StickTimeLite folder to
+/SCRIPTS/TOOLS/, then start it from SYS > TOOLS.
 Fly     : your sticks fly the quad (acro or angle mode). EXIT pauses,
 ENTER selects, +/- (or the wheel) moves through the menus.
 Modes   : Time trial, Practice, Freestyle (tricks and combos) and
@@ -5574,13 +5582,13 @@ NP = NP + 1
 qx[NP], qz[NP], qr[NP], qh[NP] = x, z, r, h
 end
 buildTrack = function(t)
-local path = "/SCRIPTS/TOOLS/FPVLite/t" .. t .. ".txt"
+local path = "/SCRIPTS/TOOLS/StickTimeLite/t" .. t .. ".txt"
 local f = io.open(path, "r")
 local s = f and io.read(f, 700) or ""           -- (EdgeTX reads into a buffer of that size)
 if f then io.close(f) end
 local g, sb = string.match(s, "([^/]*)/?(.*)")
 local d, b = nums(g), nums(sb)
-if #d < 12 then error("FPV Sim Lite: track file " .. path .. " is missing") end
+if #d < 12 then error("StickTime Lite: track file " .. path .. " is missing") end
 NG, NP, NB = 0, 0, 0
 for i = 1, #b, 6 do
 NB = NB + 1
@@ -5661,7 +5669,8 @@ local BL, BR, BF, BG = {}, {}, {}, {}
 for t = 1, 7 do BL[t], BR[t], BF[t], BG[t] = 0, 0, 0, 0 end
 local save, load
 do
-local FILE = "/SCRIPTS/TOOLS/FPVLite/data.txt"
+local FILE = "/SCRIPTS/TOOLS/StickTimeLite/data.txt"
+local OLD = "/SCRIPTS/TOOLS/FPVLite/data.txt"              -- the save under the old name, FPV Sim Lite
 save = function()
 local s = "FPVLITE2"
 for k, v in pairs(S) do s = s .. " " .. k .. "=" .. floor(v) end
@@ -5675,7 +5684,8 @@ io.close(f)
 end
 end
 load = function()
-local f = io.open(FILE, "r")
+local f, old = io.open(FILE, "r"), false
+if not f then f, old = io.open(OLD, "r"), true end
 if not f then return end
 local s = io.read(f, 600)
 io.close(f)
@@ -5700,6 +5710,7 @@ end
 end
 end
 end
+if old then save() end                            -- under the new name right away
 end
 end
 local px, py, pz, vx, vy, vz = 0, 0.15, 0, 0, 0, 0                      -- position, velocity (m, m/s)
@@ -6139,10 +6150,11 @@ local n, y = #MAIN, 15
 if state == 1 then
 local t = S.track
 local b = (focus == 1 and BR or BL)[t]
-drawText(1, 0, "FPV SIM", MIDSIZE)
+drawText(1, 0, "StickTime", MIDSIZE)
 drawText(XM, 0, "LITE", SML + RIGHT)
-drawText(XM, 7, "best " .. (focus == 3 and BF[t] .. " pts" or focus == 4 and BG[t] .. " gates" or
-b > 0 and timeStr(b) or "--"), SML + RIGHT)
+local u = XM > 127                            -- room for the units (212 px screens)
+drawText(XM, 7, "best " .. (focus == 3 and BF[t] .. (u and " pts" or "") or focus == 4 and BG[t] ..
+(u and " gates" or "") or b > 0 and timeStr(b) or "--"), SML + RIGHT)
 else
 drawText(1, 0, "SETTINGS", SML + INV)
 n, y = #OPTS + 1, 9
@@ -6381,7 +6393,7 @@ load()
 apply()
 selectTrack(S.track)
 lastT = getTime()
-local T = FPVSIM_TEST
+local T = STICKTIME_TEST
 if T then
 T.get = function() return px, py, pz, vx, vy, vz, fx, fy, fz, ux, uy, uz, rx, ry, rz, state, lap, nextGate, NG, gt end
 T.gate = function(i) return gx[i], gy[i], gz[i], gnx[i], gny[i], gnz[i], gk[i], AX[i], AY[i], AZ[i] end
@@ -6428,13 +6440,13 @@ return { init = init, run = run }
 </script>
 <script>
 const LITE_TRACKS = {
-"/SCRIPTS/TOOLS/FPVLite/t1.txt": "11 9 0 0 1 0 0 6 34 1 20 0 26 58 2 70 0 56 52 1 120 0 66 22 1 180 0 52 -8 2 230 0 24 -22 1 270 0\n",
-"/SCRIPTS/TOOLS/FPVLite/t2.txt": "23 9 -14 10 1 0 0 6 46 2 40 0 18 68 1 0 0 0 88 1 -90 0 -18 68 1 180 0 18 16 1 180 0 0 -4 1 -90 0\n",
-"/SCRIPTS/TOOLS/FPVLite/t3.txt": "37 9 0 0 1 0 0 10 30 1 20 0 12 60 2 0 0 0 84 2 -90 0 -28 84 3 -90 0 -36 52 1 180 0 -28 20 1 160 0 -12 -14 1 60 0\n",
-"/SCRIPTS/TOOLS/FPVLite/t4.txt": "53 9 0 0 5 0 0 -2 22 6 0 0 6 40 7 0 0 -2 58 6 0 0 6 76 7 0 0 2 96 4 0 3 22 112 2 90 0 44 100 4 120 3 48 78 6 180 0 40 60 7 180 0 48 42 6 180 0 44 18 3 200 0 28 -22 1 -90 0\n",
-"/SCRIPTS/TOOLS/FPVLite/t5.txt": "61 18 0 0 1 0 0 8 24 4 20 2.4 24 44 4 50 4.5 48 54 4 90 6 72 46 2 130 0 80 22 4 180 2 70 -2 4 220 3.5 48 -14 3 247 0 24 -24 4 300 2.2\n",
-"/SCRIPTS/TOOLS/FPVLite/t6.txt": "71 9 0 0 5 0 0 0 40 1 0 0 10 80 2 20 6 36 104 4 70 3 64 106 6 100 0 88 96 7 120 0 110 76 3 180 0 112 44 1 180 0 104 14 4 200 2.2 84 -8 2 250 8 56 -18 1 270 0 30 -28 4 290 3\n",
-"/SCRIPTS/TOOLS/FPVLite/t7.txt": "83 9 0 0 1 0 0 0 34 8 0 1.8 0 46 8 0 1.8 20 66 4 60 4 40 88 3 146 0 56 64 1 180 0 43.95 10 8 180 1.3 22 -16 4 250 2.5 / -6.225 34 4.025 .25 0 7 6.225 34 4.025 .25 0 7 0 34 2.2 .25 3.6 7 -6.225 46 4.025 .25 0 7 6.225 46 4.025 .25 0 7 0 46 2.2 .25 3.6 7 -10 40 .25 5.75 0 7 10 36.025 .25 1.775 0 7 10 43.975 .25 1.775 0 7 10 40 .25 2.2 3.6 7 46 64 2 2 0 24 33.6 10 1.25 3 0 2.6 40.5 10 1.25 3 0 2.6 47.4 10 1.25 3 0 2.6 -30 20 3 1.25 0 5.2 -36 50 4 4 0 3\n"
+"/SCRIPTS/TOOLS/StickTimeLite/t1.txt": "11 9 0 0 1 0 0 6 34 1 20 0 26 58 2 70 0 56 52 1 120 0 66 22 1 180 0 52 -8 2 230 0 24 -22 1 270 0\n",
+"/SCRIPTS/TOOLS/StickTimeLite/t2.txt": "23 9 -14 10 1 0 0 6 46 2 40 0 18 68 1 0 0 0 88 1 -90 0 -18 68 1 180 0 18 16 1 180 0 0 -4 1 -90 0\n",
+"/SCRIPTS/TOOLS/StickTimeLite/t3.txt": "37 9 0 0 1 0 0 10 30 1 20 0 12 60 2 0 0 0 84 2 -90 0 -28 84 3 -90 0 -36 52 1 180 0 -28 20 1 160 0 -12 -14 1 60 0\n",
+"/SCRIPTS/TOOLS/StickTimeLite/t4.txt": "53 9 0 0 5 0 0 -2 22 6 0 0 6 40 7 0 0 -2 58 6 0 0 6 76 7 0 0 2 96 4 0 3 22 112 2 90 0 44 100 4 120 3 48 78 6 180 0 40 60 7 180 0 48 42 6 180 0 44 18 3 200 0 28 -22 1 -90 0\n",
+"/SCRIPTS/TOOLS/StickTimeLite/t5.txt": "61 18 0 0 1 0 0 8 24 4 20 2.4 24 44 4 50 4.5 48 54 4 90 6 72 46 2 130 0 80 22 4 180 2 70 -2 4 220 3.5 48 -14 3 247 0 24 -24 4 300 2.2\n",
+"/SCRIPTS/TOOLS/StickTimeLite/t6.txt": "71 9 0 0 5 0 0 0 40 1 0 0 10 80 2 20 6 36 104 4 70 3 64 106 6 100 0 88 96 7 120 0 110 76 3 180 0 112 44 1 180 0 104 14 4 200 2.2 84 -8 2 250 8 56 -18 1 270 0 30 -28 4 290 3\n",
+"/SCRIPTS/TOOLS/StickTimeLite/t7.txt": "83 9 0 0 1 0 0 0 34 8 0 1.8 0 46 8 0 1.8 20 66 4 60 4 40 88 3 146 0 56 64 1 180 0 43.95 10 8 180 1.3 22 -16 4 250 2.5 / -6.225 34 4.025 .25 0 7 6.225 34 4.025 .25 0 7 0 34 2.2 .25 3.6 7 -6.225 46 4.025 .25 0 7 6.225 46 4.025 .25 0 7 0 46 2.2 .25 3.6 7 -10 40 .25 5.75 0 7 10 36.025 .25 1.775 0 7 10 43.975 .25 1.775 0 7 10 40 .25 2.2 3.6 7 46 64 2 2 0 24 33.6 10 1.25 3 0 2.6 40.5 10 1.25 3 0 2.6 47.4 10 1.25 3 0 2.6 -30 20 3 1.25 0 5.2 -36 50 4 4 0 3\n"
 };
 </script>
 <script>
@@ -6451,6 +6463,7 @@ const ROBOTO = { r: "d09GMgABAAAAAFV8ABIAAAAAsBgAAFUTAAEAAAAAAAAAAAAAAAAAAAAAAAA
   const LUA = { color: lua('lua-color'), bw: lua('lua-bw'), lite: lua('lua-lite') };
 
   const store = {
+    // (the key prefix is from StickTime's old name, FPV Sim: kept so saved settings stay)
     get(k, d) { try { const v = localStorage.getItem('fpvsim.' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
     set(k, v) { try { localStorage.setItem('fpvsim.' + k, JSON.stringify(v)); } catch (e) { /* storage blocked */ } },
   };
@@ -6516,14 +6529,14 @@ const ROBOTO = { r: "d09GMgABAAAAAFV8ABIAAAAAsBgAAFUTAAEAAAAAAAAAAAAAAAAAAAAAAAA
   function scriptFor() {
     if (app.custom) return { text: app.custom.text, name: app.custom.name };
     const kind = app.script === 'auto' ? (app.radio.color ? 'color' : 'bw') : app.script;
-    return { text: LUA[kind], name: kind === 'color' ? 'FPVSim.lua' : kind === 'lite' ? 'FPVLite/core.lua' : 'FPVSimBW/core.lua' };
+    return { text: LUA[kind], name: kind === 'color' ? 'StickTime.lua' : kind === 'lite' ? 'StickTimeLite/core.lua' : 'StickTimeBW/core.lua' };
   }
 
   function boot() {
     const r = app.radio;
     const eng = new Engine(fengari, r, {
       colorFonts, bwFonts: BW_FONTS, sd: app.sd,
-      files: Object.assign({ '/SCRIPTS/TOOLS/FPVSimBW/core.lua': LUA.bw, '/SCRIPTS/TOOLS/FPVLite/core.lua': LUA.lite }, LITE_TRACKS),
+      files: Object.assign({ '/SCRIPTS/TOOLS/StickTimeBW/core.lua': LUA.bw, '/SCRIPTS/TOOLS/StickTimeLite/core.lua': LUA.lite }, LITE_TRACKS),
       onTone: tone, onHaptic: haptic,
       onSave: () => store.set('sd', Object.fromEntries(app.sd)),
     });
@@ -6537,8 +6550,8 @@ const ROBOTO = { r: "d09GMgABAAAAAFV8ABIAAAAAsBgAAFUTAAEAAAAAAAAAAAAAAAAAAAAAAAA
     $('lcdName').textContent = r.label.split('  ')[1].split(' · ')[0];
     $('lcdRes').textContent = r.w + '×' + r.h + (r.color ? ' color' : r.depth > 1 ? ' grey' : ' mono');
     const s = scriptFor();
-    const globals = { FPVSIM_TEST: 'table' };
-    if (r.color && !eng.displayDelay) globals.FPVSIM_LAT = 0;   // nothing to predict when frames show at once
+    const globals = { STICKTIME_TEST: 'table' };
+    if (r.color && !eng.displayDelay) globals.STICKTIME_LAT = 0;   // nothing to predict when frames show at once
     eng.load(s.text, s.name, globals);
     $('rateChk').disabled = !!r.pc;
     $('delayChk').disabled = !!r.pc;
@@ -6947,7 +6960,7 @@ const ROBOTO = { r: "d09GMgABAAAAAFV8ABIAAAAAsBgAAFUTAAEAAAAAAAAAAAAAAAAAAAAAAAA
     $('delayChk').addEventListener('change', () => {
       app.delay = $('delayChk').checked; store.set('delay', app.delay);
       const e = app.engine;
-      if (e && !app.radio.pc) { e.displayDelay = app.delay; e.setGlobal('FPVSIM_LAT', app.delay ? null : 0); }
+      if (e && !app.radio.pc) { e.displayDelay = app.delay; e.setGlobal('STICKTIME_LAT', app.delay ? null : 0); }
     });
     $('fsBtn').addEventListener('click', toggleFullscreen);
     $('ghostChk').checked = app.ghost;

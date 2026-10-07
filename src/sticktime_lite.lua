@@ -1,12 +1,12 @@
-local toolName = "TNS|FPV Sim Lite|TNE"
+local toolName = "TNS|StickTime Lite|TNE"
 --[[ ======================================================================
-  FPV Sim Lite v1.2  -  the small edition of FPV Sim for B&W radios.
+  StickTime Lite v1.3  -  the small edition of StickTime for B&W radios.
   Made for radios with little memory (STM32F2: X7, X9D, X9D+, X9 Lite,
   X-Lite, TX12 MkI, T12, T8, T-Lite, T-Pro, LR3 Pro). Runs on every
   black & white EdgeTX radio with EdgeTX 2.11 or newer.
 
-  Install : copy FPVLite.lua and the FPVLite folder to /SCRIPTS/TOOLS/,
-            then start it from SYS > TOOLS.
+  Install : copy StickTimeLite.lua and the StickTimeLite folder to
+            /SCRIPTS/TOOLS/, then start it from SYS > TOOLS.
   Fly     : your sticks fly the quad (acro or angle mode). EXIT pauses,
             ENTER selects, +/- (or the wheel) moves through the menus.
   Modes   : Time trial, Practice, Freestyle (tricks and combos) and
@@ -15,7 +15,7 @@ local toolName = "TNS|FPV Sim Lite|TNE"
             real quad unplugged or the RF module off.
 ====================================================================== ]]
 
--- Same flight model as the full FPV Sim, in as little code as possible: on these radios
+-- Same flight model as the full StickTime, in as little code as possible: on these radios
 -- every instruction, constant and string of the script stays in memory while it runs.
 -- (Measured with test/memtest.lua on EdgeTX's own Lua and allocator: see the README.)
 local lcd = lcd
@@ -62,8 +62,8 @@ local OPTS = {
 local RATES = nums("70 400 35 70 350 30 100 600 50 100 500 40 150 850 45 130 700 40")
 local QP = nums("86 .22 .009 .028 .02 .012 60 .18 .0072 .024 .03 .02")
 
--- tracks: the names; each track's gates and structures are in FPVLite/t<number>.txt (made by
--- build.py from src/fpvlite_tracks.txt) and only read when the track is picked
+-- tracks: the names; each track's gates and structures are in StickTimeLite/t<number>.txt (made
+-- by build.py from src/sticktime_lite_tracks.txt) and only read when the track is picked
 local TRACKS = { @TRACKNAMES@ }
 local NT = @NTRACKS@   --#fold
 local GT, DR = 0.28, 0.15   --#fold (gate frame thickness, quad radius in m)
@@ -99,13 +99,13 @@ end
 -- half-depth bottom top). Gate types: 1 gate, 2 high gate, 3 dive gate (flat: fly down through
 -- it), 4 hoop, 5 arch, 6 flag (pass on its right), 7 flag (pass on its left), 8 gap in a structure
 buildTrack = function(t)
-  local path = "/SCRIPTS/TOOLS/FPVLite/t" .. t .. ".txt"
+  local path = "/SCRIPTS/TOOLS/StickTimeLite/t" .. t .. ".txt"
   local f = io.open(path, "r")
   local s = f and io.read(f, 700) or ""           -- (EdgeTX reads into a buffer of that size)
   if f then io.close(f) end
   local g, sb = string.match(s, "([^/]*)/?(.*)")
   local d, b = nums(g), nums(sb)
-  if #d < 12 then error("FPV Sim Lite: track file " .. path .. " is missing") end
+  if #d < 12 then error("StickTime Lite: track file " .. path .. " is missing") end
   NG, NP, NB = 0, 0, 0
   for i = 1, #b, 6 do
     NB = NB + 1
@@ -191,7 +191,8 @@ local BL, BR, BF, BG = {}, {}, {}, {}
 for t = 1, NT do BL[t], BR[t], BF[t], BG[t] = 0, 0, 0, 0 end
 local save, load
 do
-local FILE = "/SCRIPTS/TOOLS/FPVLite/data.txt"
+local FILE = "/SCRIPTS/TOOLS/StickTimeLite/data.txt"
+local OLD = "/SCRIPTS/TOOLS/FPVLite/data.txt"              -- the save under the old name, FPV Sim Lite
 
 save = function()
   local s = "FPVLITE2"
@@ -207,7 +208,8 @@ save = function()
 end
 
 load = function()
-  local f = io.open(FILE, "r")
+  local f, old = io.open(FILE, "r"), false
+  if not f then f, old = io.open(OLD, "r"), true end
   if not f then return end
   local s = io.read(f, 600)
   io.close(f)
@@ -234,6 +236,7 @@ load = function()
       end
     end
   end
+  if old then save() end                            -- under the new name right away
 end
 end
 
@@ -729,10 +732,11 @@ render = function()
     if state == MENU then
       local t = S.track
       local b = (focus == 1 and BR or BL)[t]
-      drawText(1, 0, "FPV SIM", MIDSIZE)
+      drawText(1, 0, "StickTime", MIDSIZE)
       drawText(XM, 0, "LITE", SML + RIGHT)
-      drawText(XM, 7, "best " .. (focus == 3 and BF[t] .. " pts" or focus == 4 and BG[t] .. " gates" or
-        b > 0 and timeStr(b) or "--"), SML + RIGHT)
+      local u = XM > 127                            -- room for the units (212 px screens)
+      drawText(XM, 7, "best " .. (focus == 3 and BF[t] .. (u and " pts" or "") or focus == 4 and BG[t] ..
+        (u and " gates" or "") or b > 0 and timeStr(b) or "--"), SML + RIGHT)
     else
       drawText(1, 0, "SETTINGS", SML + INV)
       n, y = #OPTS + 1, 9
@@ -987,7 +991,7 @@ local function init()
   selectTrack(S.track)
   lastT = getTime()
 --#if TEST
-  local T = FPVSIM_TEST
+  local T = STICKTIME_TEST
   if T then
     T.get = function() return px, py, pz, vx, vy, vz, fx, fy, fz, ux, uy, uz, rx, ry, rz, state, lap, nextGate, NG, gt end
     T.gate = function(i) return gx[i], gy[i], gz[i], gnx[i], gny[i], gnz[i], gk[i], AX[i], AY[i], AZ[i] end

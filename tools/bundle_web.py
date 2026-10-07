@@ -22,14 +22,14 @@ def b64(p):
 
 
 def main():
-    lua_color = read(ROOT / "sdcard/SCRIPTS/TOOLS/FPVSim.lua")
-    lua_bw = read(ROOT / "sdcard/SCRIPTS/TOOLS/FPVSimBW/core.lua")
+    lua_color = read(ROOT / "sdcard/SCRIPTS/TOOLS/StickTime.lua")
+    lua_bw = read(ROOT / "sdcard/SCRIPTS/TOOLS/StickTimeBW/core.lua")
     # the Lite with its test hooks (inert on a radio), so the emulator can be automated
-    lua_lite = read(ROOT / "test/build/fpvlite_test.lua")
-    # the Lite reads its tracks from the SD card: /SCRIPTS/TOOLS/FPVLite/t1.txt ...
-    tdir = ROOT / "sdcard/SCRIPTS/TOOLS/FPVLite"
-    tracks = {"/SCRIPTS/TOOLS/FPVLite/" + p.name: read(p) for p in sorted(tdir.glob("t*.txt"))}
-    assert tracks, "no FPV Sim Lite track files (run build.py)"
+    lua_lite = read(ROOT / "test/build/sticktime_lite_test.lua")
+    # the Lite reads its tracks from the SD card: /SCRIPTS/TOOLS/StickTimeLite/t1.txt ...
+    tdir = ROOT / "sdcard/SCRIPTS/TOOLS/StickTimeLite"
+    tracks = {"/SCRIPTS/TOOLS/StickTimeLite/" + p.name: read(p) for p in sorted(tdir.glob("t*.txt"))}
+    assert tracks, "no StickTime Lite track files (run build.py)"
     lite_tracks = json.dumps(tracks, indent=0)
     for s in (lua_color, lua_bw, lua_lite, lite_tracks):
         assert "</script" not in s.lower()

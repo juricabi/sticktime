@@ -8,6 +8,7 @@
   const LUA = { color: lua('lua-color'), bw: lua('lua-bw'), lite: lua('lua-lite') };
 
   const store = {
+    // (the key prefix is from StickTime's old name, FPV Sim: kept so saved settings stay)
     get(k, d) { try { const v = localStorage.getItem('fpvsim.' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
     set(k, v) { try { localStorage.setItem('fpvsim.' + k, JSON.stringify(v)); } catch (e) { /* storage blocked */ } },
   };
@@ -73,14 +74,14 @@
   function scriptFor() {
     if (app.custom) return { text: app.custom.text, name: app.custom.name };
     const kind = app.script === 'auto' ? (app.radio.color ? 'color' : 'bw') : app.script;
-    return { text: LUA[kind], name: kind === 'color' ? 'FPVSim.lua' : kind === 'lite' ? 'FPVLite/core.lua' : 'FPVSimBW/core.lua' };
+    return { text: LUA[kind], name: kind === 'color' ? 'StickTime.lua' : kind === 'lite' ? 'StickTimeLite/core.lua' : 'StickTimeBW/core.lua' };
   }
 
   function boot() {
     const r = app.radio;
     const eng = new Engine(fengari, r, {
       colorFonts, bwFonts: BW_FONTS, sd: app.sd,
-      files: Object.assign({ '/SCRIPTS/TOOLS/FPVSimBW/core.lua': LUA.bw, '/SCRIPTS/TOOLS/FPVLite/core.lua': LUA.lite }, LITE_TRACKS),
+      files: Object.assign({ '/SCRIPTS/TOOLS/StickTimeBW/core.lua': LUA.bw, '/SCRIPTS/TOOLS/StickTimeLite/core.lua': LUA.lite }, LITE_TRACKS),
       onTone: tone, onHaptic: haptic,
       onSave: () => store.set('sd', Object.fromEntries(app.sd)),
     });
@@ -94,8 +95,8 @@
     $('lcdName').textContent = r.label.split('  ')[1].split(' · ')[0];
     $('lcdRes').textContent = r.w + '×' + r.h + (r.color ? ' color' : r.depth > 1 ? ' grey' : ' mono');
     const s = scriptFor();
-    const globals = { FPVSIM_TEST: 'table' };
-    if (r.color && !eng.displayDelay) globals.FPVSIM_LAT = 0;   // nothing to predict when frames show at once
+    const globals = { STICKTIME_TEST: 'table' };
+    if (r.color && !eng.displayDelay) globals.STICKTIME_LAT = 0;   // nothing to predict when frames show at once
     eng.load(s.text, s.name, globals);
     $('rateChk').disabled = !!r.pc;
     $('delayChk').disabled = !!r.pc;
@@ -504,7 +505,7 @@
     $('delayChk').addEventListener('change', () => {
       app.delay = $('delayChk').checked; store.set('delay', app.delay);
       const e = app.engine;
-      if (e && !app.radio.pc) { e.displayDelay = app.delay; e.setGlobal('FPVSIM_LAT', app.delay ? null : 0); }
+      if (e && !app.radio.pc) { e.displayDelay = app.delay; e.setGlobal('STICKTIME_LAT', app.delay ? null : 0); }
     });
     $('fsBtn').addEventListener('click', toggleFullscreen);
     $('ghostChk').checked = app.ghost;

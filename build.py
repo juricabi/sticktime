@@ -4,10 +4,11 @@
 Lines between `--#if COLOR` / `--#if BW` and `--#endif` are kept only in the
 matching variant. @PLACEHOLDERS@ are substituted per variant.
 
-Color radios get one file, FPVSim.lua. B&W radios get a small loader,
-FPVSimBW.lua, plus the game in FPVSimBW/core.lua and, when the 32-bit
+Color radios get one file, StickTime.lua. B&W radios get a small loader,
+StickTimeBW.lua, plus the game in StickTimeBW/core.lua and, when the 32-bit
 EdgeTX-config Lua is available (tools/build_etxlua.sh), a precompiled
-FPVSimBW/core.luac for EdgeTX 2.11+ so the radio never has to compile it.
+StickTimeBW/core.luac for EdgeTX 2.11+ so the radio never has to compile it.
+StickTime Lite (StickTimeLite.lua + StickTimeLite/) has its own source.
 """
 import os
 import pathlib
@@ -16,37 +17,39 @@ import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent
-SRC = ROOT / "src" / "fpvsim.lua"
+SRC = ROOT / "src" / "sticktime.lua"
 OUT = ROOT / "sdcard" / "SCRIPTS" / "TOOLS"
 
 VARIANTS = {
     "COLOR": {
-        "file": "FPVSim.lua",
+        "file": "StickTime.lua",
         "INSTALL": "copy this file to /SCRIPTS/TOOLS/ on the radio SD card and",
-        "TOOLNAME": "FPV Sim",
-        "TITLE": "FPV Sim",
+        "TOOLNAME": "StickTime",
+        "TITLE": "StickTime",
         "VARIANT": "Color version - every EdgeTX color radio (480x272, 480x320, 320x480, 320x240, 800x480)",
         "TILT": "25",
         "FOV": "110",
         "TREES": "18",
-        "DATAFILE": "FPVSim.dat",
+        "DATAFILE": "StickTime.dat",
+        "OLDDATA": "FPVSim.dat",            # the save of FPV Sim (the old name): read when there is no new one
         "DEG": "°",
         "DPS": "°/s",
         "LATK": "0.011",
         "REFW": "480",
     },
     "BW": {
-        "file": "FPVSimBW/core.lua",
-        "loader": "FPVSimBW.lua",
-        "INSTALL": "copy FPVSimBW.lua and the FPVSimBW folder to /SCRIPTS/TOOLS/ and",
-        "TOOLNAME": "FPV Sim BW",
-        "TITLE": "FPV Sim BW",
+        "file": "StickTimeBW/core.lua",
+        "loader": "StickTimeBW.lua",
+        "INSTALL": "copy StickTimeBW.lua and the StickTimeBW folder to /SCRIPTS/TOOLS/ and",
+        "TOOLNAME": "StickTime BW",
+        "TITLE": "StickTime BW",
         "VARIANT": "Black & white version - 128x64 and 212x64 radios with an STM32F4 (TX12 MkII, Zorro, Boxer,\n  Pocket, MT12, GX12, X9D+ 2019, X9E, T14, T20 ...)",
         "TILT": "20",
         "FOV": "100",
         "TREES": "8",
-        "DATAFILE": "FPVSimBW.dat",
-        "DIR": "FPVSimBW",
+        "DATAFILE": "StickTimeBW.dat",
+        "OLDDATA": "FPVSimBW.dat",
+        "DIR": "StickTimeBW",
         "DEG": "",
         "DPS": "",
         "LATK": "0.003",
@@ -54,14 +57,14 @@ VARIANTS = {
     },
     # the small edition for B&W radios with little memory (STM32F2): its own source
     "LITE": {
-        "src": "fpvlite.lua",
-        "file": "FPVLite/core.lua",
-        "loader": "FPVLite.lua",
-        "test": "test/build/fpvlite_test.lua",   # with the FPVSIM_TEST hooks (--#if TEST)
+        "src": "sticktime_lite.lua",
+        "file": "StickTimeLite/core.lua",
+        "loader": "StickTimeLite.lua",
+        "test": "test/build/sticktime_lite_test.lua",   # with the STICKTIME_TEST hooks (--#if TEST)
         "strip": True,
-        "TOOLNAME": "FPV Sim Lite",
-        "TITLE": "FPV Sim Lite",
-        "DIR": "FPVLite",
+        "TOOLNAME": "StickTime Lite",
+        "TITLE": "StickTime Lite",
+        "DIR": "StickTimeLite",
     },
 }
 
@@ -69,7 +72,7 @@ VARIANTS = {
 def build(variant: str, cfg: dict, strip: bool) -> str:
     out = []
     keep = True
-    src = ROOT / "src" / cfg.get("src", "fpvsim.lua")
+    src = ROOT / "src" / cfg.get("src", "sticktime.lua")
     for n, line in enumerate(src.read_text(encoding="utf-8").splitlines(), 1):
         s = line.strip()
         m = re.match(r"^--#if\s+(\w+)$", s)
@@ -152,10 +155,10 @@ def precompile(src: pathlib.Path):
 
 
 def lite_tracks(cfg: dict):
-    """src/fpvlite_tracks.txt -> the names for the Lite's script, and FPVLite/t<n>.txt files
+    """src/sticktime_lite_tracks.txt -> the names for the Lite's script, and StickTimeLite/t<n>.txt files
     (seed, trees, gates, "/", structures) that the Lite reads when a track is picked."""
     names = []
-    for line in (ROOT / "src" / "fpvlite_tracks.txt").read_text(encoding="utf-8").splitlines():
+    for line in (ROOT / "src" / "sticktime_lite_tracks.txt").read_text(encoding="utf-8").splitlines():
         if not line.strip() or line.lstrip().startswith("#"):
             continue
         name, seed, trees, gates, boxes = [f.strip() for f in line.split("|")]
@@ -165,15 +168,15 @@ def lite_tracks(cfg: dict):
             data += " / " + " ".join(boxes.split())
         # the Lite reads at most 700 bytes of a track file (io.read(f, 700): one buffer that size)
         assert len(data) < 700, f"Lite track {name}: {len(data)} bytes, the Lite reads at most 699"
-        (OUT / "FPVLite" / f"t{len(names)}.txt").write_text(data + "\n", encoding="utf-8")
+        (OUT / "StickTimeLite" / f"t{len(names)}.txt").write_text(data + "\n", encoding="utf-8")
     cfg["TRACKNAMES"] = ", ".join(f'"{n}"' for n in names)
     cfg["NTRACKS"] = str(len(names))
-    print(f"sdcard/SCRIPTS/TOOLS/FPVLite/t1-{len(names)}.txt: {len(names)} tracks")
+    print(f"sdcard/SCRIPTS/TOOLS/StickTimeLite/t1-{len(names)}.txt: {len(names)} tracks")
 
 
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
-    (OUT / "FPVLite").mkdir(exist_ok=True)
+    (OUT / "StickTimeLite").mkdir(exist_ok=True)
     lite_tracks(VARIANTS["LITE"])
     for variant, cfg in VARIANTS.items():
         text = build(variant, cfg, strip=cfg.get("strip", False))

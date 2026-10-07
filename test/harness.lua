@@ -1,4 +1,4 @@
--- Headless EdgeTX mock for the FPV sim scripts (runs under Lua 5.2 / 5.3).
+-- Headless EdgeTX mock for the StickTime scripts (runs under Lua 5.2 / 5.3).
 -- Usage: lua harness.lua <script.lua> <color|bw> [W H]
 -- Flies full races with an autopilot on every track, races AI pilots, plays
 -- Freestyle and Gate Rush, exercises every menu, checks API arguments the way
@@ -52,9 +52,10 @@ io = {
   write = function(f, ...) for _, s in ipairs({ ... }) do f.d = f.d .. tostring(s) end end,
   close = function(f) if f.m ~= "r" then SD[f.p] = f.d end end,
 }
-local DATA = COLOR and "/SCRIPTS/TOOLS/FPVSim.dat" or "/SCRIPTS/TOOLS/FPVSimBW.dat"
--- a version 1 save file: the new script must migrate it
-SD[DATA] = "FPVSIM 2 1 3 30 100 3 5 1 1 0 4321 9876 5555 11111 0 0\n"
+local DATA = COLOR and "/SCRIPTS/TOOLS/StickTime.dat" or "/SCRIPTS/TOOLS/StickTimeBW.dat"
+-- a version 1 save file of FPV Sim (StickTime's old name): the new script must migrate it
+local OLD = COLOR and "/SCRIPTS/TOOLS/FPVSim.dat" or "/SCRIPTS/TOOLS/FPVSimBW.dat"
+SD[OLD] = "FPVSIM 2 1 3 30 100 3 5 1 1 0 4321 9876 5555 11111 0 0\n"
 
 -- lcd with argument checks (what the C API would do)
 local stat = { calls = 0, lines = 0, rejected = 0, tris = 0, rows = 0 }
@@ -97,7 +98,7 @@ function lcd.drawText(x, y, s, f) stat.calls = stat.calls + 1 num(x, "text x") n
 function lcd.drawNumber(x, y, v, f) stat.calls = stat.calls + 1 num(x, "num x") num(y, "num y") num(v, "num v") end
 function lcd.sizeText(s, f) return #s * 9, (f and f >= 0x500) and 37 or 19 end
 function lcd.RGB(r, g, b) return ((floor(r) * 0 + 1) * 0x10000) + 0x8000 end
-FPVSIM_TEST = {}
+STICKTIME_TEST = {}
 
 -- ------------------------------------------------------------------- load
 -- EdgeTX gives strings no metatable: s:sub() style calls fail on a radio, so here too
@@ -107,7 +108,7 @@ if not chunk then print("LOAD ERROR " .. err) os.exit(1) end
 collectgarbage() collectgarbage()
 local mem0 = collectgarbage("count")
 local script = chunk()
-local T = FPVSIM_TEST
+local T = STICKTIME_TEST
 script.init()
 collectgarbage()
 local memInit = collectgarbage("count")
@@ -120,6 +121,11 @@ do
   local l1, r1 = T.best(1)
   local l2, r2 = T.best(2)
   if l1 ~= 4321 or r1 ~= 9876 or l2 ~= 5555 or r2 ~= 11111 then fail("v1 best times not migrated") end
+  -- and saved under the new name right away
+  local s = SD[DATA]
+  if not s or string.sub(s, 1, 7) ~= "FPVSIM2" or not string.find(s, "l1=4321", 1, true) then
+    fail("the old save was not written to " .. DATA)
+  end
 end
 local NT = T.info()
 

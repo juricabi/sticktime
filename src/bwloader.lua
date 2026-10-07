@@ -1,6 +1,6 @@
 local toolName = "TNS|@TOOLNAME@|TNE"
 --[[ ======================================================================
-  @TITLE@ v1.2  -  loader for black & white radios
+  @TITLE@ v1.3  -  loader for black & white radios
 
   The game itself is in /SCRIPTS/TOOLS/@DIR@/ (copy that folder too):
   core.luac, precompiled for EdgeTX 2.11 and newer, and its source

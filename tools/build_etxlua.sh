@@ -3,7 +3,7 @@
 # 32-bit integers, single-precision floats, floats floored when converted to integers.
 #   .tools/etxlua53      native build, used by test/run_all.sh to catch radio-only Lua behaviour
 #   .tools/etxlua53_m32  32-bit build (needs gcc-multilib): same memory layout and bytecode
-#                        format as the radio; build.py uses it for FPVSimBW/core.luac
+#                        format as the radio; build.py uses it for StickTimeBW/core.luac
 set -e
 DIR=$(cd "$(dirname "$0")/.." && pwd)/.tools
 mkdir -p "$DIR"

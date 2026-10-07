@@ -89,7 +89,7 @@ with sync_playwright() as p:
         race_view(page, *args)
         shot(page, f"{rid}-race", sc)
 
-    # FPV Sim Lite: X7 / TX12 MkI class (128x64) and X9D+ (212x64 grey)
+    # StickTime Lite: X7 / TX12 MkI class (128x64) and X9D+ (212x64 grey)
     page.evaluate("sim.script('lite')")
     radio(page, "tx12")
     page.evaluate("sim.step(10, 50)")

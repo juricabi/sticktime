@@ -1,11 +1,11 @@
-local toolName = "TNS|FPV Sim Lite|TNE"
+local toolName = "TNS|StickTime Lite|TNE"
 --[[ ======================================================================
-FPV Sim Lite v1.2  -  the small edition of FPV Sim for B&W radios.
+StickTime Lite v1.3  -  the small edition of StickTime for B&W radios.
 Made for radios with little memory (STM32F2: X7, X9D, X9D+, X9 Lite,
 X-Lite, TX12 MkI, T12, T8, T-Lite, T-Pro, LR3 Pro). Runs on every
 black & white EdgeTX radio with EdgeTX 2.11 or newer.
-Install : copy FPVLite.lua and the FPVLite folder to /SCRIPTS/TOOLS/,
-then start it from SYS > TOOLS.
+Install : copy StickTimeLite.lua and the StickTimeLite folder to
+/SCRIPTS/TOOLS/, then start it from SYS > TOOLS.
 Fly     : your sticks fly the quad (acro or angle mode). EXIT pauses,
 ENTER selects, +/- (or the wheel) moves through the menus.
 Modes   : Time trial, Practice, Freestyle (tricks and combos) and
@@ -69,13 +69,13 @@ NP = NP + 1
 qx[NP], qz[NP], qr[NP], qh[NP] = x, z, r, h
 end
 buildTrack = function(t)
-local path = "/SCRIPTS/TOOLS/FPVLite/t" .. t .. ".txt"
+local path = "/SCRIPTS/TOOLS/StickTimeLite/t" .. t .. ".txt"
 local f = io.open(path, "r")
 local s = f and io.read(f, 700) or ""           -- (EdgeTX reads into a buffer of that size)
 if f then io.close(f) end
 local g, sb = string.match(s, "([^/]*)/?(.*)")
 local d, b = nums(g), nums(sb)
-if #d < 12 then error("FPV Sim Lite: track file " .. path .. " is missing") end
+if #d < 12 then error("StickTime Lite: track file " .. path .. " is missing") end
 NG, NP, NB = 0, 0, 0
 for i = 1, #b, 6 do
 NB = NB + 1
@@ -156,7 +156,8 @@ local BL, BR, BF, BG = {}, {}, {}, {}
 for t = 1, 7 do BL[t], BR[t], BF[t], BG[t] = 0, 0, 0, 0 end
 local save, load
 do
-local FILE = "/SCRIPTS/TOOLS/FPVLite/data.txt"
+local FILE = "/SCRIPTS/TOOLS/StickTimeLite/data.txt"
+local OLD = "/SCRIPTS/TOOLS/FPVLite/data.txt"              -- the save under the old name, FPV Sim Lite
 save = function()
 local s = "FPVLITE2"
 for k, v in pairs(S) do s = s .. " " .. k .. "=" .. floor(v) end
@@ -170,7 +171,8 @@ io.close(f)
 end
 end
 load = function()
-local f = io.open(FILE, "r")
+local f, old = io.open(FILE, "r"), false
+if not f then f, old = io.open(OLD, "r"), true end
 if not f then return end
 local s = io.read(f, 600)
 io.close(f)
@@ -195,6 +197,7 @@ end
 end
 end
 end
+if old then save() end                            -- under the new name right away
 end
 end
 local px, py, pz, vx, vy, vz = 0, 0.15, 0, 0, 0, 0                      -- position, velocity (m, m/s)
@@ -634,10 +637,11 @@ local n, y = #MAIN, 15
 if state == 1 then
 local t = S.track
 local b = (focus == 1 and BR or BL)[t]
-drawText(1, 0, "FPV SIM", MIDSIZE)
+drawText(1, 0, "StickTime", MIDSIZE)
 drawText(XM, 0, "LITE", SML + RIGHT)
-drawText(XM, 7, "best " .. (focus == 3 and BF[t] .. " pts" or focus == 4 and BG[t] .. " gates" or
-b > 0 and timeStr(b) or "--"), SML + RIGHT)
+local u = XM > 127                            -- room for the units (212 px screens)
+drawText(XM, 7, "best " .. (focus == 3 and BF[t] .. (u and " pts" or "") or focus == 4 and BG[t] ..
+(u and " gates" or "") or b > 0 and timeStr(b) or "--"), SML + RIGHT)
 else
 drawText(1, 0, "SETTINGS", SML + INV)
 n, y = #OPTS + 1, 9

@@ -5,7 +5,7 @@
 --   ETX_MODEL=f2 ETX_HEAP=63300 .tools/etxhost -radio test/memtest.lua <file.lua|file.luac> [W H]
 --
 -- A .lua file is compiled in the radio state with its debug info, as on a radio's first start.
--- Then every track and mode is played through the script's FPVSIM_TEST hooks, with the GC
+-- Then every track and mode is played through the script's STICKTIME_TEST hooks, with the GC
 -- step EdgeTX runs before each run() call. Prints the heap high-water mark and "MEM OK".
 local path, W, H = arg[1], tonumber(arg[2] or 128), tonumber(arg[3] or 64)
 local function kb(n) return string.format("%.1f", n / 1024) end
@@ -15,8 +15,8 @@ radio.new(W, H)
 local root = string.match(path, "^(.*)/SCRIPTS/TOOLS/")
 if root then radio.sdroot(root) end
 -- a radio that has been used before: a save file with settings and bests for every track
-local saves = { ["FPVLite"] = { "/SCRIPTS/TOOLS/FPVLite/data.txt", "FPVLITE2 mode=2 wind=1 quad=1 track=1 laps=3 rates=2 " ..
-  "twr=5 tilt=20", "l%d=4810 r%d=14120 f%d=1200 g%d=12" }, ["FPVSimBW"] = { "/SCRIPTS/TOOLS/FPVSimBW.dat", "FPVSIM2 " ..
+local saves = { ["StickTimeLite"] = { "/SCRIPTS/TOOLS/StickTimeLite/data.txt", "FPVLITE2 mode=2 wind=1 quad=1 track=1 laps=3 rates=2 " ..
+  "twr=5 tilt=20", "l%d=4810 r%d=14120 f%d=1200 g%d=12" }, ["StickTimeBW"] = { "/SCRIPTS/TOOLS/StickTimeBW.dat", "FPVSIM2 " ..
   "track=1 quad=1 ai=2 wind=0 mode=2 rm=850 fps=0 sticks=1 tilt=30 rc=150 map=1 re=45 ym=700 wash=0 laps=3 skill=1 " ..
   "rates=4 yc=130 ye=40 fov=100 twr=6", "l%d=4321 r%d=9876 g%d=7 f%d=300" } }
 for name, sv in pairs(saves) do

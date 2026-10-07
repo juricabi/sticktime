@@ -555,7 +555,7 @@ static int d_new(lua_State *L) {                   /* radio.new(W, H): a fresh r
 
 static int d_load(lua_State *L) {                  /* radio.load(path, withTestHooks) */
   const char *path = luaL_checkstring(L, 1);
-  if (lua_toboolean(L, 2)) { lua_newtable(Lrad); lua_setglobal(Lrad, "FPVSIM_TEST"); }
+  if (lua_toboolean(L, 2)) { lua_newtable(Lrad); lua_setglobal(Lrad, "STICKTIME_TEST"); }
   lua_settop(Lrad, 0);
   if (luaL_loadfilex(Lrad, path, NULL) != LUA_OK) {
     lua_pushnil(L); lua_pushstring(L, lua_tostring(Lrad, -1)); lua_settop(Lrad, 0);
@@ -571,12 +571,12 @@ static int d_load(lua_State *L) {                  /* radio.load(path, withTestH
   return 1;
 }
 
-/* radio.call(name, ...): __script[name](...) for init/run, or FPVSIM_TEST[name](...) with "T." */
+/* radio.call(name, ...): __script[name](...) for init/run, or STICKTIME_TEST[name](...) with "T." */
 static int d_call(lua_State *L) {
   const char *name = luaL_checkstring(L, 1);
   int n = lua_gettop(L), top;
   lua_settop(Lrad, 0);
-  if (!strncmp(name, "T.", 2)) { lua_getglobal(Lrad, "FPVSIM_TEST"); name += 2; }
+  if (!strncmp(name, "T.", 2)) { lua_getglobal(Lrad, "STICKTIME_TEST"); name += 2; }
   else lua_getglobal(Lrad, "__script");
   if (!lua_istable(Lrad, -1)) return luaL_error(L, "radio: no table for %s", name);
   lua_getfield(Lrad, -1, name);

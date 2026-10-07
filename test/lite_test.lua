@@ -1,5 +1,5 @@
--- Headless test of FPV Sim Lite (Lua 5.3 with EdgeTX's number settings, or Lua 5.2).
--- Usage: lua lite_test.lua build/fpvlite_test.lua [W H]
+-- Headless test of StickTime Lite (Lua 5.3 with EdgeTX's number settings, or Lua 5.2).
+-- Usage: lua lite_test.lua build/sticktime_lite_test.lua [W H]
 -- Menus and settings, time trials on all seven tracks with an autopilot (gates, hoops, arches,
 -- flags, dive gates, the Bando's doors), practice with wind, freestyle tricks and combos, gate
 -- rush, crashes into the ground, a gate and a wall, pause, save and reload, B&W drawing rules,
@@ -37,8 +37,8 @@ function playHaptic() end
 -- the SD card: the track files from the repository, then what the script writes
 local SD = {}
 for t = 1, 9 do
-  local fh = io.open("../sdcard/SCRIPTS/TOOLS/FPVLite/t" .. t .. ".txt", "r")
-  if fh then SD["/SCRIPTS/TOOLS/FPVLite/t" .. t .. ".txt"] = fh:read("*a") fh:close() end
+  local fh = io.open("../sdcard/SCRIPTS/TOOLS/StickTimeLite/t" .. t .. ".txt", "r")
+  if fh then SD["/SCRIPTS/TOOLS/StickTimeLite/t" .. t .. ".txt"] = fh:read("*a") fh:close() end
 end
 io = {
   open = function(p, m) if m == "r" and not SD[p] then return nil end return { p = p, m = m, d = (m == "r") and SD[p] or "", pos = 1 } end,
@@ -76,13 +76,13 @@ lcd = {
 -- EdgeTX gives strings no metatable: s:sub() style calls fail on a radio, so here too
 debug.setmetatable("", nil)
 -- load in an environment without the libraries B&W radios lack
-FPVSIM_TEST = {}
+STICKTIME_TEST = {}
 local f = assert(loadfile(path, "t", setmetatable({}, { __index = function(_, k)
   if hidden[k] then error("uses '" .. k .. "', which B&W radios do not have", 2) end
   return _G[k]
 end, __newindex = function(_, k) fail("sets global " .. tostring(k)) end })))
 local script = f()
-local T = FPVSIM_TEST
+local T = STICKTIME_TEST
 script.init()
 
 local instrMax, instrSum, frames = 0, 0.0, 0
@@ -327,11 +327,11 @@ for _ = 1, 4 do frame(EVT_VIRTUAL_PREV) end
 if frame(EVT_VIRTUAL_EXIT) ~= 1 then fail("EXIT in the menu should close the tool") end
 
 -- 6. saved and loaded again by a new instance
-local saved = SD["/SCRIPTS/TOOLS/FPVLite/data.txt"]
+local saved = SD["/SCRIPTS/TOOLS/StickTimeLite/data.txt"]
 if not saved then fail("nothing saved") else
-  FPVSIM_TEST = {}
+  STICKTIME_TEST = {}
   local s2 = f()
-  local T2 = FPVSIM_TEST
+  local T2 = STICKTIME_TEST
   s2.init()
   for k, v in pairs(T.S) do
     if T2.S[k] ~= v then fail("setting " .. k .. " not restored: " .. tostring(v) .. " vs " .. tostring(T2.S[k])) end
@@ -345,24 +345,30 @@ if not saved then fail("nothing saved") else
   print("saved: " .. saved)
 end
 -- a broken save file is ignored
-SD["/SCRIPTS/TOOLS/FPVLite/data.txt"] = "FPVLITE2 track=99 twr=13 mode=x laps=-1 l1=abc"
-FPVSIM_TEST = {}
+SD["/SCRIPTS/TOOLS/StickTimeLite/data.txt"] = "FPVLITE2 track=99 twr=13 mode=x laps=-1 l1=abc"
+STICKTIME_TEST = {}
 local s3 = f()
 s3.init()
-if FPVSIM_TEST.S.track ~= 1 or FPVSIM_TEST.S.twr ~= 5 then fail("bad save values were not rejected") end
+if STICKTIME_TEST.S.track ~= 1 or STICKTIME_TEST.S.twr ~= 5 then fail("bad save values were not rejected") end
 s3.run(0)
--- a save of the first Lite (four tracks, the 4th was the Grand Prix, now the 6th)
+-- a save of the first Lite, under its old name FPV Sim Lite (four tracks: the 4th was the Grand
+-- Prix, now the 6th): read, and saved under the new name right away
+SD["/SCRIPTS/TOOLS/StickTimeLite/data.txt"] = nil
 SD["/SCRIPTS/TOOLS/FPVLite/data.txt"] = "FPVLITE1 track=4 twr=6 rates=3 l1=4810 r1=10120 g1=3 l4=8000 r4=16500 g4=7"
-FPVSIM_TEST = {}
+STICKTIME_TEST = {}
 local s4 = f()
 s4.init()
-local T4 = FPVSIM_TEST
+local T4 = STICKTIME_TEST
 local a1, a2, a3, a4 = T4.best(6)                 -- lap, race, gate rush, combo
 local c1, c2, c3, c4 = T4.best(4)
 local d1, d2, d3 = T4.best(1)
 if T4.S.track ~= 6 or T4.S.twr ~= 6 or T4.S.rates ~= 3 or a1 ~= 8000 or a2 ~= 16500 or a3 ~= 7 or a4 ~= 0
   or c1 ~= 0 or c2 ~= 0 or c3 ~= 0 or c4 ~= 0 or d1 ~= 4810 or d2 ~= 10120 or d3 ~= 3 then
   fail("a save of the first Lite was not read right")
+end
+local new = SD["/SCRIPTS/TOOLS/StickTimeLite/data.txt"]
+if not new or string.sub(new, 1, 8) ~= "FPVLITE2" or not string.find(new, "l6=8000", 1, true) then
+  fail("the first Lite's save was not written under the new name")
 end
 s4.run(0)
 

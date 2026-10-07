@@ -1,7 +1,7 @@
 -- Draw-order check at the Bando: random camera poses; for every pair with a structure in it,
 -- cast rays from the camera to points on the object drawn later. If such a ray passes through
 -- the object drawn earlier first, the later one wrongly paints over it.
--- Usage: lua order_check.lua ../sdcard/SCRIPTS/TOOLS/FPVSim.lua color 480 272
+-- Usage: lua order_check.lua ../sdcard/SCRIPTS/TOOLS/StickTime.lua color 480 272
 local src = io.open("harness.lua"):read("*a")
 local head = src:sub(1, src:find("-- 1. menus", 1, true) - 1)
 local f = assert(load(head .. [[

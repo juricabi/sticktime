@@ -1,10 +1,10 @@
-local toolName = "TNS|FPV Sim BW|TNE"
+local toolName = "TNS|StickTime BW|TNE"
 --[[ ======================================================================
-  FPV Sim BW v1.2  -  a real 3D FPV quad simulator that runs on your radio
+  StickTime BW v1.3  -  a real 3D FPV quad simulator that runs on your radio
   Black & white version - 128x64 and 212x64 radios with an STM32F4 (TX12 MkII, Zorro, Boxer,
   Pocket, MT12, GX12, X9D+ 2019, X9E, T14, T20 ...)
 
-  Install : copy FPVSimBW.lua and the FPVSimBW folder to /SCRIPTS/TOOLS/ and
+  Install : copy StickTimeBW.lua and the StickTimeBW folder to /SCRIPTS/TOOLS/ and
             start it from SYS > TOOLS (or SD card browser > Execute).
   Fly     : your sticks fly the quad (acro or angle mode). The radio
             handles stick mode 1-4. EXIT = pause/back, ENTER = select,
@@ -279,7 +279,8 @@ local BEST = { l = {}, r = {}, g = {}, f = {} }   -- per track: best lap, race, 
 for t = 1, NT do BEST.l[t], BEST.r[t], BEST.g[t], BEST.f[t] = 0, 0, 0, 0 end
 local loadData, saveData
 do
-local DATA = "/SCRIPTS/TOOLS/FPVSimBW.dat"
+local DATA = "/SCRIPTS/TOOLS/StickTimeBW.dat"
+local OLD = "/SCRIPTS/TOOLS/FPVSimBW.dat"                 -- the save under the old name, FPV Sim
 
 local DEF = {}
 for k, v in pairs(S) do DEF[k] = v end
@@ -303,7 +304,8 @@ local function validate()
 end
 
 loadData = function()
-  local f = io.open(DATA, "r")
+  local f, old = io.open(DATA, "r"), false
+  if not f then f, old = io.open(OLD, "r"), true end
   if not f then return end
   local s = io.read(f, 1024)
   io.close(f)
@@ -335,6 +337,7 @@ loadData = function()
     end
   end
   validate()
+  if old then saveData() end                       -- under the new name right away
 end
 
 saveData = function()
@@ -921,10 +924,11 @@ local F, tanH = 160, 1.4
 -- FPV camera, rendered where the quad will be when the frame reaches the screen. Color
 -- screens show a frame one script cycle after it is drawn (50 ms on stock EdgeTX), so the
 -- prediction follows the measured frame interval and stays right on faster firmware too.
--- FPVSIM_LAT (seconds) overrides it, e.g. in the emulator when frames show at once.
+-- STICKTIME_LAT (seconds) overrides it, e.g. in the emulator when frames show at once
+-- (FPVSIM_LAT: its name before the rename to StickTime).
 local function fpvCamera()
   local c, s = P.tc, P.ts
-  local d = (state == FLY or state == DONE) and (FPVSIM_LAT or R.fi * 0.003) or 0
+  local d = (state == FLY or state == DONE) and (STICKTIME_LAT or FPVSIM_LAT or R.fi * 0.003) or 0
   local a1, a2, a3, b1, b2, b3, e1, e2, e3 = rx, ry, rz, ux, uy, uz, fx, fy, fz
   if d > 0 then rotate(P.wr * d, P.wp * d, P.wy * d) end
   kpx, kpy, kpz = px + vx * d, py + vy * d, pz + vz * d
@@ -1487,12 +1491,12 @@ local render, hitTest, pauseHit, initUI
     if state == MENU or (state == SETUP and prevState == MENU) then
       lcd.clear()
       if state == MENU then
-        drawText(1, 0, "FPV SIM", MIDSIZE)
-        drawText(XM, 1, TRACKS[S.track][1], SMLSIZE + RIGHT)
+        drawText(1, 0, "StickTime", MIDSIZE)
+        drawText(XM, 0, TRACKS[S.track][1], SMLSIZE + RIGHT)
         drawList(nil, #MAIN_ITEMS, mainLabel, nil, 13, 8)
         local t = S.track
         local b = "best " .. (BEST.l[t] > 0 and timeStr(BEST.l[t]) or "--")
-        if focus == 3 then b = "best " .. BEST.f[t] elseif focus == 4 then b = "best " .. BEST.g[t] .. " gates" end
+        if focus == 3 then b = "best " .. BEST.f[t] elseif focus == 4 then b = "best " .. BEST.g[t] .. (XM > 127 and " gates" or "") end
         drawText(XM, 7, b, SMLSIZE + RIGHT)
       else
         drawList("SETTINGS", #OPTS + 1, setLabel, setValue, 0, 9)
@@ -1673,7 +1677,7 @@ local function init()
   selectTrack(S.track)
   lastT = getTime()
   R.fpsT = lastT
-  local TEST = FPVSIM_TEST
+  local TEST = STICKTIME_TEST
   if TEST then
     TEST.get = function() return px, py, pz, vx, vy, vz, fx, fy, fz, ux, uy, uz, rx, ry, rz, state, lap, nextGate, NG, gt end
     TEST.gate = function(i) return gx[i], gy[i], gz[i], gnx[i], gny[i], gnz[i], gk[i], AX[i], AY[i], AZ[i] end

@@ -99,7 +99,7 @@ def main():
                 page.evaluate(f"sim.key('{k}'); sim.step(1, 50)")
             save(page, f"{rid}_15settings")
             page.evaluate("sim.test('set', 'ai', 0)")
-        # FPV Sim Lite (reads its tracks from the SD card): every track, freestyle and gate rush
+        # StickTime Lite (reads its tracks from the SD card): every track, freestyle and gate rush
         if "tx12" in RADIOS or "x9d" in RADIOS:
             page.evaluate("sim.script('lite')")
             for rid in [r for r in ("tx12", "x9d") if r in RADIOS]:

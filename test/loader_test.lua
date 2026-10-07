@@ -1,4 +1,4 @@
--- The B&W loaders (FPVSimBW.lua, FPVLite.lua) with a mock loadScript, run by the 32-bit
+-- The B&W loaders (StickTimeBW.lua, StickTimeLite.lua) with a mock loadScript, run by the 32-bit
 -- EdgeTX-config Lua: they must load the precompiled core.luac once, and only when there is
 -- none let EdgeTX compile core.lua, drop that copy and load the saved bytecode.
 local ROOT = "../sdcard/SCRIPTS/TOOLS/"
@@ -32,7 +32,7 @@ local function check(loader, haveLuac)
   ok = ok and good
 end
 
-for _, loader in ipairs({ "FPVSimBW.lua", "FPVLite.lua" }) do
+for _, loader in ipairs({ "StickTimeBW.lua", "StickTimeLite.lua" }) do
   check(loader, true)
   check(loader, false)
 end

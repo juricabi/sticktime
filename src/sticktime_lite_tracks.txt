@@ -1,5 +1,5 @@
-# FPV Sim Lite tracks (the same as the full game's). build.py writes each one to
-# sdcard/SCRIPTS/TOOLS/FPVLite/t<number>.txt, which the game reads when the track is picked.
+# StickTime Lite tracks (the same as the full game's). build.py writes each one to
+# sdcard/SCRIPTS/TOOLS/StickTimeLite/t<number>.txt, which the game reads when the track is picked.
 #
 # name | tree seed | trees | gates: x z type yaw height (height 0 = default for the type) | structures
 # Gate types: 1 gate, 2 high gate, 3 dive gate (flat: fly down through it), 4 hoop, 5 arch,

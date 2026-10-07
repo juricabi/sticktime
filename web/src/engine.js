@@ -271,13 +271,13 @@ const EdgeTX = (() => {
       lua.lua_setglobal(this.L, to_luastring(name));
     }
 
-    // call FPVSIM_TEST.<name>(...) inside the script (automation / tests)
+    // call STICKTIME_TEST.<name>(...) inside the script (automation / tests)
     callTest(name, ...args) {
       const { lua, to_luastring } = this.fe;
       const L = this.L;
       if (!L) return null;
       const top0 = lua.lua_gettop(L);
-      lua.lua_getglobal(L, to_luastring('FPVSIM_TEST'));
+      lua.lua_getglobal(L, to_luastring('STICKTIME_TEST'));
       if (!lua.lua_istable(L, -1)) { lua.lua_settop(L, top0); return null; }
       lua.lua_getfield(L, -1, to_luastring(name));
       lua.lua_remove(L, -2);
@@ -389,7 +389,7 @@ const EdgeTX = (() => {
       lua.lua_newtable(L);
       setfn('open', () => {
         const path = str(1), mode = lua.lua_isnoneornil(L, 2) ? 'r' : str(2);
-        // reads: the SD card's own files first, then the bundled ones (FPV Sim Lite's tracks)
+        // reads: the SD card's own files first, then the bundled ones (StickTime Lite's tracks)
         const has = self.sd.has(path) || self.files[path] !== undefined;
         if (mode[0] === 'r' && !has) { lua.lua_pushnil(L); return 1; }
         const f = { path, mode, pos: 0, data: mode[0] === 'w' ? '' : (self.sd.has(path) ? self.sd.get(path) : self.files[path] || '') };
@@ -439,7 +439,7 @@ const EdgeTX = (() => {
         return 1;
       });
 
-      // extra globals (e.g. test hooks, FPVSIM_LAT)
+      // extra globals (e.g. test hooks, STICKTIME_LAT)
       for (const k in globals) {
         if (globals[k] === 'table') { lua.lua_newtable(L); lua.lua_setglobal(L, to_luastring(k)); }
         else if (typeof globals[k] === 'number') { lua.lua_pushnumber(L, globals[k]); lua.lua_setglobal(L, to_luastring(k)); }
