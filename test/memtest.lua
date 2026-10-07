@@ -2,15 +2,18 @@
 -- script lives in its own Lua state with EdgeTX's Lua core, the radio API in ROM and a model
 -- of the radio's allocator (bins / CCM plus newlib-nano malloc, fragmentation included).
 --
---   ETX_MODEL=f2 ETX_HEAP=63300 .tools/etxhost -radio test/memtest.lua <file.lua|file.luac> [W H]
+--   ETX_MODEL=f2 ETX_HEAP=63300 .tools/etxhost -radio test/memtest.lua <file.lua|file.luac> [W H [color]]
+--
+-- "color": a color radio (its lcd functions and flag values), where the B&W loaders run
+-- StickTimeBW/color.lua and StickTimeLite/color.lua.
 --
 -- A .lua file is compiled in the radio state with its debug info, as on a radio's first start.
 -- Then every track and mode is played through the script's STICKTIME_TEST hooks, with the GC
 -- step EdgeTX runs before each run() call. Prints the heap high-water mark and "MEM OK".
-local path, W, H = arg[1], tonumber(arg[2] or 128), tonumber(arg[3] or 64)
+local path, W, H, COLOR = arg[1], tonumber(arg[2] or 128), tonumber(arg[3] or 64), arg[4] == "color"
 local function kb(n) return string.format("%.1f", n / 1024) end
 
-radio.new(W, H)
+radio.new(W, H, COLOR)
 -- a loader in /SCRIPTS/TOOLS loads its core with loadScript from the SD card folder
 local root = string.match(path, "^(.*)/SCRIPTS/TOOLS/")
 if root then radio.sdroot(root) end

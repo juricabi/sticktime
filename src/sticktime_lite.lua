@@ -1,6 +1,6 @@
 local toolName = "TNS|StickTime Lite|TNE"
 --[[ ======================================================================
-  StickTime Lite v1.4  -  the small edition of StickTime for B&W radios.
+  StickTime Lite v1.5  -  the small edition of StickTime for B&W radios.
   Made for radios with little memory (STM32F2: X7, X9D, X9D+, X9 Lite,
   X-Lite, TX12 MkI, T12, T8, T-Lite, T-Pro, LR3 Pro). Runs on every
   black & white EdgeTX radio with EdgeTX 2.11 or newer.
@@ -477,6 +477,11 @@ physics = function(dt)
   local n = floor(dt * 80) + 1
   local h = dt / n
   local km, kr, VP, KH, KS, KU, sTx = h / (P[11] + h), h / (P[12] + h), P[7], P[8], P[9], P[10], sqrt(Tmax)
+  -- the surface under the quad, for ground effect: the ground, or the top of a structure
+  local fl = 0
+  for i = 1, NB do
+    if px > bx0[i] and px < bx1[i] and pz > bz0[i] and pz < bz1[i] and py > by1[i] and by1[i] > fl then fl = by1[i] end
+  end
   -- broad phase once per frame (flags: their zone reaches 12 m from the center)
   local reach, ng, np = speed * dt + 7, 0, 0
   for i = 1, NG do
@@ -505,6 +510,12 @@ physics = function(dt)
     local vu, vr, vf = ax_ * ux + vy * uy + az_ * uz, ax_ * rx + vy * ry + az_ * rz, ax_ * fx + vy * fy + az_ * fz
     local Ta = Tm - vu * sqrt(Tm) * sTx / VP
     Ta = Ta > Tm * 1.25 and Tm * 1.25 or Ta < 0 and 0 or Ta
+    -- ground effect: +12% thrust skimming the ground or a roof, +3% at 30 cm, less tilted or fast
+    local hg = py - fl
+    if hg < 1.2 and uy > 0.3 then
+      local k = 0.049 * uy / (hg < 0.15 and 0.15 or hg)
+      Ta = Ta / (1 - k * k / (1 + (vx * vx + vz * vz) * 0.018))
+    end
     local kh = KH * sqrt(Tm * 0.0204 + 0.02)   -- rotor drag: 0.0204 = 1 / (5 G)
     local au = Ta - KU * (vu < 0 and -vu or vu) * vu
     local ar = -(kh + KS * (vr < 0 and -vr or vr)) * vr

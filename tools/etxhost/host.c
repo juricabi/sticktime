@@ -350,6 +350,24 @@ static int r_line(lua_State *L) {                  /* B&W: every point must be o
   }
   return 0;
 }
+/* color radios: drawLine drops a line with an end past the right or bottom edge */
+static int r_cline(lua_State *L) {
+  int i; lcdCalls++; lcdLines++;
+  for (i = 1; i <= 4; i++) {
+    lua_Number v = luaL_checknumber(L, i);
+    if (v > ((i % 2) ? radW : radH)) { lcdBad++; break; }
+  }
+  return 0;
+}
+static int r_rgb(lua_State *L) {
+  lua_pushinteger(L, (luaL_checkinteger(L, 1) * 65536 + luaL_checkinteger(L, 2) * 256 + luaL_checkinteger(L, 3)) * 2 + 1);
+  return 1;
+}
+static int r_sizeText(lua_State *L) {
+  size_t l; luaL_checklstring(L, 1, &l);
+  lua_pushinteger(L, (lua_Integer)l * 9); lua_pushinteger(L, 17);
+  return 2;
+}
 /* io on a small in-memory SD card: files the script writes, and files read from the real
    folder given by radio.sdroot(); io.open allocates a FatFs FIL in the Lua heap like the radio */
 #define NFILES 16
@@ -418,10 +436,26 @@ static int r_write(lua_State *L) {
 }
 static int r_close(lua_State *L) { (void)L; return 0; }
 
-/* loadScript(file [, mode]): like the radio, .luac for "b", .lua for "t", "bt" = binary first
-   (the radio takes the newer of the two; release files are made so that is the binary) */
+/* loadScript(file [, mode [, env]]): like the radio, .luac for "b", .lua for "t", "bt" = binary
+   first (the radio takes the newer of the two; release files are made so that is the binary).
+   env as in EdgeTX's api_general.cpp, which clears the stack before it reads that argument: a
+   chunk loaded with one gets nil as its _ENV, no globals at all. */
+static int r_loadScriptFile(lua_State *L, const char *fn, const char *mode);
 static int r_loadScript(lua_State *L) {
   const char *fn = luaL_checkstring(L, 1), *mode = luaL_optstring(L, 2, "bt");
+  int env = !lua_isnone(L, 3) ? 3 : 0, n;
+  char fnc[600], modec[8];
+  snprintf(fnc, sizeof(fnc), "%s", fn);
+  snprintf(modec, sizeof(modec), "%s", mode);
+  lua_settop(L, 0);
+  n = r_loadScriptFile(L, fnc, modec);
+  if (n == 1 && env) {
+    lua_pushvalue(L, env);
+    if (!lua_setupvalue(L, -2, 1)) lua_pop(L, 1);
+  }
+  return n;
+}
+static int r_loadScriptFile(lua_State *L, const char *fn, const char *mode) {
   char base[600], path[620];
   size_t n = strlen(fn);
   if (n > 4 && !strcmp(fn + n - 4, ".lua")) n -= 4;
@@ -528,7 +562,8 @@ static int xmove(lua_State *from, lua_State *to, int first, int last) {
   return n;
 }
 
-static int d_new(lua_State *L) {                   /* radio.new(W, H): a fresh radio */
+static int d_new(lua_State *L) {                   /* radio.new(W, H [, color]): a fresh radio */
+  int color = lua_toboolean(L, 3);
   radW = (int)luaL_checkinteger(L, 1); radH = (int)luaL_checkinteger(L, 2);
   if (Lrad) lua_close(Lrad);
   heapUsed = heapPeakUsed = heapTop = heapTopPeak = ccmUsed = ccmPeak = 0;
@@ -549,6 +584,21 @@ static int d_new(lua_State *L) {                   /* radio.new(W, H): a fresh r
   lua_pushinteger(Lrad, radW); lua_setglobal(Lrad, "LCD_W");
   lua_pushinteger(Lrad, radH); lua_setglobal(Lrad, "LCD_H");
   if (radW == 212) { lua_pushcfunction(Lrad, r_grey); lua_setglobal(Lrad, "GREY"); }
+  if (color) {                                     /* a color radio: its lcd and flag values */
+    static const struct { const char *n; lua_CFunction f; } fn[] = {
+      { "clear", r_nop }, { "drawLine", r_cline }, { "drawText", r_nop }, { "drawNumber", r_nop },
+      { "drawRectangle", r_nop }, { "drawFilledRectangle", r_nop }, { "drawPoint", r_nop },
+      { "RGB", r_rgb }, { "sizeText", r_sizeText } };
+    static const struct { const char *n; lua_Integer v; } cst[] = {
+      { "LEFT", 0 }, { "RIGHT", 0x40000 }, { "CENTER", 0x80000 }, { "INVERS", 0x100000 }, { "BLINK", 0x200000 },
+      { "BOLD", 0x400 }, { "PREC1", 0x800000 }, { "PREC2", 0x1000000 }, { "TINSIZE", 0x200 }, { "SMLSIZE", 0x300 },
+      { "MIDSIZE", 0x400 }, { "DBLSIZE", 0x500 }, { "XXLSIZE", 0x600 } };
+    size_t i;
+    lua_createtable(Lrad, 0, 9);
+    for (i = 0; i < sizeof(fn) / sizeof(fn[0]); i++) { lua_pushcfunction(Lrad, fn[i].f); lua_setfield(Lrad, -2, fn[i].n); }
+    lua_setglobal(Lrad, "lcd");
+    for (i = 0; i < sizeof(cst) / sizeof(cst[0]); i++) { lua_pushinteger(Lrad, cst[i].v); lua_setglobal(Lrad, cst[i].n); }
+  }
   lua_gc(Lrad, LUA_GCCOLLECT, 0);
   return 0;
 }

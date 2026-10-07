@@ -90,8 +90,13 @@ debug.setmetatable("", nil)
 STICKTIME_TEST = {}
 local f
 if COLOR then
-  -- color.lua, which loads the game (here the test build) in its own environment
-  function loadScript(p, mode, e) return loadfile(string.find(p, "/core.lua", 1, true) and path or "../sdcard" .. p, "t", e) end
+  -- color.lua, which loads the game (here the test build). As on EdgeTX, a third argument
+  -- (env) leaves the chunk with no globals at all.
+  function loadScript(p, mode, ...)
+    local file = string.find(p, "/core.lua", 1, true) and path or "../sdcard" .. p
+    if select("#", ...) > 0 then return loadfile(file, "t", nil) end
+    return loadfile(file, "t")
+  end
   f = function() return dofile("../sdcard/SCRIPTS/TOOLS/StickTimeLite/color.lua") end
 else
   f = assert(loadfile(path, "t", setmetatable({}, { __index = function(_, k)
@@ -331,6 +336,25 @@ T.vel(nx * 10, 0, nz * 10)
 sticks.thr = 0
 steps(15)
 if state() ~= CRASHED then fail("no crash into the gate frame (state " .. state() .. ")") end
+
+-- ground effect: at the throttle that holds a hover high up, the quad rises near the ground
+do
+  local hover = (((1 / 5 - 0.015) / 0.985) ^ (1 / 1.6) * 2 - 1) * 1024
+  local function vyAfter(y)
+    T.track(1) T.start(2) steps(70)
+    local _, s0 = state()
+    T.pose(s0[1], y, s0[3], 0, 0, 0) T.vel(0, 0, 0)
+    sticks.ail, sticks.ele, sticks.rud, sticks.thr = 0, 0, 0, hover
+    steps(10)
+    local st, s = state()
+    return s[5], st
+  end
+  local vLow, stLow = vyAfter(0.3)
+  local vHigh, stHigh = vyAfter(6)
+  print(string.format("ground effect: hover throttle, after 0.5 s: %.2f m/s up from 0.3 m, %.2f m/s from 6 m", vLow, vHigh))
+  if stLow ~= FLY or stHigh ~= FLY or not (vLow > vHigh + 0.05) then fail("no ground effect near the ground") end
+  idle()
+end
 idle()
 
 -- 5. pause: EXIT pauses, Resume, Restart, Menu

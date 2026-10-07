@@ -106,8 +106,13 @@ function lcd.drawNumber(x, y, v, f) stat.calls = stat.calls + 1 num(x, "num x") 
 function lcd.sizeText(s, f) return #s * 9, (f and f >= 0x500) and 37 or 19 end
 function lcd.RGB(r, g, b) return ((floor(r) * 0 + 1) * 0x10000) + 0x8000 end
 STICKTIME_TEST = {}
--- the B&W game's files, as color.lua loads them (the source: the 32-bit core.luac is for radios)
-function loadScript(p, mode, e) return loadfile("../sdcard" .. p, "t", e) end
+-- the B&W game's files, as color.lua loads them (the source: the 32-bit core.luac is for radios).
+-- As on EdgeTX, a third argument (env) leaves the chunk with no globals at all: api_general.cpp
+-- clears the stack before it reads the argument.
+function loadScript(p, mode, ...)
+  if select("#", ...) > 0 then return loadfile("../sdcard" .. p, "t", nil) end
+  return loadfile("../sdcard" .. p, "t")
+end
 
 -- ------------------------------------------------------------------- load
 -- EdgeTX gives strings no metatable: s:sub() style calls fail on a radio, so here too
@@ -355,6 +360,28 @@ do
   if state() ~= 5 and state() ~= 6 then fail("hitting the hoop rim should crash (state " .. state() .. ")") else print("hoop rim: crash registered") end
 end
 idleSticks()
+
+-- 5b. ground effect: at the throttle that holds a hover high up, the quad rises near the ground
+do
+  local mode, twr = T.S.mode, T.S.twr
+  T.set("mode", 2) T.set("twr", 5)
+  local hover = (((1 / 5 - 0.015) / 0.985) ^ (1 / 1.6) * 2 - 1) * 1024
+  local function vyAfter(y)
+    T.track(1) T.start(2) steps(70) T.state(4)
+    local _, s0 = state()
+    T.pose(s0[1], y, s0[3], 0, 0, 0) T.vel(0, 0, 0)
+    sticks.ail, sticks.ele, sticks.rud, sticks.thr = 0, 0, 0, hover
+    steps(10)
+    local st, s = state()
+    return s[5], st
+  end
+  local vLow, stLow = vyAfter(0.3)
+  local vHigh, stHigh = vyAfter(6)
+  print(string.format("ground effect: hover throttle, after 0.5 s: %.2f m/s up from 0.3 m, %.2f m/s from 6 m", vLow, vHigh))
+  if stLow ~= 4 or stHigh ~= 4 or not (vLow > vHigh + 0.05) then fail("no ground effect near the ground") end
+  T.set("mode", mode) T.set("twr", twr)
+  idleSticks()
+end
 
 -- 6a. a fast roll that stops (Fast rates, racer): the camera is drawn ahead to hide the screen's
 -- delay, but must not overshoot where the quad stops and swing back

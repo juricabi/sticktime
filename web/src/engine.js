@@ -436,18 +436,20 @@ const EdgeTX = (() => {
         lua.lua_pushinteger(L, 0); return 1;
       });
 
-      // loadScript(path [, mode [, env]]): scripts from the virtual SD card; env becomes the
-      // chunk's _ENV, as in EdgeTX
+      // loadScript(path [, mode [, env]]): scripts from the virtual SD card. Like EdgeTX's, a
+      // third argument does not become the chunk's _ENV but leaves it with none (EdgeTX clears
+      // the stack before it reads the argument), so a script that relies on it fails here too.
       global('loadScript', () => {
         const path = str(1);
+        const withEnv = !lua.lua_isnone(L, 3);   // (read before the chunk goes on the stack)
         const src = self.files[path] !== undefined ? self.files[path] : self.sd.get(path);
         if (src === undefined) { lua.lua_pushnil(L); pushStr(path + ': file not found'); return 2; }
         if (lauxlib.luaL_loadbuffer(L, to_luastring(src), null, to_luastring('@' + path.replace(/^.*\//, ''))) !== lua.LUA_OK) {
           const msg = lua.lua_tostring(L, -1); lua.lua_pop(L, 1);
           lua.lua_pushnil(L); lua.lua_pushstring(L, msg); return 2;
         }
-        if (lua.lua_type(L, 3) === lua.LUA_TTABLE) {
-          lua.lua_pushvalue(L, 3);
+        if (withEnv) {
+          lua.lua_pushnil(L);
           if (!lua.lua_setupvalue(L, -2, 1)) lua.lua_pop(L, 1);
         }
         return 1;

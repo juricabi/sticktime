@@ -37,30 +37,36 @@ for _, loader in ipairs({ "StickTimeBW.lua", "StickTimeLite.lua" }) do
   check(loader, false)
 end
 
--- started on a color radio: the loader runs <DIR>/color.lua, which loads the same core
--- (the bytecode) in its own environment, with lcd functions that draw the B&W flags in color
+-- started on a color radio: the loader runs <DIR>/color.lua, which replaces lcd and the flags
+-- with B&W-style ones and loads the same core (the bytecode). loadScript as EdgeTX's: a third
+-- argument (env) leaves the chunk with no globals at all, so color.lua must not pass one.
 for _, loader in ipairs({ "StickTimeBW.lua", "StickTimeLite.lua" }) do
   LCD_W, LCD_H = 480, 272
   local seen = {}
-  function loadScript(path, mode, env)
+  function loadScript(path, mode, ...)
     local rel = path:match("TOOLS/(.*)%.lua$")
-    seen[#seen + 1] = rel:match("[^/]*$") .. (env and "+env" or "")
+    local withEnv = select("#", ...) > 0
+    seen[#seen + 1] = rel:match("[^/]*$") .. (withEnv and "+env" or "")
     if rel:match("/color$") then return loadfile(ROOT .. rel .. ".lua") end
     local f = assert(io.open(ROOT .. rel .. ".luac", "rb"))
     local s = f:read("a")
     f:close()
-    return load(s, "=core", "b", env)
+    if withEnv then return load(s, "=core", "b", nil) end
+    return load(s, "=core", "b")
   end
-  lcd = setmetatable({ sizeText = function(t) return #t * 9, 17 end, RGB = function() return 0 end },
-                     { __index = function() return function() return 0 end end })
+  local mock = setmetatable({ sizeText = function(t) return #t * 9, 17 end, RGB = function() return 0 end },
+                            { __index = function() return function() return 0 end end })
+  lcd = mock
   local m = dofile(ROOT .. loader)
   local seq = table.concat(seen, " ")
-  local good = type(m) == "table" and type(m.init) == "function" and type(m.run) == "function" and seq == "color core+env"
+  local good = type(m) == "table" and type(m.init) == "function" and type(m.run) == "function" and seq == "color core"
+    and lcd ~= mock and FORCE == 32 and lcd.drawLine ~= mock.drawLine
   print(string.format("%-18s on a color radio: loadScript calls: %-16s %s", loader, seq,
     good and "game loaded through color.lua: ok" or "FAIL"))
   ok = ok and good
 end
 lcd = setmetatable({}, { __index = function() return function() return 0 end end })
+SOLID, DOTTED, FORCE, ERASE = 0xff, 0x55, 2, 4
 LCD_W, LCD_H = 128, 64
 print(ok and "loaders: ok" or "loaders: FAIL")
 if not ok then os.exit(1) end

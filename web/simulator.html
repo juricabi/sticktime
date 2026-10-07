@@ -841,18 +841,20 @@ const EdgeTX = (() => {
         lua.lua_pushinteger(L, 0); return 1;
       });
 
-      // loadScript(path [, mode [, env]]): scripts from the virtual SD card; env becomes the
-      // chunk's _ENV, as in EdgeTX
+      // loadScript(path [, mode [, env]]): scripts from the virtual SD card. Like EdgeTX's, a
+      // third argument does not become the chunk's _ENV but leaves it with none (EdgeTX clears
+      // the stack before it reads the argument), so a script that relies on it fails here too.
       global('loadScript', () => {
         const path = str(1);
+        const withEnv = !lua.lua_isnone(L, 3);   // (read before the chunk goes on the stack)
         const src = self.files[path] !== undefined ? self.files[path] : self.sd.get(path);
         if (src === undefined) { lua.lua_pushnil(L); pushStr(path + ': file not found'); return 2; }
         if (lauxlib.luaL_loadbuffer(L, to_luastring(src), null, to_luastring('@' + path.replace(/^.*\//, ''))) !== lua.LUA_OK) {
           const msg = lua.lua_tostring(L, -1); lua.lua_pop(L, 1);
           lua.lua_pushnil(L); lua.lua_pushstring(L, msg); return 2;
         }
-        if (lua.lua_type(L, 3) === lua.LUA_TTABLE) {
-          lua.lua_pushvalue(L, 3);
+        if (withEnv) {
+          lua.lua_pushnil(L);
           if (!lua.lua_setupvalue(L, -2, 1)) lua.lua_pop(L, 1);
         }
         return 1;
@@ -1250,7 +1252,7 @@ if (typeof module !== 'undefined') module.exports = EdgeTX;
 <script type="text/plain" id="lua-color">
 local toolName = "TNS|StickTime|TNE"
 --[[ ======================================================================
-  StickTime v1.4  -  a real 3D FPV quad simulator that runs on your radio
+  StickTime v1.5  -  a real 3D FPV quad simulator that runs on your radio
   Color version - every EdgeTX color radio (480x272, 480x320, 320x480, 320x240, 800x480)
 
   Install : copy this file to /SCRIPTS/TOOLS/ on the radio SD card and
@@ -1904,6 +1906,12 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
         nearB[nb] = i
       end
     end
+    -- the surface under the quad, for ground effect: the ground, or the top of a structure
+    local fl = 0
+    for j = 1, nb do
+      local i = nearB[j]
+      if px > bx0[i] and px < bx1[i] and pz > bz0[i] and pz < bz1[i] and py > by1[i] and by1[i] > fl then fl = by1[i] end
+    end
     local pwr, pwp, pwy = P.wr, P.wp, P.wy
     for _ = 1, n do
       Tm = Tm + (T - Tm) * km
@@ -1918,6 +1926,15 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
       -- the props move, so with thrust: the same at hover for any power); quadratic body drag
       local Ta = Tm - vu * sqrt(Tm) * sTx / VP
       if Ta > Tm * 1.25 then Ta = Tm * 1.25 elseif Ta < 0 then Ta = 0 end
+      -- ground effect: near the ground or a roof the props push their air against it and get
+      -- more thrust: +12% skimming it, +3% at 30 cm, nothing to speak of from 1 m up. Less when
+      -- tilted, and it fades with speed as the quad leaves its downwash behind.
+      local hg = py - fl
+      if hg < 1.2 and uy > 0.3 then
+        if hg < 0.15 then hg = 0.15 end
+        local k = 0.049 * uy / hg
+        Ta = Ta / (1 - k * k / (1 + (vx * vx + vz * vz) * 0.018))
+      end
       local kh = KH * sqrt(Tm * 0.0204 + 0.02)   -- 0.0204 = 1 / (5 G)
       local au = Ta - KU * (vu < 0 and -vu or vu) * vu
       local ar = -(kh + KS * (vr < 0 and -vr or vr)) * vr
@@ -3849,7 +3866,7 @@ return { init = init, run = run }
 <script type="text/plain" id="lua-bw">
 local toolName = "TNS|StickTime BW|TNE"
 --[[ ======================================================================
-  StickTime BW v1.4  -  a real 3D FPV quad simulator that runs on your radio
+  StickTime BW v1.5  -  a real 3D FPV quad simulator that runs on your radio
   Black & white version - 128x64 and 212x64 radios with an STM32F4 (TX12 MkII, Zorro, Boxer,
   Pocket, MT12, GX12, X9D+ 2019, X9E, T14, T20 ...)
 
@@ -4489,6 +4506,12 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
         nearB[nb] = i
       end
     end
+    -- the surface under the quad, for ground effect: the ground, or the top of a structure
+    local fl = 0
+    for j = 1, nb do
+      local i = nearB[j]
+      if px > bx0[i] and px < bx1[i] and pz > bz0[i] and pz < bz1[i] and py > by1[i] and by1[i] > fl then fl = by1[i] end
+    end
     local pwr, pwp, pwy = P.wr, P.wp, P.wy
     for _ = 1, n do
       Tm = Tm + (T - Tm) * km
@@ -4503,6 +4526,15 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
       -- the props move, so with thrust: the same at hover for any power); quadratic body drag
       local Ta = Tm - vu * sqrt(Tm) * sTx / VP
       if Ta > Tm * 1.25 then Ta = Tm * 1.25 elseif Ta < 0 then Ta = 0 end
+      -- ground effect: near the ground or a roof the props push their air against it and get
+      -- more thrust: +12% skimming it, +3% at 30 cm, nothing to speak of from 1 m up. Less when
+      -- tilted, and it fades with speed as the quad leaves its downwash behind.
+      local hg = py - fl
+      if hg < 1.2 and uy > 0.3 then
+        if hg < 0.15 then hg = 0.15 end
+        local k = 0.049 * uy / hg
+        Ta = Ta / (1 - k * k / (1 + (vx * vx + vz * vz) * 0.018))
+      end
       local kh = KH * sqrt(Tm * 0.0204 + 0.02)   -- 0.0204 = 1 / (5 G)
       local au = Ta - KU * (vu < 0 and -vu or vu) * vu
       local ar = -(kh + KS * (vr < 0 and -vr or vr)) * vr
@@ -5606,7 +5638,7 @@ return { init = init, run = run }
 <script type="text/plain" id="lua-lite">
 local toolName = "TNS|StickTime Lite|TNE"
 --[[ ======================================================================
-StickTime Lite v1.4  -  the small edition of StickTime for B&W radios.
+StickTime Lite v1.5  -  the small edition of StickTime for B&W radios.
 Made for radios with little memory (STM32F2: X7, X9D, X9D+, X9 Lite,
 X-Lite, TX12 MkI, T12, T8, T-Lite, T-Pro, LR3 Pro). Runs on every
 black & white EdgeTX radio with EdgeTX 2.11 or newer.
@@ -6016,6 +6048,10 @@ end
 local n = floor(dt * 80) + 1
 local h = dt / n
 local km, kr, VP, KH, KS, KU, sTx = h / (P[11] + h), h / (P[12] + h), P[7], P[8], P[9], P[10], sqrt(Tmax)
+local fl = 0
+for i = 1, NB do
+if px > bx0[i] and px < bx1[i] and pz > bz0[i] and pz < bz1[i] and py > by1[i] and by1[i] > fl then fl = by1[i] end
+end
 local reach, ng, np = speed * dt + 7, 0, 0
 for i = 1, NG do
 local dx, dy, dz, r = px - gx[i], py - gy[i], pz - gz[i], gk[i] > 5 and reach + 6 or reach
@@ -6041,6 +6077,11 @@ local ax_, az_ = vx - wx, vz - wz
 local vu, vr, vf = ax_ * ux + vy * uy + az_ * uz, ax_ * rx + vy * ry + az_ * rz, ax_ * fx + vy * fy + az_ * fz
 local Ta = Tm - vu * sqrt(Tm) * sTx / VP
 Ta = Ta > Tm * 1.25 and Tm * 1.25 or Ta < 0 and 0 or Ta
+local hg = py - fl
+if hg < 1.2 and uy > 0.3 then
+local k = 0.049 * uy / (hg < 0.15 and 0.15 or hg)
+Ta = Ta / (1 - k * k / (1 + (vx * vx + vz * vz) * 0.018))
+end
 local kh = KH * sqrt(Tm * 0.0204 + 0.02)   -- rotor drag: 0.0204 = 1 / (5 G)
 local au = Ta - KU * (vu < 0 and -vu or vu) * vu
 local ar = -(kh + KS * (vr < 0 and -vr or vr)) * vr
@@ -6531,12 +6572,17 @@ return { init = init, run = run }
 -- StickTime BW on a color radio: the B&W game at the screen's own resolution, for the highest
 -- frame rate. The B&W loader runs this file instead of the game when the screen is a color
 -- one. The game draws with the B&W radios' flags (FORCE, ERASE, INVERS, the B&W font sizes):
--- it gets its own values for them here, and lcd functions that draw them in B&W colors.
--- STICKTIME_UI scales its menus and HUD to the color fonts; the 3D view uses every pixel.
+-- here they get values of their own, and lcd becomes a set of functions that draw them in
+-- B&W colors. STICKTIME_UI scales the menus and HUD to the color fonts; the 3D view uses
+-- every pixel.
 local CORE = "/SCRIPTS/TOOLS/StickTimeBW/core.lua"
-local floor, fmt = math.floor, string.format
-local line, fill, frame, text, size = lcd.drawLine, lcd.drawFilledRectangle, lcd.drawRectangle, lcd.drawText, lcd.sizeText
-local BG, INK = lcd.RGB(214, 222, 208), lcd.RGB(24, 30, 26)   -- a B&W LCD's colors
+local floor, fmt, tostring = math.floor, string.format, tostring
+local LCD = lcd
+local clear, line, fill, frame, text, size =
+  LCD.clear, LCD.drawLine, LCD.drawFilledRectangle, LCD.drawRectangle, LCD.drawText, LCD.sizeText
+local BG, INK = LCD.RGB(214, 222, 208), LCD.RGB(24, 30, 26)   -- a B&W LCD's colors
+-- the color radio's own flags (the game's take over these globals below)
+local C_SML, C_MID, C_DBL, C_TIN, C_XXL, C_RIGHT, C_CENTER = SMLSIZE, MIDSIZE, DBLSIZE, TINSIZE, XXLSIZE, RIGHT, CENTER
 
 -- the game's B&W flags: any distinct bits, only this file reads them
 local B = { LEFT = 0, RIGHT = 1, CENTER = 2, INVERS = 4, BLINK = 8, BOLD = 16, FORCE = 32, ERASE = 64,
@@ -6552,9 +6598,9 @@ local function lc(f)
   return c
 end
 local function tf(f)
-  local d = { has(f, B.SMLSIZE) and SMLSIZE or has(f, B.MIDSIZE) and MIDSIZE or has(f, B.DBLSIZE) and DBLSIZE
-                or has(f, B.TINSIZE) and TINSIZE or has(f, B.XXLSIZE) and XXLSIZE or 0,
-              has(f, B.RIGHT) and RIGHT or has(f, B.CENTER) and CENTER or 0,
+  local d = { has(f, B.SMLSIZE) and C_SML or has(f, B.MIDSIZE) and C_MID or has(f, B.DBLSIZE) and C_DBL
+                or has(f, B.TINSIZE) and C_TIN or has(f, B.XXLSIZE) and C_XXL or 0,
+              has(f, B.RIGHT) and C_RIGHT or has(f, B.CENTER) and C_CENTER or 0,
               has(f, B.INVERS), has(f, B.PREC1) and 1 or has(f, B.PREC2) and 2 or 0 }
   TF[f] = d
   return d
@@ -6565,7 +6611,7 @@ local function str(x, y, s, f)
   if d[3] then
     -- INVERS: light text in a dark box, as on a B&W screen
     local w, h = size(s, d[1])
-    local x0 = (d[2] == RIGHT and x - w or d[2] == CENTER and x - w / 2 or x) - 2
+    local x0 = (d[2] == C_RIGHT and x - w or d[2] == C_CENTER and x - w / 2 or x) - 2
     if x0 < 0 then w, x0 = w + x0, 0 end
     fill(x0, y, w + 4, h - 2, INK)
     text(x, y, s, d[1] + d[2] + BG)
@@ -6575,7 +6621,7 @@ local function str(x, y, s, f)
 end
 
 local L = setmetatable({
-  clear = function() lcd.clear(BG) end,
+  clear = function() clear(BG) end,
   drawLine = function(x1, y1, x2, y2, p, f) line(x1, y1, x2, y2, p, LC[f or 0] or lc(f)) end,
   drawFilledRectangle = function(x, y, w, h, f) fill(x, y, w, h, LC[f or 0] or lc(f)) end,
   drawRectangle = function(x, y, w, h, f) frame(x, y, w, h, LC[f or 0] or lc(f)) end,
@@ -6585,16 +6631,22 @@ local L = setmetatable({
     local p = (TF[f] or tf(f))[4]
     str(x, y, p == 1 and fmt("%.1f", v / 10) or p == 2 and fmt("%.2f", v / 100) or tostring(v), f)
   end,
-}, { __index = lcd })
+}, { __index = LCD })
 
 -- menus and HUD: B&W layouts are made for 8 px rows of 7 px small text
-local _, h = size("A", SMLSIZE)
+local _, h = size("A", C_SML)
 local U = (h or 14) / 7
 if U < 1 then U = 1 end
 
-local env = setmetatable({ lcd = L, STICKTIME_UI = U, GREY = false }, { __index = _G })
-for k, v in pairs(B) do env[k] = v end
-local f = loadScript(CORE, "b", env) or loadScript(CORE, "bt", env)
+-- The game reads lcd and the flags as globals, so they are replaced here. (loadScript's env
+-- argument would give the game a set of its own, but EdgeTX's loadScript drops it: the game
+-- would see no globals at all.) A tool runs in a Lua state of its own on color radios, so
+-- nothing else sees the change, and it ends with the tool.
+lcd = L
+STICKTIME_UI, GREY = U, false
+LEFT, RIGHT, CENTER, INVERS, BLINK, BOLD, FORCE, ERASE = B.LEFT, B.RIGHT, B.CENTER, B.INVERS, B.BLINK, B.BOLD, B.FORCE, B.ERASE
+PREC1, PREC2, SMLSIZE, MIDSIZE, DBLSIZE, TINSIZE, XXLSIZE = B.PREC1, B.PREC2, B.SMLSIZE, B.MIDSIZE, B.DBLSIZE, B.TINSIZE, B.XXLSIZE
+local f = loadScript(CORE, "b") or loadScript(CORE, "bt")
 if not f then error("StickTime BW: cannot load " .. CORE) end
 return f()
 </script>
@@ -6602,12 +6654,17 @@ return f()
 -- StickTime Lite on a color radio: the B&W game at the screen's own resolution, for the highest
 -- frame rate. The B&W loader runs this file instead of the game when the screen is a color
 -- one. The game draws with the B&W radios' flags (FORCE, ERASE, INVERS, the B&W font sizes):
--- it gets its own values for them here, and lcd functions that draw them in B&W colors.
--- STICKTIME_UI scales its menus and HUD to the color fonts; the 3D view uses every pixel.
+-- here they get values of their own, and lcd becomes a set of functions that draw them in
+-- B&W colors. STICKTIME_UI scales the menus and HUD to the color fonts; the 3D view uses
+-- every pixel.
 local CORE = "/SCRIPTS/TOOLS/StickTimeLite/core.lua"
-local floor, fmt = math.floor, string.format
-local line, fill, frame, text, size = lcd.drawLine, lcd.drawFilledRectangle, lcd.drawRectangle, lcd.drawText, lcd.sizeText
-local BG, INK = lcd.RGB(214, 222, 208), lcd.RGB(24, 30, 26)   -- a B&W LCD's colors
+local floor, fmt, tostring = math.floor, string.format, tostring
+local LCD = lcd
+local clear, line, fill, frame, text, size =
+  LCD.clear, LCD.drawLine, LCD.drawFilledRectangle, LCD.drawRectangle, LCD.drawText, LCD.sizeText
+local BG, INK = LCD.RGB(214, 222, 208), LCD.RGB(24, 30, 26)   -- a B&W LCD's colors
+-- the color radio's own flags (the game's take over these globals below)
+local C_SML, C_MID, C_DBL, C_TIN, C_XXL, C_RIGHT, C_CENTER = SMLSIZE, MIDSIZE, DBLSIZE, TINSIZE, XXLSIZE, RIGHT, CENTER
 
 -- the game's B&W flags: any distinct bits, only this file reads them
 local B = { LEFT = 0, RIGHT = 1, CENTER = 2, INVERS = 4, BLINK = 8, BOLD = 16, FORCE = 32, ERASE = 64,
@@ -6623,9 +6680,9 @@ local function lc(f)
   return c
 end
 local function tf(f)
-  local d = { has(f, B.SMLSIZE) and SMLSIZE or has(f, B.MIDSIZE) and MIDSIZE or has(f, B.DBLSIZE) and DBLSIZE
-                or has(f, B.TINSIZE) and TINSIZE or has(f, B.XXLSIZE) and XXLSIZE or 0,
-              has(f, B.RIGHT) and RIGHT or has(f, B.CENTER) and CENTER or 0,
+  local d = { has(f, B.SMLSIZE) and C_SML or has(f, B.MIDSIZE) and C_MID or has(f, B.DBLSIZE) and C_DBL
+                or has(f, B.TINSIZE) and C_TIN or has(f, B.XXLSIZE) and C_XXL or 0,
+              has(f, B.RIGHT) and C_RIGHT or has(f, B.CENTER) and C_CENTER or 0,
               has(f, B.INVERS), has(f, B.PREC1) and 1 or has(f, B.PREC2) and 2 or 0 }
   TF[f] = d
   return d
@@ -6636,7 +6693,7 @@ local function str(x, y, s, f)
   if d[3] then
     -- INVERS: light text in a dark box, as on a B&W screen
     local w, h = size(s, d[1])
-    local x0 = (d[2] == RIGHT and x - w or d[2] == CENTER and x - w / 2 or x) - 2
+    local x0 = (d[2] == C_RIGHT and x - w or d[2] == C_CENTER and x - w / 2 or x) - 2
     if x0 < 0 then w, x0 = w + x0, 0 end
     fill(x0, y, w + 4, h - 2, INK)
     text(x, y, s, d[1] + d[2] + BG)
@@ -6646,7 +6703,7 @@ local function str(x, y, s, f)
 end
 
 local L = setmetatable({
-  clear = function() lcd.clear(BG) end,
+  clear = function() clear(BG) end,
   drawLine = function(x1, y1, x2, y2, p, f) line(x1, y1, x2, y2, p, LC[f or 0] or lc(f)) end,
   drawFilledRectangle = function(x, y, w, h, f) fill(x, y, w, h, LC[f or 0] or lc(f)) end,
   drawRectangle = function(x, y, w, h, f) frame(x, y, w, h, LC[f or 0] or lc(f)) end,
@@ -6656,16 +6713,22 @@ local L = setmetatable({
     local p = (TF[f] or tf(f))[4]
     str(x, y, p == 1 and fmt("%.1f", v / 10) or p == 2 and fmt("%.2f", v / 100) or tostring(v), f)
   end,
-}, { __index = lcd })
+}, { __index = LCD })
 
 -- menus and HUD: B&W layouts are made for 8 px rows of 7 px small text
-local _, h = size("A", SMLSIZE)
+local _, h = size("A", C_SML)
 local U = (h or 14) / 7
 if U < 1 then U = 1 end
 
-local env = setmetatable({ lcd = L, STICKTIME_UI = U, GREY = false }, { __index = _G })
-for k, v in pairs(B) do env[k] = v end
-local f = loadScript(CORE, "b", env) or loadScript(CORE, "bt", env)
+-- The game reads lcd and the flags as globals, so they are replaced here. (loadScript's env
+-- argument would give the game a set of its own, but EdgeTX's loadScript drops it: the game
+-- would see no globals at all.) A tool runs in a Lua state of its own on color radios, so
+-- nothing else sees the change, and it ends with the tool.
+lcd = L
+STICKTIME_UI, GREY = U, false
+LEFT, RIGHT, CENTER, INVERS, BLINK, BOLD, FORCE, ERASE = B.LEFT, B.RIGHT, B.CENTER, B.INVERS, B.BLINK, B.BOLD, B.FORCE, B.ERASE
+PREC1, PREC2, SMLSIZE, MIDSIZE, DBLSIZE, TINSIZE, XXLSIZE = B.PREC1, B.PREC2, B.SMLSIZE, B.MIDSIZE, B.DBLSIZE, B.TINSIZE, B.XXLSIZE
+local f = loadScript(CORE, "b") or loadScript(CORE, "bt")
 if not f then error("StickTime Lite: cannot load " .. CORE) end
 return f()
 </script>

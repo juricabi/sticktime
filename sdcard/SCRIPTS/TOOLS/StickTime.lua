@@ -1,6 +1,6 @@
 local toolName = "TNS|StickTime|TNE"
 --[[ ======================================================================
-  StickTime v1.4  -  a real 3D FPV quad simulator that runs on your radio
+  StickTime v1.5  -  a real 3D FPV quad simulator that runs on your radio
   Color version - every EdgeTX color radio (480x272, 480x320, 320x480, 320x240, 800x480)
 
   Install : copy this file to /SCRIPTS/TOOLS/ on the radio SD card and
@@ -654,6 +654,12 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
         nearB[nb] = i
       end
     end
+    -- the surface under the quad, for ground effect: the ground, or the top of a structure
+    local fl = 0
+    for j = 1, nb do
+      local i = nearB[j]
+      if px > bx0[i] and px < bx1[i] and pz > bz0[i] and pz < bz1[i] and py > by1[i] and by1[i] > fl then fl = by1[i] end
+    end
     local pwr, pwp, pwy = P.wr, P.wp, P.wy
     for _ = 1, n do
       Tm = Tm + (T - Tm) * km
@@ -668,6 +674,15 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
       -- the props move, so with thrust: the same at hover for any power); quadratic body drag
       local Ta = Tm - vu * sqrt(Tm) * sTx / VP
       if Ta > Tm * 1.25 then Ta = Tm * 1.25 elseif Ta < 0 then Ta = 0 end
+      -- ground effect: near the ground or a roof the props push their air against it and get
+      -- more thrust: +12% skimming it, +3% at 30 cm, nothing to speak of from 1 m up. Less when
+      -- tilted, and it fades with speed as the quad leaves its downwash behind.
+      local hg = py - fl
+      if hg < 1.2 and uy > 0.3 then
+        if hg < 0.15 then hg = 0.15 end
+        local k = 0.049 * uy / hg
+        Ta = Ta / (1 - k * k / (1 + (vx * vx + vz * vz) * 0.018))
+      end
       local kh = KH * sqrt(Tm * 0.0204 + 0.02)   -- 0.0204 = 1 / (5 G)
       local au = Ta - KU * (vu < 0 and -vu or vu) * vu
       local ar = -(kh + KS * (vr < 0 and -vr or vr)) * vr
