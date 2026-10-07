@@ -1,28 +1,53 @@
 # EdgeTX FPV Sim
 
-A real 3D FPV quad racing simulator that runs **on your radio** as an EdgeTX Lua tool, on every color screen and on black & white radios. A browser emulator runs the very same scripts, so you can try it before copying it to the SD card.
+A real 3D FPV quad simulator that runs **on your radio** as an EdgeTX Lua tool, on every color screen and on black & white radios. Race AI pilots, fly freestyle tricks around a bando, or chase gates against the clock. A browser emulator runs the very same scripts, so you can try it before copying it to the SD card.
 
-| TX16S (480×272) | NV14 / EL18 (320×480) | TX16S MK3 (800×480) |
+| TX16S · race against AI pilots | TX16S · the Bando | TX16S · Freestyle tricks |
 |---|---|---|
-| ![TX16S race](docs/tx16s-race.png) | ![NV14 portrait](docs/nv14-race.png) | ![MK3 dive gate](docs/mk3-dive.png) |
-| ![Menu](docs/tx16s-menu.png) | **TX12 / Zorro / X7 (128×64)** ![TX12](docs/tx12-race.png) | **X9D+ (212×64 grey)** ![X9D](docs/x9d-race.png) |
+| ![Race with AI pilots](docs/tx16s-race.png) | ![Bando](docs/tx16s-bando.png) | ![Freestyle](docs/tx16s-freestyle.png) |
+| **TX16S · flag slalom** | **NV14 / EL18 (portrait) · Hoop Forest** | **TX16S MK3 · tower and dive gate** |
+| ![Slalom](docs/tx16s-slalom.png) | ![NV14](docs/nv14-race.png) | ![MK3](docs/mk3-bando.png) |
+| **Settings: quad, power, rates** | **TX12 MkII / Zorro / Boxer (128×64)** | **X9D+ 2019 / X9E (212×64 grey)** |
+| ![Settings](docs/tx16s-settings.png) | ![TX12](docs/tx12-race.png) | ![X9D](docs/x9d-race.png) |
 
 ## Features
 
-- **Full 3D flight.** Thrust-to-weight, quadratic drag, momentum and gravity, integrated at 80 Hz. Acro (rate) or Angle (self-level) mode, Betaflight "actual" rates (Soft / Normal / Fast), camera uptilt 0–50°, field of view 80–120°, power 3:1 / 4:1 / 6:1.
-- **Three tracks.** Meadow, Figure 8 and Dive Tower: gates on the ground, high gates on legs and a flat dive gate. Trees and gate legs are solid, so you can crash.
-- **Race, Practice and Free fly.** 3-2-1 countdown, gate beeps, lap split against your best, haptic on crash, respawn at the last gate. Best lap and best race are saved per track.
-- **Color radios.** Filled sky and ground at any attitude, horizon haze, distance fog, mountains, solid gates with outlines, trees, FPV-style OSD (lap timer, best, speed, altitude, throttle bar, next-gate marker and arrow), minimap, optional stick view and FPS. Touch works on touch radios (menus, pause button).
+- **Flight model.** Props lose thrust as the airflow through them speeds up. There is rotor drag in the prop plane and quadratic body drag that depends on attitude, and the motors and rates respond with a short lag. Gravity, momentum and prop wash on descents are included too. It all runs at 80 Hz. Top speed at 5:1 is about 130 km/h, punch-outs reach about 100 km/h, and a flat fall settles at 55–60 km/h.
+- **Your quad.** Choose a **Racer** (snappy, light) or a **Freestyle** quad (heavier: it carries momentum and floats). Power is a free choice from 3:1 to 12:1. Flight mode is Acro or Angle.
+- **Rates.** Betaflight "actual" rates: Soft, Normal and Fast presets, or **Custom**, where you set center rate, max rate and expo for roll/pitch and for yaw. Editing any value switches to Custom, starting from the preset you had.
+- **Latency.** Color screens show each frame one 50 ms cycle after the script draws it, so the camera is rendered where the quad will be when the frame reaches the screen, using its current rotation rates and speed. Physics applies your sticks for the whole interval since the last frame.
+- **Seven tracks.** Meadow, Figure 8, Dive Tower, Slalom, Hoop Forest, Grand Prix and the **Bando**: an open-roof ruin with doors to fly through, a 24 m tower and stacked containers. Obstacles: gates, high gates, dive gates, hoops, arches, flags (pass on the marked side) and gaps in walls. Trees, legs, poles, walls and the tower are solid.
+- **Four ways to play.**
+  - **Race** against up to three AI pilots (Easy, Medium or Hard) with a live position, then a results screen with your place, total and lap times.
+  - **Practice**: lap timing against your best.
+  - **Freestyle**: flips, rolls, 360s, power loops, doubles, dives, hang time, gap shots and proximity runs score points. Chain them within 2.5 s for a combo multiplier (up to ×4). Crash and the combo is lost. Your best combo is saved.
+  - **Gate Rush**: 30 seconds on the clock. Every gate you hit adds time and lights the next one at random, in either direction.
+- **Wind.** Off, light or strong, with gusts, weaker near the ground.
+- **Saved per track:** best lap, best race, best combo and best Gate Rush score, plus all settings.
+- **Color radios.** Filled sky and ground at any attitude, horizon haze, distance fog, mountains, shaded structures, an FPV-style OSD (timer, best, position, speed, altitude, throttle bar, next-gate marker and arrow), minimap with AI pilots, optional stick view and FPS. Touch works on touch radios.
 - **B&W radios.** The same game in wireframe 3D, with greyscale ground on 212×64 screens.
 
 ## Install
 
-1. Copy the file for your radio from `sdcard/SCRIPTS/TOOLS/` to `/SCRIPTS/TOOLS/` on the radio's SD card:
-   - `FPVSim.lua` for color radios
-   - `FPVSimBW.lua` for black & white radios
-2. On the radio open **SYS → Tools** and start **FPV Sim**. The first start takes a few seconds while EdgeTX compiles the script.
+1. Copy from this repository's `sdcard/SCRIPTS/TOOLS/` to `/SCRIPTS/TOOLS/` on the radio's SD card:
+   - **Color radios:** `FPVSim.lua`
+   - **B&W radios:** `FPVSimBW.lua` **and** the `FPVSimBW` folder (the game is `FPVSimBW/core.lua`; `core.luac` is the same code precompiled for EdgeTX 2.11+)
+2. On the radio open **SYS → Tools** and start **FPV Sim** (or **FPV Sim BW**). The first start on a color radio takes a few seconds while EdgeTX compiles the script.
 
 > **Safety:** the radio keeps transmitting your sticks while the sim runs. Unplug the quad's battery or switch the RF module off first.
+
+Saves from version 1.0 are picked up automatically.
+
+### B&W radios and memory
+
+B&W radios have no external RAM, and EdgeTX keeps a script's debug info in memory the first time it compiles it. `FPVSimBW.lua` is therefore a small loader. It compiles the game once (EdgeTX saves `core.luac`), releases that copy and runs the stripped bytecode. With the precompiled `core.luac` from this repository nothing needs compiling at all. Running, the game needs about 90 KB of Lua memory.
+
+Free heap, read from the official EdgeTX 2.11.3 firmware binaries:
+
+| | Radios | Memory for Lua |
+|---|---|---|
+| ✅ STM32F4 | TX12 MkII, Zorro, Boxer, Pocket, MT12, GX12, X9D+ 2019, X9E, X7 ACCESS, T14, T20, T20 V2, T-Pro V2, T-Pro S, T12 Max, Bumblebee, Commando 8 | about 115–121 KB heap + about 34 KB CCM |
+| ❌ STM32F2 | TX12 (MkI), X7, X9D, X9D+ (pre-2019), X9 Lite / Lite S, X-Lite / X-Lite S, T12, T8, T-Lite, T-Pro, LR3 Pro | 63–73 KB, not enough for this version |
 
 ## Controls
 
@@ -34,6 +59,8 @@ A real 3D FPV quad racing simulator that runs **on your radio** as an EdgeTX Lua
 | Rotary, +/-, up/down | Move through menus. |
 | Touch | Tap menu rows. On a setting, tap the left part to go back a value, the right part to go forward. The pause button sits at the top of the screen (bottom of the panel on portrait radios). |
 
+Flags: a flag marks one side of the course. The yellow marker floats over the side to fly past, and passing on the other side does not count.
+
 ## Supported screens
 
 | Screen | Radios |
@@ -43,8 +70,8 @@ A real 3D FPV quad racing simulator that runs **on your radio** as an EdgeTX Lua
 | 320×480 | FlySky NV14, EL18, NB4+ (portrait: FPV view on top, instruments below) |
 | 320×240 | FlySky PA01, HelloRadioSky V12 |
 | 800×480 | RadioMaster TX16S MK3 |
-| 212×64 grey | FrSky X9D, X9D+, X9D+ 2019, X9E |
-| 128×64 | RadioMaster TX12 / MkII, Zorro, Boxer, Pocket, MT12, GX12, FrSky X7 / X-Lite / X9 Lite, Jumper T-Lite, T-Pro, T12, T14, T20, Bumblebee, BetaFPV LR3 Pro, and the other 128×64 radios |
+| 212×64 grey | FrSky X9D+ 2019, X9E (STM32F4 B&W radios, see above) |
+| 128×64 | RadioMaster TX12 MkII, Zorro, Boxer, Pocket, MT12, GX12, FrSky X7 ACCESS, Jumper T14, T20, T-Pro V2 / S, T12 Max, Bumblebee, iFlight Commando 8 |
 
 The layout is computed from `LCD_W` / `LCD_H` and the radio's real font sizes, so new screen sizes work too. Tested with Lua 5.3 as configured in EdgeTX 2.11+ and with Lua 5.2 (EdgeTX 2.10 and older).
 
@@ -53,38 +80,42 @@ The layout is computed from `LCD_W` / `LCD_H` and the radio's real font sizes, s
 EdgeTX calls a tool script's `run()` at most every 50 ms, so the target is a steady 20 fps on the slowest color radios (STM32F429).
 
 - **Timing.** The flight model uses `getTime()` deltas with 80 Hz substeps, so the flight is the same at any frame rate.
-- **Lines over fills.** `lcd.drawLine` is native Bresenham, but a filled triangle costs one LVGL call per scanline. Sky and ground therefore use one rectangle plus one thin wedge triangle at any roll angle. Gate bars are filled with 1 px "ruled" lines, tree trunks are lines, and the lit half of a tree is drawn only for near trees.
-- **Lua side.** World data is stored as arrays of numbers, hot values live in locals, no tables are created per frame, objects are depth-sorted with an insertion sort, collisions use a per-frame broad phase, and far gates switch to a single outline.
-- **Measured per frame:** about 13–18k Lua VM instructions and 700–900 triangle rows on color screens, 7–10k instructions on B&W. The emulator estimates about 16–18 ms per frame on a TX16S-class radio, inside the 50 ms budget.
+- **Lines over fills.** `lcd.drawLine` is native Bresenham, but a filled triangle costs one LVGL call per scanline. Sky and ground use one rectangle plus one thin wedge triangle at any roll angle. Gate bars, hoop segments and small wall faces are filled with 1 px "ruled" lines along their shorter side, and big faces become a triangle fan clipped to the view.
+- **Lua side.** World data is stored as arrays of numbers, hot values live in locals and upvalues, no tables are created per frame, and objects are depth-sorted with an insertion sort. Collisions use a per-frame broad phase. Far gates switch to a single outline and far hoops to six segments.
+- **Measured per frame:** about 15–60k Lua VM instructions on color screens and 7–28k on B&W. The emulator estimates 15–32 ms per frame on a TX16S-class radio, inside the 50 ms budget.
+- **Color `drawLine` quirk.** On every EdgeTX version the color `lcd.drawLine` silently drops the whole line if either end is past the right or bottom edge (`x > LCD_W` or `y > LCD_H`). Negative values are clipped by the firmware. The script clips the right and bottom edges itself, and the tests fail on any line the firmware would drop.
 - **EdgeTX Lua quirk.** EdgeTX builds Lua 5.3 with `LUA_FLOORN2I`, and releases before the 2026-08-30 fix (#7611) also floor floats in int/float equality, so `0.02 ~= 0` is `false` on those radios. The script never compares a float with an integer literal.
 - **B&W quirks.** `lcd.drawLine` on B&W radios refuses any point outside the screen and draws in XOR mode unless `FORCE` is set, so lines are clipped in Lua and drawn with `FORCE`.
 
 ## Browser emulator
 
-Open `web/simulator.html` in Chrome, Edge or Firefox. It runs the real `.lua` files in a Lua 5.3 VM with an EdgeTX-style API and draws them pixel by pixel the way the firmware does.
+Open `web/simulator.html` in Chrome, Edge or Firefox. It runs the real `.lua` files in a Lua 5.3 VM with an EdgeTX-style API and draws them pixel by pixel the way the firmware does, including the line rule above.
 
 - Pick any radio screen, color or B&W.
 - Fly with the keyboard (W/S throttle, A/D yaw, arrows for pitch and roll), drag the on-screen gimbals, or plug in your radio as a USB joystick (choose **Radio / gamepad** and map the axes).
-- Runs at the radio's 20 Hz by default, with optional B&W LCD ghosting.
+- Runs at the radio's 20 Hz by default. Color screens show each frame one cycle late, like the radio (toggle **Color screen delay**). B&W LCD ghosting is optional.
 - The **Radio load** panel counts Lua instructions and drawing work per frame and estimates the frame time on F4 and H7 radios.
-- **Open .lua** runs any other EdgeTX tool script.
+- **Open .lua** runs any other EdgeTX tool script (`loadScript` reads from the virtual SD card).
 
 ## Development
 
 ```
-src/fpvsim.lua          single source for both scripts (--#if COLOR / --#if BW blocks)
-build.py                -> sdcard/SCRIPTS/TOOLS/FPVSim.lua and FPVSimBW.lua
+src/fpvsim.lua          single source for both versions (--#if COLOR / --#if BW blocks)
+src/bwloader.lua        the B&W loader (compile once, run the bytecode)
+build.py                -> sdcard/SCRIPTS/TOOLS/FPVSim.lua, FPVSimBW.lua, FPVSimBW/core.lua (+ core.luac)
 web/src/                emulator: engine.js (EdgeTX API + LCD), app.js (UI), style.css, index.html
 tools/bundle_web.py     -> web/simulator.html (offline, single file) and web/artifact.html
-tools/build_etxlua.sh   builds a Lua 5.3 with EdgeTX's number settings for the tests
-test/harness.lua        headless EdgeTX mock: autopilot races on every track, menus, crashes, saving
-test/run_all.sh         runs the harness for every screen size (Lua 5.3, plus Lua 5.2 via lupa)
-test/web_shots.py       Playwright screenshots of the emulator on every radio
+tools/build_etxlua.sh   builds Lua 5.3 with EdgeTX's number settings (native and 32-bit) for tests and core.luac
+tools/tune_physics.py   steady-state check of the flight model (top speed, punch-out, fall, braking)
+test/harness.lua        headless EdgeTX mock: autopilot races with AI pilots on every track, flags, hoops,
+                        dive gates, freestyle combos, gate rush, menus, crashes, v1 save migration
+test/run_all.sh         runs the harness for every screen size (Lua 5.3, plus Lua 5.2 via lupa) and the loader
+test/web_shots.py       Playwright screenshots of every radio and mode in the emulator, with load estimates
 ```
 
 ```
-python3 build.py && python3 tools/bundle_web.py
-tools/build_etxlua.sh && test/run_all.sh
+tools/build_etxlua.sh && python3 build.py && python3 tools/bundle_web.py
+test/run_all.sh
 ```
 
 ## Credits

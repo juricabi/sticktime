@@ -19,6 +19,7 @@
     paused: false,
     rate: store.get('rate', 50),
     ghost: store.get('ghost', true),
+    delay: store.get('delay', true),
     sound: false,
     mode: store.get('mode', 2),
     input: 'mix',
@@ -71,17 +72,18 @@
   function scriptFor() {
     if (app.custom) return { text: app.custom.text, name: app.custom.name };
     const kind = app.script === 'auto' ? (app.radio.color ? 'color' : 'bw') : app.script;
-    return { text: LUA[kind], name: kind === 'color' ? 'FPVSim.lua' : 'FPVSimBW.lua' };
+    return { text: LUA[kind], name: kind === 'color' ? 'FPVSim.lua' : 'core.lua' };
   }
 
   function boot() {
     const r = app.radio;
     const eng = new Engine(fengari, r, {
-      colorFonts, bwFonts: BW_FONTS, sd: app.sd,
+      colorFonts, bwFonts: BW_FONTS, sd: app.sd, files: { '/SCRIPTS/TOOLS/FPVSimBW/core.lua': LUA.bw },
       onTone: tone, onHaptic: haptic,
       onSave: () => store.set('sd', Object.fromEntries(app.sd)),
     });
     eng.stickMode = app.mode - 1;
+    eng.displayDelay = app.delay;
     app.engine = eng;
     canvas.width = r.w; canvas.height = r.h;
     img = ctx.createImageData(r.w, r.h);
@@ -464,6 +466,8 @@
     }
     $('rateChk').checked = app.rate === 50;
     $('rateChk').addEventListener('change', () => { app.rate = $('rateChk').checked ? 50 : 1000 / 60; store.set('rate', app.rate); });
+    $('delayChk').checked = app.delay;
+    $('delayChk').addEventListener('change', () => { app.delay = $('delayChk').checked; store.set('delay', app.delay); if (app.engine) app.engine.displayDelay = app.delay; });
     $('ghostChk').checked = app.ghost;
     $('ghostChk').addEventListener('change', () => { app.ghost = $('ghostChk').checked; store.set('ghost', app.ghost); });
     $('pauseChk').addEventListener('change', () => { app.paused = $('pauseChk').checked; });

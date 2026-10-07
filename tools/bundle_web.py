@@ -22,7 +22,7 @@ def b64(p):
 
 def main():
     lua_color = read(ROOT / "sdcard/SCRIPTS/TOOLS/FPVSim.lua")
-    lua_bw = read(ROOT / "sdcard/SCRIPTS/TOOLS/FPVSimBW.lua")
+    lua_bw = read(ROOT / "sdcard/SCRIPTS/TOOLS/FPVSimBW/core.lua")
     for s in (lua_color, lua_bw):
         assert "</script" not in s.lower()
     parts = {

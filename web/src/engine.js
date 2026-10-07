@@ -147,6 +147,8 @@ const EdgeTX = (() => {
       this.colorFonts = opts.colorFonts || new ColorFonts();
       this.bwFonts = opts.bwFonts || null;
       this.sd = opts.sd || new Map();
+      this.files = opts.files || {};      // read-only files on the virtual SD card (bundled scripts)
+      this.displayDelay = true;           // color radios show a frame one cycle after it is drawn
       this.onTone = opts.onTone || null;
       this.onHaptic = opts.onHaptic || null;
       this.onSave = opts.onSave || null;
@@ -166,7 +168,7 @@ const EdgeTX = (() => {
     }
 
     newStats() {
-      return { instr: 0, calls: 0, lines: 0, linePx: 0, tris: 0, scan: 0, scanPx: 0, rects: 0, rectPx: 0, blendPx: 0, texts: 0, glyphs: 0 };
+      return { instr: 0, calls: 0, lines: 0, linePx: 0, tris: 0, scan: 0, scanPx: 0, rects: 0, rectPx: 0, blendPx: 0, texts: 0, glyphs: 0, rejected: 0 };
     }
 
     // ---------------------------------------------------------- Lua setup
@@ -228,6 +230,12 @@ const EdgeTX = (() => {
       const { lua, to_luastring } = this.fe;
       const L = this.L;
       this.clock += dtMs;
+      // the color UI (LVGL) flushes the canvas at the start of the next cycle:
+      // what is on screen during this cycle is what the script drew in the last one
+      if (this.color) {
+        if (!this.shown) this.shown = new Uint16Array(this.fb.length);
+        this.shown.set(this.fb);
+      }
       this.stats = this.newStats();
       const ev = this.queue.length ? this.queue.shift() : null;
       lua.lua_rawgeti(L, lua.LUA_REGISTRYINDEX, this.runRef);
@@ -398,6 +406,18 @@ const EdgeTX = (() => {
       });
       lua.lua_setglobal(L, to_luastring('io'));
 
+      // loadScript(path [, mode [, env]]): scripts from the virtual SD card
+      global('loadScript', () => {
+        const path = str(1);
+        const src = self.files[path] !== undefined ? self.files[path] : self.sd.get(path);
+        if (src === undefined) { lua.lua_pushnil(L); pushStr(path + ': file not found'); return 2; }
+        if (lauxlib.luaL_loadbuffer(L, to_luastring(src), null, to_luastring('@' + path.replace(/^.*\//, ''))) !== lua.LUA_OK) {
+          const msg = lua.lua_tostring(L, -1); lua.lua_pop(L, 1);
+          lua.lua_pushnil(L); lua.lua_pushstring(L, msg); return 2;
+        }
+        return 1;
+      });
+
       // extra globals (e.g. test hooks)
       for (const k in globals) {
         if (globals[k] === 'table') { lua.lua_newtable(L); lua.lua_setglobal(L, to_luastring(k)); }
@@ -558,7 +578,12 @@ const EdgeTX = (() => {
       setfn('setColor', () => 0);
       setfn('getColor', () => { lua.lua_pushinteger(L, int(1)); return 1; });
       setfn('drawPoint', () => { const x = int(1), y = int(2); if (x >= 0 && y >= 0 && x < W && y < H) fb[y * W + x] = colorOf(opt(3, 0)); });
-      setfn('drawLine', () => line(int(1), int(2), int(3), int(4), int(5) & 255, colorOf(opt(6, 0))));
+      // luaLcdDrawLine: an end beyond the right or bottom edge (x > LCD_W, y > LCD_H) -> nothing drawn
+      setfn('drawLine', () => {
+        const x1 = int(1), y1 = int(2), x2 = int(3), y2 = int(4);
+        if (x1 > W || y1 > H || x2 > W || y2 > H) { st().lines++; st().rejected++; return; }
+        line(x1, y1, x2, y2, int(5) & 255, colorOf(opt(6, 0)));
+      });
       setfn('drawLineWithClipping', () => {
         const x1 = int(1), y1 = int(2), x2 = int(3), y2 = int(4), xmin = int(5), xmax = int(6), ymin = int(7), ymax = int(8);
         // approximate: clip then draw
@@ -746,7 +771,8 @@ const EdgeTX = (() => {
 
     // RGBA output for display -------------------------------------------
     toRGBA(out, opts = {}) {
-      const n = this.W * this.H, fb = this.fb;
+      const n = this.W * this.H;
+      const fb = (this.color && this.displayDelay && this.shown) ? this.shown : this.fb;
       if (this.color) {
         const lut = Engine.lut || (Engine.lut = (() => {
           const t = new Uint32Array(65536);

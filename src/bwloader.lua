@@ -1,6 +1,6 @@
-local toolName = "TNS|FPV Sim BW|TNE"
+local toolName = "TNS|@TOOLNAME@|TNE"
 --[[ ======================================================================
-  FPV Sim BW v1.1  -  loader for black & white radios
+  @TITLE@ v1.1  -  loader for black & white radios
 
   The game itself is in /SCRIPTS/TOOLS/FPVSimBW/core.lua (copy that
   folder too). B&W radios have little RAM, and a script compiled on the

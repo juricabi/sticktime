@@ -1,6 +1,6 @@
 local toolName = "TNS|FPV Sim|TNE"
 --[[ ======================================================================
-  FPV Sim v1.0  -  a real 3D FPV quad simulator that runs on your radio
+  FPV Sim v1.1  -  a real 3D FPV quad simulator that runs on your radio
   Color version - every EdgeTX color radio (480x272, 480x320, 320x480, 320x240, 800x480)
 
   Install : copy this file to /SCRIPTS/TOOLS/ on the radio SD card and
@@ -8,6 +8,8 @@ local toolName = "TNS|FPV Sim|TNE"
   Fly     : your sticks fly the quad (acro or angle mode). The radio
             handles stick mode 1-4. EXIT = pause/back, ENTER = select,
             rotary / +- / up-down = move. Touch screens: tap.
+  Modes   : Race against AI pilots, Practice, Freestyle (tricks and
+            combos) and Gate Rush (beat the clock), on seven tracks.
   Safety  : the radio keeps transmitting while the sim runs - keep the
             real quad unplugged or the RF module off.
   Credits : inspired by lua-fpv-sim by Alexey Stankevich (@AlexeyStn);
@@ -21,7 +23,6 @@ local getValue, getTime = getValue, getTime
 local W, H = LCD_W, LCD_H
 local drawLine, fillRect, drawText, drawNumber = lcd.drawLine, lcd.drawFilledRectangle, lcd.drawText, lcd.drawNumber
 local SOLID, DOTTED = SOLID, DOTTED
-local TEST = FPVSIM_TEST
 local fillTri = lcd.drawFilledTriangle
 
 local EV = {
@@ -30,50 +31,101 @@ local EV = {
   TAP = EVT_TOUCH_TAP,
 }
 
--- game states
+-- game states; game modes (gmode): 1 race, 2 practice, 3 freestyle, 4 gate rush
 local MENU, SETUP, COUNT, FLY, CRASHED, READY, PAUSED, DONE = 1, 2, 3, 4, 5, 6, 7, 8
 
 -- ------------------------------------------------------------ settings
-local S = { track = 1, mode = 1, rates = 2, tilt = 25, fov = 110, power = 2, laps = 3, map = 1, sticks = 0, fps = 0 }
-local KEYS = { "track", "mode", "rates", "tilt", "fov", "power", "laps", "map", "sticks", "fps" }
+local S = { track = 1, quad = 1, twr = 5, mode = 1, rates = 2, rc = 100, rm = 600, re = 50, yc = 100, ym = 500, ye = 40,
+            tilt = 25, fov = 110, laps = 3, ai = 2, skill = 2, wind = 0, map = 1, sticks = 0, fps = 0 }
+-- rows: label, key, then either a value list (+ names, suffix) or nil, nil, suffix, min, max, step
 local OPTS = {
+  { "Quad", "quad", { 1, 2 }, { "Racer", "Freestyle" } },
+  { "Power", "twr", { 3, 4, 5, 6, 7, 8, 10, 12 }, nil, ":1" },
   { "Flight mode", "mode", { 1, 2 }, { "Acro", "Angle" } },
-  { "Rates", "rates", { 1, 2, 3 }, { "Soft", "Normal", "Fast" } },
-  { "Camera tilt", "tilt", { 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50 }, nil, "°" },
-  { "Field of view", "fov", { 80, 90, 100, 110, 120 }, nil, "°" },
-  { "Power", "power", { 1, 2, 3 }, { "Low 3:1", "Mid 4:1", "High 6:1" } },
+  { "Rates", "rates", { 1, 2, 3, 4 }, { "Soft", "Normal", "Fast", "Custom" } },
+  { "R/P center", "rc", nil, nil, "°/s", 20, 500, 10 },
+  { "R/P max", "rm", nil, nil, "°/s", 100, 1800, 50 },
+  { "R/P expo", "re", nil, nil, nil, 0, 95, 5 },
+  { "Yaw center", "yc", nil, nil, "°/s", 20, 500, 10 },
+  { "Yaw max", "ym", nil, nil, "°/s", 100, 1800, 50 },
+  { "Yaw expo", "ye", nil, nil, nil, 0, 95, 5 },
+  { "Camera tilt", "tilt", nil, nil, "°", 0, 60, 5 },
+  { "Field of view", "fov", nil, nil, "°", 70, 130, 10 },
   { "Race laps", "laps", { 1, 2, 3, 5, 10 } },
+  { "Opponents", "ai", { 0, 1, 2, 3 } },
+  { "AI skill", "skill", { 1, 2, 3 }, { "Easy", "Medium", "Hard" } },
+  { "Wind", "wind", { 0, 1, 2 }, { "Off", "Light", "Strong" } },
   { "Minimap", "map", { 0, 1 }, { "Off", "On" } },
   { "Stick view", "sticks", { 0, 1 }, { "Off", "On" } },
   { "Show FPS", "fps", { 0, 1 }, { "Off", "On" } },
 }
--- Betaflight "actual" rates (center deg/s, max deg/s, expo) and thrust/weight
-local CFG = { rc = { 70, 100, 150 }, rm = { 400, 600, 850 }, re = { 0.35, 0.5, 0.45 }, twr = { 3, 4, 6 } }
+-- Betaflight "actual" rate presets: roll/pitch center, max (deg/s), expo %, then yaw
+local RATES = { { 70, 400, 35, 70, 350, 30 }, { 100, 600, 50, 100, 500, 40 }, { 150, 850, 45, 130, 700, 40 } }
+local RKEYS = { rc = 1, rm = 2, re = 3, yc = 4, ym = 5, ye = 6 }
+-- quad profiles (racer, freestyle): prop pitch speed m/s, rotor drag, side and top
+-- drag, motor and rate response time (s), prop wash
+local QP = { vp = { 86, 60 }, kh = { 0.22, 0.18 }, ks = { 0.009, 0.0072 }, ku = { 0.028, 0.024 },
+             tm = { 0.022, 0.045 }, tr = { 0.018, 0.035 }, pw = { 0.5, 1 } }
 
 -- -------------------------------------------------------------- tracks
--- gate list: x, z, type, yaw(deg). type 1 = gate on the ground,
--- 2 = high gate on legs, 3 = dive gate (flat, fly down through it)
+-- gates: x, z, type, yaw (deg), center height (0 = default). Types: 1 gate, 2 high gate,
+-- 3 dive gate (flat, fly down through it), 4 hoop, 5 arch, 6 flag (pass on its right),
+-- 7 flag (pass on its left), 8 gap in a structure.
+-- boxes: x, z, half size x, half size z, bottom, top, kind (1 concrete, 2 red, 3 blue)
 local TRACKS = {
-  { "Meadow", 11, { 0,0,1,0, 6,34,1,20, 26,58,2,70, 56,52,1,120, 66,22,1,180, 52,-8,2,230, 24,-22,1,270 } },
-  { "Figure 8", 23, { -14,10,1,0, 6,46,2,40, 18,68,1,0, 0,88,1,-90, -18,68,1,180, 18,16,1,180, 0,-4,1,-90 } },
-  { "Dive Tower", 37, { 0,0,1,0, 10,30,1,20, 12,60,2,0, 0,84,2,-90, -28,84,3,-90, -36,52,1,180, -28,20,1,160, -12,-14,1,60 } },
+  { "Meadow", 11, { 0,0,1,0,0, 6,34,1,20,0, 26,58,2,70,0, 56,52,1,120,0, 66,22,1,180,0, 52,-8,2,230,0, 24,-22,1,270,0 } },
+  { "Figure 8", 23, { -14,10,1,0,0, 6,46,2,40,0, 18,68,1,0,0, 0,88,1,-90,0, -18,68,1,180,0, 18,16,1,180,0, 0,-4,1,-90,0 } },
+  { "Dive Tower", 37, { 0,0,1,0,0, 10,30,1,20,0, 12,60,2,0,0, 0,84,2,-90,0, -28,84,3,-90,0, -36,52,1,180,0, -28,20,1,160,0,
+                        -12,-14,1,60,0 } },
+  { "Slalom", 53, { 0,0,5,0,0, -2,22,6,0,0, 6,40,7,0,0, -2,58,6,0,0, 6,76,7,0,0, 2,96,4,0,3, 22,112,2,90,0, 44,100,4,120,3,
+                    48,78,6,180,0, 40,60,7,180,0, 48,42,6,180,0, 44,18,3,200,0, 28,-22,1,-90,0 } },
+  { "Hoop Forest", 61, { 0,0,1,0,0, 8,24,4,20,2.4, 24,44,4,50,4.5, 48,54,4,90,6, 72,46,2,130,0, 80,22,4,180,2, 70,-2,4,220,3.5,
+                         48,-14,3,247,0, 24,-24,4,300,2.2 }, nil, 2 },
+  { "Grand Prix", 71, { 0,0,5,0,0, 0,40,1,0,0, 10,80,2,20,6, 36,104,4,70,3, 64,106,6,100,0, 88,96,7,120,0, 110,76,3,180,0,
+                        112,44,1,180,0, 104,14,4,200,2.2, 84,-8,2,250,8, 56,-18,1,270,0, 30,-28,4,290,3 } },
+  { "Bando", 83, { 0,0,1,0,0, 0,34,8,0,1.8, 0,46,8,0,1.8, 20,66,4,60,4, 40,88,3,146,0, 56,64,1,180,0, 43.75,10,8,180,1.3,
+                   22,-16,4,250,2.5 },
+    { -6.1,34,3.9,0.25,0,7,1, 6.1,34,3.9,0.25,0,7,1, 0,34,2.2,0.25,3.6,7,1,
+      -6.1,46,3.9,0.25,0,7,1, 6.1,46,3.9,0.25,0,7,1, 0,46,2.2,0.25,3.6,7,1,
+      -10,40,0.25,6.25,0,7,1, 10,35.775,0.25,2.025,0,7,1, 10,44.225,0.25,2.025,0,7,1, 10,40,0.25,2.2,3.6,7,1,
+      46,64,2,2,0,24,1, 34,10,1.25,3,0,2.6,2, 40.5,10,1.25,3,0,2.6,3, 47,10,1.25,3,0,2.6,2,
+      -30,20,3,1.25,0,5.2,3, -36,50,4,4,0,3,1 } },
 }
 local NT = #TRACKS
-local GT = 0.28                       -- gate frame thickness (m)
-local GHW = { 1.5, 1.5, 2.0 }         -- inner half width per type
-local GHH = { 1.0, 1.0, 2.0 }         -- inner half height per type
-local GCY = { 1.35, 5.5, 7.0 }        -- center height per type
+local GT, FLAGH = 0.28, 3.4                            -- frame thickness, flag pole height (m)
+local GHW = { 1.5, 1.5, 2.0, 1.25, 2.4, 6, 6, 2.2 }     -- inner half width, ring radius, flag zone
+local GHH = { 1.0, 1.0, 2.0, 1.25, 2.4, 30, 30, 1.8 }   -- inner half height
+local GSH = { 1, 1, 1, 2, 2, 3, 3, 4 }                 -- shape: 1 frame, 2 ring, 3 flag, 4 gap
 
 -- gates (struct of arrays: fast indexed access in the hot loops)
 local NG, gx, gy, gz, gk, gd = 0, {}, {}, {}, {}, {}
 local gnx, gny, gnz, grx, grz, gax, gay, gaz = {}, {}, {}, {}, {}, {}, {}, {}
--- pillars: trees (k=1) and gate legs (k=2) - also used for collisions
+local AX, AY, AZ = {}, {}, {}           -- aim point per gate: racing line, markers, respawn
+-- pillars: trees (k=1), gate legs and hoop stands (k=2), flag poles (k=3)
 local NP, qx, qz, qr, qh, qk = 0, {}, {}, {}, {}, {}
--- start pad and track bounds
-local TR = { px = 0, pz = -14, hx = 0, hz = 1, x0 = 0, x1 = 1, z0 = 0, z1 = 1 }
+-- boxes: walls, towers, containers
+local BX = { n = 0, x0 = {}, x1 = {}, y0 = {}, y1 = {}, z0 = {}, z1 = {}, k = {} }
+-- start pad, track bounds, wind direction
+local TR = { px = 0, pz = -14, hx = 0, hz = 1, x0 = 0, x1 = 1, z0 = 0, z1 = 1, wx = 0, wz = 1 }
+-- AI pilots and the racing line (Hermite curves between aim points)
+local AI = { n = 0, vt = 0, ch = {}, sl = {}, sf = {}, seg = {}, k = {}, s = {}, v = {}, d = {},
+             x = {}, y = {}, z = {}, f = {}, o = {}, x0 = {}, z0 = {}, l0 = {} }
+
+AI.pos = function(i, s)
+  local j = i % NG + 1
+  local c = AI.ch[i]
+  local s2 = s * s
+  local s3 = s2 * s
+  local h1, h3 = 2 * s3 - 3 * s2 + 1, 3 * s2 - 2 * s3
+  local h2, h4 = (s3 - 2 * s2 + s) * c, (s3 - s2) * c
+  return h1 * AX[i] + h2 * gnx[i] + h3 * AX[j] + h4 * gnx[j],
+         h1 * AY[i] + h2 * gny[i] + h3 * AY[j] + h4 * gny[j],
+         h1 * AZ[i] + h2 * gnz[i] + h3 * AZ[j] + h4 * gnz[j]
+end
 
 local buildTrack
 do
+  local GCY = { 1.35, 5.5, 7.0, 2.4, 0, 0, 0, 2.0 }       -- default center height per type
   local seed = 1
   local function rnd()
     seed = seed * 171 % 30269
@@ -92,15 +144,38 @@ do
     dx, dz = ax + dx * t - x, az + dz * t - z
     return dx * dx + dz * dz
   end
+  local function boxDist2(x, z)
+    local m = 1e9
+    for b = 1, BX.n do
+      local dx, dz = BX.x0[b] - x, BX.z0[b] - z
+      if x - BX.x1[b] > dx then dx = x - BX.x1[b] end
+      if z - BX.z1[b] > dz then dz = z - BX.z1[b] end
+      if dx < 0 then dx = 0 end
+      if dz < 0 then dz = 0 end
+      if dx * dx + dz * dz < m then m = dx * dx + dz * dz end
+    end
+    return m
+  end
+
   buildTrack = function(t)
-    local d = TRACKS[t][3]
-    NG, NP = 0, 0
-    for i = 1, #d, 4 do
+    local T = TRACKS[t]
+    local d, bd = T[3], T[4]
+    NG, NP, BX.n = 0, 0, 0
+    if bd then
+      for i = 1, #bd, 7 do
+        local n = BX.n + 1
+        BX.n = n
+        BX.x0[n], BX.x1[n], BX.z0[n], BX.z1[n] = bd[i] - bd[i + 2], bd[i] + bd[i + 2], bd[i + 1] - bd[i + 3], bd[i + 1] + bd[i + 3]
+        BX.y0[n], BX.y1[n], BX.k[n] = bd[i + 4], bd[i + 5], bd[i + 6]
+      end
+    end
+    for i = 1, #d, 5 do
       NG = NG + 1
       local k, yaw = d[i + 2], d[i + 3] * 0.0174533
       local hx, hz = sin(yaw), cos(yaw)
-      local x, z, y = d[i], d[i + 1], GCY[k]
-      gx[NG], gy[NG], gz[NG], gk[NG] = x, y, z, k
+      local x, z, y = d[i], d[i + 1], d[i + 4]
+      if y <= 0 then y = GCY[k] end
+      local iw, ih = GHW[k], GHH[k]
       grx[NG], grz[NG] = hz, -hx
       if k == 3 then
         gnx[NG], gny[NG], gnz[NG] = 0, -1, 0
@@ -109,7 +184,7 @@ do
         gnx[NG], gny[NG], gnz[NG] = hx, 0, hz
         gax[NG], gay[NG], gaz[NG] = 0, 1, 0
       end
-      local iw, ih = GHW[k], GHH[k]
+      local ax, ay, az = x, y, z
       if k == 2 then
         local o = iw + GT * 0.5
         addPillar(x + hz * o, z - hx * o, GT * 0.5, y - ih - GT, 2)
@@ -121,10 +196,22 @@ do
             addPillar(x + hz * ow * sx + hx * oh * sz, z - hx * ow * sx + hz * oh * sz, GT * 0.5, y, 2)
           end
         end
+      elseif k == 4 then
+        addPillar(x, z, 0.08, y - iw - GT, 2)
+      elseif k == 5 then
+        ay = 1.4
+      elseif k == 6 or k == 7 then
+        -- (x, z) is the pole; the gate itself is the pass zone beside it
+        local s = k == 6 and 1 or -1
+        addPillar(x, z, 0.12, FLAGH, 3)
+        ax, ay, az = x + hz * s * 2.5, 1.8, z - hx * s * 2.5
+        x, z, y = x + hz * s * iw, z - hx * s * iw, 0
       end
+      gx[NG], gy[NG], gz[NG], gk[NG] = x, y, z, k
+      AX[NG], AY[NG], AZ[NG] = ax, ay, az
     end
     TR.hx, TR.hz = gnx[1], gnz[1]
-    TR.px, TR.pz = gx[1] - TR.hx * 14, gz[1] - TR.hz * 14
+    TR.px, TR.pz = AX[1] - TR.hx * 14, AZ[1] - TR.hz * 14
     local x0, x1, z0, z1 = TR.px, TR.px, TR.pz, TR.pz
     for i = 1, NG do
       if gx[i] < x0 then x0 = gx[i] end
@@ -132,18 +219,26 @@ do
       if gz[i] < z0 then z0 = gz[i] end
       if gz[i] > z1 then z1 = gz[i] end
     end
+    for b = 1, BX.n do
+      if BX.x0[b] < x0 then x0 = BX.x0[b] end
+      if BX.x1[b] > x1 then x1 = BX.x1[b] end
+      if BX.z0[b] < z0 then z0 = BX.z0[b] end
+      if BX.z1[b] > z1 then z1 = BX.z1[b] end
+    end
     TR.x0, TR.x1, TR.z0, TR.z1 = x0, x1, z0, z1
-    -- scenery trees, kept away from the racing line
-    seed = TRACKS[t][2]
-    local n, tries = 0, 0
-    while n < 18 and tries < 300 do
+    seed = T[2]
+    local a = rnd() * 6.2832
+    TR.wx, TR.wz = sin(a), cos(a)
+    -- scenery trees, kept away from the racing line and structures
+    local n, tries, want = 0, 0, 18 * (T[5] or 1)
+    while n < want and tries < want * 16 do
       tries = tries + 1
       local x = x0 - 30 + rnd() * (x1 - x0 + 60)
       local z = z0 - 30 + rnd() * (z1 - z0 + 60)
-      local ok = segDist2(x, z, TR.px, TR.pz, gx[1], gz[1]) > 100
+      local ok = segDist2(x, z, TR.px, TR.pz, AX[1], AZ[1]) > 100 and boxDist2(x, z) > 16
       for i = 1, NG do
         local j = i % NG + 1
-        if ok and segDist2(x, z, gx[i], gz[i], gx[j], gz[j]) < 100 then ok = false end
+        if ok and segDist2(x, z, AX[i], AZ[i], AX[j], AZ[j]) < 100 then ok = false end
       end
       for i = 1, NP do
         local dx, dz = x - qx[i], z - qz[i]
@@ -155,44 +250,105 @@ do
         addPillar(x, z, h * 0.14, h, 1)
       end
     end
+    -- racing line: length and speed factor of each leg
+    for i = 1, NG do
+      local j = i % NG + 1
+      local dx, dy, dz = AX[j] - AX[i], AY[j] - AY[i], AZ[j] - AZ[i]
+      local c = sqrt(dx * dx + dy * dy + dz * dz) + 0.01
+      AI.ch[i] = c
+      local L, lx, ly, lz = 0, AX[i], AY[i], AZ[i]
+      for q = 1, 8 do
+        local x, y, z = AI.pos(i, q / 8)
+        L = L + sqrt((x - lx) * (x - lx) + (y - ly) * (y - ly) + (z - lz) * (z - lz))
+        lx, ly, lz = x, y, z
+      end
+      AI.sl[i] = L
+      dx, dy, dz = dx / c, dy / c, dz / c
+      local k1 = dx * gnx[i] + dy * gny[i] + dz * gnz[i]
+      local k2 = dx * gnx[j] + dy * gny[j] + dz * gnz[j]
+      if k2 < k1 then k1 = k2 end
+      AI.sf[i] = 0.55 + 0.225 * (k1 + 1)
+    end
   end
 end
 
 -- --------------------------------------------------------- persistence
-local bestLap, bestRace = {}, {}
-for t = 1, NT do bestLap[t], bestRace[t] = 0, 0 end
+local BEST = { l = {}, r = {}, g = {}, f = {} }   -- per track: best lap, race, gate rush gates, freestyle combo
+for t = 1, NT do BEST.l[t], BEST.r[t], BEST.g[t], BEST.f[t] = 0, 0, 0, 0 end
+local loadData, saveData
+do
 local DATA = "/SCRIPTS/TOOLS/FPVSim.dat"
 
-local function loadData()
-  local f = io.open(DATA, "r")
-  if not f then return end
-  local s = io.read(f, 512)
-  io.close(f)
-  if type(s) ~= "string" or string.sub(s, 1, 6) ~= "FPVSIM" then return end
-  local v, n = {}, 0
-  for num in string.gmatch(s, "%-?%d+") do
-    n = n + 1
-    v[n] = tonumber(num)
+local DEF = {}
+for k, v in pairs(S) do DEF[k] = v end
+
+local function validate()
+  for i = 1, #OPTS do
+    local o = OPTS[i]
+    local v, ok = S[o[2]], false
+    if type(v) == "number" then
+      if o[3] then
+        for j = 1, #o[3] do
+          if o[3][j] == v then ok = true end
+        end
+      else
+        ok = v >= o[6] and v <= o[7]
+      end
+    end
+    if not ok then S[o[2]] = DEF[o[2]] end
   end
-  for i = 1, #KEYS do
-    if v[i] then S[KEYS[i]] = v[i] end
-  end
-  for t = 1, NT do
-    bestLap[t] = v[#KEYS + t * 2 - 1] or 0
-    bestRace[t] = v[#KEYS + t * 2] or 0
-  end
-  if S.track < 1 or S.track > NT then S.track = 1 end
+  if type(S.track) ~= "number" or S.track < 1 or S.track > NT then S.track = 1 end
 end
 
-local function saveData()
-  local s = "FPVSIM"
-  for i = 1, #KEYS do s = s .. " " .. floor(S[KEYS[i]]) end
-  for t = 1, NT do s = s .. " " .. floor(bestLap[t]) .. " " .. floor(bestRace[t]) end
+loadData = function()
+  local f = io.open(DATA, "r")
+  if not f then return end
+  local s = io.read(f, 1024)
+  io.close(f)
+  if type(s) ~= "string" then return end
+  if string.sub(s, 1, 7) == "FPVSIM2" then
+    for k, n, v in string.gmatch(s, "(%a+)(%d*)=(%-?%d+)") do
+      v = tonumber(v)
+      if n == "" then
+        if S[k] ~= nil then S[k] = v end
+      else
+        local t = tonumber(n)
+        if BEST[k] and t >= 1 and t <= NT then BEST[k][t] = v end
+      end
+    end
+  elseif string.sub(s, 1, 6) == "FPVSIM" then
+    -- version 1 file: 10 settings, then best lap / race of the first three tracks
+    local v, n = {}, 0
+    for num in string.gmatch(s, "%-?%d+") do
+      n = n + 1
+      v[n] = tonumber(num)
+    end
+    local K1 = { "track", "mode", "rates", "tilt", "fov", "twr", "laps", "map", "sticks", "fps" }
+    for i = 1, 10 do
+      if v[i] then S[K1[i]] = v[i] end
+    end
+    S.twr = ({ 3, 4, 6 })[v[6] or 2] or 5
+    for t = 1, 3 do
+      BEST.l[t], BEST.r[t] = v[9 + t * 2] or 0, v[10 + t * 2] or 0
+    end
+  end
+  validate()
+end
+
+saveData = function()
+  local s = "FPVSIM2"
+  for k, v in pairs(S) do s = s .. " " .. k .. "=" .. floor(v) end
+  for k, b in pairs(BEST) do
+    for t = 1, NT do
+      if b[t] > 0 then s = s .. " " .. k .. t .. "=" .. floor(b[t]) end
+    end
+  end
   local f = io.open(DATA, "w")
   if f then
     io.write(f, s .. "\n")
     io.close(f)
   end
+end
 end
 
 -- ----------------------------------------------------------- game state
@@ -200,12 +356,14 @@ local px, py, pz, vx, vy, vz = 0, 0.15, 0, 0, 0, 0                 -- quad posit
 local rx, ry, rz, ux, uy, uz, fx, fy, fz = 1, 0, 0, 0, 1, 0, 0, 0, 1 -- quad right / up / forward axes
 local sA, sE, sT, sR, speed = 0, 0, 0, 0, 0                           -- sticks, speed
 local DR, NEAR = 0.15, 0.2                                            -- quad radius, camera near plane
-local P = { rc = 100, rm = 600, re = 0.5, twr = 4, angle = false, tc = 0.9, ts = 0.42 }
-local state, prevState, pausedFrom, gmode = MENU, MENU, FLY, 1      -- gmode: 1 race, 2 practice, 3 free fly
+local P = { rc = 100, rm = 600, re = 0.5, yc = 100, ym = 500, ye = 0.4, twr = 5, angle = false, tc = 0.9, ts = 0.42,
+            wr = 0, wp = 0, wy = 0 }                                  -- settings in use, body rates (rad/s)
+local state, prevState, pausedFrom, gmode = MENU, MENU, FLY, 1
 local gt, lastT, tState, tStart = 0, 0, 0, 0                          -- game clock in 10 ms ticks
 local lapStart, lap, nextGate, lastGate = nil, 0, 1, 0
-local R = { laps = {}, n = 0, total = 0, newLap = false, newRace = false, msg = nil, msgT = 0, good = true,
-            ready = 0, crashes = 0, cn = -1, fps = 0, fpsN = 0, fpsT = 0 }
+local R = { laps = {}, n = 0, total = 0, newLap = false, newRace = false, newBest = false, msg = nil, msgT = 0, good = true,
+            ready = 0, crashes = 0, cd = -1, fps = 0, fpsN = 0, fpsT = 0,
+            pk = 0, pos = 1, sc = 0, ch = 0, chn = 0, cht = 0, prox = 9, rn = 0, rt = 0, smp = 0 }
 
 local function timeStr(cs)
   cs = floor(cs)
@@ -223,12 +381,19 @@ local function showMsg(s, good)
 end
 
 -- -------------------------------------------------------------- physics
-local readSticks, rotate, placeDrone, respawn, physics
-do
-  local G, KQ, KL, KU = 9.81, 0.022, 0.12, 0.9
+local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rushNext
+;(function()
+  local G = 9.81
   local SRC = { "ail", "ele", "thr", "rud" }
   local grounded = true
-  local nearG, nearP = {}, {}
+  local nearG, nearP, nearB = {}, {}, {}
+  local Tm = 0                                   -- motor thrust (lags the throttle)
+  local seed = 7
+
+  rnd = function()
+    seed = seed * 171 % 30269
+    return seed / 30269
+  end
 
   local function clamp1(v)
     if v > 1 then return 1 elseif v < -1 then return -1 end
@@ -250,10 +415,11 @@ do
     if sT < 0 then sT = 0 elseif sT > 1 then sT = 1 end
   end
 
-  local function rate(x)
+  -- Betaflight "actual" rates: center sensitivity c, max rate m (deg/s), expo e
+  local function rate(x, c, m, e)
     local a = x < 0 and -x or x
     local x2 = x * x
-    return (x * P.rc + (P.rm - P.rc) * a * x * (x2 * x2 * P.re + 1 - P.re)) * 0.0174533
+    return (x * c + (m - c) * a * x * (x2 * x2 * e + 1 - e)) * 0.0174533
   end
 
   rotate = function(ar, ap, ay)
@@ -285,21 +451,24 @@ do
   placeDrone = function(x, y, z, hx, hz)
     px, py, pz, vx, vy, vz = x, y, z, 0, 0, 0
     local l = sqrt(hx * hx + hz * hz)
+    if l < 0.01 then hx, hz, l = TR.hx, TR.hz, 1 end
     hx, hz = hx / l, hz / l
     fx, fy, fz, rx, ry, rz, ux, uy, uz = hx, 0, hz, hz, 0, -hx, 0, 1, 0
     grounded = y <= DR + 0.01
-    speed = 0
+    speed, Tm, P.wr, P.wp, P.wy = 0, 0, 0, 0, 0
     for i = 1, NG do
       gd[i] = (px - gx[i]) * gnx[i] + (py - gy[i]) * gny[i] + (pz - gz[i]) * gnz[i]
     end
   end
 
   respawn = function()
-    if lastGate > 0 and gmode ~= 3 then
+    if gmode == 3 then
+      if R.ax then placeDrone(R.ax, R.ay + 0.5, R.az, R.ahx, R.ahz) else placeDrone(TR.px, DR, TR.pz, TR.hx, TR.hz) end
+    elseif lastGate > 0 then
       local i, j = lastGate, nextGate
-      local y = gy[i]
+      local y = AY[i]
       if gk[i] == 3 then y = y - 1.5 end
-      placeDrone(gx[i] + gnx[i] * 1.5, y, gz[i] + gnz[i] * 1.5, gx[j] - gx[i], gz[j] - gz[i])
+      placeDrone(AX[i] + gnx[i] * 1.5, y, AZ[i] + gnz[i] * 1.5, AX[j] - AX[i], AZ[j] - AZ[i])
     else
       placeDrone(TR.px, DR, TR.pz, TR.hx, TR.hz)
     end
@@ -308,6 +477,10 @@ do
   local function crash()
     if state == DONE then respawn() return end
     state, tState, R.crashes = CRASHED, gt, R.crashes + 1
+    if gmode == 3 then
+      R.ch, R.chn = 0, 0
+      tricks(-1)
+    end
     beep(260, 400, PLAY_NOW)
     if playHaptic then playHaptic(60, 0) end
   end
@@ -315,26 +488,49 @@ do
   local function finishRace()
     R.total = gt - tStart
     local t = S.track
-    if bestRace[t] == 0 or R.total < bestRace[t] then
-      bestRace[t], R.newRace = R.total, true
+    if BEST.r[t] == 0 or R.total < BEST.r[t] then
+      BEST.r[t], R.newRace = R.total, true
     end
+    local p = 1
+    for a = 1, AI.n do
+      if AI.d[a] > 0 then p = p + 1 end
+    end
+    R.pos = p
     state, tState = DONE, gt
     saveData()
     beep(1800, 120)
     beep(2400, 300)
   end
 
-  local function gatePassed(i)
-    if gmode == 3 or i ~= nextGate then return end
+  local function gatePassed(i, fwd)
+    if state == DONE then return end
+    if gmode == 3 then
+      if GSH[gk[i]] ~= 3 then trick("GAP", 150) end
+      return
+    end
+    if i ~= nextGate then return end
+    if gmode == 4 then
+      R.rn = R.rn + 1
+      local b = 6 - R.rn * 0.15
+      if b < 2.5 then b = 2.5 end
+      R.rt = R.rt + b
+      lastGate = i
+      rushNext()
+      showMsg("GATE " .. R.rn .. "  +" .. fmt("%.1f", b) .. "s", true)
+      beep(1300 + R.rn * 30, 60)
+      return
+    end
+    if not fwd then return end
     lastGate, nextGate = i, i % NG + 1
+    R.pk = R.pk + 1
     if i == 1 then
       if lapStart then
         local lt = gt - lapStart
         R.n = R.n + 1
         R.laps[R.n] = lt
-        local b = bestLap[S.track]
+        local b = BEST.l[S.track]
         if b == 0 or lt < b then
-          bestLap[S.track], R.newLap = lt, true
+          BEST.l[S.track], R.newLap = lt, true
           showMsg("LAP " .. lap .. "  " .. timeStr(lt) .. "  BEST!", true)
           saveData()
         else
@@ -355,36 +551,55 @@ do
   end
 
   physics = function(dt)
+    local Tmax = P.twr * G
     local wr, wp
     if P.angle then
-      -- self level: steer the up vector towards the stick-commanded tilt
+      -- self level: steer the up vector towards the stick-commanded tilt (45 deg at full stick)
       local hx, hz = -rz, rx
       local l = sqrt(hx * hx + hz * hz) + 0.0001
       hx, hz = hx / l, hz / l
-      local tp, tr = sE * 0.9, sA * 0.9
-      local dx, dz = hx * tp + hz * tr, hz * tp - hx * tr
-      wr, wp = 7 * (dx * rx + ry + dz * rz), -7 * (dx * fx + fy + dz * fz)
-      if wr > 7 then wr = 7 elseif wr < -7 then wr = -7 end
-      if wp > 7 then wp = 7 elseif wp < -7 then wp = -7 end
+      local dx, dz = hx * sE + hz * sA, hz * sE - hx * sA
+      wr, wp = 8 * (dx * rx + ry + dz * rz), -8 * (dx * fx + fy + dz * fz)
+      if wr > 8 then wr = 8 elseif wr < -8 then wr = -8 end
+      if wp > 8 then wp = 8 elseif wp < -8 then wp = -8 end
     else
-      wr, wp = rate(sA), -rate(sE)
+      wr, wp = rate(sA, P.rc, P.rm, P.re), -rate(sE, P.rc, P.rm, P.re)
     end
-    local wy = rate(sR)
-    local T = P.twr * G * (0.04 + 0.96 * sT ^ 1.6)
+    local wy = rate(sR, P.yc, P.ym, P.ye)
+    local T = Tmax * (0.04 + 0.96 * sT ^ 1.6)
+    -- prop wash: descending into your own downwash shakes the quad
+    local vu0 = vx * ux + vy * uy + vz * uz
+    if vu0 < -2 and sT > 0.2 then
+      local a = (-vu0 - 2) * 0.2
+      if a > 1 then a = 1 end
+      a = a * sT * P.pw * 5
+      wr, wp = wr + (rnd() - 0.5) * a, wp + (rnd() - 0.5) * a
+    end
     if grounded and T < G * 1.02 then
       -- resting on the ground: stays level, can only yaw
-      wr, wp = 0, 0
+      wr, wp, P.wr, P.wp = 0, 0, 0, 0
       if uy < 0.999 then placeDrone(px, DR, pz, fx, fz) end
+    end
+    -- wind with gusts, weaker near the ground
+    local wx, wz = 0, 0
+    if S.wind > 0 and py > 0.3 then
+      local g = (S.wind == 1 and 3 or 7) * (1 + 0.3 * sin(gt * 0.009) + 0.2 * sin(gt * 0.031))
+      if py < 4 then g = g * py * 0.25 end
+      wx, wz = TR.wx * g, TR.wz * g
     end
     local n = floor(dt * 80) + 1
     local h = dt / n
+    local km, kr = h / (P.tm + h), h / (P.tr + h)
+    local KH, VP, KS, KU, sTx = P.kh, P.vp, P.ks, P.ku, sqrt(Tmax)
     local x0, x1, z0, z1 = TR.x0 - 160, TR.x1 + 160, TR.z0 - 160, TR.z1 + 160
-    -- broad phase once per frame: only gates/pillars within reach get tested per substep
+    local bx0, bx1, by0, by1, bz0, bz1 = BX.x0, BX.x1, BX.y0, BX.y1, BX.z0, BX.z1
+    -- broad phase once per frame: only objects within reach get tested per substep
     local reach = speed * dt + 7
-    local ng, np = 0, 0
+    local ng, np, nb = 0, 0, 0
     for i = 1, NG do
       local dx, dy, dz = px - gx[i], py - gy[i], pz - gz[i]
-      if dx < reach and dx > -reach and dy < reach and dy > -reach and dz < reach and dz > -reach then
+      local r = GSH[gk[i]] == 3 and reach + 6 or reach
+      if dx < r and dx > -r and dy < r and dy > -r and dz < r and dz > -r then
         ng = ng + 1
         nearG[ng] = i
       else
@@ -398,25 +613,43 @@ do
         nearP[np] = i
       end
     end
+    for i = 1, BX.n do
+      if px > bx0[i] - reach and px < bx1[i] + reach and pz > bz0[i] - reach and pz < bz1[i] + reach and py < by1[i] + reach then
+        nb = nb + 1
+        nearB[nb] = i
+      end
+    end
+    local pwr, pwp, pwy = P.wr, P.wp, P.wy
     for _ = 1, n do
-      rotate(wr * h, wp * h, wy * h)
-      local vu = vx * ux + vy * uy + vz * uz
-      local sp = sqrt(vx * vx + vy * vy + vz * vz)
-      local k, a = KQ * sp + KL, T - KU * vu
-      vx = vx + (ux * a - k * vx) * h
-      vy = vy + (uy * a - k * vy - G) * h
-      vz = vz + (uz * a - k * vz) * h
+      Tm = Tm + (T - Tm) * km
+      pwr, pwp, pwy = pwr + (wr - pwr) * kr, pwp + (wp - pwp) * kr, pwy + (wy - pwy) * kr
+      rotate(pwr * h, pwp * h, pwy * h)
+      -- air-relative velocity in body axes
+      local ax_, az_ = vx - wx, vz - wz
+      local vu = ax_ * ux + vy * uy + az_ * uz
+      local vr = ax_ * rx + vy * ry + az_ * rz
+      local vf = ax_ * fx + vy * fy + az_ * fz
+      -- props lose thrust with inflow speed; rotor drag in the prop plane; quadratic body drag
+      local Ta = Tm - vu * sqrt(Tm) * sTx / VP
+      if Ta > Tm * 1.25 then Ta = Tm * 1.25 elseif Ta < 0 then Ta = 0 end
+      local kh = KH * sqrt(Tm / Tmax + 0.02)
+      local au = Ta - KU * (vu < 0 and -vu or vu) * vu
+      local ar = -(kh + KS * (vr < 0 and -vr or vr)) * vr
+      local af = -(kh + KS * (vf < 0 and -vf or vf)) * vf
+      vx = vx + (ux * au + rx * ar + fx * af) * h
+      vy = vy + (uy * au + ry * ar + fy * af - G) * h
+      vz = vz + (uz * au + rz * ar + fz * af) * h
       local ox, oy, oz = px, py, pz
       px, py, pz = px + vx * h, py + vy * h, pz + vz * h
       grounded = false
       if py < DR then
-        if vy < -5.5 or sp > 13 or uy < 0.35 then crash() return end
+        if vy < -6 or vx * vx + vz * vz > 196 or uy < 0.35 then crash() return end
         py, grounded = DR, true
         if vy < 0 then vy = 0 end
         local fr = 1 - 7 * h
         vx, vz = vx * fr, vz * fr
       end
-      if py > 120 or px < x0 or px > x1 or pz < z0 or pz > z1 then crash() return end
+      if py > 250 or px < x0 or px > x1 or pz < z0 or pz > z1 then crash() return end
       -- gates: detect crossings of each nearby gate plane
       for j = 1, ng do
         local i = nearG[j]
@@ -429,26 +662,235 @@ do
           local qx_, qy_, qz_ = ox + (px - ox) * t - cx, oy + (py - oy) * t - cy, oz + (pz - oz) * t - cz
           local lx = qx_ * grx[i] + qz_ * grz[i]
           local ly = qx_ * gax[i] + qy_ * gay[i] + qz_ * gaz[i]
-          if lx < 0 then lx = -lx end
-          if ly < 0 then ly = -ly end
-          local iw, ih = GHW[gk[i]], GHH[gk[i]]
-          if lx < iw - DR * 0.5 and ly < ih - DR * 0.5 then
-            if d1 >= 0 then gatePassed(i) end
-          elseif lx < iw + GT + DR and ly < ih + GT + DR then
-            crash() return
+          local k = gk[i]
+          local iw, ih, sh = GHW[k], GHH[k], GSH[k]
+          if sh == 2 then
+            local r2, a, b = lx * lx + ly * ly, iw - DR * 0.5, iw + GT + DR
+            if r2 < a * a then gatePassed(i, d1 >= 0)
+            elseif r2 < b * b then crash() return end
+          else
+            if lx < 0 then lx = -lx end
+            if ly < 0 then ly = -ly end
+            if lx < iw - DR * 0.5 and ly < ih - DR * 0.5 then gatePassed(i, d1 >= 0)
+            elseif sh == 1 and lx < iw + GT + DR and ly < ih + GT + DR then crash() return end
           end
+          if state ~= FLY and state ~= DONE then return end
         end
       end
-      -- trees and gate legs
+      -- trees, legs, poles and structures
       for j = 1, np do
         local i = nearP[j]
         local dx, dz, r = px - qx[i], pz - qz[i], qr[i] + DR
         if dx < r and dx > -r and dz < r and dz > -r and py < qh[i] and dx * dx + dz * dz < r * r then crash() return end
       end
+      for j = 1, nb do
+        local i = nearB[j]
+        if px > bx0[i] - DR and px < bx1[i] + DR and pz > bz0[i] - DR and pz < bz1[i] + DR and py < by1[i] + DR and py > by0[i] - DR then
+          crash() return
+        end
+      end
     end
+    P.wr, P.wp, P.wy = pwr, pwp, pwy
     orthonormalize()
     speed = sqrt(vx * vx + vy * vy + vz * vz)
+    if gmode == 3 then
+      -- distance to the nearest surface, for proximity tricks
+      local m = py + 0.7
+      for j = 1, np do
+        local i = nearP[j]
+        if py < qh[i] then
+          local dx, dz = px - qx[i], pz - qz[i]
+          local d = sqrt(dx * dx + dz * dz) - qr[i]
+          if d < m then m = d end
+        end
+      end
+      for j = 1, nb do
+        local i = nearB[j]
+        local dx, dy, dz = bx0[i] - px, by0[i] - py, bz0[i] - pz
+        if px - bx1[i] > dx then dx = px - bx1[i] end
+        if py - by1[i] > dy then dy = py - by1[i] end
+        if pz - bz1[i] > dz then dz = pz - bz1[i] end
+        if dx < 0 then dx = 0 end
+        if dy < 0 then dy = 0 end
+        if dz < 0 then dz = 0 end
+        local d = sqrt(dx * dx + dy * dy + dz * dz)
+        if d < m then m = d end
+      end
+      R.prox = m
+    end
   end
+end)()
+
+-- ----------------------------------------------------- freestyle tricks
+;(function()
+  local acc, t0, idle, thr, nrot = { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }
+  local hiY, hiT, inv, prox = 0, 0, 0, 0
+  local NAME = { "ROLL", "ROLL", "BACKFLIP", "FRONTFLIP", "360", "360" }
+  local PTS = { 100, 100, 50 }
+
+  local function mult()
+    local m = 1 + (R.chn - 1) * 0.5
+    if m > 4 then m = 4 end
+    return m
+  end
+
+  trick = function(name, pts)
+    pts = floor(pts)
+    R.ch, R.chn, R.cht = R.ch + pts, R.chn + 1, gt
+    showMsg(name .. " +" .. pts, true)
+    beep(1400 + R.chn * 120, 50)
+  end
+
+  local function bank()
+    local v = floor(R.ch * mult())
+    R.sc = R.sc + v
+    if v > BEST.f[S.track] then
+      BEST.f[S.track], R.newBest = v, true
+      showMsg("COMBO " .. v .. "  BEST!", true)
+      beep(2400, 200)
+      saveData()
+    elseif R.chn > 1 then
+      showMsg("COMBO " .. v, true)
+    end
+    R.ch, R.chn = 0, 0
+  end
+
+  -- continuous rotation about one body axis: 330 deg counts as a full turn
+  local function axis(a, w, dt)
+    local s = acc[a]
+    if (w > 1.5 and s >= 0) or (w < -1.5 and s <= 0) then
+      if nrot[a] < 1 and s > -0.01 and s < 0.01 then t0[a], thr[a] = gt, 0 end
+      s = s + w * dt
+      thr[a] = thr[a] + sT * dt
+      idle[a] = 0
+      local need = 5.76 + nrot[a] * 6.2832
+      if s > need or s < -need then
+        nrot[a] = nrot[a] + 1
+        local dur = (gt - t0[a]) * 0.01
+        local name, pts = NAME[a * 2 - (s > 0 and 1 or 0)], PTS[a]
+        if a == 2 and s > 0 and dur > 0.8 and thr[a] > dur * 0.4 then name, pts = "POWER LOOP", 250 end
+        if nrot[a] == 2 then name, pts = "DOUBLE " .. name, pts * 1.5
+        elseif nrot[a] > 2 then name, pts = "MULTI " .. name, pts * 2 end
+        trick(name, pts)
+        t0[a], thr[a] = gt, 0
+      end
+    else
+      idle[a] = idle[a] + dt
+      if idle[a] > 0.3 then s, nrot[a] = 0, 0 end
+    end
+    acc[a] = s
+  end
+
+  tricks = function(dt)
+    if dt < 0 then
+      for a = 1, 3 do acc[a], nrot[a], idle[a] = 0, 0, 0 end
+      hiY, inv, prox = 0, 0, 0
+      return
+    end
+    axis(1, P.wr, dt)
+    axis(2, P.wp, dt)
+    axis(3, P.wy, dt)
+    -- dive: a fast drop of 10 m or more that ends under control
+    if py > hiY or gt - hiT > 200 then hiY, hiT = py, gt end
+    if hiY - py > 10 and vy > -2 then
+      trick("DIVE " .. floor(hiY - py) .. "m", 60 + (hiY - py) * 6)
+      hiY, hiT = py, gt
+    end
+    if uy < -0.5 then inv = inv + dt
+    else
+      if inv > 0.8 then trick("HANG TIME", inv * 60) end
+      inv = 0
+    end
+    if R.prox < 1.5 and speed > 8 then prox = prox + dt
+    else
+      if prox > 0.3 then trick("PROXY", prox * 150) end
+      prox = 0
+    end
+    if R.chn > 0 and gt - R.cht > 250 then bank() end
+  end
+end)()
+
+-- ------------------------------------------------- gate rush, AI pilots
+rushNext = function()
+  local j = nextGate
+  for _ = 1, 30 do
+    j = floor(rnd() * NG) + 1
+    if j > NG then j = NG end
+    if j ~= nextGate and j ~= lastGate and GSH[gk[j]] ~= 3 then break end
+  end
+  nextGate = j
+end
+
+AI.start = function()
+  local n = gmode == 1 and S.ai or 0
+  AI.n = n
+  AI.vt = ({ 9, 13, 17.5 })[S.skill] * (0.75 + 0.05 * S.twr)
+  for a = 1, n do
+    local L = a == 1 and 2.2 or (a == 2 and -2.2 or 0)
+    local B = a == 3 and 3 or 0
+    local x, z = TR.px + TR.hz * L - TR.hx * B, TR.pz - TR.hx * L - TR.hz * B
+    local dx, dz = AX[1] - x, AZ[1] - z
+    AI.x0[a], AI.z0[a], AI.l0[a] = x, z, sqrt(dx * dx + dz * dz) + 0.01
+    AI.x[a], AI.y[a], AI.z[a] = x, DR, z
+    AI.seg[a], AI.k[a], AI.s[a], AI.v[a], AI.d[a] = 0, 0, 0, 0, 0
+    AI.f[a] = 1.02 - 0.04 * a + rnd() * 0.04
+    AI.o[a] = L * 0.25
+  end
+end
+
+AI.update = function(dt)
+  local last = S.laps * NG + 1
+  for a = 1, AI.n do
+    local seg = AI.seg[a]
+    local vt, L = AI.vt * AI.f[a], AI.l0[a]
+    if seg > 0 then L, vt = AI.sl[seg], vt * AI.sf[seg] end
+    if AI.d[a] > 0 then vt = vt * 0.6 end
+    local v = AI.v[a]
+    if v < vt then
+      v = v + 10 * dt
+      if v > vt then v = vt end
+    else
+      v = v - 14 * dt
+      if v < vt then v = vt end
+    end
+    AI.v[a] = v
+    local s = AI.s[a] + v * dt / L
+    if s >= 1 then
+      s = s - 1
+      if s > 0.9 then s = 0.9 end
+      seg = seg % NG + 1
+      AI.seg[a], AI.k[a] = seg, AI.k[a] + 1
+      if AI.k[a] == last and AI.d[a] <= 0 then AI.d[a] = gt - tStart end
+    end
+    AI.s[a] = s
+    local x, y, z
+    if seg == 0 then
+      x, y, z = AI.x0[a] + (AX[1] - AI.x0[a]) * s, DR + (AY[1] - DR) * s, AI.z0[a] + (AZ[1] - AI.z0[a]) * s
+    else
+      x, y, z = AI.pos(seg, s)
+      local j, o = seg % NG + 1, AI.o[a]
+      x = x + (grx[seg] + (grx[j] - grx[seg]) * s) * o
+      z = z + (grz[seg] + (grz[j] - grz[seg]) * s) * o
+      if y < 0.4 then y = 0.4 end
+    end
+    AI.x[a], AI.y[a], AI.z[a] = x, y, z
+  end
+end
+
+-- race position: 1 + AI pilots ahead of the player
+AI.place = function()
+  local pk, pf = R.pk, 0
+  local i = nextGate
+  local dx, dy, dz = AX[i] - px, AY[i] - py, AZ[i] - pz
+  local d = sqrt(dx * dx + dy * dy + dz * dz)
+  local L = pk > 0 and AI.sl[lastGate] or 14
+  pf = 1 - d / L
+  local p = 1
+  for a = 1, AI.n do
+    local k = AI.k[a]
+    if AI.d[a] > 0 or k > pk or (k == pk and AI.s[a] > pf) then p = p + 1 end
+  end
+  return p
 end
 
 -- --------------------------------------------------------------- camera
@@ -460,12 +902,19 @@ local CX, CY = VX + VW / 2, VY + VH / 2
 local SC = VW / 480
 local F, tanH = 160, 1.4
 
+-- FPV camera, rendered where the quad will be when the frame reaches the screen:
+-- 0.055 s ahead (color screens show a frame one 50 ms cycle after it is drawn)
 local function fpvCamera()
   local c, s = P.tc, P.ts
-  kpx, kpy, kpz = px, py, pz
+  local d = (state == FLY or state == DONE) and 0.055 or 0
+  local a1, a2, a3, b1, b2, b3, e1, e2, e3 = rx, ry, rz, ux, uy, uz, fx, fy, fz
+  if d > 0 then rotate(P.wr * d, P.wp * d, P.wy * d) end
+  kpx, kpy, kpz = px + vx * d, py + vy * d, pz + vz * d
+  if kpy < 0.05 then kpy = 0.05 end
   krx, kry, krz = rx, ry, rz
   kfx, kfy, kfz = fx * c + ux * s, fy * c + uy * s, fz * c + uz * s
   kux, kuy, kuz = ux * c - fx * s, uy * c - fy * s, uz * c - fz * s
+  rx, ry, rz, ux, uy, uz, fx, fy, fz = a1, a2, a3, b1, b2, b3, e1, e2, e3
 end
 
 local function orbitCamera()
@@ -482,8 +931,14 @@ local function orbitCamera()
 end
 
 local function applySettings()
-  local r = S.rates
-  P.rc, P.rm, P.re, P.twr = CFG.rc[r], CFG.rm[r], CFG.re[r], CFG.twr[S.power]
+  local r = RATES[S.rates]
+  if r then
+    P.rc, P.rm, P.re, P.yc, P.ym, P.ye = r[1], r[2], r[3] * 0.01, r[4], r[5], r[6] * 0.01
+  else
+    P.rc, P.rm, P.re, P.yc, P.ym, P.ye = S.rc, S.rm, S.re * 0.01, S.yc, S.ym, S.ye * 0.01
+  end
+  for k, v in pairs(QP) do P[k] = v[S.quad] or v[1] end
+  P.twr = S.twr
   P.angle = S.mode == 2
   local t = S.tilt * 0.0174533
   P.tc, P.ts = cos(t), sin(t)
@@ -491,26 +946,46 @@ local function applySettings()
   F = (VW / 2) / tanH
 end
 
--- visible objects sorted far -> near (painter's algorithm)
+-- visible objects sorted far -> near (painter's algorithm).
+-- ids: gates 1..NG, trees -i, boxes 1000+b, AI pilots 2000+a
 local ordZ, ordI, nOrd = {}, {}, 0
 local function collectObjects(maxZ)
   nOrd = 0
-  for n = 1, NG + NP do
-    local i, X, Y, Z, rad = n, 0, 0, 0, 4
+  local n1 = NG + NP
+  local n2 = n1 + BX.n
+  for n = 1, n2 + (gmode == 1 and AI.n or 0) do
+    local id, X, Y, Z, rad = n, 0, 0, 0, 4
     if n <= NG then
-      X, Y, Z = gx[i] - kpx, gy[i] - kpy, gz[i] - kpz
-    else
-      i = n - NG
+      X, Y, Z = gx[n] - kpx, gy[n] - kpy, gz[n] - kpz
+      local sh = GSH[gk[n]]
+      if sh == 3 then rad = 9
+      elseif sh == 4 then
+        -- a gap's highlight goes on top of the walls around it
+        X, Y, Z = X - kfx * 2, Y - kfy * 2, Z - kfz * 2
+      end
+    elseif n <= n1 then
+      local i = n - NG
       if qk[i] == 1 then
         X, Y, Z = qx[i] - kpx, qh[i] * 0.4 - kpy, qz[i] - kpz
         rad = qh[i]
       else
         Z = -1e9
       end
-      i = -i
+      id = -i
+    elseif n <= n2 then
+      local b = n - n1
+      local x0, x1, y0, y1, z0, z1 = BX.x0[b], BX.x1[b], BX.y0[b], BX.y1[b], BX.z0[b], BX.z1[b]
+      X, Y, Z = (x0 + x1) * 0.5 - kpx, (y0 + y1) * 0.5 - kpy, (z0 + z1) * 0.5 - kpz
+      rad = (x1 - x0 + y1 - y0 + z1 - z0) * 0.5
+      id = 1000 + b
+    else
+      local a = n - n2
+      X, Y, Z = AI.x[a] - kpx, AI.y[a] - kpy, AI.z[a] - kpz
+      rad = 1
+      id = 2000 + a
     end
     local z = X * kfx + Y * kfy + Z * kfz
-    if z > -4 and z < maxZ then
+    if z > -rad and z < maxZ then
       local x = X * krx + Y * kry + Z * krz
       if x < 0 then x = -x end
       if z < 4 or x < z * tanH + rad then
@@ -519,7 +994,7 @@ local function collectObjects(maxZ)
           ordZ[j + 1], ordI[j + 1] = ordZ[j], ordI[j]
           j = j - 1
         end
-        ordZ[j + 1], ordI[j + 1] = z, i
+        ordZ[j + 1], ordI[j + 1] = z, id
         nOrd = nOrd + 1
       end
     end
@@ -530,15 +1005,20 @@ local C = {}            -- colors (color radios) / grey levels (B&W)
 local render3D, initGfx
 
 -- ============================================================ COLOR GFX
-do
+;(function()
   local RGB = lcd.RGB
   local NF = 6
+  local RCOS, RSIN = {}, {}                             -- ring segments (12 per turn)
+  for j = 1, 12 do RCOS[j], RSIN[j] = cos(j * 0.5235988), sin(j * 0.5235988) end
+  local XL, YL = W - 1, H - 1
   local MT, NMT = {}, 0
   local HAZE = { 214, 230, 242 }
   local HZN = floor(10 * SC + 0.5)        -- haze band height (px)
   local cSky, cGround, cGridN, cGridF, cMtn, cSnow, cPad, cPad2
   local hazeS, hazeG = {}, {}
-  local fGate, fGateE, fNext, fNextE, fNextG, fTree, fTreeH, fTrunk, fPole = {}, {}, {}, {}, {}, {}, {}, {}, {}
+  local fGate, fGateE, fNext, fNextE, fNextG, fTree, fTreeH, fTrunk, fPole, fFlag, fBoxE = {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}
+  local fBox = {}
+  local fxs, fys, gxs, gys, P3x, P3y, P3z = {}, {}, {}, {}, {}, {}, {}
 
   local function mixc(a, b, t)
     return RGB(floor(a[1] + (b[1] - a[1]) * t + 0.5), floor(a[2] + (b[2] - a[2]) * t + 0.5), floor(a[3] + (b[3] - a[3]) * t + 0.5))
@@ -557,6 +1037,7 @@ do
     C.white, C.black, C.accent, C.accent2 = RGB(255, 255, 255), RGB(0, 0, 0), RGB(255, 138, 0), RGB(255, 214, 64)
     C.good, C.bad, C.red, C.cyan = RGB(96, 232, 120), RGB(255, 96, 96), RGB(230, 30, 40), RGB(80, 220, 255)
     C.panel, C.panelBG, C.dim = RGB(14, 18, 28), RGB(22, 26, 36), RGB(170, 178, 192)
+    C.ai = { RGB(255, 72, 72), RGB(64, 150, 255), RGB(200, 96, 255) }
     for k = 0, 7 do hazeS[k + 1] = mixc(HAZE, sky, k / 8) end
     for k = 0, 3 do hazeG[k + 1] = mixc({ 150, 182, 140 }, grass, k / 4) end
     ramp(fGate, { 236, 238, 244 }, 0.8)
@@ -568,6 +1049,17 @@ do
     ramp(fTreeH, { 62, 128, 60 }, 0.85)
     ramp(fTrunk, { 96, 64, 40 }, 0.85)
     ramp(fPole, { 70, 72, 82 }, 0.85)
+    ramp(fFlag, { 226, 40, 48 }, 0.7)
+    ramp(fBoxE, { 52, 52, 58 }, 0.85)
+    -- structures: concrete, red and blue containers; top, x and z faces shaded
+    local KC, SH = { { 168, 164, 156 }, { 172, 60, 44 }, { 50, 92, 156 } }, { 1.2, 0.92, 0.72 }
+    for k = 1, 3 do
+      for s = 1, 3 do
+        local c, m, t = KC[k], SH[s], {}
+        ramp(t, { c[1] * m < 255 and c[1] * m or 255, c[2] * m < 255 and c[2] * m or 255, c[3] * m < 255 and c[3] * m or 255 }, 0.85)
+        fBox[k * 3 + s - 3] = t
+      end
+    end
     -- distant mountain range: triangles at infinity (only rotate with the camera)
     local s, az = 5, 0
     NMT = 0
@@ -583,7 +1075,26 @@ do
     end
   end
 
-  -- 3D line in camera space: near-plane clip + project (C code clips to screen)
+  -- lcd.drawLine on color radios drops the whole line when an end is beyond the
+  -- right or bottom edge (x > LCD_W or y > LCD_H). The firmware clips the left
+  -- and top edges itself, so only the right and bottom edges are clipped here.
+  local function ln(x1, y1, x2, y2, col)
+    if x1 > XL then
+      if x2 > XL then return end
+      y1, x1 = y1 + (y2 - y1) * (XL - x1) / (x2 - x1), XL
+    elseif x2 > XL then
+      y2, x2 = y2 + (y1 - y2) * (XL - x2) / (x1 - x2), XL
+    end
+    if y1 > YL then
+      if y2 > YL then return end
+      x1, y1 = x1 + (x2 - x1) * (YL - y1) / (y2 - y1), YL
+    elseif y2 > YL then
+      x2, y2 = x2 + (x1 - x2) * (YL - y2) / (y1 - y2), YL
+    end
+    drawLine(x1, y1, x2, y2, SOLID, col)
+  end
+
+  -- 3D line in camera space: near-plane clip + project
   local function line3(X1, Y1, Z1, X2, Y2, Z2, col)
     if Z1 < NEAR then
       if Z2 < NEAR then return end
@@ -594,7 +1105,51 @@ do
       X2, Y2, Z2 = X2 + (X1 - X2) * t, Y2 + (Y1 - Y2) * t, NEAR
     end
     local s1, s2 = F / Z1, F / Z2
-    drawLine(CX + X1 * s1, CY - Y1 * s1, CX + X2 * s2, CY - Y2 * s2, SOLID, col)
+    local x1, y1, x2, y2 = CX + X1 * s1, CY - Y1 * s1, CX + X2 * s2, CY - Y2 * s2
+    if x1 <= XL and x2 <= XL and y1 <= YL and y2 <= YL then drawLine(x1, y1, x2, y2, SOLID, col) else ln(x1, y1, x2, y2, col) end
+  end
+
+  -- polygon in fxs/fys: clip to the 3D view (Sutherland-Hodgman), fill as a triangle fan
+  local function clip2(n, ax, ay, bx, by, useX, lim, sg)
+    if n < 3 then return 0 end
+    local m = 0
+    local qx_, qy_ = ax[n], ay[n]
+    local qd = sg * ((useX and qx_ or qy_) - lim)
+    for i = 1, n do
+      local cx, cy = ax[i], ay[i]
+      local cd = sg * ((useX and cx or cy) - lim)
+      if (cd <= 0) ~= (qd <= 0) then
+        local t = qd / (qd - cd)
+        m = m + 1
+        bx[m], by[m] = qx_ + (cx - qx_) * t, qy_ + (cy - qy_) * t
+      end
+      if cd <= 0 then
+        m = m + 1
+        bx[m], by[m] = cx, cy
+      end
+      qx_, qy_, qd = cx, cy, cd
+    end
+    return m
+  end
+
+  local function fillPoly(n, col)
+    n = clip2(n, fxs, fys, gxs, gys, true, VX - 1, -1)
+    n = clip2(n, gxs, gys, fxs, fys, true, VX + VW, 1)
+    n = clip2(n, fxs, fys, gxs, gys, false, VY - 1, -1)
+    n = clip2(n, gxs, gys, fxs, fys, false, VY + VH, 1)
+    for i = 2, n - 1 do fillTri(fxs[1], fys[1], fxs[i], fys[i], fxs[i + 1], fys[i + 1], col) end
+  end
+
+  -- filled triangle; far off-screen corners go through the clipper (the firmware
+  -- walks every row between the top and bottom corner, even off-screen ones)
+  local function tri(x1, y1, x2, y2, x3, y3, col)
+    local lo, hi = VY - 2000, VY + VH + 2000
+    if y1 > lo and y1 < hi and y2 > lo and y2 < hi and y3 > lo and y3 < hi then
+      fillTri(x1, y1, x2, y2, x3, y3, col)
+    else
+      fxs[1], fys[1], fxs[2], fys[2], fxs[3], fys[3] = x1, y1, x2, y2, x3, y3
+      fillPoly(3, col)
+    end
   end
 
   local function drawMountains()
@@ -685,10 +1240,10 @@ do
     nx, ny = nx / m, ny / m
     local n = HZN
     for k = 0, n - 1 do
-      drawLine(hx0 + nx * k, hy0 + ny * k, hx1 + nx * k, hy1 + ny * k, SOLID, hazeS[floor(k * 8 / n) + 1])
+      ln(hx0 + nx * k, hy0 + ny * k, hx1 + nx * k, hy1 + ny * k, hazeS[floor(k * 8 / n) + 1])
     end
     for k = 1, floor(n / 2) do
-      drawLine(hx0 - nx * k, hy0 - ny * k, hx1 - nx * k, hy1 - ny * k, SOLID, hazeG[floor((k - 1) * 8 / n) + 1])
+      ln(hx0 - nx * k, hy0 - ny * k, hx1 - nx * k, hy1 - ny * k, hazeG[floor((k - 1) * 8 / n) + 1])
     end
   end
 
@@ -734,19 +1289,19 @@ do
       local bx, bz = ox + (hx + hz) * e, oz + (hz - hx) * e
       local cx, cz = ox + (hz - hx) * e, oz - (hz + hx) * e
       local dx, dz = ox - (hx + hz) * e, oz + (hx - hz) * e
-      local AX, AY, AZ = ax * krx + y * kry + az * krz, ax * kux + y * kuy + az * kuz, ax * kfx + y * kfy + az * kfz
-      local BX, BY, BZ = bx * krx + y * kry + bz * krz, bx * kux + y * kuy + bz * kuz, bx * kfx + y * kfy + bz * kfz
+      local AX_, AY_, AZ_ = ax * krx + y * kry + az * krz, ax * kux + y * kuy + az * kuz, ax * kfx + y * kfy + az * kfz
+      local BX_, BY_, BZ_ = bx * krx + y * kry + bz * krz, bx * kux + y * kuy + bz * kuz, bx * kfx + y * kfy + bz * kfz
       local CX_, CY_, CZ_ = cx * krx + y * kry + cz * krz, cx * kux + y * kuy + cz * kuz, cx * kfx + y * kfy + cz * kfz
-      local DX, DY, DZ = dx * krx + y * kry + dz * krz, dx * kux + y * kuy + dz * kuz, dx * kfx + y * kfy + dz * kfz
-      line3(AX, AY, AZ, BX, BY, BZ, col)
-      line3(BX, BY, BZ, CX_, CY_, CZ_, col)
-      line3(CX_, CY_, CZ_, DX, DY, DZ, col)
-      line3(DX, DY, DZ, AX, AY, AZ, col)
+      local DX_, DY_, DZ_ = dx * krx + y * kry + dz * krz, dx * kux + y * kuy + dz * kuz, dx * kfx + y * kfy + dz * kfz
+      line3(AX_, AY_, AZ_, BX_, BY_, BZ_, col)
+      line3(BX_, BY_, BZ_, CX_, CY_, CZ_, col)
+      line3(CX_, CY_, CZ_, DX_, DY_, DZ_, col)
+      line3(DX_, DY_, DZ_, AX_, AY_, AZ_, col)
     end
   end
 
-  -- one gate bar = quad between its outer and inner edge, filled with
-  -- 1 px "ruled" lines (fast native Bresenham), or 2 triangles when huge
+  -- one frame bar = quad between its outer edge a-b and inner edge c-d,
+  -- filled with 1 px "ruled" lines (native Bresenham) or a clipped fan when big
   local function bar(ax, ay, az, bx, by, bz, cx, cy, cz, dx, dy, dz, fill, e1, e2)
     if az < NEAR then
       if bz < NEAR then return end
@@ -777,38 +1332,175 @@ do
     p, q = dx - bx, dy - by
     local m = (p < 0 and -p or p) + (q < 0 and -q or q)
     if m > n then n = m end
+    -- a bar only a few pixels thick reads as its outline: keep it the fill colour
+    if n < 4 then e1, e2 = fill, fill end
+    local safe = ax <= XL and bx <= XL and cx <= XL and dx <= XL and ay <= YL and by <= YL and cy <= YL and dy <= YL
     if n > 140 then
-      -- bar fills the view: triangles, unless the coordinates are absurd (camera in the bar)
-      if ay > -4 * H and ay < 5 * H and by > -4 * H and by < 5 * H and cy > -4 * H and cy < 5 * H and dy > -4 * H and dy < 5 * H then
-        fillTri(ax, ay, bx, by, dx, dy, fill)
-        fillTri(ax, ay, dx, dy, cx, cy, fill)
-      end
+      fxs[1], fys[1], fxs[2], fys[2], fxs[3], fys[3], fxs[4], fys[4] = ax, ay, bx, by, dx, dy, cx, cy
+      fillPoly(4, fill)
     elseif n >= 2 then
       n = floor(n)
       local sx1, sy1, sx2, sy2 = (cx - ax) / n, (cy - ay) / n, (dx - bx) / n, (dy - by) / n
       local x1, y1, x2, y2 = ax, ay, bx, by
       for _ = 2, n do
         x1, y1, x2, y2 = x1 + sx1, y1 + sy1, x2 + sx2, y2 + sy2
-        drawLine(x1, y1, x2, y2, SOLID, fill)
+        if safe then drawLine(x1, y1, x2, y2, SOLID, fill) else ln(x1, y1, x2, y2, fill) end
       end
     end
-    drawLine(ax, ay, bx, by, SOLID, e1)
-    drawLine(cx, cy, dx, dy, SOLID, e2)
+    if safe then
+      drawLine(ax, ay, bx, by, SOLID, e1)
+      drawLine(cx, cy, dx, dy, SOLID, e2)
+    else
+      ln(ax, ay, bx, by, e1)
+      ln(cx, cy, dx, dy, e2)
+    end
+  end
+
+  local function md(p, q) return (p < 0 and -p or p) + (q < 0 and -q or q) end
+
+  -- flat face given as corner a plus edges u, v (camera space): near-plane clip,
+  -- then ruled lines when small or a clipped triangle fan when big
+  local function face(ax, ay, az, ux_, uy_, uz_, vx_, vy_, vz_, col, ecol)
+    P3x[1], P3y[1], P3z[1] = ax, ay, az
+    P3x[2], P3y[2], P3z[2] = ax + ux_, ay + uy_, az + uz_
+    P3x[3], P3y[3], P3z[3] = ax + ux_ + vx_, ay + uy_ + vy_, az + uz_ + vz_
+    P3x[4], P3y[4], P3z[4] = ax + vx_, ay + vy_, az + vz_
+    local m, clipped = 0, false
+    local jx, jy, jz = P3x[4], P3y[4], P3z[4]
+    for i = 1, 4 do
+      local ix, iy, iz = P3x[i], P3y[i], P3z[i]
+      if (iz >= NEAR) ~= (jz >= NEAR) then
+        local t, s = (NEAR - jz) / (iz - jz), F / NEAR
+        m = m + 1
+        fxs[m], fys[m] = CX + (jx + (ix - jx) * t) * s, CY - (jy + (iy - jy) * t) * s
+        clipped = true
+      end
+      if iz >= NEAR then
+        local s = F / iz
+        m = m + 1
+        fxs[m], fys[m] = CX + ix * s, CY - iy * s
+      end
+      jx, jy, jz = ix, iy, iz
+    end
+    if m < 3 then return end
+    local x0, x1, y0, y1 = fxs[1], fxs[1], fys[1], fys[1]
+    for i = 2, m do
+      local x, y = fxs[i], fys[i]
+      if x < x0 then x0 = x elseif x > x1 then x1 = x end
+      if y < y0 then y0 = y elseif y > y1 then y1 = y end
+    end
+    if x1 < VX or x0 > VX + VW or y1 < VY or y0 > VY + VH then return end
+    if clipped then
+      fillPoly(m, col)
+      return
+    end
+    local a1, b1, a2, b2, a3, b3, a4, b4 = fxs[1], fys[1], fxs[2], fys[2], fxs[3], fys[3], fxs[4], fys[4]
+    if x1 - x0 > 150 or y1 - y0 > 150 then
+      fillPoly(4, col)
+    else
+      -- rule along the pair of edges that needs fewer lines
+      local n1, n2 = md(a4 - a1, b4 - b1), md(a3 - a2, b3 - b2)
+      if n2 > n1 then n1 = n2 end
+      local n3, n4 = md(a2 - a1, b2 - b1), md(a3 - a4, b3 - b4)
+      if n4 > n3 then n3 = n4 end
+      local sa, sb, sc, sd, ta, tb, tc, td = a1, b1, a2, b2, a4, b4, a3, b3
+      if n3 < n1 then sa, sb, sc, sd, ta, tb, tc, td, n1 = a1, b1, a4, b4, a2, b2, a3, b3, n3 end
+      n1 = floor(n1)
+      if n1 < 1 then n1 = 1 end
+      local dx1, dy1, dx2, dy2 = (ta - sa) / n1, (tb - sb) / n1, (tc - sc) / n1, (td - sd) / n1
+      local safe = x1 <= XL and y1 <= YL
+      for _ = 0, n1 do
+        if safe then drawLine(sa, sb, sc, sd, SOLID, col) else ln(sa, sb, sc, sd, col) end
+        sa, sb, sc, sd = sa + dx1, sb + dy1, sc + dx2, sd + dy2
+      end
+    end
+    if x1 - x0 + y1 - y0 > 6 then
+      ln(a1, b1, a2, b2, ecol)
+      ln(a2, b2, a3, b3, ecol)
+      ln(a3, b3, a4, b4, ecol)
+      ln(a4, b4, a1, b1, ecol)
+    end
   end
 
   local function drawGate(i, z)
     local fi = floor((z - 18) * 0.045) + 1
     if fi < 1 then fi = 1 elseif fi > NF then fi = NF end
+    local nxt = i == nextGate and gmode ~= 3
     local fill, e1, e2 = fGate[fi], fGateE[fi], fGateE[fi]
-    if i == nextGate and gmode ~= 3 then fill, e1, e2 = fNext[fi], fNextE[fi], fNextG[fi] end
+    if nxt then fill, e1, e2 = fNext[fi], fNextE[fi], fNextG[fi] end
     local k = gk[i]
+    local sh = GSH[k]
     local dx, dy, dz = gx[i] - kpx, gy[i] - kpy, gz[i] - kpz
-    local cx, cy, cz = dx * krx + dy * kry + dz * krz, dx * kux + dy * kuy + dz * kuz, z
+    local cx, cy, cz = dx * krx + dy * kry + dz * krz, dx * kux + dy * kuy + dz * kuz, dx * kfx + dy * kfy + dz * kfz
     local r1, r3 = grx[i], grz[i]
     local Rx, Ry, Rz = r1 * krx + r3 * krz, r1 * kux + r3 * kuz, r1 * kfx + r3 * kfz
     local a1, a2, a3 = gax[i], gay[i], gaz[i]
     local Ax, Ay, Az = a1 * krx + a2 * kry + a3 * krz, a1 * kux + a2 * kuy + a3 * kuz, a1 * kfx + a2 * kfy + a3 * kfz
     local iw, ih = GHW[k], GHH[k]
+    if sh == 3 then
+      -- flag: pole plus a cloth on the outer side; pass on the zone side
+      local sd = k == 6 and 1 or -1
+      local o = -iw * sd
+      local bX, bY, bZ = cx + Rx * o, cy + Ry * o, cz + Rz * o
+      local ex, ey, ez = kry * FLAGH, kuy * FLAGH, kfy * FLAGH
+      local tX, tY, tZ = bX + ex, bY + ey, bZ + ez
+      line3(bX, bY, bZ, tX, tY, tZ, fPole[fi])
+      local w = -0.9 * sd
+      local wX, wY, wZ = Rx * w, Ry * w, Rz * w
+      local mX, mY, mZ = bX + ex * 0.45, bY + ey * 0.45, bZ + ez * 0.45
+      local p3x, p3y, p3z = tX + wX - ex * 0.06, tY + wY - ey * 0.06, tZ + wZ - ez * 0.06
+      local p4x, p4y, p4z = mX + wX + ex * 0.08, mY + wY + ey * 0.08, mZ + wZ + ez * 0.08
+      if tZ > 1 and mZ > 1 and p3z > 1 and p4z > 1 then
+        local s1, s2, s3, s4 = F / tZ, F / mZ, F / p3z, F / p4z
+        local col = nxt and fNext[fi] or fFlag[fi]
+        local X1, Y1, X2, Y2 = CX + tX * s1, CY - tY * s1, CX + mX * s2, CY - mY * s2
+        local X3, Y3, X4, Y4 = CX + p3x * s3, CY - p3y * s3, CX + p4x * s4, CY - p4y * s4
+        tri(X1, Y1, X2, Y2, X4, Y4, col)
+        tri(X1, Y1, X4, Y4, X3, Y3, col)
+      end
+      return
+    elseif sh == 4 then
+      -- gap in a structure: only the next one is marked, with a thin frame
+      if nxt then
+        local wx, wy, wz, hx, hy, hz = Rx * iw, Ry * iw, Rz * iw, Ax * ih, Ay * ih, Az * ih
+        line3(cx - wx + hx, cy - wy + hy, cz - wz + hz, cx + wx + hx, cy + wy + hy, cz + wz + hz, fill)
+        line3(cx + wx + hx, cy + wy + hy, cz + wz + hz, cx + wx - hx, cy + wy - hy, cz + wz - hz, fill)
+        line3(cx + wx - hx, cy + wy - hy, cz + wz - hz, cx - wx - hx, cy - wy - hy, cz - wz - hz, fill)
+        line3(cx - wx - hx, cy - wy - hy, cz - wz - hz, cx - wx + hx, cy - wy + hy, cz - wz + hz, fill)
+      end
+      return
+    elseif sh == 2 then
+      -- hoop (on a stand) or arch: a ring of bar segments
+      local ro = iw + GT
+      local ns, st = k == 4 and 12 or 6, 1
+      if z > 35 then ns, st = ns / 2, 2 end
+      if k == 4 then
+        local h = gy[i] - ro
+        local X, Y, Z = cx - Ax * ro, cy - Ay * ro, cz - Az * ro
+        line3(X, Y, Z, X - kry * h, Y - kuy * h, Z - kfy * h, fPole[fi])
+      end
+      if z > 70 then
+        local rm = iw + GT * 0.5
+        local oX, oY, oZ = cx + Rx * rm, cy + Ry * rm, cz + Rz * rm
+        for j = st, ns * st, st do
+          local c_, s_ = RCOS[j], RSIN[j]
+          local X, Y, Z = cx + (Rx * c_ + Ax * s_) * rm, cy + (Ry * c_ + Ay * s_) * rm, cz + (Rz * c_ + Az * s_) * rm
+          line3(oX, oY, oZ, X, Y, Z, fill)
+          oX, oY, oZ = X, Y, Z
+        end
+        return
+      end
+      local oX, oY, oZ, iX, iY, iZ = cx + Rx * ro, cy + Ry * ro, cz + Rz * ro, cx + Rx * iw, cy + Ry * iw, cz + Rz * iw
+      for j = st, ns * st, st do
+        local c_, s_ = RCOS[j], RSIN[j]
+        local wx, wy, wz = Rx * c_ + Ax * s_, Ry * c_ + Ay * s_, Rz * c_ + Az * s_
+        local oX2, oY2, oZ2 = cx + wx * ro, cy + wy * ro, cz + wz * ro
+        local iX2, iY2, iZ2 = cx + wx * iw, cy + wy * iw, cz + wz * iw
+        bar(oX, oY, oZ, oX2, oY2, oZ2, iX, iY, iZ, iX2, iY2, iZ2, fill, e1, e2)
+        oX, oY, oZ, iX, iY, iZ = oX2, oY2, oZ2, iX2, iY2, iZ2
+      end
+      return
+    end
     local ow, oh = iw + GT, ih + GT
     if k > 1 then
       -- legs down to the ground
@@ -877,13 +1569,55 @@ do
     local tw = floor(w * 0.16)
     if tw > 3 then tw = 3 end
     local tc = fTrunk[fi]
+    local safe = x0 < XL - 4 and cx < XL - 4 and y0 < YL - 4 and cy < YL - 4
     for k = -tw, tw, 2 do
       local o = k * 0.5
-      drawLine(x0 + ux_ * o, y0 + uy_ * o, cx + ux_ * o, cy + uy_ * o, SOLID, tc)
+      if safe then drawLine(x0 + ux_ * o, y0 + uy_ * o, cx + ux_ * o, cy + uy_ * o, SOLID, tc)
+      else ln(x0 + ux_ * o, y0 + uy_ * o, cx + ux_ * o, cy + uy_ * o, tc) end
     end
-    fillTri(x1, y1, cx + nx, cy + ny, cx - nx, cy - ny, fTree[fi])
+    tri(x1, y1, cx + nx, cy + ny, cx - nx, cy - ny, fTree[fi])
     -- lit half only on near trees, where it reads as a cone
-    if l > 28 and z < 55 then fillTri(x1, y1, cx, cy, cx - nx, cy - ny, fTreeH[fi]) end
+    if l > 28 and z < 55 then tri(x1, y1, cx, cy, cx - nx, cy - ny, fTreeH[fi]) end
+  end
+
+  local function drawBox(b, z)
+    local x0, x1, y0, y1, z0, z1 = BX.x0[b], BX.x1[b], BX.y0[b], BX.y1[b], BX.z0[b], BX.z1[b]
+    local fi = floor((z - 18) * 0.045) + 1
+    if fi < 1 then fi = 1 elseif fi > NF then fi = NF end
+    local k3, ec = BX.k[b] * 3 - 3, fBoxE[fi]
+    local dx, dy, dz = x0 - kpx, y0 - kpy, z0 - kpz
+    local ox, oy, oz = dx * krx + dy * kry + dz * krz, dx * kux + dy * kuy + dz * kuz, dx * kfx + dy * kfy + dz * kfz
+    local sx, sy, sz = x1 - x0, y1 - y0, z1 - z0
+    local Xx, Xy, Xz = krx * sx, kux * sx, kfx * sx      -- box edges in camera space
+    local Yx, Yy, Yz = kry * sy, kuy * sy, kfy * sy
+    local Zx, Zy, Zz = krz * sz, kuz * sz, kfz * sz
+    if kpx < x0 then face(ox, oy, oz, Zx, Zy, Zz, Yx, Yy, Yz, fBox[k3 + 2][fi], ec)
+    elseif kpx > x1 then face(ox + Xx, oy + Xy, oz + Xz, Zx, Zy, Zz, Yx, Yy, Yz, fBox[k3 + 2][fi], ec) end
+    if kpz < z0 then face(ox, oy, oz, Xx, Xy, Xz, Yx, Yy, Yz, fBox[k3 + 3][fi], ec)
+    elseif kpz > z1 then face(ox + Zx, oy + Zy, oz + Zz, Xx, Xy, Xz, Yx, Yy, Yz, fBox[k3 + 3][fi], ec) end
+    if kpy > y1 then face(ox + Yx, oy + Yy, oz + Yz, Xx, Xy, Xz, Zx, Zy, Zz, fBox[k3 + 1][fi], ec)
+    elseif kpy < y0 then face(ox, oy, oz, Xx, Xy, Xz, Zx, Zy, Zz, fBox[k3 + 3][fi], ec) end
+  end
+
+  -- AI pilot: a small quad with a colored tag above it (visible from afar)
+  local function drawAI(a, z)
+    if z < 1 then return end
+    local dx, dy, dz = AI.x[a] - kpx, AI.y[a] - kpy, AI.z[a] - kpz
+    local s = F / z
+    local sx, sy = CX + (dx * krx + dy * kry + dz * krz) * s, CY - (dx * kux + dy * kuy + dz * kuz) * s
+    local col, r = C.ai[a], 0.24 * s
+    if r > 60 then r = 60 end
+    if r >= 2 then
+      local q = r * 0.4
+      ln(sx - r, sy - q, sx + r, sy + q, C.black)
+      ln(sx - r, sy + q, sx + r, sy - q, C.black)
+      fillRect(sx - r * 0.4, sy - r * 0.18, r * 0.8 + 1, r * 0.36 + 1, col)
+    else
+      fillRect(sx - 1, sy - 1, 3, 2, col)
+    end
+    local m = 3 * SC + 2
+    local ty = sy - r - m
+    tri(sx, ty, sx - m, ty - m * 1.4, sx + m, ty - m * 1.4, col)
   end
 
   render3D = function()
@@ -895,32 +1629,39 @@ do
     collectObjects(165)
     for j = 1, nOrd do
       local id = ordI[j]
-      if id > 0 then drawGate(id, ordZ[j]) else drawTree(-id, ordZ[j]) end
+      if id < 0 then drawTree(-id, ordZ[j])
+      elseif id < 1000 then drawGate(id, ordZ[j])
+      elseif id < 2000 then drawBox(id - 1000, ordZ[j])
+      else drawAI(id - 2000, ordZ[j]) end
     end
   end
-end
+end)()
 
 
 -- ---------------------------------------------------------- game flow
 local function startRace(m)
   gmode = m
   lap, nextGate, lastGate, lapStart = 0, 1, 0, nil
-  R.n, R.total, R.newLap, R.newRace, R.crashes, R.msg, R.cn = 0, 0, false, false, 0, nil, -1
+  R.n, R.total, R.newLap, R.newRace, R.newBest, R.crashes, R.msg, R.cd = 0, 0, false, false, false, 0, nil, -1
+  R.pk, R.pos, R.sc, R.ch, R.chn, R.rn, R.rt, R.ax, R.bx, R.smp = 0, 1, 0, 0, 0, 0, 30, nil, nil, gt
   placeDrone(TR.px, DR, TR.pz, TR.hx, TR.hz)
-  state, tState = COUNT, gt
+  AI.start()
+  tricks(-1)
+  if m == 3 then state, R.ready = READY, gt else state, tState = COUNT, gt end
 end
 
 local function selectTrack(t)
   S.track = t
   buildTrack(t)
+  AI.n = 0
   placeDrone(TR.px, DR, TR.pz, TR.hx, TR.hz)
 end
 
 local function update(dt)
   if state == COUNT then
     local n = floor((gt - tState) / 100)
-    if n ~= R.cn then
-      R.cn = n
+    if n ~= R.cd then
+      R.cd = n
       if n < 3 then beep(1000, 120) end
     end
     if n >= 3 then
@@ -930,6 +1671,15 @@ local function update(dt)
     end
   elseif state == FLY or state == DONE then
     physics(dt)
+    if gmode == 3 and state == FLY then
+      tricks(dt)
+      -- freestyle respawn point: where the quad was 1-2 s before a crash
+      if gt - R.smp >= 100 then
+        R.smp = gt
+        R.ax, R.ay, R.az, R.ahx, R.ahz = R.bx, R.by, R.bz, R.bhx, R.bhz
+        R.bx, R.by, R.bz, R.bhx, R.bhz = px, py, pz, fx, fz
+      end
+    end
   elseif state == CRASHED then
     if gt - tState > 120 then
       respawn()
@@ -941,13 +1691,30 @@ local function update(dt)
       state = FLY
     end
   end
+  if gmode == 1 and AI.n > 0 and state ~= COUNT and dt > 0 then
+    AI.update(dt)
+    if state ~= DONE then R.pos = AI.place() end
+  end
+  if gmode == 4 and (state == FLY or state == CRASHED or state == READY) then
+    R.rt = R.rt - dt
+    if R.rt <= 0 then
+      R.rt = 0
+      local t = S.track
+      if R.rn > BEST.g[t] then BEST.g[t], R.newBest = R.rn, true end
+      saveData()
+      state, tState = DONE, gt
+      beep(900, 300)
+    end
+  end
 end
 
 -- menus
 local focus, scroll, editing = 1, 0, false
-local MAIN_ITEMS = { "Race", "Practice", "Free fly", "Track", "Settings", "Exit" }
+local MAIN_ITEMS = { "Race", "Practice", "Freestyle", "Gate Rush", "Track", "Settings", "Exit" }
 local PAUSE_ITEMS = { "Resume", "Restart", "Settings", "Main menu" }
 
+local optStep, optText
+do
 local function optIndex(o)
   local v = S[o[2]]
   for j = 1, #o[3] do
@@ -956,17 +1723,35 @@ local function optIndex(o)
   return 1
 end
 
-local function optStep(o, d)
+optStep = function(o, d)
+  local key = o[2]
+  if RKEYS[key] and S.rates < 4 then
+    -- editing a rate switches to custom rates, starting from the preset in use
+    local r = RATES[S.rates]
+    for k, j in pairs(RKEYS) do S[k] = r[j] end
+    S.rates = 4
+  end
   local vals = o[3]
-  local j = optIndex(o) + d
-  if j < 1 then j = #vals elseif j > #vals then j = 1 end
-  S[o[2]] = vals[j]
+  if vals then
+    local j = optIndex(o) + d
+    if j < 1 then j = #vals elseif j > #vals then j = 1 end
+    S[key] = vals[j]
+  else
+    local v = S[key] + d * o[8]
+    if v < o[6] then v = o[6] elseif v > o[7] then v = o[7] end
+    S[key] = v
+  end
   applySettings()
 end
 
-local function optText(o)
+optText = function(o)
   if o[4] then return o[4][optIndex(o)] end
-  return S[o[2]] .. (o[5] or "")
+  local key = o[2]
+  local v, j = S[key], RKEYS[key]
+  if j and S.rates < 4 then v = RATES[S.rates][j] end
+  if key == "re" or key == "ye" then return fmt("0.%02d", v) end
+  return v .. (o[5] or "")
+end
 end
 
 local function setLabel(i)
@@ -979,14 +1764,27 @@ local function setValue(i)
   return optText(OPTS[i])
 end
 
+
 local render, hitTest, pauseHit, initUI
 
 -- ============================================================= COLOR UI
-do
+;(function()
   local hS, hM, hL, hX, MG = 14, 20, 28, 40, 6
   local TOUCH = EV.TAP ~= nil
   local hitN, hitX, hitY, hitW, hitH, hitI = 0, {}, {}, {}, {}, {}
   local PB = { 0, 0, 0 }   -- pause button x, y, size
+  local GMO = { 1.9, 1.9, 0.6, 2.1, 1.6, 2.2, 2.2, 2.4 }  -- next-gate marker height above the aim point
+
+  local function bestInfo()
+    local t = S.track
+    if focus == 3 then return "Best combo " .. BEST.f[t] end
+    if focus == 4 then return "Best Gate Rush " .. BEST.g[t] end
+    return "Lap " .. (BEST.l[t] > 0 and timeStr(BEST.l[t]) or "--") .. "  Race " .. (BEST.r[t] > 0 and timeStr(BEST.r[t]) or "--")
+  end
+
+  local function place(p)
+    return p .. (p == 1 and "st" or p == 2 and "nd" or p == 3 and "rd" or "th")
+  end
 
   local function hit(x, y, w, h, i)
     hitN = hitN + 1
@@ -1026,13 +1824,13 @@ do
   local function nextGateMarker()
     if gmode == 3 or NG == 0 then return end
     local i = nextGate
-    local dx, dy, dz = gx[i] - kpx, gy[i] - kpy, gz[i] - kpz
+    local dx, dy, dz = AX[i] - kpx, AY[i] - kpy, AZ[i] - kpz
     local X, Y, Z = dx * krx + dy * kry + dz * krz, dx * kux + dy * kuy + dz * kuz, dx * kfx + dy * kfy + dz * kfz
     local rxm, rym = VW / 2 - 16 * SC, VH / 2 - 16 * SC
     if Z > 1 then
       local sx, sy = X * F / Z, Y * F / Z
       if sx > -rxm and sx < rxm and sy > -rym and sy < rym then
-        local top = (gk[i] == 3 and 0.6 or GHH[gk[i]] + GT + 0.6) * F / Z
+        local top = GMO[gk[i]] * F / Z
         local m = 7 * SC
         local bx, by = CX + sx, CY - sy - top
         if by < VY + m * 2 then by = VY + m * 2 end
@@ -1057,16 +1855,28 @@ do
     local s = (w - 6) / sx
     if (h - 6) / sz < s then s = (h - 6) / sz end
     local ox, oz = x + w / 2 - (TR.x0 + TR.x1) * 0.5 * s, y + h / 2 + (TR.z0 + TR.z1) * 0.5 * s
+    for b = 1, BX.n do
+      fillRect(ox + BX.x0[b] * s, oz - BX.z1[b] * s, (BX.x1[b] - BX.x0[b]) * s + 1, (BX.z1[b] - BX.z0[b]) * s + 1, C.dim, 7)
+    end
     for i = 1, NG do
       local j = i % NG + 1
-      drawLine(ox + gx[i] * s, oz - gz[i] * s, ox + gx[j] * s, oz - gz[j] * s, SOLID, C.dim)
+      drawLine(ox + AX[i] * s, oz - AZ[i] * s, ox + AX[j] * s, oz - AZ[j] * s, SOLID, C.dim)
     end
     local e = 3 * SC + 1
     for i = 1, NG do
       local c = (i == nextGate and gmode ~= 3) and C.accent or C.white
-      local gxp, gzp = ox + gx[i] * s, oz - gz[i] * s
-      drawLine(gxp - grx[i] * e, gzp + grz[i] * e, gxp + grx[i] * e, gzp - grz[i] * e, SOLID, c)
-      drawLine(gxp - grx[i] * e, gzp + grz[i] * e + 1, gxp + grx[i] * e, gzp - grz[i] * e + 1, SOLID, c)
+      local k = gk[i]
+      if GSH[k] == 3 then
+        local o = -GHW[k] * (k == 6 and 1 or -1)
+        fillRect(ox + (gx[i] + grx[i] * o) * s - 1, oz - (gz[i] + grz[i] * o) * s - 1, 3, 3, c)
+      else
+        local gxp, gzp = ox + gx[i] * s, oz - gz[i] * s
+        drawLine(gxp - grx[i] * e, gzp + grz[i] * e, gxp + grx[i] * e, gzp - grz[i] * e, SOLID, c)
+        drawLine(gxp - grx[i] * e, gzp + grz[i] * e + 1, gxp + grx[i] * e, gzp - grz[i] * e + 1, SOLID, c)
+      end
+    end
+    if gmode == 1 then
+      for a = 1, AI.n do fillRect(ox + AI.x[a] * s - 1, oz - AI.z[a] * s - 1, 3, 3, C.ai[a]) end
     end
     local dxp, dzp = ox + px * s, oz - pz * s
     local l = sqrt(fx * fx + fz * fz) + 0.0001
@@ -1101,6 +1911,25 @@ do
     return s
   end
 
+  local function comboText()
+    local m = 1 + (R.chn - 1) * 0.5
+    if m > 4 then m = 4 end
+    return fmt("COMBO x%.1f  %d", m, floor(R.ch * m))
+  end
+
+  -- mode readout: title, big number, extra line, best (top-right)
+  local function modeInfo()
+    local t = S.track
+    if gmode == 3 then
+      return "SCORE", tostring(R.sc), R.chn > 0 and comboText() or nil, "BEST COMBO " .. BEST.f[t], C.white
+    elseif gmode == 4 then
+      return "GATES " .. R.rn, fmt("%.1f", R.rt), nil, "BEST " .. BEST.g[t], R.rt < 5 and C.bad or C.white
+    end
+    local b = BEST.l[t]
+    return lapText(), lapStart and timeStr(gt - lapStart) or "0.00", (gmode == 1 and AI.n > 0) and ("P" .. R.pos .. "/" .. (AI.n + 1)) or nil,
+           "BEST " .. (b > 0 and timeStr(b) or "--"), C.white
+  end
+
   local function drawHUD()
     local m = MG
     local c = 5 * SC + 1
@@ -1109,17 +1938,14 @@ do
     drawLine(CX, CY - c, CX, CY - c * 0.5, SOLID, C.white)
     if state ~= COUNT then nextGateMarker() end
     if PORTRAIT then return end
-    if gmode ~= 3 then
-      txt(m, m, lapText(), SMLSIZE + C.white)
-      txt(m, m + hS, lapStart and timeStr(gt - lapStart) or "0.00", DBLSIZE + C.white)
-      local b = bestLap[S.track]
-      local rxp = W - m
-      if S.map == 1 then rxp = W - m * 2 - floor(H * 0.3) end
-      txt(rxp, m, "BEST " .. (b > 0 and timeStr(b) or "--"), SMLSIZE + RIGHT + C.accent2)
-      if gmode == 1 and state ~= COUNT then txt(rxp, m + hS, timeStr(gt - tStart), SMLSIZE + RIGHT + C.white) end
-    else
-      txt(m, m, "FREE FLY", SMLSIZE + C.white)
-    end
+    local t1, big, extra, best, bc = modeInfo()
+    txt(m, m, t1, SMLSIZE + C.white)
+    txt(m, m + hS, big, DBLSIZE + bc)
+    if extra then txt(m, m + hS + hX, extra, (gmode == 1 and MIDSIZE or SMLSIZE) + C.accent2) end
+    local rxp = W - m
+    if S.map == 1 then rxp = W - m * 2 - floor(H * 0.3) end
+    txt(rxp, m, best, SMLSIZE + RIGHT + C.accent2)
+    if gmode == 1 and state ~= COUNT then txt(rxp, m + hS, timeStr(gt - tStart), SMLSIZE + RIGHT + C.white) end
     if S.map == 1 then
       local ms = floor(H * 0.3)
       drawMinimap(W - m - ms, m, ms, ms, 7)
@@ -1154,15 +1980,12 @@ do
     local s = floor((ms - 6) / 2)
     if s > H - m - sy then s = H - m - sy end
     if s > 16 then drawSticks(x2, sy, s, 6) end
-    if gmode ~= 3 then
-      drawText(m, y, lapText(), C.white)
-      drawText(m, y + hM, lapStart and timeStr(gt - lapStart) or "0.00", DBLSIZE + C.white)
-      local b = bestLap[S.track]
-      drawText(m, y + hM + hX, "BEST " .. (b > 0 and timeStr(b) or "--"), SMLSIZE + C.accent2)
-      if gmode == 1 and state ~= COUNT then drawText(m, y + hM + hX + hS, "RACE " .. timeStr(gt - tStart), SMLSIZE + C.white) end
-    else
-      drawText(m, y, "FREE FLY", C.white)
-    end
+    local t1, big, extra, best, bc = modeInfo()
+    drawText(m, y, t1, C.white)
+    drawText(m, y + hM, big, DBLSIZE + bc)
+    drawText(m, y + hM + hX, best, SMLSIZE + C.accent2)
+    if extra then drawText(m, y + hM + hX + hS, extra, SMLSIZE + C.white)
+    elseif gmode == 1 and state ~= COUNT then drawText(m, y + hM + hX + hS, "RACE " .. timeStr(gt - tStart), SMLSIZE + C.white) end
     local yb = y + hM + hX + hS * 2 + m
     drawText(m, yb, floor(speed * 3.6) .. " km/h", MIDSIZE + C.white)
     drawText(m, yb + hL, "ALT " .. floor(py) .. "m" .. (P.angle and "  ANGLE" or ""), SMLSIZE + C.dim)
@@ -1217,12 +2040,12 @@ do
   end
 
   local function mainLabel(i)
-    if i == 1 then return "Race (" .. S.laps .. " laps)" end
+    if i == 1 then return "Race (" .. S.laps .. " laps" .. (S.ai > 0 and ", " .. S.ai .. " AI" or "") .. ")" end
     return MAIN_ITEMS[i]
   end
 
   local function mainValue(i)
-    if i == 4 then return TRACKS[S.track][1] end
+    if i == 5 then return TRACKS[S.track][1] end
     return nil
   end
 
@@ -1232,8 +2055,7 @@ do
     txt(x + MG, y, "FPV SIM", DBLSIZE + C.white)
     local tw = lcd.sizeText and lcd.sizeText("FPV SIM ", DBLSIZE) or floor(120 * SC)
     txt(x + MG + tw, y + hX - hS - 4, "3D quad racer", SMLSIZE + C.accent2)
-    local t = S.track
-    local info = "Best lap " .. (bestLap[t] > 0 and timeStr(bestLap[t]) or "--") .. "   Race " .. (bestRace[t] > 0 and timeStr(bestRace[t]) or "--")
+    local info = bestInfo()
     if PORTRAIT then
       -- 3D view stays clear on top, the menu fills the instrument panel
       txt(x + MG, VH - MG - hS, info, SMLSIZE + C.white)
@@ -1251,29 +2073,40 @@ do
     local w = floor(W * 0.62)
     if PORTRAIT or w < 240 then w = W - MG * 4 end
     local x = (W - w) / 2
-    local n = R.n
+    local rush = gmode == 4
+    local n = rush and 0 or R.n
     if n > 5 then n = 5 end
-    local h = hL + hM * 2 + hS * n + MG * 7 + hM + 10
+    local extra = (not rush and AI.n > 0) and hM or 0
+    local h = hL + hM * 2 + hS * n + MG * 7 + hM + 10 + extra
     local y = (PORTRAIT and VH or H) / 2 - h / 2
     if y < MG then y = MG end
     panel(x, y, w, h)
     local cy = y + MG
-    drawText(x + w / 2, cy, R.newRace and "NEW RECORD!" or "FINISHED", MIDSIZE + CENTER + (R.newRace and C.accent2 or C.white))
+    local rec = rush and R.newBest or (not rush and R.newRace)
+    drawText(x + w / 2, cy, rec and "NEW RECORD!" or (rush and "TIME UP" or "FINISHED"), MIDSIZE + CENTER + (rec and C.accent2 or C.white))
     cy = cy + hL + MG
-    drawText(x + MG * 2, cy, "Total", C.dim)
-    drawText(x + w - MG * 2, cy, timeStr(R.total), RIGHT + C.white)
-    cy = cy + hM
-    local b = 0
-    for i = 1, R.n do
-      if b == 0 or R.laps[i] < b then b = R.laps[i] end
+    local function row(a, b, col)
+      drawText(x + MG * 2, cy, a, C.dim)
+      drawText(x + w - MG * 2, cy, b, RIGHT + col)
+      cy = cy + hM
     end
-    drawText(x + MG * 2, cy, "Best lap", C.dim)
-    drawText(x + w - MG * 2, cy, timeStr(b), RIGHT + (R.newLap and C.accent2 or C.white))
-    cy = cy + hM + 4
-    for i = 1, n do
-      drawText(x + MG * 2, cy, "Lap " .. i, SMLSIZE + C.dim)
-      drawText(x + w - MG * 2, cy, timeStr(R.laps[i]), SMLSIZE + RIGHT + (R.laps[i] == b and C.good or C.white))
-      cy = cy + hS
+    if rush then
+      row("Gates", tostring(R.rn), C.white)
+      row("Best", tostring(BEST.g[S.track]), R.newBest and C.accent2 or C.white)
+    else
+      if AI.n > 0 then row("Position", place(R.pos) .. " of " .. (AI.n + 1), R.pos == 1 and C.accent2 or C.white) end
+      row("Total", timeStr(R.total), C.white)
+      local b = 0
+      for i = 1, R.n do
+        if b == 0 or R.laps[i] < b then b = R.laps[i] end
+      end
+      row("Best lap", timeStr(b), R.newLap and C.accent2 or C.white)
+      cy = cy + 4
+      for i = 1, n do
+        drawText(x + MG * 2, cy, "Lap " .. i, SMLSIZE + C.dim)
+        drawText(x + w - MG * 2, cy, timeStr(R.laps[i]), SMLSIZE + RIGHT + (R.laps[i] == b and C.good or C.white))
+        cy = cy + hS
+      end
     end
     cy = cy + MG
     hitN = 0
@@ -1344,12 +2177,12 @@ do
     local s = PB[3] + 10
     return s > 10 and tx >= PB[1] - 5 and tx < PB[1] + s and ty >= PB[2] - 5 and ty < PB[2] + s
   end
-end
+end)()
 
 
 -- ------------------------------------------------------------ input
 local handleEvent
-do
+;(function()
   local function listNav(event, n)
     if event == EV.NEXT then
       focus = focus % n + 1
@@ -1360,6 +2193,7 @@ do
 
   local function toMenu()
     state, focus, scroll, editing = MENU, 1, 0, false
+    AI.n = 0
     placeDrone(TR.px, DR, TR.pz, TR.hx, TR.hz)
   end
 
@@ -1371,10 +2205,10 @@ do
   end
 
   local function mainSelect(i, frac)
-    if i <= 3 then startRace(i)
-    elseif i == 4 then stepTrack((frac and frac < 0.4) and -1 or 1)
-    elseif i == 5 then prevState, state, focus, scroll, editing = MENU, SETUP, 1, 0, false
-    elseif i == 6 then return 1
+    if i <= 4 then startRace(i)
+    elseif i == 5 then stepTrack((frac and frac < 0.4) and -1 or 1)
+    elseif i == 6 then prevState, state, focus, scroll, editing = MENU, SETUP, 1, 0, false
+    elseif i == 7 then return 1
     end
     return 0
   end
@@ -1403,7 +2237,7 @@ do
       end
       listNav(event, #MAIN_ITEMS)
       if event == EV.ENTER then
-        if focus == 4 then
+        if focus == 5 then
           editing = true
           return 0
         end
@@ -1433,7 +2267,7 @@ do
         if prevState == PAUSED then
           state, focus, scroll = PAUSED, 3, 0
         else
-          state, focus, scroll = MENU, 5, 0
+          state, focus, scroll = MENU, 6, 0
         end
       end
     elseif state == PAUSED then
@@ -1455,7 +2289,7 @@ do
     end
     return 0
   end
-end
+end)()
 
 -- ------------------------------------------------------------ entry
 local function init()
@@ -1467,9 +2301,10 @@ local function init()
   selectTrack(S.track)
   lastT = getTime()
   R.fpsT = lastT
+  local TEST = FPVSIM_TEST
   if TEST then
     TEST.get = function() return px, py, pz, vx, vy, vz, fx, fy, fz, ux, uy, uz, rx, ry, rz, state, lap, nextGate, NG, gt end
-    TEST.gate = function(i) return gx[i], gy[i], gz[i], gnx[i], gny[i], gnz[i], gk[i] end
+    TEST.gate = function(i) return gx[i], gy[i], gz[i], gnx[i], gny[i], gnz[i], gk[i], AX[i], AY[i], AZ[i] end
     TEST.start = function(m) startRace(m) end
     TEST.state = function(s) state = s end
     TEST.set = function(k, v)
@@ -1490,6 +2325,11 @@ local function init()
     end
     TEST.next = function(i) nextGate, lastGate = i, (i - 2) % NG + 1 end
     TEST.race = function() return lastGate, lapStart, R.n, R.laps, R.total, R.crashes, tStart end
+    TEST.info = function() return NT, P.twr, gmode, R.pos, AI.n, R.sc, R.rn, R.rt, R.chn, BX.n, TRACKS[S.track][1] end
+    TEST.ai = function(a) return AI.x[a], AI.y[a], AI.z[a], AI.k[a], AI.d[a], AI.v[a], AI.seg[a] end
+    TEST.best = function(t) return BEST.l[t], BEST.r[t], BEST.g[t], BEST.f[t] end
+    TEST.box = function(b) return BX.x0[b], BX.x1[b], BX.y0[b], BX.y1[b], BX.z0[b], BX.z1[b] end
+    TEST.S = S
   end
 end
 
@@ -1498,7 +2338,8 @@ local function run(event, touch)
   local dtk = now - lastT
   lastT = now
   if dtk > 10 then dtk = 10 elseif dtk < 0 then dtk = 0 end
-  if state ~= PAUSED and state ~= SETUP then gt = gt + dtk end
+  if state == PAUSED or state == SETUP then dtk = 0 end
+  gt = gt + dtk
   readSticks()
   if handleEvent(event or 0, touch) ~= 0 then return 1 end
   update(dtk / 100)

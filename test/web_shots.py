@@ -3,6 +3,7 @@
 scripts deterministically, save LCD screenshots and report errors + load stats."""
 import base64
 import json
+import math
 import pathlib
 import sys
 
@@ -14,6 +15,7 @@ OUT.mkdir(parents=True, exist_ok=True)
 PAGE = (ROOT / "web" / "simulator.html").as_uri()
 
 RADIOS = sys.argv[1].split(",") if len(sys.argv) > 1 else ["tx16s", "tx15", "nv14", "pa01", "mk3", "x9d", "tx12"]
+worst = {}
 
 
 def save(page, name):
@@ -21,10 +23,30 @@ def save(page, name):
     (OUT / f"{name}.png").write_bytes(base64.b64decode(url.split(",", 1)[1]))
 
 
-def stats(page):
-    return page.evaluate("""() => { const e = sim.engine; const s = e.last; const est = e.estimate();
+def stats(page, rid, what):
+    s = page.evaluate("""() => { const e = sim.engine; const s = e.last; const est = e.estimate();
         return {err: e.error, ms: +est.ms.toFixed(1), instr: s.instr, calls: s.calls, lines: s.lines, linePx: s.linePx,
                 tris: s.tris, scan: Math.round(s.scan), rects: s.rects, texts: s.texts, rejected: s.rejected || 0}; }""")
+    print(f"{rid:6s} {what:10s} {s}")
+    if s["ms"] > worst.get(rid, (0, ""))[0]:
+        worst[rid] = (s["ms"], what)
+    if s["rejected"]:
+        print("   !! lines rejected by the firmware rule")
+    return s
+
+
+def view(page, track, gate, back, side, up, pitch, roll, mode=1, speed=0):
+    """put the quad `back` m before `gate`, looking through it"""
+    page.evaluate(f"sim.test('track', {track}); sim.test('start', {mode}); sim.step(70, 50)")
+    g = page.evaluate(f"sim.test('gate', {gate})")
+    gx, gy, gz, nx, ny, nz, k, ax, ay, az = g[:10]
+    if k == 3:
+        nx, nz = 0, 1
+    yaw = math.degrees(math.atan2(nx, nz))
+    x, y, z = ax - nx * back + nz * side, ay + up, az - nz * back - nx * side
+    page.evaluate(f"sim.test('next', {gate}); sim.test('pose', {x}, {y}, {z}, {yaw}, {pitch}, {roll}); sim.test('vel', {nx * speed}, 0, {nz * speed})")
+    page.evaluate("sim.test('state', 4); sim.sticks(0, 0, 0.05, 0)")
+    return page.evaluate("sim.step(1, 50)")
 
 
 def main():
@@ -36,48 +58,50 @@ def main():
         page.on("pageerror", lambda e: logs.append(f"pageerror: {e}"))
         page.goto(PAGE)
         page.wait_for_function("window.sim && window.sim.engine && window.sim.engine.frames > 2", timeout=20000)
-        page.evaluate("sim.pause(true); sim.app.ghost = false")
+        page.evaluate("sim.pause(true); sim.app.ghost = false; sim.app.delay = false")
         for rid in RADIOS:
             page.evaluate(f"sim.radio('{rid}')")
-            page.evaluate("sim.pause(true)")
+            page.evaluate("sim.pause(true); sim.engine.displayDelay = false")
             err = page.evaluate("sim.step(30, 50)")
             if err:
                 print(rid, "ERROR", json.dumps(err)[:2000]); continue
-            save(page, f"{rid}_1menu")
-            print(rid, "menu", stats(page))
-            # race: countdown then fly a bit
-            page.evaluate("sim.test('start', 1)")
-            page.evaluate("sim.sticks(0, 0, -1, 0)")
+            save(page, f"{rid}_01menu")
+            stats(page, rid, "menu")
+            # race with AI pilots: countdown, then the start
+            page.evaluate("sim.test('set', 'ai', 3); sim.test('track', 1); sim.test('start', 1); sim.sticks(0, 0, -1, 0)")
             page.evaluate("sim.step(40, 50)")
-            save(page, f"{rid}_2count")
-            page.evaluate("sim.step(25, 50)")
-            page.evaluate("sim.sticks(0, 0.25, 0.1, 0)")
+            save(page, f"{rid}_02count")
+            page.evaluate("sim.step(25, 50); sim.sticks(0, 0.25, 0.1, 0)")
             err = page.evaluate("sim.step(30, 50)")
             if err: print(rid, "ERROR", err); continue
-            save(page, f"{rid}_3fly")
-            print(rid, "fly ", stats(page), page.evaluate("sim.test('get')")[:3])
-            # poses: approach gate 2 slightly from the side, then banked + pitched view
-            g = page.evaluate("sim.test('gate', 2)")
-            gx, gy, gz, nx, ny, nz = g[:6]
-            page.evaluate(f"sim.test('pose', {gx - nx * 12 + 3}, {gy + 0.6}, {gz - nz * 12}, {__import__('math').degrees(__import__('math').atan2(nx, nz))}, -8, 25)")
-            page.evaluate("sim.test('state', 4)")
-            page.evaluate("sim.sticks(0, 0, 0.0, 0)")
-            page.evaluate("sim.step(1, 50)")
-            save(page, f"{rid}_4gate")
-            print(rid, "gate", stats(page))
-            page.evaluate(f"sim.test('pose', {gx - nx * 2.5}, {gy + 0.2}, {gz - nz * 2.5}, {__import__('math').degrees(__import__('math').atan2(nx, nz))}, 0, -50)")
-            page.evaluate("sim.step(1, 50)")
-            save(page, f"{rid}_5close")
-            print(rid, "close", stats(page))
-            page.evaluate("sim.test('pose', 20, 25, -40, 30, -35, 120)")
-            page.evaluate("sim.step(1, 50)")
-            save(page, f"{rid}_6inverted")
-            print(rid, "inv ", stats(page))
-            page.evaluate("sim.key('exit')")
-            page.evaluate("sim.step(2, 50)")
-            save(page, f"{rid}_7pause")
+            save(page, f"{rid}_03race")
+            stats(page, rid, "race")
+            for name, args in (("04gate", (1, 3, 14, -1.0, 0.6, -6, -14)), ("05hoops", (5, 3, 12, 0.5, 0.2, -4, 8)),
+                               ("06flags", (4, 2, 10, 1.5, 0.2, -6, 0)), ("07grandprix", (6, 4, 16, 0, 0.5, -5, -10)),
+                               ("08bando", (7, 2, 14, 0, 0.5, -4, 0)), ("09ruin", (7, 3, 3, 0, 0.2, -2, 0)),
+                               ("10tower", (7, 6, 26, -6, 4, -10, 20)), ("11dive", (3, 5, 0, 0, 6, -60, 0))):
+                err = view(page, *args)
+                if err: print(rid, name, "ERROR", err); break
+                save(page, f"{rid}_{name}")
+                stats(page, rid, name)
+            # freestyle combo and gate rush HUDs
+            page.evaluate("sim.test('track', 7); sim.test('start', 3); sim.step(10, 50); sim.test('state', 4); sim.test('pose', -20, 20, -20, 45, 0, 0)")
+            page.evaluate("sim.sticks(0, 1, 0.2, 0); sim.step(12, 50); sim.sticks(1, 0, 0.2, 0); sim.step(10, 50); sim.sticks(0, 0, 0.3, 0); sim.step(3, 50)")
+            save(page, f"{rid}_12freestyle")
+            stats(page, rid, "freestyle")
+            page.evaluate("sim.test('track', 1); sim.test('start', 4); sim.step(70, 50); sim.sticks(0, 0.2, 0.3, 0); sim.step(20, 50)")
+            save(page, f"{rid}_13rush")
+            stats(page, rid, "rush")
+            page.evaluate("sim.key('exit'); sim.step(2, 50)")
+            save(page, f"{rid}_14pause")
+            # settings list (rates rows)
+            for k in ("next", "next", "enter", "next", "next", "next", "next"):
+                page.evaluate(f"sim.key('{k}'); sim.step(1, 50)")
+            save(page, f"{rid}_15settings")
+            page.evaluate("sim.test('set', 'ai', 0)")
         page.screenshot(path=str(OUT / "page.png"))
         b.close()
+        print("worst frame estimate per radio (ms):", {k: v for k, v in worst.items()})
         for l in logs:
             print(l)
 

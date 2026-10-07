@@ -134,10 +134,11 @@
       <h2>Emulation</h2>
       <div class="toggles">
         <label class="toggle" for="rateChk"><span>Real radio refresh (20 Hz)</span><input type="checkbox" id="rateChk"></label>
+        <label class="toggle" for="delayChk"><span>Color screen delay (1 frame)</span><input type="checkbox" id="delayChk"></label>
         <label class="toggle" for="ghostChk"><span>Slow B&amp;W LCD (ghosting)</span><input type="checkbox" id="ghostChk"></label>
         <label class="toggle" for="pauseChk"><span>Pause</span><input type="checkbox" id="pauseChk"></label>
       </div>
-      <p class="note" style="margin-top:8px">The radio calls a tool script's <code>run()</code> at most every 50 ms, so the sim is built for 20 fps.</p>
+      <p class="note" style="margin-top:8px">The radio calls a tool script's <code>run()</code> at most every 50 ms, so the sim is built for 20 fps. Color radios show each frame one 50 ms cycle after it is drawn; the script renders the view where the quad will be by then.</p>
     </div>
   </aside>
 </div>
