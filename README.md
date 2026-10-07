@@ -121,11 +121,12 @@ The script is ready for that:
 
 Open `web/simulator.html` in Chrome, Edge or Firefox. It runs the real `.lua` files in a Lua 5.3 VM with an EdgeTX-style API and draws them pixel by pixel the way the firmware does, including the line rule above.
 
-- Pick any radio screen, color or B&W, or **PC screen**: 1280×720 at 60 fps with no radio limits, for playing and testing on a computer. **Fullscreen** (or the F key) fills the monitor.
+- Pick any radio screen, color or B&W, or **PC screen**: 1280×720 at 60 fps with no radio limits, for playing and testing on a computer. **Fullscreen** (or the F key) fills the monitor, and B&W screens keep sharp pixels.
+- Each script runs on its own kind of screen, as on a radio: StickTime on color screens and the PC screen, StickTime BW and StickTime Lite on B&W screens. Picking a script moves to a screen it runs on, and picking a screen switches to its script.
 - Fly with the keyboard (W/S throttle, A/D yaw, arrows for pitch and roll), drag the on-screen gimbals, or plug in your radio as a USB joystick (choose **Radio / gamepad** and map the axes).
 - Runs at the radio's 20 Hz by default (toggle **Real radio refresh**). Color screens show each frame one cycle late, like the radio (toggle **Color screen delay**). B&W LCD ghosting is optional.
 - The **Radio load** panel counts Lua instructions and drawing work per frame and estimates the frame time on F4 and H7 radios.
-- **StickTime Lite** is in the script list (it picks a B&W screen), and the **Radio load** panel can estimate STM32F2 radios.
+- For StickTime Lite the **Radio load** panel estimates an STM32F2 radio.
 - **Open .lua** runs any other EdgeTX tool script (`loadScript` reads from the virtual SD card).
 
 ## Development

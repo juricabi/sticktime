@@ -144,6 +144,7 @@
     else if (k >= 1) k = 1;
     canvas.style.width = Math.floor(r.w * k) + 'px';
     canvas.classList.toggle('smooth', r.color && Math.abs(k - Math.round(k)) > 0.01);
+    canvas.classList.toggle('bw', !r.color);             // B&W pixels stay sharp in fullscreen too
   }
 
   // ---------------------------------------------------------- gimbals
@@ -402,33 +403,54 @@
   // ------------------------------------------------------------ wiring
   function setupUI() {
     const rs = $('radioSel');
-    for (const r of RADIOS) {
-      const o = document.createElement('option');
-      o.value = r.id; o.textContent = r.label;
-      rs.appendChild(o);
+    // the screens by kind: StickTime runs on color screens (the PC screen too), StickTime BW
+    // and StickTime Lite on black & white ones
+    for (const [label, color] of [['Color screens', true], ['Black & white screens', false]]) {
+      const g = document.createElement('optgroup');
+      g.label = label;
+      for (const r of RADIOS.filter((x) => x.color === color)) {
+        const o = document.createElement('option');
+        o.value = r.id; o.textContent = r.label;
+        g.appendChild(o);
+      }
+      rs.appendChild(g);
     }
-    rs.value = app.radio.id;
     const ss = $('scriptSel');
-    // the Lite is for B&W radios (STM32F2 class): pick one for it, and its CPU for the estimate
-    const liteFits = () => {
-      if (app.script !== 'lite') return;
-      if (app.radio.color) { app.radio = RADIOS.find((r) => r.id === 'tx12'); rs.value = app.radio.id; store.set('radio', app.radio.id); }
-      app.cpu = 'F2';
+    // A script only runs on its kind of screen. Picking a script that doesn't fit the screen
+    // moves to the last screen of its kind; picking a screen that doesn't fit the script
+    // switches the script to Auto (the one made for that screen).
+    const COLOR_SCRIPT = { color: true, bw: false, lite: false };
+    const last = { true: store.get('lastColor', 'tx16s'), false: store.get('lastBW', 'tx12') };
+    const setRadio = (id) => {
+      app.radio = RADIOS.find((r) => r.id === id) || app.radio;
+      rs.value = app.radio.id;
+      store.set('radio', app.radio.id);
+      last[app.radio.color] = app.radio.id;
+      store.set(app.radio.color ? 'lastColor' : 'lastBW', app.radio.id);
     };
+    const setScript = (id) => { app.script = id; ss.value = id; store.set('script', id); };
+    const fit = (by) => {
+      const color = COLOR_SCRIPT[app.script];
+      if (!app.custom && color !== undefined && color !== app.radio.color) {
+        if (by === 'radio') setScript('auto'); else setRadio(last[color]);
+      }
+      app.cpu = app.script === 'lite' ? 'F2' : null;      // the Lite is for STM32F2 radios
+    };
+    setRadio(app.radio.id);
+    setScript(app.script);
+    fit('script');
     rs.addEventListener('change', () => {
-      app.radio = RADIOS.find((r) => r.id === rs.value); store.set('radio', app.radio.id); app.cpu = null;
-      if (app.script === 'lite' && app.radio.color) { app.script = 'auto'; ss.value = 'auto'; store.set('script', 'auto'); }
-      liteFits();
+      setRadio(rs.value);
+      fit('radio');
       boot();
     });
-    ss.value = app.script;
     ss.addEventListener('change', () => {
       if (ss.value === 'custom') return;
-      app.script = ss.value; app.custom = null; store.set('script', app.script); app.cpu = null;
-      liteFits();
+      app.custom = null;
+      setScript(ss.value);
+      fit('script');
       boot();
     });
-    liteFits();
     $('restartBtn').addEventListener('click', boot);
     $('ovBtn').addEventListener('click', boot);
     $('soundBtn').addEventListener('click', () => {

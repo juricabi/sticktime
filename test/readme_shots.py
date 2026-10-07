@@ -89,11 +89,14 @@ with sync_playwright() as p:
         race_view(page, *args)
         shot(page, f"{rid}-race", sc)
 
-    # StickTime Lite: X7 / TX12 MkI class (128x64) and X9D+ (212x64 grey)
+    # StickTime Lite: X7 / TX12 MkI class (128x64) and X9D+ (212x64 grey); the menu with the
+    # bests the test autopilot flies on the Meadow (a 48.1 s lap)
+    page.evaluate("sim.app.sd.set('/SCRIPTS/TOOLS/StickTimeLite/data.txt', 'FPVLITE2 track=1 r1=15120 l1=4810 f1=950 g1=11')")
     page.evaluate("sim.script('lite')")
     radio(page, "tx12")
     page.evaluate("sim.step(10, 50)")
     shot(page, "lite-menu", 4)
+    page.evaluate("sim.app.sd.delete('/SCRIPTS/TOOLS/StickTimeLite/data.txt')")
     race_view(page, 5, 2, 9, 0.3, 0.4, -8, -8, 10, mode=1, ai=None)          # Hoop Forest
     shot(page, "lite-tx12", 4)
     radio(page, "x9d")

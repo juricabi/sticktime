@@ -1474,8 +1474,8 @@ local render, hitTest, pauseHit, initUI
     for r = 1, rows do
       local i = scroll + r
       local ry = y + (r - 1) * rh
-      drawText(2, ry + 1, label(i), SMLSIZE + ((i == focus and not (editing and value)) and INVERS or 0))
       local v = value and value(i)
+      drawText(2, ry + 1, label(i), SMLSIZE + ((i == focus and not (editing and v)) and INVERS or 0))
       if v then drawText(XM - 1, ry + 1, v, SMLSIZE + RIGHT + ((i == focus and editing) and INVERS or 0)) end
     end
   end
@@ -1487,17 +1487,19 @@ local render, hitTest, pauseHit, initUI
     return MAIN_ITEMS[i]
   end
 
+  -- the track's bests next to the modes: race, lap, combo, gates
+  local function mainValue(i)
+    local t = S.track
+    local b = i == 1 and BEST.r[t] or i == 2 and BEST.l[t] or i == 3 and BEST.f[t] or i == 4 and BEST.g[t]
+    if b then return b < 1 and "--" or i < 3 and timeStr(b) or floor(b) .. "" end
+  end
+
   render = function()
     if state == MENU or (state == SETUP and prevState == MENU) then
       lcd.clear()
       if state == MENU then
         drawText(1, 0, "StickTime", MIDSIZE)
-        drawText(XM, 0, TRACKS[S.track][1], SMLSIZE + RIGHT)
-        drawList(nil, #MAIN_ITEMS, mainLabel, nil, 13, 8)
-        local t = S.track
-        local b = "best " .. (BEST.l[t] > 0 and timeStr(BEST.l[t]) or "--")
-        if focus == 3 then b = "best " .. BEST.f[t] elseif focus == 4 then b = "best " .. BEST.g[t] .. (XM > 127 and " gates" or "") end
-        drawText(XM, 7, b, SMLSIZE + RIGHT)
+        drawList(nil, #MAIN_ITEMS, mainLabel, mainValue, 13, 8)
       else
         drawList("SETTINGS", #OPTS + 1, setLabel, setValue, 0, 9)
       end

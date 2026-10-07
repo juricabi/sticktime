@@ -728,40 +728,34 @@ end
 render = function()
   if state == MENU or state == SETUP then
     lcd.clear()
-    local n, y = #MAIN, 15
+    local n, y, t = #MAIN, 15, S.track
     if state == MENU then
-      local t = S.track
-      local b = (focus == 1 and BR or BL)[t]
       drawText(1, 0, "StickTime", MIDSIZE)
       drawText(XM, 0, "LITE", SML + RIGHT)
-      local u = XM > 127                            -- room for the units (212 px screens)
-      drawText(XM, 7, "best " .. (focus == 3 and BF[t] .. (u and " pts" or "") or focus == 4 and BG[t] ..
-        (u and " gates" or "") or b > 0 and timeStr(b) or "--"), SML + RIGHT)
     else
       drawText(1, 0, "SETTINGS", SML + INV)
       n, y = #OPTS + 1, 9
     end
-    -- the list, scrolled to keep the focus in view
+    -- the list, scrolled to keep the focus in view; on the right the track's bests (time trial,
+    -- lap, combo, gates) or the setting's value
     local rows = floor((YM + 1 - y) / 8)
     if rows > n then rows = n end
     if focus - scroll > rows then scroll = focus - rows end
     if focus <= scroll then scroll = focus - 1 end
     for r = 1, rows do
       local i = scroll + r
-      local o, f = OPTS[i], i == focus and INV or 0
+      local o, f, v = OPTS[i], i == focus and INV or 0, nil
       local l = o and o[1] or "Back"
       if state == MENU then
-        l = MAIN[i]
-        if i == 5 then
-          l = TRACKS[S.track]
-          l = editing and "< " .. l .. " >" or "Track: " .. l
-        end
+        l, v = MAIN[i], i == 1 and BR[t] or i == 2 and BL[t] or i == 3 and BF[t] or i == 4 and BG[t]
+        if v then v = v < 1 and "--" or i < 3 and timeStr(v) or v .. "" end
+        if i == 5 then l = editing and "< " .. TRACKS[t] .. " >" or "Track: " .. TRACKS[t] end
+      elseif o then
+        local j = optIdx(o)
+        v = type(o[4]) == "table" and o[4][j] or o[3][j] .. (o[4] or "")
       end
       drawText(2, y, l, SML + ((editing and state == SETUP) and 0 or f))
-      if state == SETUP and o then
-        local j = optIdx(o)
-        drawText(XM - 1, y, type(o[4]) == "table" and o[4][j] or o[3][j] .. (o[4] or ""), SML + RIGHT + (editing and f or 0))
-      end
+      if v then drawText(XM - 1, y, v, SML + RIGHT + ((editing and state == SETUP) and f or 0)) end
       y = y + 8
     end
     return
