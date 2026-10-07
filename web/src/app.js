@@ -28,6 +28,7 @@
     cpu: null,
     sd: new Map(Object.entries(store.get('sd', {}))),
     pad: store.get('padmap', { ail: [0, false], ele: [1, false], thr: [2, false], rud: [3, false] }),
+    padKey: store.get('padKey', ''),
   };
   const stick = { ail: 0, ele: 0, thr: -1, rud: 0 };   // -1..1
   const colorFonts = new ColorFonts('RobotoEmu, Roboto, Arial, sans-serif');
@@ -257,13 +258,48 @@
   }
 
   // ----------------------------------------------------------- gamepad
-  let padIndex = -1, padBlocked = false;
+  // Every connected gamepad is listed. The chosen one is remembered by its slot and name
+  // (by name alone when it comes back in another slot); with none chosen, the first one
+  // with four axes is used.
+  let padBlocked = false, padSig = '', padShown = '';
+  const padKey = (g) => g.index + ':' + g.id;
   function readPad() {
     let pads = [];
     try { pads = navigator.getGamepads ? Array.from(navigator.getGamepads()) : []; padBlocked = false; } catch (e) { padBlocked = true; }
-    const p = pads.find((g) => g && g.connected && g.axes.length >= 4) || null;
-    padIndex = p ? p.index : -1;
+    pads = pads.filter((g) => g && g.connected);
+    const name = app.padKey.slice(app.padKey.indexOf(':') + 1);
+    const p = pads.find((g) => padKey(g) === app.padKey) || (name && pads.find((g) => g.id === name))
+      || pads.find((g) => g.axes.length >= 4) || pads[0] || null;
+    listPads(pads, p);
     return p;
+  }
+  function listPads(pads, p) {
+    const sig = pads.map(padKey).join('|');
+    const sel = $('padSel');
+    if (sig !== padSig) {
+      padSig = sig;
+      sel.textContent = '';
+      for (const g of pads) {
+        const o = document.createElement('option');
+        o.value = padKey(g);
+        // the name without the USB ids (Chrome: "Name (Vendor: … Product: …)", Firefox: "vvvv-pppp-Name")
+        const name = g.id.replace(/\s*\((?:STANDARD GAMEPAD\s*)?Vendor:[^)]*\)\s*$/i, '').replace(/^[0-9a-f]{4}-[0-9a-f]{4}-/i, '');
+        o.textContent = (g.index + 1) + ': ' + (name || g.id).slice(0, 40) + ' (' + g.axes.length + ' axes)';
+        sel.appendChild(o);
+      }
+      $('padPick').hidden = pads.length === 0;
+      padShown = '';
+    }
+    const k = p ? padKey(p) : '';
+    if (k !== padShown) {
+      padShown = k;
+      if (p) sel.value = k;
+      // as many axes to map as the chosen gamepad has (at least 8)
+      const n = Math.max(8, p ? p.axes.length : 0);
+      for (const s of document.querySelectorAll('.axis select')) {
+        while (s.options.length < n) { const o = document.createElement('option'); o.value = s.options.length; o.textContent = 'axis ' + s.options.length; s.appendChild(o); }
+      }
+    }
   }
   function gamepadSticks() {
     const p = readPad();
@@ -285,7 +321,7 @@
     const st = $('padStatus');
     if (padBlocked) { st.textContent = 'This browser frame blocks gamepads. Open simulator.html from the repo directly in Chrome or Edge to fly with your radio over USB.'; st.className = 'note warn'; }
     else if (!p) { st.textContent = 'Plug in the radio, choose USB Joystick on it, then move a stick so the browser sees it.'; st.className = 'note'; }
-    else { st.textContent = 'Connected: ' + p.id.slice(0, 60) + ' (' + p.axes.length + ' axes)'; st.className = 'note'; }
+    else { st.textContent = 'Move a stick: the bars below follow the chosen gamepad.'; st.className = 'note'; }
     for (const fn of ['ail', 'ele', 'thr', 'rud']) {
       const m = document.querySelector('.axis[data-fn="' + fn + '"] .meter i');
       const v = p ? (p.axes[app.pad[fn][0]] || 0) * (app.pad[fn][1] ? -1 : 1) : stick[fn];
@@ -511,6 +547,7 @@
       });
     });
     $('padBox').hidden = true;
+    $('padSel').addEventListener('change', () => { app.padKey = $('padSel').value; store.set('padKey', app.padKey); });
     for (const fn of ['ail', 'ele', 'thr', 'rud']) {
       const row = document.querySelector('.axis[data-fn="' + fn + '"]');
       const sel = row.querySelector('select');

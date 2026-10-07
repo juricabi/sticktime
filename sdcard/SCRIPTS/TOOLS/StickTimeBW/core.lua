@@ -65,8 +65,8 @@ local RATES = { { 70, 400, 35, 70, 350, 30 }, { 100, 600, 50, 100, 500, 40 }, { 
 local RKEYS = { rc = 1, rm = 2, re = 3, yc = 4, ym = 5, ye = 6 }
 -- quad profiles (racer, freestyle): prop pitch speed m/s, rotor drag, side and top
 -- drag, motor and rate response time (s) of a well-tuned quad, prop wash strength
-local QP = { vp = { 86, 60 }, kh = { 0.22, 0.18 }, ks = { 0.009, 0.0072 }, ku = { 0.028, 0.024 },
-             tm = { 0.02, 0.03 }, tr = { 0.012, 0.02 }, pw = { 0.5, 1 } }
+local QP = { vp = { 86, 66 }, kh = { 0.22, 0.205 }, ks = { 0.009, 0.0082 }, ku = { 0.028, 0.026 },
+             tm = { 0.02, 0.025 }, tr = { 0.012, 0.016 }, pw = { 0.5, 1 } }
 
 -- -------------------------------------------------------------- tracks
 -- gates: x, z, type, yaw (deg), center height (0 = default). Types: 1 gate, 2 high gate,
@@ -926,11 +926,16 @@ local F, tanH = 160, 1.4
 -- prediction follows the measured frame interval and stays right on faster firmware too.
 -- STICKTIME_LAT (seconds) overrides it, e.g. in the emulator when frames show at once
 -- (FPVSIM_LAT: its name before the rename to StickTime).
+-- The turn is predicted over a third of that time only: the stick can center at any moment,
+-- and a fast roll drawn the whole delay ahead overshoots for a frame and swings back when it
+-- stops (about 35 deg at 850 deg/s). A third is about as long as the quad keeps turning after
+-- the stick centers, so the picture no longer swings back, and still gains 20 ms.
 local function fpvCamera()
   local c, s = P.tc, P.ts
   local d = (state == FLY or state == DONE) and (STICKTIME_LAT or FPVSIM_LAT or R.fi * 0.003) or 0
   local a1, a2, a3, b1, b2, b3, e1, e2, e3 = rx, ry, rz, ux, uy, uz, fx, fy, fz
-  if d > 0 then rotate(P.wr * d, P.wp * d, P.wy * d) end
+  local dr = d * 0.35
+  if d > 0 then rotate(P.wr * dr, P.wp * dr, P.wy * dr) end
   kpx, kpy, kpz = px + vx * d, py + vy * d, pz + vz * d
   if kpy < 0.05 then kpy = 0.05 end
   krx, kry, krz = rx, ry, rz
@@ -1710,6 +1715,7 @@ local function init()
     TEST.box = function(b) return BX.x0[b], BX.x1[b], BX.y0[b], BX.y1[b], BX.z0[b], BX.z1[b] end
     TEST.S = S
     TEST.order = function() return nOrd, ordP, ordI, TEST.bounds, kpx, kpy, kpz end
+    TEST.cam = function() return krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz end
   end
 end
 

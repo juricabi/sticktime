@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Steady-state check of the quad model used in src/sticktime.lua.
-Usage: tools/tune_physics.py [KH=0.18 VP=60 KQS=0.0072 KQU=0.024]
+Usage: tools/tune_physics.py [KH=0.205 VP=66 KQS=0.0082 KQU=0.026]
 
 Model (mass-normalised, body axes r/u/f):
   T  = Tmax*(0.015 + 0.985*thr^1.6)       motor thrust, lagged with TAU_M
@@ -12,7 +12,7 @@ import math
 import sys
 
 G = 9.81
-# racer profile in src/sticktime.lua (QP); freestyle: KH=0.18 VP=60 KQS=0.0072 KQU=0.024
+# racer profile in src/sticktime.lua (QP); freestyle: KH=0.205 VP=66 KQS=0.0082 KQU=0.026
 P = dict(KQS=0.009, KQU=0.028, KH=0.22, VP=86.0)
 
 

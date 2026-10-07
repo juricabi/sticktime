@@ -46,7 +46,7 @@ local OPTS = {
 { "Wind", "wind", { 0, 1, 2 }, { "Off", "Light", "Strong" } },
 }
 local RATES = nums("70 400 35 70 350 30 100 600 50 100 500 40 150 850 45 130 700 40")
-local QP = nums("86 .22 .009 .028 .02 .012 60 .18 .0072 .024 .03 .02")
+local QP = nums("86 .22 .009 .028 .02 .012 66 .205 .0082 .026 .025 .016")
 local TRACKS = { "Meadow", "Figure 8", "Dive Tower", "Slalom", "Hoop Forest", "Grand Prix", "Bando" }
 local GW = { 1.5, 1.5, 2, 1.25, 2.4, 6, 6, 2.2 }
 local GH = { 1, 1, 2, 1.25, 2.4, 30, 30, 1.8 }

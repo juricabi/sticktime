@@ -11,6 +11,11 @@ local toolName = "TNS|@TOOLNAME@|TNE"
   saves core.luac); that copy is dropped and core.luac is loaded.
   If you edit core.lua, delete core.luac.
 ====================================================================== ]]
+-- made for black & white screens: on a color radio, color.lua says which game to start instead
+if LCD_W > 212 then
+  local m = loadScript("/SCRIPTS/TOOLS/@DIR@/color.lua")
+  if m then return m() end
+end
 local CORE = "/SCRIPTS/TOOLS/@DIR@/core.lua"
 local f = loadScript(CORE, "b")
 if not f then

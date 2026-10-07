@@ -1,0 +1,56 @@
+diff --git a/radio/src/gui/colorlcd/standalone_lua.cpp b/radio/src/gui/colorlcd/standalone_lua.cpp
+index e9274a0..bf57df2 100644
+--- a/radio/src/gui/colorlcd/standalone_lua.cpp
++++ b/radio/src/gui/colorlcd/standalone_lua.cpp
+@@ -124,6 +124,9 @@ void luaExecStandalone(const char * filename)
+ // singleton instance
+ StandaloneLuaWindow* StandaloneLuaWindow::_instance;
+ 
++// StickTime build: tells the UI task to run its loop faster while a Lua tool is open
++bool standaloneLuaActive() { return StandaloneLuaWindow::instance() != nullptr; }
++
+ StandaloneLuaWindow::StandaloneLuaWindow(bool useLvgl, int initFn, int runFn) :
+     Window(MainWindow::instance(), {0, 0, LCD_W, LCD_H}),
+     useLvgl(useLvgl), initFunction(initFn), runFunction(runFn)
+@@ -274,6 +277,8 @@ void StandaloneLuaWindow::checkEvents()
+               UNPROTECT_LUA();
+             } else {
+               invalidate();
++              // StickTime build: show the frame now, not at the next UI cycle
++              lv_refr_now(nullptr);
+             }
+           }
+         } else if (lua_isstring(lsStandalone, -1)) {
+diff --git a/radio/src/tasks.cpp b/radio/src/tasks.cpp
+index 0fda1a4..bd9c636 100644
+--- a/radio/src/tasks.cpp
++++ b/radio/src/tasks.cpp
+@@ -53,6 +53,19 @@ mutex_handle_t audioMutex;
+ 
+ #define MENU_TASK_PERIOD (50)  // 50ms
+ 
++#if defined(COLORLCD) && defined(LUA)
++// StickTime build: while a full screen Lua tool (a game) runs, the UI loop runs every 20 ms
++// instead of 50 ms, so the tool gets up to 50 frames a second. Everything else is unchanged.
++#define MENU_TASK_PERIOD_LUA_TOOL (20)
++bool standaloneLuaActive();  // gui/colorlcd/standalone_lua.cpp
++static uint32_t menuTaskPeriod()
++{
++  return standaloneLuaActive() ? MENU_TASK_PERIOD_LUA_TOOL : MENU_TASK_PERIOD;
++}
++#else
++static uint32_t menuTaskPeriod() { return MENU_TASK_PERIOD; }
++#endif
++
+ #if defined(COLORLCD) && defined(CLI)
+ bool perMainEnabled = true;
+ #endif
+@@ -95,7 +108,7 @@ static void menusTask()
+ #endif
+     DEBUG_TIMER_STOP(debugTimerPerMain);
+ 
+-    sleep_until(&next_tick, MENU_TASK_PERIOD);
++    sleep_until(&next_tick, menuTaskPeriod());
+     resetForcePowerOffRequest();
+   }
+ 

@@ -19,9 +19,9 @@ StickTime was called FPV Sim up to version 1.2.
 ## Features
 
 - **Flight model.** Props lose thrust as the airflow through them speeds up. There is rotor drag in the prop plane and quadratic body drag that depends on attitude, plus gravity and momentum. Both quads feel like a well-tuned build: the motors spool up in 20–30 ms and the rates follow your sticks in 12–20 ms. Zero throttle keeps 1.5% idle thrust, like DShot idle on a real quad, so you drop properly instead of floating. It all runs at 80 Hz. Top speed at 5:1 is about 130 km/h, punch-outs reach about 100 km/h, and a flat fall settles at 55–60 km/h.
-- **Your quad.** Choose a **Racer** (snappy, light) or a **Freestyle** quad (heavier: it carries momentum and floats). Power is a free choice from 3:1 to 12:1. Flight mode is Acro or Angle.
+- **Your quad.** Choose a **Racer** (snappy, light, the most grip) or a **Freestyle** quad (heavier: it carries more momentum and floats a little more). Power is a free choice from 3:1 to 12:1. Flight mode is Acro or Angle.
 - **Rates.** Betaflight "actual" rates: Soft, Normal and Fast presets, or **Custom**, where you set center rate, max rate and expo for roll/pitch and for yaw. Editing any value switches to Custom, starting from the preset you had.
-- **Latency.** Color screens show each frame one UI cycle after the script draws it, so the camera is rendered where the quad will be when the frame reaches the screen, using its current rotation rates and speed. The prediction follows the measured frame interval, so it stays right on firmware that runs scripts faster (see [Faster firmware](#faster-firmware)). Physics applies your sticks for the whole interval since the last frame.
+- **Latency.** Color screens show each frame one UI cycle after the script draws it, so the camera is rendered ahead: where the quad will be when the frame reaches the screen, and a third of that time ahead in its turn. Turning further ahead would make a fast roll overshoot and swing back when the stick centers. The prediction follows the measured frame interval, so it stays right on firmware that runs scripts faster (see [Faster firmware](#faster-firmware)). Physics applies your sticks for the whole interval since the last frame.
 - **Seven tracks.** Meadow, Figure 8, Dive Tower, Slalom, Hoop Forest, Grand Prix and the **Bando**: an open-roof ruin with doors to fly through, a 24 m tower and stacked containers. Obstacles: gates, high gates, dive gates, hoops, arches, flags (pass on the marked side) and gaps in walls. Trees, legs, poles, walls and the tower are solid.
 - **Four ways to play.**
   - **Race** against up to three AI pilots (Easy, Medium or Hard) with a live position, then a results screen with your place, total and lap times.
@@ -42,7 +42,7 @@ StickTime was called FPV Sim up to version 1.2.
    - **Older B&W radios (STM32F2):** `StickTimeLite.lua` **and** the `StickTimeLite` folder (the game and its seven track files). StickTime Lite runs on the other B&W radios too.
 2. On the radio open **SYS → Tools** and start **StickTime** (or **StickTime BW**, **StickTime Lite**). The first start on a color radio takes a few seconds while EdgeTX compiles the script.
 
-The B&W versions need **EdgeTX 2.11 or newer** (see below). The color version also runs on older EdgeTX.
+The B&W versions need **EdgeTX 2.11 or newer** (see below). The color version also runs on older EdgeTX. Started on a color radio, StickTime BW and StickTime Lite only show a note to start StickTime instead.
 
 > **Safety:** the radio keeps transmitting your sticks while the sim runs. Unplug the quad's battery or switch the RF module off first.
 
@@ -99,17 +99,24 @@ The layout is computed from `LCD_W` / `LCD_H` and the radio's real font sizes, s
 EdgeTX calls a tool script's `run()` at most every 50 ms, so the target is a steady 20 fps on the slowest color radios (STM32F429).
 
 - **Timing.** The flight model uses `getTime()` deltas with 80 Hz substeps, so the flight is the same at any frame rate.
-- **Lines over fills.** `lcd.drawLine` is native Bresenham, but a filled triangle costs one LVGL call per scanline. Sky and ground use one rectangle plus one thin wedge triangle at any roll angle. Gate bars, hoop segments and small wall faces are filled with 1 px "ruled" lines along their shorter side, and big faces become a triangle fan clipped to the view.
+- **Fills.** Sky and ground are one rectangle plus one thin wedge triangle at any roll angle. Walls, the tower and the containers are two filled triangles per face: the firmware fills them row by row in C, which costs less than many lines drawn from Lua and leaves no gaps between them. Gate bars that run across are triangles too. Upright bars and hoop segments are filled with 1 px "ruled" lines (native Bresenham), as many as the bar is thick. Faces cut by the camera's near plane go through a polygon clipper.
 - **Lua side.** World data is stored as arrays of numbers, hot values live in locals and upvalues, no tables are created per frame, and objects are depth-sorted with an insertion sort. Collisions use a per-frame broad phase. Far gates switch to a single outline and far hoops to six segments.
 - **Draw order.** With walls, the tower or containers in view, depth order is not enough: a long wall's center can be far away while its near end covers everything behind it. For each pair that overlaps on screen and involves a structure, the script finds a plane that separates their bounding boxes and draws the object on the far side of it first, then a topological sort puts everything in order. A ray-cast test over hundreds of camera poses at the Bando finds no pair drawn in the wrong order.
-- **Measured per frame:** about 15–85k Lua VM instructions on color screens and 7–27k on B&W screens, for StickTime BW and the Lite alike (the Lite up to 45k looking down over the whole Bando). The emulator estimates 15–18 ms per frame on a TX16S-class radio for the open tracks and 33–41 ms in the busiest Bando views, and 4–11 ms for the Lite on an STM32F2 radio with no FPU (17 ms over the whole Bando), inside the 50 ms budget.
+- **Measured per frame:** about 15–65k Lua VM instructions on color screens and 7–28k on B&W screens, for StickTime BW and the Lite alike (the Lite up to 45k looking down over the whole Bando). The emulator estimates 15–17 ms per frame on a TX16S-class radio for the open tracks and 27–35 ms in the busiest Bando views, and 4–11 ms for the Lite on an STM32F2 radio with no FPU (17 ms over the whole Bando), inside the 50 ms budget.
 - **Color `drawLine` quirk.** On every EdgeTX version the color `lcd.drawLine` silently drops the whole line if either end is past the right or bottom edge (`x > LCD_W` or `y > LCD_H`). Negative values are clipped by the firmware. The script clips the right and bottom edges itself, and the tests fail on any line the firmware would drop.
 - **EdgeTX Lua quirk.** EdgeTX builds Lua 5.3 with `LUA_FLOORN2I`, and releases before the 2026-08-30 fix (#7611) also floor floats in int/float equality, so `0.02 ~= 0` is `false` on those radios. The script never compares a float with an integer literal.
 - **B&W quirks.** `lcd.drawLine` on B&W radios refuses any point outside the screen and draws in XOR mode unless `FORCE` is set, so lines are clipped in Lua and drawn with `FORCE`.
 
 ## Faster firmware
 
-Stock EdgeTX calls a tool's `run()` at most every 50 ms (`MENU_TASK_PERIOD` in `radio/src/tasks.cpp`), however fast the CPU is. The game does not speed up by itself: the firmware has to call it more often. A build or fork with a shorter period gets more frames, as far as the radio can draw them. H7 radios (TX15, TX16S MK3) need 10–25 ms per frame, so 40–60 fps is within reach. F4 radios (TX16S, T16) need up to about 40 ms in the busiest views and gain little.
+Stock EdgeTX calls a tool's `run()` at most every 50 ms (`MENU_TASK_PERIOD` in `radio/src/tasks.cpp`), however fast the CPU is, and on color radios each frame appears one 50 ms cycle after the script draws it. The game does not speed up by itself: the firmware has to call it more often. A build or fork with a shorter period gets more frames, as far as the radio can draw them. H7 radios (TX15, TX16S MK3) need 10–25 ms per frame, so 40–60 fps is within reach. F4 radios (TX16S, T16) need up to about 40 ms in the busiest views and gain little.
+
+[`firmware/edgetx-fast-lua.patch`](firmware/edgetx-fast-lua.patch) does both for color radios, and only while a Lua tool is open:
+
+- the UI loop runs every 20 ms instead of 50 ms (up to 50 fps), and goes back to 50 ms when the tool closes;
+- each frame goes to the screen as soon as the script has drawn it (`lv_refr_now`), not at the next cycle.
+
+The mixer task (sticks, mixes, RF output, telemetry, watchdog) has a higher priority and is not touched. `tools/build_firmware.sh v12` clones EdgeTX `main`, applies the patch and builds the firmware for that radio (any target name from EdgeTX's `tools/build-common.sh`), with ARM GCC 14.2 on the `PATH`. On the HelloRadioSky V12, whose 320×240 screen is connected over SPI, every full frame takes about 13 ms to send plus the wait for the screen's refresh, so the game runs at about 30 fps there. Estimated stick-to-screen latency drops from about 90 ms to about 40 ms.
 
 The script is ready for that:
 
@@ -137,6 +144,7 @@ src/sticktime_lite.lua  StickTime Lite (--#if TEST: hooks for the tests, left ou
 src/sticktime_lite_tracks.txt
                         the Lite's tracks, one line each (build.py writes StickTimeLite/t1.txt ... t7.txt)
 src/bwloader.lua        the B&W loaders (precompiled core.luac first)
+src/bwcolor.lua         what the B&W loaders show on a color radio instead of the game
 build.py                -> sdcard/SCRIPTS/TOOLS/: StickTime.lua, StickTimeBW.lua + StickTimeBW/,
                         StickTimeLite.lua + StickTimeLite/ (lines marked --#fold are constants, written
                         into the code that uses them)
@@ -146,6 +154,7 @@ tools/build_etxlua.sh   builds Lua 5.3 with EdgeTX's number settings (native and
 tools/build_etxhost.sh  builds tools/etxhost/host.c: EdgeTX's own Lua core (32-bit) with a model of the B&W
                         radios' Lua allocator; makes the core.luac files and runs test/memtest.lua
 tools/tune_physics.py   steady-state check of the flight model (top speed, punch-out, fall, braking)
+tools/build_firmware.sh EdgeTX main + firmware/edgetx-fast-lua.patch for one radio (see Faster firmware)
 test/harness.lua        headless EdgeTX mock: autopilot races with AI pilots on every track, flags, hoops,
                         dive gates, freestyle combos, gate rush, menus, crashes, taking over FPV Sim's
                         saves (version 1 format)

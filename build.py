@@ -194,6 +194,9 @@ def main():
             lp = OUT / cfg["loader"]
             lp.write_text(lt, encoding="utf-8")
             print(f"{lp.relative_to(ROOT)}: {len(lt.encode())} bytes (loader)")
+            # what the loader shows on a color radio instead of the game
+            ct = placeholders((ROOT / "src" / "bwcolor.lua").read_text(encoding="utf-8"), cfg)
+            (OUT / cfg["DIR"] / "color.lua").write_text(ct, encoding="utf-8")
             precompile(path)
 
 

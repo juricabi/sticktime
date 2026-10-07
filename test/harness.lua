@@ -347,6 +347,39 @@ do
 end
 idleSticks()
 
+-- 6a. a fast roll that stops (Fast rates, racer): the camera is drawn ahead to hide the screen's
+-- delay, but must not overshoot where the quad stops and swing back
+do
+  local atan2 = math.atan2 or math.atan
+  T.track(1) T.set("rates", 3) T.set("quad", 1) T.start(2)
+  steps(8)
+  T.state(4)
+  T.pose(0, 60, 0, 0, 0, 0) T.vel(0, 0, 0)
+  sticks.thr, sticks.ele, sticks.rud, sticks.ail = 0, 0, 0, 1024
+  local function roll(rx_, ry_, last)
+    local a = atan2(-ry_, rx_)
+    while last and a - last > math.pi do a = a - 2 * math.pi end
+    while last and a - last < -math.pi do a = a + 2 * math.pi end
+    return a
+  end
+  local cam, body, peak = nil, nil, -1e9
+  for i = 1, 26 do
+    if i == 13 then sticks.ail = 0 end
+    frame(0)
+    local crx, cry = T.cam()
+    cam = roll(crx, cry, cam)
+    local s = { T.get() }
+    body = roll(s[13], s[14], body)
+    if i >= 6 and cam > peak then peak = cam end
+  end
+  local back = math.deg(peak - body)
+  if state() ~= 4 then fail("roll check: the quad should still be flying (state " .. state() .. ")")
+  elseif back > 10 then fail(string.format("the camera swings back %.1f deg when a fast roll stops", back))
+  else print(string.format("fast roll stop: camera swings back %.1f deg", math.max(0, back))) end
+  T.set("rates", 2)
+  idleSticks()
+end
+
 -- 6. freestyle: flips, rolls and a gap shot score a combo
 T.track(7)
 T.set("mode", 1)

@@ -3,3 +3,4 @@ test/shots/
 __pycache__/
 *.pyc
 test/build/
+firmware/build/

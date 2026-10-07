@@ -73,8 +73,8 @@ local RATES = { { 70, 400, 35, 70, 350, 30 }, { 100, 600, 50, 100, 500, 40 }, { 
 local RKEYS = { rc = 1, rm = 2, re = 3, yc = 4, ym = 5, ye = 6 }
 -- quad profiles (racer, freestyle): prop pitch speed m/s, rotor drag, side and top
 -- drag, motor and rate response time (s) of a well-tuned quad, prop wash strength
-local QP = { vp = { 86, 60 }, kh = { 0.22, 0.18 }, ks = { 0.009, 0.0072 }, ku = { 0.028, 0.024 },
-             tm = { 0.02, 0.03 }, tr = { 0.012, 0.02 }, pw = { 0.5, 1 } }
+local QP = { vp = { 86, 66 }, kh = { 0.22, 0.205 }, ks = { 0.009, 0.0082 }, ku = { 0.028, 0.026 },
+             tm = { 0.02, 0.025 }, tr = { 0.012, 0.016 }, pw = { 0.5, 1 } }
 
 -- -------------------------------------------------------------- tracks
 -- gates: x, z, type, yaw (deg), center height (0 = default). Types: 1 gate, 2 high gate,
@@ -954,11 +954,16 @@ local F, tanH = 160, 1.4
 -- prediction follows the measured frame interval and stays right on faster firmware too.
 -- STICKTIME_LAT (seconds) overrides it, e.g. in the emulator when frames show at once
 -- (FPVSIM_LAT: its name before the rename to StickTime).
+-- The turn is predicted over a third of that time only: the stick can center at any moment,
+-- and a fast roll drawn the whole delay ahead overshoots for a frame and swings back when it
+-- stops (about 35 deg at 850 deg/s). A third is about as long as the quad keeps turning after
+-- the stick centers, so the picture no longer swings back, and still gains 20 ms.
 local function fpvCamera()
   local c, s = P.tc, P.ts
   local d = (state == FLY or state == DONE) and (STICKTIME_LAT or FPVSIM_LAT or R.fi * @LATK@) or 0
   local a1, a2, a3, b1, b2, b3, e1, e2, e3 = rx, ry, rz, ux, uy, uz, fx, fy, fz
-  if d > 0 then rotate(P.wr * d, P.wp * d, P.wy * d) end
+  local dr = d * 0.35
+  if d > 0 then rotate(P.wr * dr, P.wp * dr, P.wy * dr) end
   kpx, kpy, kpz = px + vx * d, py + vy * d, pz + vz * d
   if kpy < 0.05 then kpy = 0.05 end
   krx, kry, krz = rx, ry, rz
@@ -1008,44 +1013,39 @@ do
   -- and the camera is on one side of the gap, the object on that side is in front. Then a
   -- topological sort (Kahn) draws everything far to near while keeping those rules.
   local OB = { x0 = {}, x1 = {}, y0 = {}, y1 = {}, z0 = {}, z1 = {}, b = {} }
-  local osx, osy, osr = {}, {}, {}                    -- screen circle of each object
+  local sx0, sx1, sy0, sy1 = {}, {}, {}, {}            -- screen rectangle of each object
   local EA, EB, SU, cnt, st, indeg, done, DO = {}, {}, {}, {}, {}, {}, {}, {}
 
-  -- 1: object i goes before j, -1: after, 0: no rule needed (they cannot overlap on screen).
+  -- Rules only for pairs with a structure in them that overlap on screen. A plane between
+  -- their boxes (along x, then z, then y) with the camera on one side puts the other object
+  -- behind: rule 1 draws i before j, -1 after, 0 none (they cannot overlap on screen).
   -- Touching faces count as separated (2 cm tolerance: radio Lua uses 32-bit floats).
-  local function sep(a0, a1, b0, b1, c)
-    if a1 <= b0 + 0.02 then
-      if c >= b0 then return 1 elseif c <= a1 then return -1 end
-      return 0
-    elseif b1 <= a0 + 0.02 then
-      if c >= a0 then return -1 elseif c <= b1 then return 1 end
-      return 0
-    end
-    return nil
-  end
-
-  local function rel(i, j)
-    local v = sep(OB.x0[i], OB.x1[i], OB.x0[j], OB.x1[j], kpx)
-    if v then return v end
-    v = sep(OB.z0[i], OB.z1[i], OB.z0[j], OB.z1[j], kpz)
-    if v then return v end
-    v = sep(OB.y0[i], OB.y1[i], OB.y0[j], OB.y1[j], kpy)
-    if v then return v end
-    -- bounds intersect (e.g. a tree's box touching a wall): farther first
-    return ordZ[i] > ordZ[j] and 1 or -1
-  end
-
+  -- Boxes that intersect (a tree's box touching a wall): the farther one first.
   local function sortWithStructures(n)
-    -- rules only for pairs with a structure in them that overlap on screen
     local ne = 0
+    local isB, X0, X1, Y0, Y1, Z0, Z1 = OB.b, OB.x0, OB.x1, OB.y0, OB.y1, OB.z0, OB.z1
+    local cx, cy, cz = kpx, kpy, kpz
     for i = 1, n do
-      if OB.b[i] then
-        local xi, yi, ri = osx[i], osy[i], osr[i]
+      if isB[i] then
+        local p0, p1, q0, q1 = sx0[i], sx1[i], sy0[i], sy1[i]
+        local a0, a1, c0, c1, e0, e1 = X0[i], X1[i], Z0[i], Z1[i], Y0[i], Y1[i]
         for j = 1, n do
-          if j ~= i and (j > i or not OB.b[j]) then
-            local dx, dy, r = xi - osx[j], yi - osy[j], ri + osr[j]
-            if dx * dx + dy * dy < r * r then
-              local v = rel(i, j)
+          if j ~= i and (j > i or not isB[j]) then
+            if p0 < sx1[j] and sx0[j] < p1 and q0 < sy1[j] and sy0[j] < q1 then
+              local v, b0, b1 = 0, X0[j], X1[j]
+              if a1 <= b0 + 0.02 then v = cx >= b0 and 1 or cx <= a1 and -1 or 0
+              elseif b1 <= a0 + 0.02 then v = cx >= a0 and -1 or cx <= b1 and 1 or 0
+              else
+                b0, b1 = Z0[j], Z1[j]
+                if c1 <= b0 + 0.02 then v = cz >= b0 and 1 or cz <= c1 and -1 or 0
+                elseif b1 <= c0 + 0.02 then v = cz >= c0 and -1 or cz <= b1 and 1 or 0
+                else
+                  b0, b1 = Y0[j], Y1[j]
+                  if e1 <= b0 + 0.02 then v = cy >= b0 and 1 or cy <= e1 and -1 or 0
+                  elseif b1 <= e0 + 0.02 then v = cy >= e0 and -1 or cy <= b1 and 1 or 0
+                  else v = ordZ[i] > ordZ[j] and 1 or -1 end
+                end
+              end
               if v > 0 then
                 ne = ne + 1
                 EA[ne], EB[ne] = i, j
@@ -1146,32 +1146,52 @@ do
           nOrd = o
           ordZ[o], ordI[o] = z, id
 --#if COLOR
-          -- screen circle around the object's bounding sphere, made conservative: nearest
-          -- depth, and stretched towards the edges (perspective grows off-axis objects by
-          -- 1/cos^2 of their angle). Whole screen when the camera is close.
-          if z > rad * 2 then
-            local y = X * kux + Y * kuy + Z * kuz
-            local s = F / z
-            osx[o], osy[o] = x * s, y * s
-            osr[o] = rad * F / (z - rad) * (1 + (x * x + y * y) / (z * z))
-          else
-            osx[o], osy[o], osr[o] = 0, 0, 1e6
-          end
+          -- screen rectangle (in pixels from the center) for the draw-order rules, made
+          -- conservative; the whole screen when the object reaches the camera.
+          local y = X * kux + Y * kuy + Z * kuz
           local isBox = id >= 1000 and id < 2000
           OB.b[o] = isBox
+          sx0[o], sx1[o], sy0[o], sy1[o] = -1e6, 1e6, -1e6, 1e6
           if isBox then
+            -- a box: its extent across, up and along the view, then the nearest and farthest
+            -- depth for the outer edges (a wall seen edge-on is a narrow strip, not a circle)
             local b = id - 1000
-            OB.x0[o], OB.x1[o], OB.y0[o], OB.y1[o], OB.z0[o], OB.z1[o] = BX.x0[b], BX.x1[b], BX.y0[b], BX.y1[b], BX.z0[b], BX.z1[b]
+            local x0, x1, y0, y1, z0, z1 = BX.x0[b], BX.x1[b], BX.y0[b], BX.y1[b], BX.z0[b], BX.z1[b]
+            OB.x0[o], OB.x1[o], OB.y0[o], OB.y1[o], OB.z0[o], OB.z1[o] = x0, x1, y0, y1, z0, z1
             boxes = true
-          elseif id > 0 and id < 1000 then
-            OB.x0[o], OB.x1[o], OB.y0[o], OB.y1[o], OB.z0[o], OB.z1[o] = GB.x0[id], GB.x1[id], GB.y0[id], GB.y1[id], GB.z0[id], GB.z1[id]
-          elseif id < 0 then
-            local i = -id
-            local r = qh[i] * 0.25
-            OB.x0[o], OB.x1[o], OB.y0[o], OB.y1[o], OB.z0[o], OB.z1[o] = qx[i] - r, qx[i] + r, 0, qh[i], qz[i] - r, qz[i] + r
+            local hx, hy, hz = (x1 - x0) * 0.5, (y1 - y0) * 0.5, (z1 - z0) * 0.5
+            local a, c, e = krx * hx, kry * hy, krz * hz
+            local ex = (a < 0 and -a or a) + (c < 0 and -c or c) + (e < 0 and -e or e)
+            a, c, e = kux * hx, kuy * hy, kuz * hz
+            local ey = (a < 0 and -a or a) + (c < 0 and -c or c) + (e < 0 and -e or e)
+            a, c, e = kfx * hx, kfy * hy, kfz * hz
+            local ez = (a < 0 and -a or a) + (c < 0 and -c or c) + (e < 0 and -e or e)
+            if z - ez > NEAR then
+              local f0, f1 = F / (z - ez), F / (z + ez)
+              a, c = x - ex, x + ex
+              sx0[o], sx1[o] = a * (a < 0 and f0 or f1), c * (c > 0 and f0 or f1)
+              a, c = y - ey, y + ey
+              sy0[o], sy1[o] = a * (a < 0 and f0 or f1), c * (c > 0 and f0 or f1)
+            end
           else
-            local a, r = id - 2000, 0.3
-            OB.x0[o], OB.x1[o], OB.y0[o], OB.y1[o], OB.z0[o], OB.z1[o] = AI.x[a] - r, AI.x[a] + r, AI.y[a] - r, AI.y[a] + r, AI.z[a] - r, AI.z[a] + r
+            -- other objects: around their bounding sphere, at its nearest depth and stretched
+            -- towards the edges (perspective grows off-axis objects by 1/cos^2 of their angle)
+            if z > rad * 2 then
+              local s = F / z
+              local r = rad * F / (z - rad) * (1 + (x * x + y * y) / (z * z))
+              x, y = x * s, y * s
+              sx0[o], sx1[o], sy0[o], sy1[o] = x - r, x + r, y - r, y + r
+            end
+            if id > 0 and id < 1000 then
+              OB.x0[o], OB.x1[o], OB.y0[o], OB.y1[o], OB.z0[o], OB.z1[o] = GB.x0[id], GB.x1[id], GB.y0[id], GB.y1[id], GB.z0[id], GB.z1[id]
+            elseif id < 0 then
+              local i = -id
+              local r = qh[i] * 0.25
+              OB.x0[o], OB.x1[o], OB.y0[o], OB.y1[o], OB.z0[o], OB.z1[o] = qx[i] - r, qx[i] + r, 0, qh[i], qz[i] - r, qz[i] + r
+            else
+              local a, r = id - 2000, 0.3
+              OB.x0[o], OB.x1[o], OB.y0[o], OB.y1[o], OB.z0[o], OB.z1[o] = AI.x[a] - r, AI.x[a] + r, AI.y[a] - r, AI.y[a] + r, AI.z[a] - r, AI.z[a] + r
+            end
           end
 --#endif
         end
@@ -1533,9 +1553,17 @@ local render3D, initGfx
     -- a bar only a few pixels thick reads as its outline: keep it the fill colour
     if n < 4 then e1, e2 = fill, fill end
     local safe = ax <= XL and bx <= XL and cx <= XL and dx <= XL and ay <= YL and by <= YL and cy <= YL and dy <= YL
-    if n > 140 then
-      fxs[1], fys[1], fxs[2], fys[2], fxs[3], fys[3], fxs[4], fys[4] = ax, ay, bx, by, dx, dy, cx, cy
-      fillPoly(4, fill)
+    -- thick bars as triangles when they run more across than up (few rows to fill), or when
+    -- very thick; upright bars keep their ruled lines (as many as the bar is thick)
+    p, q = bx - ax, by - ay
+    if n > 140 or (n >= 3 and (p < 0 and -p or p) >= (q < 0 and -q or q)) then
+      if safe and ax >= VX and bx >= VX and cx >= VX and dx >= VX and ay >= VY and by >= VY and cy >= VY and dy >= VY then
+        fillTri(ax, ay, bx, by, dx, dy, fill)
+        fillTri(ax, ay, dx, dy, cx, cy, fill)
+      else
+        fxs[1], fys[1], fxs[2], fys[2], fxs[3], fys[3], fxs[4], fys[4] = ax, ay, bx, by, dx, dy, cx, cy
+        fillPoly(4, fill)
+      end
     elseif n >= 2 then
       n = floor(n)
       local sx1, sy1, sx2, sy2 = (cx - ax) / n, (cy - ay) / n, (dx - bx) / n, (dy - by) / n
@@ -1554,16 +1582,52 @@ local render3D, initGfx
     end
   end
 
-  local function md(p, q) return (p < 0 and -p or p) + (q < 0 and -q or q) end
-
-  -- flat face given as corner a plus edges u, v (camera space): near-plane clip,
-  -- then ruled lines when small or a clipped triangle fan when big
+  -- flat face given as corner a plus edges u, v (camera space), filled and outlined
   local function face(ax, ay, az, ux_, uy_, uz_, vx_, vy_, vz_, col, ecol)
+    -- all corners in front of the near plane (nearly always): project in locals
+    local bz, cz, dz = az + uz_, az + uz_ + vz_, az + vz_
+    if az >= NEAR and bz >= NEAR and cz >= NEAR and dz >= NEAR then
+      local s = F / az
+      local a1, b1 = CX + ax * s, CY - ay * s
+      s = F / bz
+      local a2, b2 = CX + (ax + ux_) * s, CY - (ay + uy_) * s
+      s = F / cz
+      local a3, b3 = CX + (ax + ux_ + vx_) * s, CY - (ay + uy_ + vy_) * s
+      s = F / dz
+      local a4, b4 = CX + (ax + vx_) * s, CY - (ay + vy_) * s
+      local x0, x1, y0, y1 = a1, a1, b1, b1
+      if a2 < x0 then x0 = a2 elseif a2 > x1 then x1 = a2 end
+      if a3 < x0 then x0 = a3 elseif a3 > x1 then x1 = a3 end
+      if a4 < x0 then x0 = a4 elseif a4 > x1 then x1 = a4 end
+      if b2 < y0 then y0 = b2 elseif b2 > y1 then y1 = b2 end
+      if b3 < y0 then y0 = b3 elseif b3 > y1 then y1 = b3 end
+      if b4 < y0 then y0 = b4 elseif b4 > y1 then y1 = b4 end
+      if x1 < VX or x0 > VX + VW or y1 < VY or y0 > VY + VH then return end
+      -- two triangles, which the firmware fills row by row in C. Ruled lines (one call
+      -- each, drawn pixel by pixel) cost more on walls and leave holes between slanted
+      -- lines that show as dots.
+      if x0 < VX or x1 > VX + VW or y0 < VY or y1 > VY + VH then
+        fxs[1], fys[1], fxs[2], fys[2], fxs[3], fys[3], fxs[4], fys[4] = a1, b1, a2, b2, a3, b3, a4, b4
+        fillPoly(4, col)
+      else
+        fillTri(a1, b1, a2, b2, a3, b3, col)
+        fillTri(a1, b1, a3, b3, a4, b4, col)
+      end
+      -- outlines only where they show: each line call costs as much as a short line
+      if x1 - x0 + y1 - y0 > 16 then
+        ln(a1, b1, a2, b2, ecol)
+        ln(a2, b2, a3, b3, ecol)
+        ln(a3, b3, a4, b4, ecol)
+        ln(a4, b4, a1, b1, ecol)
+      end
+      return
+    end
+    -- cut by the near plane: clip the polygon, then fill it
     P3x[1], P3y[1], P3z[1] = ax, ay, az
     P3x[2], P3y[2], P3z[2] = ax + ux_, ay + uy_, az + uz_
     P3x[3], P3y[3], P3z[3] = ax + ux_ + vx_, ay + uy_ + vy_, az + uz_ + vz_
     P3x[4], P3y[4], P3z[4] = ax + vx_, ay + vy_, az + vz_
-    local m, clipped = 0, false
+    local m = 0
     local jx, jy, jz = P3x[4], P3y[4], P3z[4]
     for i = 1, 4 do
       local ix, iy, iz = P3x[i], P3y[i], P3z[i]
@@ -1571,7 +1635,6 @@ local render3D, initGfx
         local t, s = (NEAR - jz) / (iz - jz), F / NEAR
         m = m + 1
         fxs[m], fys[m] = CX + (jx + (ix - jx) * t) * s, CY - (jy + (iy - jy) * t) * s
-        clipped = true
       end
       if iz >= NEAR then
         local s = F / iz
@@ -1588,36 +1651,7 @@ local render3D, initGfx
       if y < y0 then y0 = y elseif y > y1 then y1 = y end
     end
     if x1 < VX or x0 > VX + VW or y1 < VY or y0 > VY + VH then return end
-    if clipped then
-      fillPoly(m, col)
-      return
-    end
-    local a1, b1, a2, b2, a3, b3, a4, b4 = fxs[1], fys[1], fxs[2], fys[2], fxs[3], fys[3], fxs[4], fys[4]
-    if x1 - x0 > 150 or y1 - y0 > 150 then
-      fillPoly(4, col)
-    else
-      -- rule along the pair of edges that needs fewer lines
-      local n1, n2 = md(a4 - a1, b4 - b1), md(a3 - a2, b3 - b2)
-      if n2 > n1 then n1 = n2 end
-      local n3, n4 = md(a2 - a1, b2 - b1), md(a3 - a4, b3 - b4)
-      if n4 > n3 then n3 = n4 end
-      local sa, sb, sc, sd, ta, tb, tc, td = a1, b1, a2, b2, a4, b4, a3, b3
-      if n3 < n1 then sa, sb, sc, sd, ta, tb, tc, td, n1 = a1, b1, a4, b4, a2, b2, a3, b3, n3 end
-      n1 = floor(n1)
-      if n1 < 1 then n1 = 1 end
-      local dx1, dy1, dx2, dy2 = (ta - sa) / n1, (tb - sb) / n1, (tc - sc) / n1, (td - sd) / n1
-      local safe = x1 <= XL and y1 <= YL
-      for _ = 0, n1 do
-        if safe then drawLine(sa, sb, sc, sd, SOLID, col) else ln(sa, sb, sc, sd, col) end
-        sa, sb, sc, sd = sa + dx1, sb + dy1, sc + dx2, sd + dy2
-      end
-    end
-    if x1 - x0 + y1 - y0 > 6 then
-      ln(a1, b1, a2, b2, ecol)
-      ln(a2, b2, a3, b3, ecol)
-      ln(a3, b3, a4, b4, ecol)
-      ln(a4, b4, a1, b1, ecol)
-    end
+    fillPoly(m, col)
   end
 
   local function drawGate(i, z)
@@ -2939,6 +2973,7 @@ local function init()
     TEST.box = function(b) return BX.x0[b], BX.x1[b], BX.y0[b], BX.y1[b], BX.z0[b], BX.z1[b] end
     TEST.S = S
     TEST.order = function() return nOrd, ordP, ordI, TEST.bounds, kpx, kpy, kpz end
+    TEST.cam = function() return krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz end
   end
 end
 

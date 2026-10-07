@@ -60,7 +60,7 @@ local OPTS = {
 -- Betaflight "actual" rates: roll/pitch center, max (deg/s), expo %, then yaw (Soft, Normal, Fast);
 -- racer, freestyle: prop pitch speed (m/s), rotor drag, side and top drag, motor and rate lag (s)
 local RATES = nums("70 400 35 70 350 30 100 600 50 100 500 40 150 850 45 130 700 40")
-local QP = nums("86 .22 .009 .028 .02 .012 60 .18 .0072 .024 .03 .02")
+local QP = nums("86 .22 .009 .028 .02 .012 66 .205 .0082 .026 .025 .016")
 
 -- tracks: the names; each track's gates and structures are in StickTimeLite/t<number>.txt (made
 -- by build.py from src/sticktime_lite_tracks.txt) and only read when the track is picked

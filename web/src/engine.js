@@ -21,9 +21,13 @@ const EdgeTX = (() => {
 
   // Rough per-operation costs (microseconds) used for the radio CPU estimate.
   // Derived from how the firmware implements each call; real radios vary.
+  // Color radios: a slanted lcd.drawLine is a software Bresenham that stores pixel by pixel
+  // into the frame buffer in SDRAM (about 25 cycles a pixel), and on H7 radios every call
+  // also cleans the whole data cache. A filled triangle draws each row through LVGL's
+  // fill (a few hundred cycles a row, then a fast fill).
   const CPU = {
-    F4: { name: 'STM32F429 (TX16S class)', instr: 0.32, call: 3.0, linePx: 0.03, scan: 5.0, scanPx: 0.006, rect: 9, rectPx: 0.006, blendPx: 0.03, text: 35, glyph: 6, frame: 4000 },
-    H7: { name: 'STM32H750 (TX15 / MK3 class)', instr: 0.11, call: 7.0, linePx: 0.012, scan: 2.0, scanPx: 0.003, rect: 4, rectPx: 0.002, blendPx: 0.012, text: 14, glyph: 2.5, frame: 2500 },
+    F4: { name: 'STM32F429 (TX16S class)', instr: 0.32, call: 3.0, linePx: 0.12, scan: 2.5, scanPx: 0.009, rect: 9, rectPx: 0.006, blendPx: 0.03, text: 35, glyph: 6, frame: 4000 },
+    H7: { name: 'STM32H750 (TX15 / MK3 class)', instr: 0.11, call: 7.0, linePx: 0.04, scan: 1.0, scanPx: 0.003, rect: 4, rectPx: 0.002, blendPx: 0.012, text: 14, glyph: 2.5, frame: 2500 },
     BW: { name: 'STM32F4 B&W (TX12 class)', instr: 0.32, call: 2.5, linePx: 0.06, scan: 0, scanPx: 0, rect: 3, rectPx: 0.06, blendPx: 0, text: 12, glyph: 2, frame: 1200 },
     // 120 MHz Cortex-M3 without FPU: slower clock, and Lua's floats run in software
     F2: { name: 'STM32F2 B&W (X7 / X9D+ class)', instr: 0.55, call: 3.5, linePx: 0.08, scan: 0, scanPx: 0, rect: 4, rectPx: 0.08, blendPx: 0, text: 16, glyph: 3, frame: 1500 },

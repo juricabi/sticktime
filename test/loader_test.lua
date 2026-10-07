@@ -36,5 +36,25 @@ for _, loader in ipairs({ "StickTimeBW.lua", "StickTimeLite.lua" }) do
   check(loader, true)
   check(loader, false)
 end
+
+-- started on a color radio: no game loaded, a message instead, EXIT closes it
+CENTER, MIDSIZE, SMLSIZE, EVT_VIRTUAL_EXIT, EVT_VIRTUAL_ENTER = 4, 0x400, 0x300, 1, 2
+for _, loader in ipairs({ "StickTimeBW.lua", "StickTimeLite.lua" }) do
+  LCD_W, LCD_H = 480, 272
+  local calls, texts = 0, 0
+  function loadScript(path)
+    local rel = string.match(path, "TOOLS/(.*)%.lua$")
+    if string.match(rel, "/color$") then return loadfile(ROOT .. rel .. ".lua") end
+    calls = calls + 1
+    return nil
+  end
+  lcd.drawText = function(x, y, t) texts = texts + 1 if x < 0 or y < 0 or x > LCD_W or y > LCD_H then texts = -99 end end
+  local m = dofile(ROOT .. loader)
+  local good = type(m) == "table" and calls == 0 and m.run(0) == 0 and texts == 7 and m.run(EVT_VIRTUAL_EXIT) == 1
+  print(string.format("%-18s on a color radio: %s", loader, good and "message, no game loaded, EXIT closes: ok" or "FAIL"))
+  ok = ok and good
+  lcd.drawText = nil
+end
+LCD_W, LCD_H = 128, 64
 print(ok and "loaders: ok" or "loaders: FAIL")
 if not ok then os.exit(1) end
