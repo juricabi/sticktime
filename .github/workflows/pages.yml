@@ -1,0 +1,51 @@
+---
+name: Emulator on GitHub Pages
+# The browser emulator (web/simulator.html, one self-contained file) as the project's site:
+# https://juricabi.github.io/sticktime/
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'web/simulator.html'
+      - 'docs/social-preview.png'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy the emulator
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v7
+
+      - name: Put the site together
+        run: |
+          mkdir -p _site
+          cp web/simulator.html _site/index.html
+          cp docs/social-preview.png _site/social-preview.png
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v6
+
+      - name: Upload the site
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v5

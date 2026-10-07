@@ -2,6 +2,8 @@
 
 **StickTime** is a real 3D FPV quad simulator that runs **on your radio** as an EdgeTX Lua tool, on every color screen and on black & white radios, with a **Lite** edition for older B&W radios that have little memory. Get stick time anywhere with nothing but your radio: race AI pilots, fly freestyle tricks around a bando, or chase gates against the clock. A browser emulator runs the very same scripts, so you can try it before copying it to the SD card.
 
+**[Play it in your browser](https://juricabi.github.io/sticktime/)** · **[Download for your radio](https://github.com/juricabi/sticktime/releases/latest)** · EdgeTX 2.11 or newer (the color version also runs on older EdgeTX) · free software, GPL-2.0
+
 StickTime was called FPV Sim up to version 1.2.
 
 ![StickTime's menu on a TX16S](docs/tx16s-menu.png)
@@ -36,7 +38,7 @@ StickTime was called FPV Sim up to version 1.2.
 
 ## Install
 
-1. Copy from this repository's `sdcard/SCRIPTS/TOOLS/` to `/SCRIPTS/TOOLS/` on the radio's SD card:
+1. Download `StickTime-<version>-sdcard.zip` from the [latest release](https://github.com/juricabi/sticktime/releases/latest) (the same files are in this repository's `sdcard/` folder) and copy from its `SCRIPTS/TOOLS/` to `/SCRIPTS/TOOLS/` on the radio's SD card:
    - **Color radios:** `StickTime.lua`
    - **B&W radios with an STM32F4** (see the table below): `StickTimeBW.lua` **and** the `StickTimeBW` folder
    - **Older B&W radios (STM32F2):** `StickTimeLite.lua` **and** the `StickTimeLite` folder (the game and its seven track files). StickTime Lite runs on the other B&W radios too.
@@ -135,7 +137,7 @@ The script is ready for that:
 
 ## Browser emulator
 
-Open `web/simulator.html` in Chrome, Edge or Firefox. It runs the real `.lua` files in a Lua 5.3 VM with an EdgeTX-style API and draws them pixel by pixel the way the firmware does, including the line rule above.
+Play it at **[juricabi.github.io/sticktime](https://juricabi.github.io/sticktime/)**, or open `web/simulator.html` (one file, works offline) in Chrome, Edge or Firefox. It runs the real `.lua` files in a Lua 5.3 VM with an EdgeTX-style API and draws them pixel by pixel the way the firmware does, including the line rule above.
 
 - Pick any radio screen, color or B&W, or **PC screen**: 1280×720 at 60 fps with no radio limits, for playing and testing on a computer. **Fullscreen** (or the F key) fills the monitor, and B&W screens keep sharp pixels.
 - StickTime runs on color screens and the PC screen, StickTime BW and StickTime Lite on any screen (on a color screen through their `color.lua`, as on a radio). Picking StickTime with a B&W screen moves to a color screen, and picking a B&W screen while StickTime is selected switches to Auto.
@@ -160,6 +162,8 @@ build.py                -> sdcard/SCRIPTS/TOOLS/: StickTime.lua, StickTimeBW.lua
                         into the code that uses them)
 web/src/                emulator: engine.js (EdgeTX API + LCD), app.js (UI), style.css, index.html
 tools/bundle_web.py     -> web/simulator.html (offline, single file) and web/artifact.html
+.github/workflows/pages.yml
+                        publishes web/simulator.html as the project site (GitHub Pages)
 tools/build_etxlua.sh   builds Lua 5.3 with EdgeTX's number settings (native and 32-bit) for the tests
 tools/build_etxhost.sh  builds tools/etxhost/host.c: EdgeTX's own Lua core (32-bit) with a model of the B&W
                         radios' Lua allocator; makes the core.luac files and runs test/memtest.lua
@@ -189,3 +193,7 @@ test/run_all.sh
 
 - Idea from [lua-fpv-sim](https://github.com/alexeystn/lua-fpv-sim) by Alexey Stankevich, the first FPV sim on OpenTX. This project is an independent rewrite with a 3D engine.
 - Emulator: [fengari](https://fengari.io) Lua VM (MIT), Roboto font (SIL OFL), X11 misc-fixed bitmap fonts (public domain). License texts are in `web/vendor/`.
+
+## License
+
+StickTime is free software under the [GNU General Public License v2](LICENSE), the same license as EdgeTX. The emulator includes fengari (MIT), the Roboto font (SIL Open Font License) and the X11 misc-fixed bitmap fonts (public domain); their license texts are in `web/vendor/`.

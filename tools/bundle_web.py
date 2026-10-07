@@ -57,9 +57,24 @@ def main():
     inline = "<script>\n/* fengari-web 0.1.4 (MIT) - https://fengari.io */\n" + read(W / "vendor/fengari-web.js") + "\n</script>"
     art = tpl.replace("{{FENGARI_TAG}}", cdn)
     (W / "artifact.html").write_text(art, encoding="utf-8")
+    # the offline page is also the GitHub Pages site (.github/workflows/pages.yml): search and
+    # link-preview metadata in its head
+    site = "https://juricabi.github.io/sticktime/"
+    desc = ("Play StickTime in your browser: a real 3D FPV quad simulator that runs on EdgeTX radios as a Lua "
+            "tool. Race AI pilots, fly freestyle around a bando, chase gates. The emulator runs the same "
+            "scripts as the radio, on any color or black & white screen.")
+    meta = ("<title>StickTime: 3D FPV simulator for EdgeTX radios</title>\n"
+            f"<meta name=\"description\" content=\"{desc}\">\n"
+            f"<link rel=\"canonical\" href=\"{site}\">\n"
+            "<meta property=\"og:type\" content=\"website\">\n"
+            "<meta property=\"og:title\" content=\"StickTime: 3D FPV simulator for EdgeTX radios\">\n"
+            f"<meta property=\"og:description\" content=\"{desc}\">\n"
+            f"<meta property=\"og:url\" content=\"{site}\">\n"
+            f"<meta property=\"og:image\" content=\"{site}social-preview.png\">\n"
+            "<meta name=\"twitter:card\" content=\"summary_large_image\">\n")
     full = ("<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n"
             "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\">\n"
-            "</head>\n<body>\n" + tpl.replace("{{FENGARI_TAG}}", inline) + "\n</body>\n</html>\n")
+            + meta + "</head>\n<body>\n" + tpl.replace("{{FENGARI_TAG}}", inline) + "\n</body>\n</html>\n")
     (W / "simulator.html").write_text(full, encoding="utf-8")
     for f in ("artifact.html", "simulator.html"):
         print(f, (W / f).stat().st_size // 1024, "KB")
