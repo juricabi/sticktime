@@ -128,7 +128,7 @@ On the HelloRadioSky V12 (STM32H750, firmware in SDRAM, 320×240 screen on SPI) 
 - sends frames to the screen in the background: the screen's vertical blank signal (FMARK) starts the transfer and the SPI interrupt finishes it, while the CPU already runs the next frame. Stock EdgeTX waits for the blank and then for the 13 ms transfer every frame.
 - paces the frames evenly: a frame starts no sooner than 20 ms after the previous one, so every frame goes out on every second refresh of the screen, a steady 38 fps. Otherwise a light game such as StickTime BW mixes frames that catch the very next refresh (13 ms) with frames that wait for the one after (26 ms), which looks less smooth even though it averages more fps.
 
-The mixer task (sticks, mixes, RF output, telemetry, watchdog) has a higher priority and is not touched. `tools/build_firmware.sh v12` fetches the EdgeTX `main` commit the patch is made against, applies the patch and builds the firmware for that radio (any target name from EdgeTX's `tools/build-common.sh`), with ARM GCC 14.2 on the `PATH`. The same changes are on the `fast-lua-20ms` branch of [juricabi/edgetx](https://github.com/juricabi/edgetx/tree/fast-lua-20ms), whose CI publishes firmware for every color radio as the `fast-lua-20ms` prerelease. Estimated stick-to-screen latency drops from about 90 ms to about 40 ms.
+The mixer task (sticks, mixes, RF output, telemetry, watchdog) has a higher priority and is not touched. `tools/build_firmware.sh v12` clones EdgeTX `main`, applies the patch and builds the firmware for that radio (any target name from EdgeTX's `tools/build-common.sh`), with ARM GCC 14.2 on the `PATH`. The same changes are on the `fast-lua-20ms` branch of [juricabi/edgetx](https://github.com/juricabi/edgetx/tree/fast-lua-20ms), whose CI publishes firmware for every color radio as the `fast-lua-20ms` prerelease. Estimated stick-to-screen latency drops from about 90 ms to about 40 ms.
 
 The script is ready for that:
 
@@ -172,7 +172,7 @@ tools/build_etxlua.sh   builds Lua 5.3 with EdgeTX's number settings (native and
 tools/build_etxhost.sh  builds tools/etxhost/host.c: EdgeTX's own Lua core (32-bit) with a model of the B&W
                         radios' Lua allocator; makes the core.luac files and runs test/memtest.lua
 tools/tune_physics.py   steady-state check of the flight model (top speed, punch-out, fall, braking)
-tools/build_firmware.sh EdgeTX (pinned main commit) + firmware/edgetx-fast-lua.patch for one radio (see Faster firmware)
+tools/build_firmware.sh EdgeTX main + firmware/edgetx-fast-lua.patch for one radio (see Faster firmware)
 test/harness.lua        headless EdgeTX mock: autopilot races with AI pilots on every track, flags, hoops,
                         dive gates, freestyle combos, gate rush, menus, crashes, taking over FPV Sim's
                         saves (version 1 format)

@@ -1,5 +1,5 @@
 diff --git a/radio/src/boards/generic_stm32/linker/stm32h750_sdram/extra_sections.ld b/radio/src/boards/generic_stm32/linker/stm32h750_sdram/extra_sections.ld
-index bc3890c..92a19a8 100644
+index bc3890cc0..92a19a84f 100644
 --- a/radio/src/boards/generic_stm32/linker/stm32h750_sdram/extra_sections.ld
 +++ b/radio/src/boards/generic_stm32/linker/stm32h750_sdram/extra_sections.ld
 @@ -22,6 +22,9 @@
@@ -13,7 +13,7 @@ index bc3890c..92a19a8 100644
    . = ALIGN(4);
    _eiram = .;
 diff --git a/radio/src/boards/helloradio-h750/lcd_driver.cpp b/radio/src/boards/helloradio-h750/lcd_driver.cpp
-index db167fb..767f62c 100644
+index db167fbe4..767f62c5d 100644
 --- a/radio/src/boards/helloradio-h750/lcd_driver.cpp
 +++ b/radio/src/boards/helloradio-h750/lcd_driver.cpp
 @@ -31,6 +31,18 @@
@@ -290,7 +290,7 @@ index db167fb..767f62c 100644
    lcdSetFlushCb(startLcdRefresh);
  }
 diff --git a/radio/src/gui/colorlcd/lcd.cpp b/radio/src/gui/colorlcd/lcd.cpp
-index 24d28b4..4483a0e 100644
+index 24d28b40b..4483a0e4e 100644
 --- a/radio/src/gui/colorlcd/lcd.cpp
 +++ b/radio/src/gui/colorlcd/lcd.cpp
 @@ -56,12 +56,10 @@ void lcdSetFlushCb(void (*cb)(lv_disp_drv_t*, uint16_t*, const rect_t&))
@@ -319,7 +319,7 @@ index 24d28b4..4483a0e 100644
    disp_drv.hor_res = LCD_W; /*Set the horizontal resolution in pixels*/
    disp_drv.ver_res = LCD_H; /*Set the vertical resolution in pixels*/
 diff --git a/radio/src/gui/colorlcd/lcd.h b/radio/src/gui/colorlcd/lcd.h
-index c5d64e4..bc08b48 100644
+index c5d64e4ba..bc08b48ca 100644
 --- a/radio/src/gui/colorlcd/lcd.h
 +++ b/radio/src/gui/colorlcd/lcd.h
 @@ -40,9 +40,9 @@ typedef _lv_disp_drv_t lv_disp_drv_t;
@@ -335,7 +335,7 @@ index c5d64e4..bc08b48 100644
  // Init LVGL and its display driver
  void lcdInitDisplayDriver();
 diff --git a/radio/src/gui/colorlcd/libui/bitmapbuffer.cpp b/radio/src/gui/colorlcd/libui/bitmapbuffer.cpp
-index 1962e6f..49be9cd 100644
+index 1962e6fef..49be9cd38 100644
 --- a/radio/src/gui/colorlcd/libui/bitmapbuffer.cpp
 +++ b/radio/src/gui/colorlcd/libui/bitmapbuffer.cpp
 @@ -98,7 +98,7 @@ void BitmapBuffer::setData(uint16_t *d)
@@ -485,7 +485,7 @@ index 1962e6f..49be9cd 100644
    lv_draw_rect_dsc_init(&rect_dsc);
    rect_dsc.bg_opa = ((OPACITY_MAX - opacity) * LV_OPA_COVER) / OPACITY_MAX;
 diff --git a/radio/src/gui/colorlcd/libui/bitmapbuffer.h b/radio/src/gui/colorlcd/libui/bitmapbuffer.h
-index 29d4ee0..157c8bd 100644
+index 29d4ee04d..157c8bdc3 100644
 --- a/radio/src/gui/colorlcd/libui/bitmapbuffer.h
 +++ b/radio/src/gui/colorlcd/libui/bitmapbuffer.h
 @@ -42,6 +42,14 @@ constexpr uint8_t STASHED = 0x33;
@@ -523,7 +523,7 @@ index 29d4ee0..157c8bd 100644
 +  void fastFill(coord_t x, coord_t y, coord_t w, coord_t h, pixel_t color);
  };
 diff --git a/radio/src/gui/colorlcd/libui/bitmapbuffer_draw_extra.cpp b/radio/src/gui/colorlcd/libui/bitmapbuffer_draw_extra.cpp
-index 38307bc..24636c6 100644
+index 38307bc08..24636c658 100644
 --- a/radio/src/gui/colorlcd/libui/bitmapbuffer_draw_extra.cpp
 +++ b/radio/src/gui/colorlcd/libui/bitmapbuffer_draw_extra.cpp
 @@ -43,10 +43,7 @@ void BitmapBuffer::invertRect(coord_t x, coord_t y, coord_t w, coord_t h,
@@ -626,7 +626,7 @@ index 38307bc..24636c6 100644
    for (int y1 = h2 - 1; y1 >= 0; y1--) {
      for (int x1 = w2 - 1; x1 >= 0; x1--) {
 diff --git a/radio/src/gui/colorlcd/standalone_lua.cpp b/radio/src/gui/colorlcd/standalone_lua.cpp
-index e9274a0..03a92a2 100644
+index e9274a074..03a92a211 100644
 --- a/radio/src/gui/colorlcd/standalone_lua.cpp
 +++ b/radio/src/gui/colorlcd/standalone_lua.cpp
 @@ -22,6 +22,7 @@
@@ -685,7 +685,7 @@ index e9274a0..03a92a2 100644
            }
          } else if (lua_isstring(lsStandalone, -1)) {
 diff --git a/radio/src/lua/CMakeLists.txt b/radio/src/lua/CMakeLists.txt
-index 47e576c..1deaef2 100644
+index 47e576c8a..1deaef2cf 100644
 --- a/radio/src/lua/CMakeLists.txt
 +++ b/radio/src/lua/CMakeLists.txt
 @@ -71,3 +71,14 @@ add_compile_definitions(LUA_COMPAT_5_2)
@@ -704,7 +704,7 @@ index 47e576c..1deaef2 100644
 +  endforeach()
 +endif()
 diff --git a/radio/src/lua/api_colorlcd.cpp b/radio/src/lua/api_colorlcd.cpp
-index 2c6451c..afdc5e2 100644
+index 2c6451c02..afdc5e243 100644
 --- a/radio/src/lua/api_colorlcd.cpp
 +++ b/radio/src/lua/api_colorlcd.cpp
 @@ -64,7 +64,7 @@ Clear the LCD screen
@@ -762,7 +762,7 @@ index 2c6451c..afdc5e2 100644
    if (!luaLcdAllowed || !luaLcdBuffer)
      return 0;
 diff --git a/radio/src/targets/common/arm/stm32/dma2d.cpp b/radio/src/targets/common/arm/stm32/dma2d.cpp
-index c5f6e72..0946f08 100644
+index c5f6e72c8..0946f0844 100644
 --- a/radio/src/targets/common/arm/stm32/dma2d.cpp
 +++ b/radio/src/targets/common/arm/stm32/dma2d.cpp
 @@ -25,6 +25,8 @@
@@ -807,7 +807,7 @@ index c5f6e72..0946f08 100644
  
  }
 diff --git a/radio/src/targets/common/arm/stm32/dma2d.h b/radio/src/targets/common/arm/stm32/dma2d.h
-index d13e69c..a3e1999 100644
+index d13e69ca0..a3e1999ed 100644
 --- a/radio/src/targets/common/arm/stm32/dma2d.h
 +++ b/radio/src/targets/common/arm/stm32/dma2d.h
 @@ -24,7 +24,7 @@
@@ -841,10 +841,10 @@ index d13e69c..a3e1999 100644
  void DMAInit();
  void DMAFillRect(uint16_t * dest, uint16_t destw, uint16_t desth, uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t color);
  void DMACopyBitmap(uint16_t * dest, uint16_t destw, uint16_t desth, uint16_t x, uint16_t y, const uint16_t * src, uint16_t srcw, uint16_t srch, uint16_t srcx, uint16_t srcy, uint16_t w, uint16_t h);
-diff --git a/radio/src/targets/v12/CMakeLists.txt b/radio/src/targets/v12/CMakeLists.txt
-index 18fb1cd..cd592c1 100644
---- a/radio/src/targets/v12/CMakeLists.txt
-+++ b/radio/src/targets/v12/CMakeLists.txt
+diff --git a/radio/src/targets/hrs/v12/CMakeLists.txt b/radio/src/targets/hrs/v12/CMakeLists.txt
+index 3771abf1e..dc4ec4751 100644
+--- a/radio/src/targets/hrs/v12/CMakeLists.txt
++++ b/radio/src/targets/hrs/v12/CMakeLists.txt
 @@ -71,6 +71,10 @@ add_definitions(
  
  set(SDRAM ON)
@@ -857,7 +857,7 @@ index 18fb1cd..cd592c1 100644
  set(AUX_SERIAL YES)
  
 diff --git a/radio/src/tasks.cpp b/radio/src/tasks.cpp
-index 0fda1a4..bd9c636 100644
+index 0c70b79e0..49100a0d2 100644
 --- a/radio/src/tasks.cpp
 +++ b/radio/src/tasks.cpp
 @@ -53,6 +53,19 @@ mutex_handle_t audioMutex;
@@ -880,7 +880,7 @@ index 0fda1a4..bd9c636 100644
  #if defined(COLORLCD) && defined(CLI)
  bool perMainEnabled = true;
  #endif
-@@ -95,7 +108,7 @@ static void menusTask()
+@@ -97,7 +110,7 @@ static void menusTask()
  #endif
      DEBUG_TIMER_STOP(debugTimerPerMain);
  
@@ -890,7 +890,7 @@ index 0fda1a4..bd9c636 100644
    }
  
 diff --git a/radio/src/thirdparty/Lua/src/lapi.c b/radio/src/thirdparty/Lua/src/lapi.c
-index 0a7aaef..1819f5f 100644
+index 0a7aaefc5..1819f5f42 100644
 --- a/radio/src/thirdparty/Lua/src/lapi.c
 +++ b/radio/src/thirdparty/Lua/src/lapi.c
 @@ -57,7 +57,7 @@ const char lua_ident[] =
@@ -1639,7 +1639,7 @@ index 0a7aaef..1819f5f 100644
    LClosure *f1;
    UpVal **up1 = getupvalref(L, fidx1, n1, &f1);
 diff --git a/radio/src/thirdparty/Lua/src/lauxlib.c b/radio/src/thirdparty/Lua/src/lauxlib.c
-index 6b3d726..627b3c3 100644
+index 6b3d726d8..627b3c3bb 100644
 --- a/radio/src/thirdparty/Lua/src/lauxlib.c
 +++ b/radio/src/thirdparty/Lua/src/lauxlib.c
 @@ -47,7 +47,7 @@ void etxNormalizePath(const char *in, char *out, size_t outLen);
@@ -2224,7 +2224,7 @@ index 6b3d726..627b3c3 100644
    if (sz != LUAL_NUMSIZES)  /* check numeric types */
      luaL_error(L, "core and library have incompatible numeric types");
 diff --git a/radio/src/thirdparty/Lua/src/lbaselib.c b/radio/src/thirdparty/Lua/src/lbaselib.c
-index 9ebebff..5d25c95 100644
+index 9ebebff93..5d25c9536 100644
 --- a/radio/src/thirdparty/Lua/src/lbaselib.c
 +++ b/radio/src/thirdparty/Lua/src/lbaselib.c
 @@ -20,7 +20,7 @@
@@ -2504,7 +2504,7 @@ index 9ebebff..5d25c95 100644
    lua_pushliteral(L, LUA_VERSION);  /* set global _VERSION */
    lua_setfield(L, -2, "_VERSION");
 diff --git a/radio/src/thirdparty/Lua/src/ldo.c b/radio/src/thirdparty/Lua/src/ldo.c
-index ae4615b..69cc931 100644
+index ae4615b08..69cc93134 100644
 --- a/radio/src/thirdparty/Lua/src/ldo.c
 +++ b/radio/src/thirdparty/Lua/src/ldo.c
 @@ -88,7 +88,7 @@ struct lua_longjmp {
@@ -2793,7 +2793,7 @@ index ae4615b..69cc931 100644
    struct SParser p;
    int status;
 diff --git a/radio/src/thirdparty/Lua/src/lfunc.c b/radio/src/thirdparty/Lua/src/lfunc.c
-index 3512b2c..74b60e9 100644
+index 3512b2c71..74b60e99c 100644
 --- a/radio/src/thirdparty/Lua/src/lfunc.c
 +++ b/radio/src/thirdparty/Lua/src/lfunc.c
 @@ -22,7 +22,7 @@
@@ -2869,7 +2869,7 @@ index 3512b2c..74b60e9 100644
    for (i = 0; i<f->sizelocvars && f->locvars[i].startpc <= pc; i++) {
      if (pc < f->locvars[i].endpc) {  /* is variable active? */
 diff --git a/radio/src/thirdparty/Lua/src/lgc.c b/radio/src/thirdparty/Lua/src/lgc.c
-index aeea565..7d4b719 100644
+index aeea56534..7d4b7194b 100644
 --- a/radio/src/thirdparty/Lua/src/lgc.c
 +++ b/radio/src/thirdparty/Lua/src/lgc.c
 @@ -122,7 +122,7 @@ static void reallymarkobject (global_State *g, GCObject *o);
@@ -3309,7 +3309,7 @@ index aeea565..7d4b719 100644
    lua_assert(g->gckind == KGC_NORMAL);
    if (isemergency) g->gckind = KGC_EMERGENCY;  /* set flag */
 diff --git a/radio/src/thirdparty/Lua/src/lmathlib.c b/radio/src/thirdparty/Lua/src/lmathlib.c
-index 46ee1b3..4e3834f 100644
+index 46ee1b3bb..4e3834f8f 100644
 --- a/radio/src/thirdparty/Lua/src/lmathlib.c
 +++ b/radio/src/thirdparty/Lua/src/lmathlib.c
 @@ -35,7 +35,7 @@
@@ -3576,7 +3576,7 @@ index 46ee1b3..4e3834f 100644
  }
  
 diff --git a/radio/src/thirdparty/Lua/src/lmem.c b/radio/src/thirdparty/Lua/src/lmem.c
-index 0241cc3..be90fe7 100644
+index 0241cc3ba..be90fe7df 100644
 --- a/radio/src/thirdparty/Lua/src/lmem.c
 +++ b/radio/src/thirdparty/Lua/src/lmem.c
 @@ -45,7 +45,7 @@
@@ -3607,7 +3607,7 @@ index 0241cc3..be90fe7 100644
    global_State *g = G(L);
    size_t realosize = (block) ? osize : 0;
 diff --git a/radio/src/thirdparty/Lua/src/lobject.c b/radio/src/thirdparty/Lua/src/lobject.c
-index 2218c8c..2988600 100644
+index 2218c8cdd..298860055 100644
 --- a/radio/src/thirdparty/Lua/src/lobject.c
 +++ b/radio/src/thirdparty/Lua/src/lobject.c
 @@ -38,7 +38,7 @@ LUAI_DDEF const TValue luaO_nilobject_ = {NILCONSTANT};
@@ -3780,7 +3780,7 @@ index 2218c8c..2988600 100644
    if (*source == '=') {  /* 'literal' source */
      if (l <= bufflen)  /* small enough? */
 diff --git a/radio/src/thirdparty/Lua/src/lstate.c b/radio/src/thirdparty/Lua/src/lstate.c
-index 6b3a9da..e48f9f4 100644
+index 6b3a9da60..e48f9f497 100644
 --- a/radio/src/thirdparty/Lua/src/lstate.c
 +++ b/radio/src/thirdparty/Lua/src/lstate.c
 @@ -78,7 +78,7 @@ typedef struct LG {
@@ -3924,7 +3924,7 @@ index 6b3a9da..e48f9f4 100644
    lua_lock(L);
    close_state(L);
 diff --git a/radio/src/thirdparty/Lua/src/lstring.c b/radio/src/thirdparty/Lua/src/lstring.c
-index b950067..5337971 100644
+index b95006709..533797190 100644
 --- a/radio/src/thirdparty/Lua/src/lstring.c
 +++ b/radio/src/thirdparty/Lua/src/lstring.c
 @@ -36,7 +36,7 @@
@@ -4044,7 +4044,7 @@ index b950067..5337971 100644
    GCObject *o;
    if (s > MAX_SIZE - sizeof(Udata))
 diff --git a/radio/src/thirdparty/Lua/src/ltable.c b/radio/src/thirdparty/Lua/src/ltable.c
-index 66d6299..fbc1269 100644
+index 66d6299c9..fbc1269f7 100644
 --- a/radio/src/thirdparty/Lua/src/ltable.c
 +++ b/radio/src/thirdparty/Lua/src/ltable.c
 @@ -95,7 +95,7 @@ static const Node dummynode_ = {
@@ -4343,7 +4343,7 @@ index 66d6299..fbc1269 100644
  }
  #endif
 diff --git a/radio/src/thirdparty/Lua/src/ltablib.c b/radio/src/thirdparty/Lua/src/ltablib.c
-index a4dd9d1..1895236 100644
+index a4dd9d144..1895236b0 100644
 --- a/radio/src/thirdparty/Lua/src/ltablib.c
 +++ b/radio/src/thirdparty/Lua/src/ltablib.c
 @@ -33,7 +33,7 @@
@@ -4509,7 +4509,7 @@ index a4dd9d1..1895236 100644
  }
  
 diff --git a/radio/src/thirdparty/Lua/src/ltm.c b/radio/src/thirdparty/Lua/src/ltm.c
-index 6b20253..e1cdd3c 100644
+index 6b2025303..e1cdd3ca8 100644
 --- a/radio/src/thirdparty/Lua/src/ltm.c
 +++ b/radio/src/thirdparty/Lua/src/ltm.c
 @@ -45,7 +45,7 @@ static const char *const luaT_eventname[] = {  /* ORDER TM */
@@ -4594,7 +4594,7 @@ index 6b20253..e1cdd3c 100644
    if (!luaT_callbinTM(L, p1, p2, L->top, event))
      return -1;  /* no metamethod */
 diff --git a/radio/src/thirdparty/Lua/src/luaconf.h b/radio/src/thirdparty/Lua/src/luaconf.h
-index 15c5376..dc9c7ec 100644
+index 15c53762d..dc9c7ec68 100644
 --- a/radio/src/thirdparty/Lua/src/luaconf.h
 +++ b/radio/src/thirdparty/Lua/src/luaconf.h
 @@ -150,6 +150,18 @@
@@ -4617,7 +4617,7 @@ index 15c5376..dc9c7ec 100644
  ** {==================================================================
  ** Compatibility with previous versions
 diff --git a/radio/src/thirdparty/Lua/src/lvm.c b/radio/src/thirdparty/Lua/src/lvm.c
-index 7a2d5a6..e7aa93a 100644
+index 7a2d5a6ed..e7aa93ac7 100644
 --- a/radio/src/thirdparty/Lua/src/lvm.c
 +++ b/radio/src/thirdparty/Lua/src/lvm.c
 @@ -69,7 +69,7 @@

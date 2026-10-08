@@ -1,10 +1,9 @@
 #!/bin/bash
-# Build EdgeTX (the main commit the patch is made against) with firmware/edgetx-fast-lua.patch
-# for one color radio: while a Lua tool is open, the UI loop runs every 20 ms instead of 50 ms,
-# each frame goes to the screen as soon as it is drawn, and its lines, rectangles and
-# triangles are drawn straight into the canvas. On the V12 the Lua interpreter also runs from
-# ITCM and frames go to the screen in the background, evenly paced. See README.md, Faster
-# firmware.
+# Build EdgeTX main with firmware/edgetx-fast-lua.patch for one color radio: while a Lua
+# tool is open, the UI loop runs every 20 ms instead of 50 ms, each frame goes to the screen
+# as soon as it is drawn, and its lines, rectangles and triangles are drawn straight into the
+# canvas. On the V12 the Lua interpreter also runs from ITCM and frames go to the screen in
+# the background, evenly paced. See README.md, Faster firmware.
 #
 #   tools/build_firmware.sh v12        (any target name from EdgeTX's tools/build-common.sh)
 #
@@ -17,17 +16,11 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 TARGET=${1:?usage: tools/build_firmware.sh <target, e.g. v12>}
 PATCH=$ROOT/firmware/edgetx-fast-lua.patch
 SRC=${EDGETX_SRC:-$ROOT/.tools/edgetx-main}
-# the EdgeTX main commit the patch is made against (the base of the fast-lua-20ms branch):
-# later main reorganized the V12 target, so the patch does not apply to main's tip
-BASE=${EDGETX_BASE:-78007d0f9ca9b572f1d9e57c1063eb367a1820c3}
 if [ -n "$GCC_ARM" ]; then export PATH=$GCC_ARM:$PATH; fi
 
 if [ ! -d "$SRC/radio" ]; then
-  git init -q "$SRC"
-  git -C "$SRC" remote add origin https://github.com/EdgeTX/edgetx.git
-  git -C "$SRC" fetch -q --depth 1 origin "$BASE"
-  git -C "$SRC" checkout -q FETCH_HEAD
-  git -C "$SRC" submodule update -q --init --recursive --depth 1
+  git clone --depth 1 --branch main --recurse-submodules --shallow-submodules \
+    https://github.com/EdgeTX/edgetx.git "$SRC"
 fi
 cd "$SRC"
 if git apply --check "$PATCH" 2>/dev/null; then
