@@ -45,8 +45,7 @@ local MENU, SETUP, COUNT, FLY, CRASHED, READY, PAUSED, DONE = 1, 2, 3, 4, 5, 6, 
 
 -- ------------------------------------------------------------ settings
 local S = { track = 1, quad = 1, twr = 5, mode = 1, rates = 2, rc = 100, rm = 600, re = 50, yc = 100, ym = 500, ye = 40,
-            tilt = @TILT@, fov = @FOV@, laps = 3, ai = 2, skill = 2, wind = 0, wash = 0, snd = 2, vib = 1, map = 1, sticks = 0,
-            fps = 0 }
+            tilt = @TILT@, fov = @FOV@, laps = 3, ai = 2, skill = 2, wind = 0, wash = 0, vib = 1, map = 1, sticks = 0, fps = 0 }
 -- rows: label, key, then either a value list (+ names, suffix) or nil, nil, suffix, min, max, step
 local OPTS = {
   { "Quad", "quad", { 1, 2 }, { "Racer", "Freestyle" } },
@@ -66,7 +65,6 @@ local OPTS = {
   { "AI skill", "skill", { 1, 2, 3 }, { "Easy", "Medium", "Hard" } },
   { "Wind", "wind", { 0, 1, 2 }, { "Off", "Light", "Strong" } },
   { "Prop wash", "wash", { 0, 1 }, { "Off", "On" } },
-  { "Motor sound", "snd", { 0, 1, 2, 3 }, { "Off", "Low", "Mid", "High" } },
   { "Vibration", "vib", { 0, 1 }, { "Off", "On" } },
 --#if COLOR
   { "Minimap", "map", { 0, 1 }, { "Off", "On" } },
@@ -427,7 +425,7 @@ local function showMsg(s, good)
 end
 
 -- -------------------------------------------------------------- physics
-local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rushNext, motorSound
+local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rushNext
 ;(function()
   local G = 9.81
   local SRC = { "ail", "ele", "thr", "rud" }
@@ -440,45 +438,6 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
   rnd = function()
     seed = seed * 171 % 30269
     return seed / 30269
-  end
-
-  -- motor sound. With the clips in StickTimeSound/ (16 levels of motor speed, four takes, 0.1 s
-  -- each, made by tools/make_motor_sound.py): EdgeTX plays queued files back to back, so the
-  -- clip for the current motor speed is queued whenever less than a frame and 20 ms of sound is
-  -- left, in a take picked at random (x = x * 11 % 251 runs through 250 values), which gives the
-  -- sound the slow, irregular wobble of real rotors. Without them: a tone on the background (vario) channel whose pitch follows the motor
-  -- speed (the square root of the thrust), 190 Hz at idle to 540 Hz flat out, a little higher
-  -- in fast rotations; each call restarts its 200 ms, so it plays as long as frames come.
-  local SNDF = "/SCRIPTS/TOOLS/StickTimeSound/m"
-  local TK, wav, sndOn, sndQ, sndX = { "a.wav", "b.wav", "c.wav", "d.wav" }, nil, false, 0, 1
-  motorSound = function(on)
-    if wav == nil then
-      local f = playFile and io.open(SNDF .. "01a.wav", "r")
-      wav = f and true or false
-      if f then io.close(f) end
-    end
-    if on and S.snd > 0 then
-      local r = sqrt(Tm / (P.twr * G))                  -- motor speed, 0..1
-      if wav then
-        local now = getTime()
-        if sndQ < now then sndQ = now end               -- nothing queued any more
-        if sndQ - now < R.fi + 2 then
-          local lv = floor((r - 0.12) * 17.05 + 1.5)
-          if lv < 1 then lv = 1 elseif lv > 16 then lv = 16 end
-          sndX = sndX * 11 % 251
-          playFile(SNDF .. (lv < 10 and "0" or "") .. lv .. TK[sndX % 4 + 1], S.snd + 1)
-          sndQ = sndQ + 9.994                           -- a clip is 1599 samples at 16 kHz
-        end
-      elseif playTone and PLAY_BACKGROUND then
-        local w = sqrt(P.wr * P.wr + P.wp * P.wp + P.wy * P.wy)
-        playTone(floor((140 + 400 * r) * (1 + (w < 12 and w or 12) * 0.006)), 200, 0, PLAY_BACKGROUND + PLAY_NOW, 0,
-          S.snd * 2 - 1)
-      end
-      sndOn = true
-    elseif sndOn then
-      if not wav then playTone(200, 0, 0, PLAY_BACKGROUND + PLAY_NOW) end   -- silence at once
-      sndOn, sndQ = false, 0
-    end
   end
 
   local function clamp1(v)
@@ -2240,7 +2199,6 @@ local function update(dt)
     AI.update(dt)
     if state ~= DONE then R.pos = AI.place() end
   end
-  motorSound((state == FLY or state == DONE) and dt > 0)
   if gmode == 4 and (state == FLY or state == CRASHED or state == READY) then
     R.rt = R.rt - dt
     if R.rt <= 0 then

@@ -36,7 +36,7 @@ end
 end
 return t
 end
-local S = { track = 1, quad = 1, twr = 5, mode = 1, rates = 2, tilt = 20, laps = 3, wind = 0, snd = 2, vib = 1 }
+local S = { track = 1, quad = 1, twr = 5, mode = 1, rates = 2, tilt = 20, laps = 3, wind = 0, vib = 1 }
 local OPTS = {
 { "Quad", "quad", { 1, 2 }, { "Racer", "Freestyle" } },
 { "Power", "twr", nums("3 4 5 6 7 8 10 12"), ":1" },
@@ -45,7 +45,6 @@ local OPTS = {
 { "Camera tilt", "tilt", nums("0 10 15 20 25 30 35 40 50") },
 { "Laps", "laps", nums("1 2 3 5 10") },
 { "Wind", "wind", { 0, 1, 2 }, { "Off", "Light", "Strong" } },
-{ "Motor sound", "snd", { 0, 1, 2, 3 }, { "Off", "Low", "Mid", "High" } },
 { "Vibration", "vib", { 0, 1 }, { "Off", "On" } },
 }
 local RATES = nums("70 400 35 70 350 30 100 600 50 100 500 40 150 850 45 130 700 40")
@@ -539,36 +538,6 @@ buildTrack(t)
 collectgarbage()                                  -- what building left behind, before flying
 place(spx, 0.15, spz, shx, shz)
 end
-local SNDF, TK, wav, sndOn, sndQ, sndX = "/SCRIPTS/TOOLS/StickTimeSound/m", { "a.wav", "b.wav", "c.wav", "d.wav" }, nil, false, 0, 1
-local function motorSound(on)
-if wav == nil then
-local f = playFile and io.open(SNDF .. "01a.wav", "r")
-wav = f and true or false
-if f then io.close(f) end
-end
-if on and S.snd > 0 then
-local r = sqrt(Tm / (S.twr * 9.81))
-if wav then
-local now = getTime()
-if sndQ < now then sndQ = now end
-if sndQ - now < fi + 2 then
-local lv = floor((r - 0.12) * 17.05 + 1.5)
-lv = lv < 1 and 1 or lv > 16 and 16 or lv
-sndX = sndX * 11 % 251
-playFile(SNDF .. (lv < 10 and "0" or "") .. lv .. TK[sndX % 4 + 1], S.snd + 1)
-sndQ = sndQ + 9.994
-end
-elseif PLAY_BACKGROUND then
-local w = sqrt(wr0 * wr0 + wp0 * wp0 + wy0 * wy0)
-playTone(floor((140 + 400 * r) * (1 + (w < 12 and w or 12) * 0.006)), 200, 0, PLAY_BACKGROUND + PLAY_NOW, 0,
-S.snd * 2 - 1)
-end
-sndOn = true
-elseif sndOn then
-if not wav then playTone(200, 0, 0, PLAY_BACKGROUND + PLAY_NOW) end   -- silence at once
-sndOn, sndQ = false, 0
-end
-end
 local function update(dt)
 if state == 3 then
 local n = floor((gt - tState) / 100)
@@ -604,7 +573,6 @@ elseif state == 6 then
 local e = gt - tState
 if e > 25 and (e > 200 or sA * sA + sE * sE + sR * sR > 0.015 or sT > 0.3) then state = 4 end
 end
-motorSound((state == 4 or state == 8) and dt > 0)
 if gm == 4 and state ~= 3 and state ~= 8 then
 rt = rt - dt
 if rt <= 0 then

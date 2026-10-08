@@ -378,8 +378,7 @@ const EdgeTX = (() => {
       global('getStickMode', () => { lua.lua_pushinteger(L, self.stickMode); return 1; });
       global('playTone', () => { if (self.onTone) self.onTone(int(1), int(2), opt(3, 0), opt(4, 0), opt(5, 0), opt(6, 0)); });
       global('playHaptic', () => { if (self.onHaptic) self.onHaptic(int(1)); });
-      global('playFile', () => { if (self.onFile) self.onFile(str(1), opt(2, 0)); });
-      global('playNumber', () => 0); global('killEvents', () => 0);
+      global('playFile', () => 0); global('playNumber', () => 0); global('killEvents', () => 0);
       global('getUsage', () => { lua.lua_pushinteger(L, 0); return 1; });
       global('getAvailableMemory', () => { lua.lua_pushinteger(L, 4 * 1024 * 1024); return 1; });
       global('getRSSI', () => { lua.lua_pushinteger(L, 0); return 1; });
