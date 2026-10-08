@@ -1,8 +1,11 @@
 ---
 name: Release
-# Publish a release on GitHub with a tag like v1.5 (Releases > Draft a new release): this
-# attaches the SD card zip (StickTime-1.5-sdcard.zip, built from sdcard/ at that tag) and,
-# when docs/releases/v1.5.md exists, uses it as the title and notes.
+# Publish a release on GitHub with a tag like v1.6 (Releases > Draft a new release): this
+# attaches the SD card zip (StickTime-1.6-sdcard.zip, built from sdcard/ at that tag) and,
+# when docs/releases/v1.6.md exists, uses it as the title and notes.
+# Run by hand (Actions > Release > Run workflow) with a tag that has no release yet, it
+# publishes that release itself from the branch it runs on, with docs/releases/<tag>.md as
+# the notes. With a tag that has a release, it builds and attaches the zip again.
 on:
   release:
     types:
@@ -10,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag to (re)attach the SD card zip to, e.g. v1.5'
+        description: 'Release tag, e.g. v1.6 (a new one is published from this branch)'
         required: true
 
 permissions:
@@ -27,7 +30,22 @@ jobs:
       - name: Check out the release
         uses: actions/checkout@v7
         with:
-          ref: ${{ env.TAG }}
+          fetch-depth: 0
+
+      - name: Publish the release (run by hand for a new tag)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            notes="docs/releases/$TAG.md"
+            if [ ! -f "$notes" ]; then
+              echo "::error::no release $TAG and no $notes to publish it with"
+              exit 1
+            fi
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "StickTime ${TAG#v}" \
+              --notes-file "$notes" --repo "$GITHUB_REPOSITORY"
+            git fetch -q --tags
+          fi
+          git checkout -q "$TAG"
 
       - name: Build and attach
         run: |
