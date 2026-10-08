@@ -98,7 +98,7 @@ local TRACKS = {
   -- gate and a dive gate on the start straight, a split-S (through the high gate, back
   -- through the one under it) and a corner flag before the finish
   { "Pro Track", 97, { 0,0,1,0,0, 0,22,2,0,0, 0,44,3,0,0, 8,62,7,90,0, 16,44,4,180,0, 16,22,1,180,0, 24,4,6,90,0,
-                       32,22,1,0,0, 32,46,2,0,0, 32,46.6,1,180,0, 46,26,4,160,3, 48,4,1,180,0, 46,-14,7,225,0,
+                       32,22,1,0,0, 32,46,2,0,0, 32,46,1,180,0, 46,26,4,160,3, 48,4,1,180,0, 46,-14,7,225,0,
                        24,-22,1,270,0 } },
 }
 local NT = #TRACKS
