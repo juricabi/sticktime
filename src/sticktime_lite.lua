@@ -620,19 +620,37 @@ local function selectTrack(t)
   place(spx, DR, spz, shx, shz)
 end
 
--- motor sound: a tone on the background (vario) channel, its pitch following the motors' speed
--- (the square root of their thrust): 190 Hz at idle, 540 Hz flat out, higher in fast rotations.
--- Each call restarts its 200 ms, so it plays on while frames keep coming. Volume 1, 3 or 5.
-local sndOn = false
+-- motor sound: the clips in StickTimeSound/ (16 levels of motor speed, four takes picked at random,
+-- 0.1 s), queued back to back whenever less than a frame and 20 ms is left; without them a tone on
+-- the background (vario) channel, 190 Hz at idle to 540 Hz flat out, restarted every frame.
+local SNDF, TK, wav, sndOn, sndQ, sndX = "/SCRIPTS/TOOLS/StickTimeSound/m", { "a.wav", "b.wav", "c.wav", "d.wav" }, nil, false, 0, 1
 local function motorSound(on)
-  if on and S.snd > 0 and PLAY_BACKGROUND then
-    local w = sqrt(wr0 * wr0 + wp0 * wp0 + wy0 * wy0)
-    playTone(floor((140 + 400 * sqrt(Tm / (S.twr * 9.81))) * (1 + (w < 12 and w or 12) * 0.006)), 200, 0,
-      PLAY_BACKGROUND + PLAY_NOW, 0, S.snd * 2 - 1)
+  if wav == nil then
+    local f = playFile and io.open(SNDF .. "01a.wav", "r")
+    wav = f and true or false
+    if f then io.close(f) end
+  end
+  if on and S.snd > 0 then
+    local r = sqrt(Tm / (S.twr * 9.81))
+    if wav then
+      local now = getTime()
+      if sndQ < now then sndQ = now end
+      if sndQ - now < fi + 2 then
+        local lv = floor((r - 0.12) * 17.05 + 1.5)
+        lv = lv < 1 and 1 or lv > 16 and 16 or lv
+        sndX = sndX * 11 % 251
+        playFile(SNDF .. (lv < 10 and "0" or "") .. lv .. TK[sndX % 4 + 1], S.snd + 1)
+        sndQ = sndQ + 9.994
+      end
+    elseif PLAY_BACKGROUND then
+      local w = sqrt(wr0 * wr0 + wp0 * wp0 + wy0 * wy0)
+      playTone(floor((140 + 400 * r) * (1 + (w < 12 and w or 12) * 0.006)), 200, 0, PLAY_BACKGROUND + PLAY_NOW, 0,
+        S.snd * 2 - 1)
+    end
     sndOn = true
   elseif sndOn then
-    playTone(200, 0, 0, PLAY_BACKGROUND + PLAY_NOW)   -- silence at once
-    sndOn = false
+    if not wav then playTone(200, 0, 0, PLAY_BACKGROUND + PLAY_NOW) end   -- silence at once
+    sndOn, sndQ = false, 0
   end
 end
 

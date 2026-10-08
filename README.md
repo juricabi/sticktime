@@ -20,6 +20,8 @@ Download `StickTime-<version>-sdcard.zip` from the [latest release](https://gith
 | B&W with an STM32F4: TX12 MkII, Zorro, Boxer, Pocket, MT12, GX12, X9D+ 2019, X9E, X7 ACCESS, T14, T20, T-Pro V2 / S, T12 Max, Bumblebee, Commando 8 | `StickTimeBW.lua` and the `StickTimeBW` folder | 2.11+ |
 | Older B&W (STM32F2): TX12 MkI, X7, X9D, X9D+, X9 Lite, X-Lite, T12, T8, T-Lite, T-Pro, LR3 Pro | `StickTimeLite.lua` and the `StickTimeLite` folder | 2.11+ |
 
+Also copy the `StickTimeSound` folder (200 KB) for the motor sound; without it you get a plain tone.
+
 > **Safety:** the radio keeps transmitting your sticks while the sim runs. Unplug the quad's battery or switch the RF module off first.
 
 StickTime BW and StickTime Lite also run on color radios, drawn in B&W style at the screen's full resolution, which is faster on slow radios. StickTime was called FPV Sim up to version 1.2: it takes over FPV Sim's settings and best times on its first start, after which the old `FPVSim…` and `FPVLite…` files can go.
@@ -35,7 +37,7 @@ StickTime BW and StickTime Lite also run on color radios, drawn in B&W style at 
     - **Practice**: lap times against your best.
     - **Freestyle**: flips, rolls, 360s, power loops, dives, hang time, gap shots and proximity runs score points; chain them within 2.5 s for up to a ×4 combo.
     - **Gate Rush**: 30 s on the clock, every gate adds time and lights the next one at random.
-- **Wind** (off, light, strong, with gusts), optional **prop wash**, a **motor sound** whose pitch follows the motors (Off, Low, Mid, High) and a **vibration** on crashes and laps (On, Off).
+- **Wind** (off, light, strong, with gusts), optional **prop wash**, a **vibration** on crashes and laps (On, Off), and a **motor sound** (Off, Low, Mid, High) made like a real quad's: the props' buzz with its harmonics, the motors' whine and the air rush, rendered at 16 motor speeds and checked against recordings of real quadcopters, including their slow, irregular wobble.
 - **Saved per track:** best lap, race, combo and Gate Rush score, plus all settings.
 - **Color radios:** filled sky and ground, haze and fog, mountains, shaded structures, an FPV-style OSD, a minimap with the AI pilots, optional stick view and FPS, and touch. **B&W radios:** the same game in wireframe, with greyscale ground on 212×64 screens. **Lite:** the same flight model, quads and tracks, with Time trial, Practice, Freestyle and Gate Rush; no AI pilots, custom rates or prop wash.
 
@@ -153,6 +155,8 @@ tools/build_etxlua.sh   Lua 5.3 with EdgeTX's number settings (native and 32-bit
 tools/build_etxhost.sh  EdgeTX's own Lua core with a model of the B&W radios' allocator: makes the
                         core.luac files and runs test/memtest.lua
 tools/tune_physics.py   steady-state check of the flight model (top speed, punch-out, fall, braking)
+tools/make_motor_sound.py
+                        renders the motor sound clips (StickTimeSound/: 16 motor speeds x 4 takes)
 tools/build_firmware.sh EdgeTX main + firmware/edgetx-fast-lua.patch for one radio
 test/harness.lua        headless EdgeTX mock: autopilot races with AI pilots on every track, flags, hoops,
                         dive gates, freestyle, gate rush, ground effect, motor sound, menus, crashes, saves

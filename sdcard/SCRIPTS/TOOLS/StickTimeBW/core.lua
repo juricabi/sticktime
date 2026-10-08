@@ -414,21 +414,42 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     return seed / 30269
   end
 
-  -- motor sound: a tone on the radio's background channel (the vario's), its pitch following
-  -- the motors' speed, which goes with the square root of their thrust: about 190 Hz at idle,
-  -- 320 Hz at a 5:1 hover and 540 Hz flat out, up to 7% higher while the quad rotates fast.
-  -- Each call restarts the tone's 200 ms, so it plays on as long as frames keep coming.
-  local SNDV, sndOn = { 1, 3, 5 }, false          -- tone volume (1-5) for Low, Mid, High
+  -- motor sound. With the clips in StickTimeSound/ (16 levels of motor speed, four takes, 0.1 s
+  -- each, made by tools/make_motor_sound.py): EdgeTX plays queued files back to back, so the
+  -- clip for the current motor speed is queued whenever less than a frame and 20 ms of sound is
+  -- left, in a take picked at random (x = x * 11 % 251 runs through 250 values), which gives the
+  -- sound the slow, irregular wobble of real rotors. Without them: a tone on the background (vario) channel whose pitch follows the motor
+  -- speed (the square root of the thrust), 190 Hz at idle to 540 Hz flat out, a little higher
+  -- in fast rotations; each call restarts its 200 ms, so it plays as long as frames come.
+  local SNDF = "/SCRIPTS/TOOLS/StickTimeSound/m"
+  local TK, wav, sndOn, sndQ, sndX = { "a.wav", "b.wav", "c.wav", "d.wav" }, nil, false, 0, 1
   motorSound = function(on)
-    if not (playTone and PLAY_BACKGROUND) then return end
+    if wav == nil then
+      local f = playFile and io.open(SNDF .. "01a.wav", "r")
+      wav = f and true or false
+      if f then io.close(f) end
+    end
     if on and S.snd > 0 then
-      local w = sqrt(P.wr * P.wr + P.wp * P.wp + P.wy * P.wy)
-      local f = (140 + 400 * sqrt(Tm / (P.twr * G))) * (1 + (w < 12 and w or 12) * 0.006)
-      playTone(floor(f), 200, 0, PLAY_BACKGROUND + PLAY_NOW, 0, SNDV[S.snd])
+      local r = sqrt(Tm / (P.twr * G))                  -- motor speed, 0..1
+      if wav then
+        local now = getTime()
+        if sndQ < now then sndQ = now end               -- nothing queued any more
+        if sndQ - now < R.fi + 2 then
+          local lv = floor((r - 0.12) * 17.05 + 1.5)
+          if lv < 1 then lv = 1 elseif lv > 16 then lv = 16 end
+          sndX = sndX * 11 % 251
+          playFile(SNDF .. (lv < 10 and "0" or "") .. lv .. TK[sndX % 4 + 1], S.snd + 1)
+          sndQ = sndQ + 9.994                           -- a clip is 1599 samples at 16 kHz
+        end
+      elseif playTone and PLAY_BACKGROUND then
+        local w = sqrt(P.wr * P.wr + P.wp * P.wp + P.wy * P.wy)
+        playTone(floor((140 + 400 * r) * (1 + (w < 12 and w or 12) * 0.006)), 200, 0, PLAY_BACKGROUND + PLAY_NOW, 0,
+          S.snd * 2 - 1)
+      end
       sndOn = true
     elseif sndOn then
-      playTone(200, 0, 0, PLAY_BACKGROUND + PLAY_NOW)   -- silence at once
-      sndOn = false
+      if not wav then playTone(200, 0, 0, PLAY_BACKGROUND + PLAY_NOW) end   -- silence at once
+      sndOn, sndQ = false, 0
     end
   end
 

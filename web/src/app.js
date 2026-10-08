@@ -89,6 +89,37 @@
     o.onended = () => { live = live.filter((x) => x !== o); };
     toneEnd = t1 + Math.max(0, pause) / 1000;
   }
+  // WAV files (StickTime's motor sound clips, bundled): EdgeTX plays queued files back to back,
+  // at the WAV volume (playFile's 1-5: each step down halves it)
+  const wavBufs = {};
+  let wavEnd = 0;
+  function playWav(path, vol) {
+    if (!app.sound || !actx || !SOUNDS[path]) return;
+    let buf = wavBufs[path];
+    if (!buf) {
+      const bytes = Uint8Array.from(atob(SOUNDS[path]), (c) => c.charCodeAt(0));
+      const dv = new DataView(bytes.buffer);
+      let p = 12, rate = 16000, data = null;
+      while (p + 8 <= bytes.length) {                    // RIFF chunks: fmt (rate), data (16-bit PCM)
+        const id = String.fromCharCode(...bytes.slice(p, p + 4)), size = dv.getUint32(p + 4, true);
+        if (id === 'fmt ') rate = dv.getUint32(p + 12, true);
+        if (id === 'data') { data = new Int16Array(bytes.buffer.slice(p + 8, p + 8 + size)); break; }
+        p += 8 + size + (size & 1);
+      }
+      if (!data) return;
+      buf = actx.createBuffer(1, data.length, rate);
+      const ch = buf.getChannelData(0);
+      for (let i = 0; i < data.length; i++) ch[i] = data[i] / 32768;
+      wavBufs[path] = buf;
+    }
+    const src = actx.createBufferSource(), g = actx.createGain();
+    src.buffer = buf;
+    g.gain.value = 0.5 * Math.pow(2, (vol || 3) - 5);
+    src.connect(g).connect(actx.destination);
+    const t0 = Math.max(actx.currentTime + 0.02, wavEnd);
+    src.start(t0);
+    wavEnd = t0 + buf.duration;
+  }
   function haptic(ms) {
     const r = $('radio');
     r.classList.remove('buzz'); void r.offsetWidth; r.classList.add('buzz');
@@ -109,8 +140,9 @@
     const r = app.radio;
     const eng = new Engine(fengari, r, {
       colorFonts, bwFonts: BW_FONTS, sd: app.sd,
-      files: Object.assign({ '/SCRIPTS/TOOLS/StickTimeBW/core.lua': LUA.bw, '/SCRIPTS/TOOLS/StickTimeLite/core.lua': LUA.lite }, LITE_TRACKS),
-      onTone: tone, onHaptic: haptic,
+      files: Object.assign({ '/SCRIPTS/TOOLS/StickTimeBW/core.lua': LUA.bw, '/SCRIPTS/TOOLS/StickTimeLite/core.lua': LUA.lite }, LITE_TRACKS,
+        Object.fromEntries(Object.keys(SOUNDS).map((p) => [p, 'RIFF']))),
+      onTone: tone, onHaptic: haptic, onFile: playWav,
       onSave: () => store.set('sd', Object.fromEntries(app.sd)),
     });
     eng.stickMode = app.mode - 1;

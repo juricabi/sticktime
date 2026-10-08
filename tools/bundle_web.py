@@ -34,6 +34,10 @@ def main():
     tracks = {"/SCRIPTS/TOOLS/StickTimeLite/" + p.name: read(p) for p in sorted(tdir.glob("t*.txt"))}
     assert tracks, "no StickTime Lite track files (run build.py)"
     lite_tracks = json.dumps(tracks, indent=0)
+    # the motor sound clips (tools/make_motor_sound.py), played by the emulator like EdgeTX does
+    sdir = ROOT / "sdcard/SCRIPTS/TOOLS/StickTimeSound"
+    sounds = json.dumps({"/SCRIPTS/TOOLS/StickTimeSound/" + p.name: b64(p) for p in sorted(sdir.glob("*.wav"))},
+                        separators=(",", ":"))
     for s in (lua_color, lua_bw, lua_lite, lua_bwcolor, lua_litecolor, lite_tracks):
         assert "</script" not in s.lower()
     parts = {
@@ -47,6 +51,7 @@ def main():
         "LUA_BWCOLOR": lua_bwcolor,
         "LUA_LITECOLOR": lua_litecolor,
         "LITE_TRACKS": lite_tracks,
+        "SOUNDS": sounds,
         "ROBOTO400": b64(W / "vendor/roboto-latin-400-normal.woff2"),
         "ROBOTO700": b64(W / "vendor/roboto-latin-700-normal.woff2"),
     }

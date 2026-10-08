@@ -45,8 +45,17 @@ function playTone(f, d, p, flags, incr, vol)
 end
 local buzz = 0
 function playHaptic() buzz = buzz + 1 end
+local wavs = { n = 0 }
+function playFile(p, vol)
+  if wavs.n == 0 then wavs.t1 = clock end              -- when the first clip starts
+  wavs.n, wavs.last, wavs.vol = wavs.n + 1, p, vol
+end
 -- the SD card: the track files from the repository, then what the script writes
 local SD = {}
+local rio = io
+-- the motor sound clips on the SD card: on the color runs (B&W runs: without, the tone instead)
+local SOUNDS = COLOR
+if SOUNDS then SD["/SCRIPTS/TOOLS/StickTimeSound/m01a.wav"] = "RIFF" end
 for t = 1, 9 do
   local fh = io.open("../sdcard/SCRIPTS/TOOLS/StickTimeLite/t" .. t .. ".txt", "r")
   if fh then SD["/SCRIPTS/TOOLS/StickTimeLite/t" .. t .. ".txt"] = fh:read("*a") fh:close() end
@@ -364,8 +373,8 @@ do
 end
 idle()
 
--- motor sound: a background tone whose pitch follows the throttle while flying, silent when
--- paused or off; Vibration off: no buzz on a crash
+-- motor sound: with the clips (color runs) the clip for the motor speed about every 0.1 s, a little
+-- ahead; without them (B&W runs) a background tone. Silent when paused or off. Vibration off: no buzz
 do
   local snd, vib, mode = T.S.snd, T.S.vib, T.S.mode
   T.set("mode", 1) T.set("snd", 2) T.set("vib", 1)
@@ -373,30 +382,47 @@ do
   local _, s0 = state()
   T.pose(s0[1], 30, s0[3], 0, 0, 0) T.vel(0, 0, 0)
   sticks.ail, sticks.ele, sticks.rud, sticks.thr = 0, 0, 0, -1024
-  bgt.n = 0
-  steps(8)
-  local nIdle, fIdle = bgt.n, bgt.f or 0
+  bgt.n, wavs.n = 0, 0
+  local t0 = clock
+  steps(20)
+  local nIdle, fIdle, cIdle = bgt.n, bgt.f or 0, wavs.last
   sticks.thr = 1024
-  steps(8)
-  local fFull = bgt.f or 0
-  print(string.format("motor sound: %d tones in 0.4 s, %d Hz at idle, %d Hz at full throttle (flags %s, volume %s, %s ms)",
-    nIdle, fIdle, fFull, tostring(bgt.flags), tostring(bgt.vol), tostring(bgt.len)))
-  if nIdle < 4 then fail("motor sound: no background tone while flying") end
-  if bgt.flags ~= PLAY_BACKGROUND + PLAY_NOW or bgt.vol ~= 3 or not bgt.len or bgt.len < 100 then fail("motor sound: wrong playTone arguments") end
-  if fIdle < 160 or fIdle > 220 or fFull < 480 or fFull > 620 then fail("motor sound: pitch should rise from about 190 to 540 Hz") end
+  steps(20)
+  local fFull, cFull = bgt.f or 0, wavs.last
+  local function level(c) return tonumber(string.match(c or "", "/StickTimeSound/m(%d%d)[abcd]%.wav$") or 0) end
+  if SOUNDS then
+    local ahead = wavs.t1 + wavs.n * 99.94 - clock             -- ms of sound queued beyond now
+    print(string.format("motor sound: %d clips in 2 s, %s at idle, %s flat out, volume %s, %.0f ms queued ahead",
+      wavs.n, tostring(cIdle), tostring(cFull), tostring(wavs.vol), ahead))
+    if bgt.n > 0 then fail("motor sound: the tone plays although the clips are there") end
+    if wavs.n < 19 or wavs.n > 23 then fail("motor sound: " .. wavs.n .. " clips in 2 s, expected about 20") end
+    if ahead < 0 or ahead > 200 then fail("motor sound: " .. ahead .. " ms of clips queued ahead") end
+    if level(cIdle) ~= 1 or level(cFull) ~= 16 or wavs.vol ~= 3 then fail("motor sound: wrong clip or volume") end
+    for _, c in ipairs({ cIdle, cFull }) do
+      local f = rio.open("../sdcard" .. c, "rb")
+      if not f then fail("motor sound: no file " .. c) else f:close() end
+    end
+  else
+    print(string.format("motor sound: %d tones in 1 s, %d Hz at idle, %d Hz at full throttle (flags %s, volume %s, %s ms)",
+      nIdle, fIdle, fFull, tostring(bgt.flags), tostring(bgt.vol), tostring(bgt.len)))
+    if wavs.n > 0 then fail("motor sound: clips played although there are none") end
+    if nIdle < 8 then fail("motor sound: no background tone while flying") end
+    if bgt.flags ~= PLAY_BACKGROUND + PLAY_NOW or bgt.vol ~= 3 or not bgt.len or bgt.len < 100 then fail("motor sound: wrong playTone arguments") end
+    if fIdle < 160 or fIdle > 220 or fFull < 480 or fFull > 620 then fail("motor sound: pitch should rise from about 190 to 540 Hz") end
+  end
   sticks.thr = -300
   frame(EVT_VIRTUAL_EXIT)                                -- pause
   frame(0)
-  if state() ~= PAUSED or bgt.len ~= 0 then fail("motor sound: not silenced on pause (state " .. state() .. ")") end
-  local n = bgt.n
+  if state() ~= PAUSED or (not SOUNDS and bgt.len ~= 0) then fail("motor sound: not silenced on pause (state " .. state() .. ")") end
+  local n, m = bgt.n, wavs.n
   steps(5)
-  if bgt.n ~= n then fail("motor sound: tones while paused") end
+  if bgt.n ~= n or wavs.n ~= m then fail("motor sound: sound while paused") end
   frame(EVT_VIRTUAL_ENTER)                               -- resume
   T.set("snd", 0)
   steps(4)
-  n = bgt.n
+  n, m = bgt.n, wavs.n
   steps(6)
-  if bgt.n ~= n then fail("motor sound: tones with Motor sound off") end
+  if bgt.n ~= n or wavs.n ~= m then fail("motor sound: sound with Motor sound off") end
   for v = 1, 0, -1 do
     T.set("vib", v)
     T.state(FLY) T.pose(s0[1], 3, s0[3], 0, 0, 0) T.vel(0, -15, 0)
