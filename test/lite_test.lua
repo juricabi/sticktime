@@ -1,7 +1,7 @@
 -- Headless test of StickTime Lite (Lua 5.3 with EdgeTX's number settings, or Lua 5.2).
 -- Usage: lua lite_test.lua build/sticktime_lite_test.lua [W H [color]]
 -- color: on a color radio, through StickTimeLite/color.lua as the loader runs it there
--- Menus and settings, time trials on all seven tracks with an autopilot (gates, hoops, arches,
+-- Menus and settings, time trials on all eight tracks with an autopilot (gates, hoops, arches,
 -- flags, dive gates, the Bando's doors), practice with wind, freestyle tricks and combos, gate
 -- rush, crashes into the ground, a gate and a wall, pause, save and reload, B&W drawing rules,
 -- VM instructions per frame.
@@ -147,6 +147,8 @@ local function autopilot(target)
   local vdes = math.min(11, 3 + dist * 0.35)
   if math.abs(herr) > 0.6 then vdes = 3 end
   if k == 3 then vdes = math.min(vdes, hd * 0.6) end
+  -- too high for a frame or hoop (the low gate of a split-S): slow enough to sink to it in time
+  if k < 6 and k ~= 3 and py - ty > 0.7 then vdes = math.min(vdes, math.max(0.5, 2 * hd / (py - ty))) end
   sticks.ele = math.max(-0.75, math.min(0.75, (vdes - vf) * 0.12)) * 1024
   sticks.ail = math.max(-0.6, math.min(0.6, -vs * 0.15 + herr * 0.25)) * 1024
   local _, twr = T.info()

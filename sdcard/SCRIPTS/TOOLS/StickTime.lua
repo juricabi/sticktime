@@ -9,7 +9,7 @@ local toolName = "TNS|StickTime|TNE"
             handles stick mode 1-4. EXIT = pause/back, ENTER = select,
             rotary / +- / up-down = move. Touch screens: tap.
   Modes   : Race against AI pilots, Practice, Freestyle (tricks and
-            combos) and Gate Rush (beat the clock), on seven tracks.
+            combos) and Gate Rush (beat the clock), on eight tracks.
   Safety  : the radio keeps transmitting while the sim runs - keep the
             real quad unplugged or the RF module off.
   Credits : inspired by lua-fpv-sim by Alexey Stankevich (@AlexeyStn);
@@ -94,6 +94,12 @@ local TRACKS = {
       -10,40,0.25,5.75,0,7,1, 10,36.025,0.25,1.775,0,7,1, 10,43.975,0.25,1.775,0,7,1, 10,40,0.25,2.2,3.6,7,1,
       46,64,2,2,0,24,1, 33.6,10,1.25,3,0,2.6,2, 40.5,10,1.25,3,0,2.6,3, 47.4,10,1.25,3,0,2.6,2,
       -30,20,3,1.25,0,5.2,3, -36,50,4,4,0,3,1 } },
+  -- laid out like a real race: lanes up and down the field joined by flag hairpins, a high
+  -- gate and a dive gate on the start straight, a split-S (through the high gate, back
+  -- through the one under it) and a corner flag before the finish
+  { "Pro Track", 97, { 0,0,1,0,0, 0,22,2,0,0, 0,44,3,0,0, 8,62,7,90,0, 16,44,4,180,0, 16,22,1,180,0, 24,4,6,90,0,
+                       32,22,1,0,0, 32,46,2,0,0, 32,46.6,1,180,0, 46,26,4,160,3, 48,4,1,180,0, 46,-14,7,225,0,
+                       24,-22,1,270,0 } },
 }
 local NT = #TRACKS
 local GT, FLAGH = 0.28, 3.4                            -- frame thickness, flag pole height (m)
@@ -430,6 +436,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     seed = seed * 171 % 30269
     return seed / 30269
   end
+  if STICKTIME_TEST then STICKTIME_TEST.seed = function(s) seed = s end end
 
   local function clamp1(v)
     if v > 1 then return 1 elseif v < -1 then return -1 end

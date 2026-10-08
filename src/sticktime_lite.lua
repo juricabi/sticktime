@@ -10,7 +10,7 @@ local toolName = "TNS|StickTime Lite|TNE"
   Fly     : your sticks fly the quad (acro or angle mode). EXIT pauses,
             ENTER selects, +/- (or the wheel) moves through the menus.
   Modes   : Time trial, Practice, Freestyle (tricks and combos) and
-            Gate Rush (beat the clock), on seven tracks.
+            Gate Rush (beat the clock), on eight tracks.
   Safety  : the radio keeps transmitting while the sim runs - keep the
             real quad unplugged or the RF module off.
 ====================================================================== ]]

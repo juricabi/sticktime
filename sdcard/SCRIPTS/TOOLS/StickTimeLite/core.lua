@@ -9,7 +9,7 @@ Install : copy StickTimeLite.lua and the StickTimeLite folder to
 Fly     : your sticks fly the quad (acro or angle mode). EXIT pauses,
 ENTER selects, +/- (or the wheel) moves through the menus.
 Modes   : Time trial, Practice, Freestyle (tricks and combos) and
-Gate Rush (beat the clock), on seven tracks.
+Gate Rush (beat the clock), on eight tracks.
 Safety  : the radio keeps transmitting while the sim runs - keep the
 real quad unplugged or the RF module off.
 ====================================================================== ]]
@@ -49,7 +49,7 @@ local OPTS = {
 }
 local RATES = nums("70 400 35 70 350 30 100 600 50 100 500 40 150 850 45 130 700 40")
 local QP = nums("90 .55 .009 .028 .02 .012 68 .48 .0082 .026 .025 .016")
-local TRACKS = { "Meadow", "Figure 8", "Dive Tower", "Slalom", "Hoop Forest", "Grand Prix", "Bando" }
+local TRACKS = { "Meadow", "Figure 8", "Dive Tower", "Slalom", "Hoop Forest", "Grand Prix", "Bando", "Pro Track" }
 local GW = { 1.5, 1.5, 2, 1.25, 2.4, 6, 6, 2.2 }
 local GH = { 1, 1, 2, 1.25, 2.4, 30, 30, 1.8 }
 local GY = { 1.35, 5.5, 7, 2.4, 0, 0, 0, 2 }
@@ -155,7 +155,7 @@ end
 end
 end
 local BL, BR, BF, BG = {}, {}, {}, {}
-for t = 1, 7 do BL[t], BR[t], BF[t], BG[t] = 0, 0, 0, 0 end
+for t = 1, 8 do BL[t], BR[t], BF[t], BG[t] = 0, 0, 0, 0 end
 local save, load
 do
 local FILE = "/SCRIPTS/TOOLS/StickTimeLite/data.txt"
@@ -163,7 +163,7 @@ local OLD = "/SCRIPTS/TOOLS/FPVLite/data.txt"              -- the save under the
 save = function()
 local s = "FPVLITE2 lay=2"
 for k, v in pairs(S) do s = s .. " " .. k .. "=" .. floor(v) end
-for t = 1, 7 do
+for t = 1, 8 do
 s = s .. " l" .. t .. "=" .. floor(BL[t]) .. " r" .. t .. "=" .. floor(BR[t]) .. " f" .. t .. "=" .. BF[t] .. " g" .. t .. "=" .. BG[t]
 end
 local f = io.open(FILE, "w")
@@ -190,9 +190,9 @@ end
 local B = k == "l" and BL or k == "r" and BR or k == "f" and BF or k == "g" and BG
 if k == "lay" then lay = v
 elseif B then
-if n and n >= 1 and n <= 7 then B[n] = v end
+if n and n >= 1 and n <= 8 then B[n] = v end
 elseif k == "track" then
-if v >= 1 and v <= 7 then S.track = v end
+if v >= 1 and v <= 8 then S.track = v end
 else
 for _, o in ipairs(OPTS) do
 for _, x in ipairs(o[3]) do
@@ -855,7 +855,7 @@ local n = state == 1 and #MAIN or #OPTS + 1
 if editing then
 local d = e == E_INC and 1 or e == E_DEC and -1 or 0
 if state == 1 and d ~= 0 then
-selectTrack((S.track + d - 1) % 7 + 1)
+selectTrack((S.track + d - 1) % 8 + 1)
 save()
 elseif d ~= 0 then
 local o = OPTS[focus]

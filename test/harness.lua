@@ -206,6 +206,8 @@ local function autopilot(target)
   local vdes = math.min(11, 3 + dist * 0.35)
   if math.abs(herr) > 0.6 then vdes = 3 end
   if k == 3 then vdes = math.min(vdes, hd * 0.6) end
+  -- too high for a frame or hoop (the low gate of a split-S): slow enough to sink to it in time
+  if k < 6 and k ~= 3 and py - ty > 0.7 then vdes = math.min(vdes, math.max(0.5, 2 * hd / (py - ty))) end
   sticks.ele = math.max(-0.75, math.min(0.75, (vdes - vf) * 0.12)) * 1024
   sticks.ail = math.max(-0.6, math.min(0.6, -vs * 0.15 + herr * 0.25)) * 1024
   local _, twr = T.info()
@@ -469,9 +471,11 @@ do
 end
 idleSticks()
 
--- 7. gate rush: the autopilot chases random gates until the clock runs out
+-- 7. gate rush: the autopilot chases random gates until the clock runs out (the same gates
+-- every run: the random numbers start where they do when the script loads)
 T.track(1)
 T.set("mode", 2)
+T.seed(7)
 T.start(4)
 local rushDone = false
 for f = 1, FPS * 240 do
