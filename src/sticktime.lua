@@ -1,6 +1,6 @@
 local toolName = "TNS|@TOOLNAME@|TNE"
 --[[ ======================================================================
-  @TITLE@ v1.5  -  a real 3D FPV quad simulator that runs on your radio
+  @TITLE@ v1.6  -  a real 3D FPV quad simulator that runs on your radio
   @VARIANT@
 
   Install : @INSTALL@
@@ -44,7 +44,8 @@ local MENU, SETUP, COUNT, FLY, CRASHED, READY, PAUSED, DONE = 1, 2, 3, 4, 5, 6, 
 
 -- ------------------------------------------------------------ settings
 local S = { track = 1, quad = 1, twr = 5, mode = 1, rates = 2, rc = 100, rm = 600, re = 50, yc = 100, ym = 500, ye = 40,
-            tilt = @TILT@, fov = @FOV@, laps = 3, ai = 2, skill = 2, wind = 0, wash = 0, map = 1, sticks = 0, fps = 0 }
+            tilt = @TILT@, fov = @FOV@, laps = 3, ai = 2, skill = 2, wind = 0, wash = 0, snd = 2, vib = 1, map = 1, sticks = 0,
+            fps = 0 }
 -- rows: label, key, then either a value list (+ names, suffix) or nil, nil, suffix, min, max, step
 local OPTS = {
   { "Quad", "quad", { 1, 2 }, { "Racer", "Freestyle" } },
@@ -64,6 +65,8 @@ local OPTS = {
   { "AI skill", "skill", { 1, 2, 3 }, { "Easy", "Medium", "Hard" } },
   { "Wind", "wind", { 0, 1, 2 }, { "Off", "Light", "Strong" } },
   { "Prop wash", "wash", { 0, 1 }, { "Off", "On" } },
+  { "Motor sound", "snd", { 0, 1, 2, 3 }, { "Off", "Low", "Mid", "High" } },
+  { "Vibration", "vib", { 0, 1 }, { "Off", "On" } },
 --#if COLOR
   { "Minimap", "map", { 0, 1 }, { "Off", "On" } },
   { "Stick view", "sticks", { 0, 1 }, { "Off", "On" } },
@@ -423,7 +426,7 @@ local function showMsg(s, good)
 end
 
 -- -------------------------------------------------------------- physics
-local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rushNext
+local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rushNext, motorSound
 ;(function()
   local G = 9.81
   local SRC = { "ail", "ele", "thr", "rud" }
@@ -436,6 +439,24 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
   rnd = function()
     seed = seed * 171 % 30269
     return seed / 30269
+  end
+
+  -- motor sound: a tone on the radio's background channel (the vario's), its pitch following
+  -- the motors' speed, which goes with the square root of their thrust: about 290 Hz at idle,
+  -- 590 Hz at a 5:1 hover and 1080 Hz flat out, up to 7% higher while the quad rotates fast.
+  -- Each call restarts the tone's 200 ms, so it plays on as long as frames keep coming.
+  local SNDV, sndOn = { 1, 3, 5 }, false          -- tone volume (1-5) for Low, Mid, High
+  motorSound = function(on)
+    if not (playTone and PLAY_BACKGROUND) then return end
+    if on and S.snd > 0 then
+      local w = sqrt(P.wr * P.wr + P.wp * P.wp + P.wy * P.wy)
+      local f = (180 + 900 * sqrt(Tm / (P.twr * G))) * (1 + (w < 12 and w or 12) * 0.006)
+      playTone(floor(f), 200, 0, PLAY_BACKGROUND + PLAY_NOW, 0, SNDV[S.snd])
+      sndOn = true
+    elseif sndOn then
+      playTone(200, 0, 0, PLAY_BACKGROUND + PLAY_NOW)   -- silence at once
+      sndOn = false
+    end
   end
 
   local function clamp1(v)
@@ -525,7 +546,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
       tricks(-1)
     end
     beep(260, 400, PLAY_NOW)
-    if playHaptic then playHaptic(60, 0) end
+    if playHaptic and S.vib == 1 then playHaptic(60, 0) end
   end
 
   local function finishRace()
@@ -581,7 +602,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
         end
         lap = lap + 1
         beep(2200, 160)
-        if playHaptic then playHaptic(25, 0) end
+        if playHaptic and S.vib == 1 then playHaptic(25, 0) end
         if gmode == 1 and lap > S.laps then finishRace() return end
       else
         lap = 1
@@ -2196,6 +2217,7 @@ local function update(dt)
     AI.update(dt)
     if state ~= DONE then R.pos = AI.place() end
   end
+  motorSound((state == FLY or state == DONE) and dt > 0)
   if gmode == 4 and (state == FLY or state == CRASHED or state == READY) then
     R.rt = R.rt - dt
     if R.rt <= 0 then

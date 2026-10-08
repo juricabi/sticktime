@@ -26,7 +26,7 @@ EVT_VIRTUAL_ENTER, EVT_VIRTUAL_EXIT, EVT_VIRTUAL_NEXT, EVT_VIRTUAL_PREV = 514, 5
 EVT_VIRTUAL_INC, EVT_VIRTUAL_DEC, EVT_VIRTUAL_MENU = 7680, 7424, 518
 EVT_ENTER_BREAK, EVT_EXIT_BREAK = 514, 513
 if COLOR then EVT_TOUCH_FIRST, EVT_TOUCH_BREAK, EVT_TOUCH_SLIDE, EVT_TOUCH_TAP = 4097, 4098, 4099, 4100 end
-PLAY_NOW = 1
+PLAY_NOW, PLAY_BACKGROUND = 0x10, 0x20         -- EdgeTX's values
 if not COLOR and H == 64 and W == 212 then GREY = function(x) return x * 0x10000 end end
 
 local clock = 0
@@ -43,8 +43,14 @@ function getFieldInfo(n)
 end
 function getStickMode() return 1 end
 local tones = 0
-function playTone() tones = tones + 1 end
-function playHaptic() end
+-- background tones (the motor sound): how many, and the last one's frequency, length, flags, volume
+local bg = { n = 0 }
+function playTone(f, d, p, flags, incr, vol)
+  if flags and flags % 0x40 >= 0x20 then bg.n, bg.f, bg.len, bg.flags, bg.vol = bg.n + 1, f, d, flags, vol
+  else tones = tones + 1 end
+end
+local buzz = 0
+function playHaptic() buzz = buzz + 1 end
 
 -- io in EdgeTX style, on an in-memory SD card
 local SD = {}
@@ -217,7 +223,7 @@ local function idleSticks() sticks.ail, sticks.ele, sticks.rud, sticks.thr = 0, 
 
 -- ------------------------------------------------------------ scenarios
 -- 1. menus: walk every item, open settings, change every option both ways
-local OPTN = GAME_COLOR and 20 or 18
+local OPTN = GAME_COLOR and 22 or 20
 steps(20)
 for i = 1, 9 do frame(EVT_VIRTUAL_NEXT) frame(0) end
 for i = 1, 9 do frame(EVT_VIRTUAL_PREV) frame(0) end
@@ -380,6 +386,53 @@ do
   print(string.format("ground effect: hover throttle, after 0.5 s: %.2f m/s up from 0.3 m, %.2f m/s from 6 m", vLow, vHigh))
   if stLow ~= 4 or stHigh ~= 4 or not (vLow > vHigh + 0.05) then fail("no ground effect near the ground") end
   T.set("mode", mode) T.set("twr", twr)
+  idleSticks()
+end
+
+-- 5c. motor sound: a background tone whose pitch follows the throttle while flying, silent when
+-- paused or off; Vibration off: no buzz on a crash
+do
+  local snd, vib, mode = T.S.snd, T.S.vib, T.S.mode
+  T.set("mode", 1) T.set("snd", 2) T.set("vib", 1)
+  T.track(1) T.start(2) steps(70) T.state(4)
+  local _, s0 = state()
+  T.pose(s0[1], 30, s0[3], 0, 0, 0) T.vel(0, 0, 0)
+  sticks.ail, sticks.ele, sticks.rud, sticks.thr = 0, 0, 0, -1024
+  bg.n = 0
+  steps(8)
+  local nIdle, fIdle = bg.n, bg.f or 0
+  sticks.thr = 1024
+  steps(8)
+  local fFull = bg.f or 0
+  print(string.format("motor sound: %d tones in 0.4 s, %d Hz at idle, %d Hz at full throttle (flags %s, volume %s, %s ms)",
+    nIdle, fIdle, fFull, tostring(bg.flags), tostring(bg.vol), tostring(bg.len)))
+  if nIdle < 4 then fail("motor sound: no background tone while flying") end
+  if bg.flags ~= PLAY_BACKGROUND + PLAY_NOW or bg.vol ~= 3 or not bg.len or bg.len < 100 then fail("motor sound: wrong playTone arguments") end
+  if fIdle < 250 or fIdle > 350 or fFull < 950 or fFull > 1200 then fail("motor sound: pitch should rise from about 290 to 1080 Hz") end
+  sticks.thr = -300
+  frame(EVT_VIRTUAL_EXIT)                                    -- pause
+  frame(0)
+  if state() ~= 7 or bg.len ~= 0 then fail("motor sound: not silenced on pause (state " .. state() .. ", last length " .. tostring(bg.len) .. ")") end
+  local n = bg.n
+  steps(5)
+  if bg.n ~= n then fail("motor sound: tones while paused") end
+  frame(EVT_VIRTUAL_ENTER)                                   -- resume
+  T.set("snd", 0)
+  steps(4)
+  n = bg.n
+  steps(6)
+  if bg.n ~= n then fail("motor sound: tones with Motor sound off") end
+  -- a hard landing crashes: one buzz with Vibration on, none with it off
+  for v = 1, 0, -1 do
+    T.set("vib", v)
+    T.state(4) T.pose(s0[1], 3, s0[3], 0, 0, 0) T.vel(0, -15, 0)
+    local b = buzz
+    steps(6)
+    if state() ~= 5 and state() ~= 6 then fail("hard landing should crash (state " .. state() .. ")") end
+    if (buzz > b) ~= (v == 1) then fail("Vibration " .. (v == 1 and "on" or "off") .. ": " .. (buzz - b) .. " buzzes on a crash") end
+  end
+  print("vibration: buzz on a crash only with Vibration on")
+  T.set("snd", snd) T.set("vib", vib) T.set("mode", mode)
   idleSticks()
 end
 

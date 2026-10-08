@@ -36,8 +36,15 @@ function getFieldInfo(n)
   return ids[n] and { id = ids[n], name = n } or nil
 end
 local tones = 0
-function playTone() tones = tones + 1 end
-function playHaptic() end
+PLAY_NOW, PLAY_BACKGROUND = 0x10, 0x20                 -- EdgeTX's values
+-- background tones (the motor sound): how many, and the last one's frequency, length, flags, volume
+local bgt = { n = 0 }
+function playTone(f, d, p, flags, incr, vol)
+  if flags and flags % 0x40 >= 0x20 then bgt.n, bgt.f, bgt.len, bgt.flags, bgt.vol = bgt.n + 1, f, d, flags, vol
+  else tones = tones + 1 end
+end
+local buzz = 0
+function playHaptic() buzz = buzz + 1 end
 -- the SD card: the track files from the repository, then what the script writes
 local SD = {}
 for t = 1, 9 do
@@ -171,7 +178,7 @@ frame(EVT_VIRTUAL_ENTER)
 if state() ~= SETUP then fail("settings did not open") end
 local before = {}
 for k, v in pairs(T.S) do before[k] = v end
-for i = 1, 7 do
+for i = 1, 9 do
   frame(EVT_VIRTUAL_ENTER)
   frame(EVT_VIRTUAL_INC) frame(0)
   frame(EVT_VIRTUAL_DEC) frame(EVT_VIRTUAL_DEC) frame(0)
@@ -356,6 +363,52 @@ do
   idle()
 end
 idle()
+
+-- motor sound: a background tone whose pitch follows the throttle while flying, silent when
+-- paused or off; Vibration off: no buzz on a crash
+do
+  local snd, vib, mode = T.S.snd, T.S.vib, T.S.mode
+  T.set("mode", 1) T.set("snd", 2) T.set("vib", 1)
+  T.track(1) T.start(2) steps(70) T.state(FLY)
+  local _, s0 = state()
+  T.pose(s0[1], 30, s0[3], 0, 0, 0) T.vel(0, 0, 0)
+  sticks.ail, sticks.ele, sticks.rud, sticks.thr = 0, 0, 0, -1024
+  bgt.n = 0
+  steps(8)
+  local nIdle, fIdle = bgt.n, bgt.f or 0
+  sticks.thr = 1024
+  steps(8)
+  local fFull = bgt.f or 0
+  print(string.format("motor sound: %d tones in 0.4 s, %d Hz at idle, %d Hz at full throttle (flags %s, volume %s, %s ms)",
+    nIdle, fIdle, fFull, tostring(bgt.flags), tostring(bgt.vol), tostring(bgt.len)))
+  if nIdle < 4 then fail("motor sound: no background tone while flying") end
+  if bgt.flags ~= PLAY_BACKGROUND + PLAY_NOW or bgt.vol ~= 3 or not bgt.len or bgt.len < 100 then fail("motor sound: wrong playTone arguments") end
+  if fIdle < 250 or fIdle > 350 or fFull < 950 or fFull > 1200 then fail("motor sound: pitch should rise from about 290 to 1080 Hz") end
+  sticks.thr = -300
+  frame(EVT_VIRTUAL_EXIT)                                -- pause
+  frame(0)
+  if state() ~= PAUSED or bgt.len ~= 0 then fail("motor sound: not silenced on pause (state " .. state() .. ")") end
+  local n = bgt.n
+  steps(5)
+  if bgt.n ~= n then fail("motor sound: tones while paused") end
+  frame(EVT_VIRTUAL_ENTER)                               -- resume
+  T.set("snd", 0)
+  steps(4)
+  n = bgt.n
+  steps(6)
+  if bgt.n ~= n then fail("motor sound: tones with Motor sound off") end
+  for v = 1, 0, -1 do
+    T.set("vib", v)
+    T.state(FLY) T.pose(s0[1], 3, s0[3], 0, 0, 0) T.vel(0, -15, 0)
+    local b = buzz
+    steps(6)
+    if state() ~= CRASHED then fail("hard landing should crash (state " .. state() .. ")") end
+    if (buzz > b) ~= (v == 1) then fail("Vibration " .. (v == 1 and "on" or "off") .. ": " .. (buzz - b) .. " buzzes on a crash") end
+  end
+  print("vibration: buzz on a crash only with Vibration on")
+  T.set("snd", snd) T.set("vib", vib) T.set("mode", mode)
+  idle()
+end
 
 -- 5. pause: EXIT pauses, Resume, Restart, Menu
 steps(40)

@@ -349,7 +349,7 @@ const EdgeTX = (() => {
       if (this.color) NAMED.forEach((c, i) => gnum(c[0], i << 16));
       for (const k in EVENTS) gnum(k, EVENTS[k]);
       if (this.touchEnabled) { gnum('EVT_TOUCH_FIRST', TOUCH.FIRST); gnum('EVT_TOUCH_BREAK', TOUCH.BREAK); gnum('EVT_TOUCH_SLIDE', TOUCH.SLIDE); gnum('EVT_TOUCH_TAP', TOUCH.TAP); }
-      gnum('PLAY_NOW', 0x01); gnum('PLAY_BACKGROUND', 0x02);
+      gnum('PLAY_NOW', 0x10); gnum('PLAY_BACKGROUND', 0x20);   // EdgeTX's values
       if (!this.color && this.depth > 1) {
         global('GREY', () => { lua.lua_pushinteger(L, (int(1) & 0xF) * 0x10000); return 1; });
         gnum('GREY_DEFAULT', 11 * 0x10000);
@@ -376,7 +376,7 @@ const EdgeTX = (() => {
         return 1;
       });
       global('getStickMode', () => { lua.lua_pushinteger(L, self.stickMode); return 1; });
-      global('playTone', () => { if (self.onTone) self.onTone(int(1), int(2), opt(3, 0), opt(4, 0)); });
+      global('playTone', () => { if (self.onTone) self.onTone(int(1), int(2), opt(3, 0), opt(4, 0), opt(5, 0), opt(6, 0)); });
       global('playHaptic', () => { if (self.onHaptic) self.onHaptic(int(1)); });
       global('playFile', () => 0); global('playNumber', () => 0); global('killEvents', () => 0);
       global('getUsage', () => { lua.lua_pushinteger(L, 0); return 1; });

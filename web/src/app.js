@@ -48,11 +48,33 @@
   }
 
   // ------------------------------------------------------------- sound
-  let actx = null, toneEnd = 0, live = [];
-  function tone(freq, dur, pause, flags) {
-    if (!app.sound || !actx) return;
+  let actx = null, toneEnd = 0, live = [], motor = null;
+  // EdgeTX's background channel (the vario's, StickTime's motor sound): one tone that each call
+  // retunes and keeps going for its duration; a call with duration 0 silences it
+  function bgTone(freq, dur, vol) {
     const now = actx.currentTime;
-    if (flags & 1) { live.forEach((o) => { try { o.stop(); } catch (e) { /* already stopped */ } }); live = []; toneEnd = now; }
+    if (!motor) {
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = 'triangle';
+      o.frequency.value = Math.max(50, freq);
+      g.gain.value = 0;
+      o.connect(g).connect(actx.destination);
+      o.start();
+      motor = { o, g };
+    }
+    const g = motor.g.gain;
+    g.cancelScheduledValues(now);
+    g.setValueAtTime(g.value, now);
+    if (dur <= 0) { g.setTargetAtTime(0, now, 0.008); return; }
+    motor.o.frequency.setTargetAtTime(Math.max(50, freq), now, 0.012);
+    g.setTargetAtTime([0.018, 0.006, 0.011, 0.018, 0.026, 0.034][vol] || 0.018, now, 0.01);
+    g.setTargetAtTime(0, now + dur / 1000, 0.01);
+  }
+  function tone(freq, dur, pause, flags, incr, vol) {
+    if (!app.sound || !actx) return;
+    if (flags & 0x20) { bgTone(freq, dur, vol); return; }        // PLAY_BACKGROUND
+    const now = actx.currentTime;
+    if (flags & 0x10) { live.forEach((o) => { try { o.stop(); } catch (e) { /* already stopped */ } }); live = []; toneEnd = now; }
     const t0 = Math.max(now, toneEnd), t1 = t0 + Math.max(0.02, dur / 1000);
     const o = actx.createOscillator(), g = actx.createGain();
     o.type = 'square';
@@ -497,6 +519,7 @@
     $('ovBtn').addEventListener('click', boot);
     $('soundBtn').addEventListener('click', () => {
       app.sound = !app.sound;
+      if (!app.sound && motor && actx) bgTone(0, 0, 0);
       if (app.sound && !actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { app.sound = false; } }
       if (actx && actx.state === 'suspended') actx.resume();
       $('soundBtn').setAttribute('aria-pressed', String(app.sound));
