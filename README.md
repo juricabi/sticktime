@@ -26,7 +26,7 @@ StickTime BW and StickTime Lite also run on color radios, drawn in B&W style at 
 
 ## Features
 
-- **Flight model.** Props lose thrust as the air through them speeds up; rotor drag in the prop plane makes the quad carve like a real 5" (a sideways slide halves in about 2 s); quadratic body drag; ground effect near the ground and roofs (up to 12% more thrust); motors that spool up in 20–30 ms and a DShot-style 1.5% idle, so you drop instead of floating. All at 80 Hz. At 5:1: about 125 km/h top speed, 100 km/h punch-outs, 65 km/h flat fall.
+- **Flight model.** Props lose thrust as the air through them speeds up; rotor drag in the prop plane makes the quad carve like a real 5" (a sideways slide halves in about 2 s); quadratic body drag; ground effect near the ground and roofs (up to 12% more thrust); motors that spool up in 20–30 ms and a DShot-style 1.5% idle, so you drop instead of floating. All at 80 Hz. At the default 6:1: about 130 km/h top speed, 115 km/h punch-outs, 65 km/h flat fall.
 - **Your quad.** **Racer** (snappy, the most grip) or **Freestyle** (heavier, carries more momentum). Power from 3:1 to 12:1, Acro or Angle mode.
 - **Rates.** Betaflight Actual rates: Soft, Normal and Fast presets, or Custom center sensitivity (10–500 deg/s), max rate (100–2000 deg/s) and expo (0.00–1.00) for roll/pitch and yaw, in Betaflight's own steps (10 deg/s and 0.01), so your Actual rates go in exactly as they are. Hold a key or spin the wheel quickly for five times bigger steps.
 - **Seven tracks.** Meadow, Figure 8, Dive Tower, Slalom, Hoop Forest, Grand Prix and the **Bando**, an open-roof ruin with doors to fly through, a 24 m tower and stacked containers. Gates, high gates, dive gates, hoops, arches, flags (pass on the marked side, shown by a yellow marker) and gaps in walls. Trees, poles, walls and structures are solid.
@@ -35,7 +35,7 @@ StickTime BW and StickTime Lite also run on color radios, drawn in B&W style at 
     - **Practice**: lap times against your best.
     - **Freestyle**: flips, rolls, 360s, power loops, dives, hang time, gap shots and proximity runs score points; chain them within 2.5 s for up to a ×4 combo.
     - **Gate Rush**: 30 s on the clock, every gate adds time and lights the next one at random.
-- **Wind** (off, light, strong, with gusts), optional **prop wash**, beeps for the countdown, gates and laps, and a **vibration** on crashes and laps (On, Off).
+- **Wind** (off, light, strong, with gusts; each track has its own direction, shown by a small arrow on the OSD: up is where your nose points), optional **prop wash**, beeps for the countdown, gates and laps, and a **vibration** on crashes and laps (On, Off).
 - **Saved per track:** best lap, race, combo and Gate Rush score, plus all settings.
 - **Color radios:** filled sky and ground, haze and fog, mountains, shaded structures, an FPV-style OSD, a minimap with the AI pilots, optional stick view and FPS, and touch. **B&W radios:** the same game in wireframe, with greyscale ground on 212×64 screens. **Lite:** the same flight model, quads and tracks, with Time trial, Practice, Freestyle and Gate Rush; no AI pilots, custom rates or prop wash.
 

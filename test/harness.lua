@@ -41,7 +41,7 @@ function getFieldInfo(n)
   local ids = { ail = 1, ele = 2, thr = 3, rud = 4 }
   return ids[n] and { id = ids[n], name = n } or nil
 end
-function getStickMode() return 1 end
+function getStickMode() return 2 end      -- EdgeTX 3.0+: the mode, 1 to 4
 local tones = 0
 function playTone() tones = tones + 1 end
 local buzz = 0
@@ -58,7 +58,7 @@ io = {
 local DATA = GAME_COLOR and "/SCRIPTS/TOOLS/StickTime.dat" or "/SCRIPTS/TOOLS/StickTimeBW.dat"
 -- a version 1 save file of FPV Sim (StickTime's old name): the new script must migrate it
 local OLD = GAME_COLOR and "/SCRIPTS/TOOLS/FPVSim.dat" or "/SCRIPTS/TOOLS/FPVSimBW.dat"
-SD[OLD] = "FPVSIM 2 1 3 30 100 3 5 1 1 0 4321 9876 5555 11111 0 0\n"
+SD[OLD] = "FPVSIM 2 1 3 30 100 2 5 1 1 0 4321 9876 5555 11111 0 0\n"
 
 -- lcd with argument checks (what the C API would do)
 local stat = { calls = 0, lines = 0, rejected = 0, tris = 0, rows = 0 }
@@ -129,7 +129,7 @@ collectgarbage()
 local memInit = collectgarbage("count")
 
 -- settings and bests migrated from the version 1 file
-if T.S.track ~= 2 or T.S.rates ~= 3 or T.S.tilt ~= 30 or T.S.twr ~= 6 or T.S.laps ~= 5 then
+if T.S.track ~= 2 or T.S.rates ~= 3 or T.S.tilt ~= 30 or T.S.twr ~= 4 or T.S.laps ~= 5 then
   fail(string.format("v1 settings not migrated: track %s rates %s tilt %s twr %s laps %s", T.S.track, T.S.rates, T.S.tilt, T.S.twr, T.S.laps))
 end
 do
@@ -142,6 +142,7 @@ do
     fail("the old save was not written to " .. DATA)
   end
 end
+T.set("twr", 6)                                  -- the tests below fly at 6:1, the default
 local NT = T.info()
 
 local instr = 0
@@ -494,6 +495,22 @@ T.state(1)
 local r = frame(EVT_VIRTUAL_EXIT)
 if r ~= 1 then fail("EXIT in main menu should quit (got " .. tostring(r) .. ")") end
 if stat.rejected > 0 then fail(stat.rejected .. " lines would be rejected by the firmware") end
+
+-- 9. a save from before layout 2 (flag sides swapped on the Slalom and the Grand Prix) loses
+-- those tracks' lap and race bests and keeps everything else; a layout 2 save keeps them
+for _, c in ipairs({ { "", 0, 0 }, { "lay=2 ", 5000, 12000 } }) do
+  SD[DATA] = "FPVSIM2 " .. c[1] .. "track=4 l1=4321 r1=9876 l4=5000 r4=12000 g4=9 f4=300 l6=7000 r6=15000\n"
+  STICKTIME_TEST = {}
+  chunk().init()
+  local L = STICKTIME_TEST
+  local a1, a2 = L.best(1)
+  local b1, b2, b3, b4 = L.best(4)
+  local c1, c2 = L.best(6)
+  if L.S.track ~= 4 or a1 ~= 4321 or a2 ~= 9876 or b1 ~= c[2] or b2 ~= c[3] or b3 ~= 9 or b4 ~= 300
+    or c1 ~= (c[2] > 0 and 7000 or 0) or c2 ~= (c[2] > 0 and 15000 or 0) then
+    fail(string.format("layout %s save: bests %s %s / %s %s %s %s / %s %s", c[1], a1, a2, b1, b2, b3, b4, c1, c2))
+  end
+end
 
 collectgarbage()
 print(string.format("%s %s %dx%d  frames %d  instr/frame (incl. mock lcd) avg %d max %d  tri rows avg %d max %d  rejected lines %d",

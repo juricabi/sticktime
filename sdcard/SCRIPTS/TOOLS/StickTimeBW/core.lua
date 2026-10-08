@@ -1,6 +1,6 @@
 local toolName = "TNS|StickTime BW|TNE"
 --[[ ======================================================================
-  StickTime BW v1.6.1  -  a real 3D FPV quad simulator that runs on your radio
+  StickTime BW v1.6.2  -  a real 3D FPV quad simulator that runs on your radio
   Black & white version - 128x64 and 212x64 radios with an STM32F4 (TX12 MkII, Zorro, Boxer,
   Pocket, MT12, GX12, X9D+ 2019, X9E, T14, T20 ...)
 
@@ -40,7 +40,7 @@ local EV = {
 local MENU, SETUP, COUNT, FLY, CRASHED, READY, PAUSED, DONE = 1, 2, 3, 4, 5, 6, 7, 8
 
 -- ------------------------------------------------------------ settings
-local S = { track = 1, quad = 1, twr = 5, mode = 1, rates = 2, rc = 100, rm = 600, re = 50, yc = 100, ym = 500, ye = 40,
+local S = { track = 1, quad = 1, twr = 6, mode = 1, rates = 2, rc = 100, rm = 600, re = 50, yc = 100, ym = 500, ye = 40,
             tilt = 20, fov = 100, laps = 3, ai = 2, skill = 2, wind = 0, wash = 0, vib = 1, map = 1, sticks = 0, fps = 0 }
 -- rows: label, key, then either a value list (+ names, suffix) or nil, nil, suffix, min, max, step
 local OPTS = {
@@ -83,11 +83,11 @@ local TRACKS = {
   { "Figure 8", 23, { -14,10,1,0,0, 6,46,2,40,0, 18,68,1,0,0, 0,88,1,-90,0, -18,68,1,180,0, 18,16,1,180,0, 0,-4,1,-90,0 } },
   { "Dive Tower", 37, { 0,0,1,0,0, 10,30,1,20,0, 12,60,2,0,0, 0,84,2,-90,0, -28,84,3,-90,0, -36,52,1,180,0, -28,20,1,160,0,
                         -12,-14,1,60,0 } },
-  { "Slalom", 53, { 0,0,5,0,0, -2,22,6,0,0, 6,40,7,0,0, -2,58,6,0,0, 6,76,7,0,0, 2,96,4,0,3, 22,112,2,90,0, 44,100,4,120,3,
-                    48,78,6,180,0, 40,60,7,180,0, 48,42,6,180,0, 44,18,3,200,0, 28,-22,1,-90,0 } },
+  { "Slalom", 53, { 0,0,5,0,0, -2,22,7,0,0, 6,40,6,0,0, -2,58,7,0,0, 6,76,6,0,0, 2,96,4,0,3, 22,112,2,90,0, 44,100,4,120,3,
+                    48,78,7,180,0, 40,60,6,180,0, 48,42,7,180,0, 44,18,3,200,0, 28,-22,1,-90,0 } },
   { "Hoop Forest", 61, { 0,0,1,0,0, 8,24,4,20,2.4, 24,44,4,50,4.5, 48,54,4,90,6, 72,46,2,130,0, 80,22,4,180,2, 70,-2,4,220,3.5,
                          48,-14,3,247,0, 24,-24,4,300,2.2 }, nil, 2 },
-  { "Grand Prix", 71, { 0,0,5,0,0, 0,40,1,0,0, 10,80,2,20,6, 36,104,4,70,3, 64,106,6,100,0, 88,96,7,120,0, 110,76,3,180,0,
+  { "Grand Prix", 71, { 0,0,5,0,0, 0,40,1,0,0, 10,80,2,20,6, 36,104,4,70,3, 64,106,7,100,0, 88,96,6,120,0, 110,76,3,180,0,
                         112,44,1,180,0, 104,14,4,200,2.2, 84,-8,2,250,8, 56,-18,1,270,0, 30,-28,4,290,3 } },
   { "Bando", 83, { 0,0,1,0,0, 0,34,8,0,1.8, 0,46,8,0,1.8, 20,66,4,60,4, 40,88,3,146,0, 56,64,1,180,0, 43.95,10,8,180,1.3,
                    22,-16,4,250,2.5 },
@@ -315,15 +315,20 @@ loadData = function()
   io.close(f)
   if type(s) ~= "string" then return end
   if string.sub(s, 1, 7) == "FPVSIM2" then
+    local lay = 0
     for k, n, v in string.gmatch(s, "(%a+)(%d*)=(%-?%d+)") do
       v = tonumber(v)
-      if n == "" then
+      if k == "lay" then lay = v
+      elseif n == "" then
         if S[k] ~= nil then S[k] = v end
       else
         local t = tonumber(n)
         if BEST[k] and t >= 1 and t <= NT then BEST[k][t] = v end
       end
     end
+    -- layout 2 (1.6.2) swapped the flag sides on the Slalom and the Grand Prix: a straight line
+    -- passed them. Lap and race bests flown before cannot be beaten fairly, so they start over.
+    if lay < 2 then BEST.l[4], BEST.r[4], BEST.l[6], BEST.r[6] = 0, 0, 0, 0 end
   elseif string.sub(s, 1, 6) == "FPVSIM" then
     -- version 1 file: 10 settings, then best lap / race of the first three tracks
     local v, n = {}, 0
@@ -335,7 +340,7 @@ loadData = function()
     for i = 1, 10 do
       if v[i] then S[K1[i]] = v[i] end
     end
-    S.twr = ({ 3, 4, 6 })[v[6] or 2] or 5
+    S.twr = ({ 3, 4, 6 })[v[6] or 2] or 6
     for t = 1, 3 do
       BEST.l[t], BEST.r[t] = v[9 + t * 2] or 0, v[10 + t * 2] or 0
     end
@@ -345,7 +350,7 @@ loadData = function()
 end
 
 saveData = function()
-  local s = "FPVSIM2"
+  local s = "FPVSIM2 lay=2"
   for k, v in pairs(S) do s = s .. " " .. k .. "=" .. floor(v) end
   for k, b in pairs(BEST) do
     for t = 1, NT do
@@ -365,7 +370,7 @@ local px, py, pz, vx, vy, vz = 0, 0.15, 0, 0, 0, 0                 -- quad posit
 local rx, ry, rz, ux, uy, uz, fx, fy, fz = 1, 0, 0, 0, 1, 0, 0, 0, 1 -- quad right / up / forward axes
 local sA, sE, sT, sR, speed = 0, 0, 0, 0, 0                           -- sticks, speed
 local DR, NEAR = 0.15, 0.2                                            -- quad radius, camera near plane
-local P = { rc = 100, rm = 600, re = 0.5, yc = 100, ym = 500, ye = 0.4, twr = 5, angle = false, tc = 0.9, ts = 0.42,
+local P = { rc = 100, rm = 600, re = 0.5, yc = 100, ym = 500, ye = 0.4, twr = 6, angle = false, tc = 0.9, ts = 0.42,
             wr = 0, wp = 0, wy = 0 }                                  -- settings in use, body rates (rad/s)
 local state, prevState, pausedFrom, gmode = MENU, MENU, FLY, 1
 local gt, lastT, tState, tStart = 0, 0, 0, 0                          -- game clock in 10 ms ticks
@@ -1492,6 +1497,19 @@ local render, hitTest, pauseHit, initUI
     drawLine(CX - 4 * U, CY, CX - 2 * U, CY, SOLID, BLK)
     drawLine(CX + 2 * U, CY, CX + 4 * U, CY, SOLID, BLK)
     if S.fps == 1 then drawNumber(XM, YM + 2 - 8 * U, R.fps, SMLSIZE + RIGHT) end
+    -- wind: where it blows, as seen from the quad (up is the way its nose points)
+    if S.wind > 0 then
+      local r = 6 * U
+      local cx, cy = XM - r, YM - r - (S.fps == 1 and 9 * U or 0)
+      fillRect(cx - r, cy - r, r * 2 + 1, r * 2 + 1, ERASE)
+      lcd.drawRectangle(cx - r, cy - r, r * 2 + 1, r * 2 + 1, BLK)
+      local a = 4 * U / (sqrt(fx * fx + fz * fz) + 0.0001)
+      local ex, ey = (TR.wx * fz - TR.wz * fx) * a, -(TR.wx * fx + TR.wz * fz) * a
+      local tx, ty = cx + ex, cy + ey
+      drawLine(cx - ex, cy - ey, tx, ty, SOLID, BLK)
+      drawLine(tx, ty, tx - ex * 0.6 - ey * 0.5, ty - ey * 0.6 + ex * 0.5, SOLID, BLK)
+      drawLine(tx, ty, tx - ex * 0.6 + ey * 0.5, ty - ey * 0.6 - ex * 0.5, SOLID, BLK)
+    end
   end
 
   local function drawList(title, n, label, value, y, rh)

@@ -168,7 +168,7 @@ const EdgeTX = (() => {
       this.touchEnabled = this.color;
       this.fb = this.color ? new Uint16Array(this.W * this.H) : new Uint8Array(this.W * this.H);
       this.sticks = { ail: 0, ele: 0, thr: -1024, rud: 0 };
-      this.stickMode = 1; // 0..3 = mode 1..4
+      this.stickMode = 1; // 0..3 = mode 1..4 (getStickMode() gives 1..4, as EdgeTX does)
       this.queue = [];
       this.clock = 0;          // ms
       this.error = null;
@@ -375,7 +375,7 @@ const EdgeTX = (() => {
         pushStr(name); lua.lua_setfield(L, -2, to_luastring('desc'));
         return 1;
       });
-      global('getStickMode', () => { lua.lua_pushinteger(L, self.stickMode); return 1; });
+      global('getStickMode', () => { lua.lua_pushinteger(L, self.stickMode + 1); return 1; });
       global('playTone', () => { if (self.onTone) self.onTone(int(1), int(2), opt(3, 0), opt(4, 0), opt(5, 0), opt(6, 0)); });
       global('playHaptic', () => { if (self.onHaptic) self.onHaptic(int(1)); });
       global('playFile', () => 0); global('playNumber', () => 0); global('killEvents', () => 0);

@@ -1,6 +1,6 @@
 local toolName = "TNS|StickTime Lite|TNE"
 --[[ ======================================================================
-StickTime Lite v1.6.1  -  the small edition of StickTime for B&W radios.
+StickTime Lite v1.6.2  -  the small edition of StickTime for B&W radios.
 Made for radios with little memory (STM32F2: X7, X9D, X9D+, X9 Lite,
 X-Lite, TX12 MkI, T12, T8, T-Lite, T-Pro, LR3 Pro). Runs on every
 black & white EdgeTX radio with EdgeTX 2.11 or newer.
@@ -36,7 +36,7 @@ end
 end
 return t
 end
-local S = { track = 1, quad = 1, twr = 5, mode = 1, rates = 2, tilt = 20, laps = 3, wind = 0, vib = 1 }
+local S = { track = 1, quad = 1, twr = 6, mode = 1, rates = 2, tilt = 20, laps = 3, wind = 0, vib = 1 }
 local OPTS = {
 { "Quad", "quad", { 1, 2 }, { "Racer", "Freestyle" } },
 { "Power", "twr", nums("3 4 5 6 7 8 10 12"), ":1" },
@@ -161,7 +161,7 @@ do
 local FILE = "/SCRIPTS/TOOLS/StickTimeLite/data.txt"
 local OLD = "/SCRIPTS/TOOLS/FPVLite/data.txt"              -- the save under the old name, FPV Sim Lite
 save = function()
-local s = "FPVLITE2"
+local s = "FPVLITE2 lay=2"
 for k, v in pairs(S) do s = s .. " " .. k .. "=" .. floor(v) end
 for t = 1, 7 do
 s = s .. " l" .. t .. "=" .. floor(BL[t]) .. " r" .. t .. "=" .. floor(BR[t]) .. " f" .. t .. "=" .. BF[t] .. " g" .. t .. "=" .. BG[t]
@@ -180,6 +180,7 @@ local s = io.read(f, 600)
 io.close(f)
 local h = type(s) == "string" and string.sub(s, 1, 8)
 if h ~= "FPVLITE2" and h ~= "FPVLITE1" then return end
+local lay = 0
 for k, n, v in string.gmatch(s, "(%a+)(%d*)=(%d+)") do
 v, n = tonumber(v), tonumber(n)
 if h == "FPVLITE1" then
@@ -187,7 +188,8 @@ if n == 4 then n = 6 end
 if k == "track" and v == 4 then v = 6 end
 end
 local B = k == "l" and BL or k == "r" and BR or k == "f" and BF or k == "g" and BG
-if B then
+if k == "lay" then lay = v
+elseif B then
 if n and n >= 1 and n <= 7 then B[n] = v end
 elseif k == "track" then
 if v >= 1 and v <= 7 then S.track = v end
@@ -199,6 +201,7 @@ end
 end
 end
 end
+if lay < 2 then BL[4], BR[4], BL[6], BR[6] = 0, 0, 0, 0 end
 if old then save() end                            -- under the new name right away
 end
 end
@@ -818,6 +821,18 @@ local th = floor(sT * 30 * U)
 if th > 0 then lcd.drawFilledRectangle(0, YM - th, 2 * U, th, BLK) end
 drawLine(CX - 4 * U, CY, CX - 2 * U, CY, SOLID, BLK)
 drawLine(CX + 2 * U, CY, CX + 4 * U, CY, SOLID, BLK)
+if S.wind > 0 then
+local r = 6 * U
+local cx, cy = XM - r, YM - r
+lcd.drawFilledRectangle(cx - r, cy - r, r * 2 + 1, r * 2 + 1, ERASE)
+lcd.drawRectangle(cx - r, cy - r, r * 2 + 1, r * 2 + 1, BLK)
+local a = 4 * U / (sqrt(fx * fx + fz * fz) + 0.0001)
+local ex, ey = (wdx * fz - wdz * fx) * a, -(wdx * fx + wdz * fz) * a
+local tx, ty = cx + ex, cy + ey
+drawLine(cx - ex, cy - ey, tx, ty, SOLID, BLK)
+drawLine(tx, ty, tx - ex * 0.6 - ey * 0.5, ty - ey * 0.6 + ex * 0.5, SOLID, BLK)
+drawLine(tx, ty, tx - ex * 0.6 + ey * 0.5, ty - ey * 0.6 - ex * 0.5, SOLID, BLK)
+end
 if msg and gt - msgT < 200 then drawText(CX, 10 * U, msg, SML + CENTER) end
 end
 if state == 3 then
