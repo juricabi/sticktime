@@ -32,6 +32,7 @@ local U = STICKTIME_UI or 1
 local EV = {
   ENTER = EVT_VIRTUAL_ENTER or EVT_ENTER_BREAK, EXIT = EVT_VIRTUAL_EXIT or EVT_EXIT_BREAK,
   NEXT = EVT_VIRTUAL_NEXT, PREV = EVT_VIRTUAL_PREV, INC = EVT_VIRTUAL_INC, DEC = EVT_VIRTUAL_DEC,
+  NEXTR = EVT_VIRTUAL_NEXT_REPT, PREVR = EVT_VIRTUAL_PREV_REPT, INCR = EVT_VIRTUAL_INC_REPT, DECR = EVT_VIRTUAL_DEC_REPT,
   TAP = EVT_TOUCH_TAP,
 }
 
@@ -48,12 +49,12 @@ local OPTS = {
   { "Power", "twr", { 3, 4, 5, 6, 7, 8, 10, 12 }, nil, ":1" },
   { "Flight mode", "mode", { 1, 2 }, { "Acro", "Angle" } },
   { "Rates", "rates", { 1, 2, 3, 4 }, { "Soft", "Normal", "Fast", "Custom" } },
-  { "R/P center", "rc", nil, nil, "", 20, 500, 10 },
-  { "R/P max", "rm", nil, nil, "", 100, 1800, 10 },
-  { "R/P expo", "re", nil, nil, nil, 0, 95, 5 },
-  { "Yaw center", "yc", nil, nil, "", 20, 500, 10 },
-  { "Yaw max", "ym", nil, nil, "", 100, 1800, 10 },
-  { "Yaw expo", "ye", nil, nil, nil, 0, 95, 5 },
+  { "R/P center", "rc", nil, nil, "", 10, 500, 10 },
+  { "R/P max", "rm", nil, nil, "", 100, 2000, 10 },
+  { "R/P expo", "re", nil, nil, nil, 0, 100, 1 },
+  { "Yaw center", "yc", nil, nil, "", 10, 500, 10 },
+  { "Yaw max", "ym", nil, nil, "", 100, 2000, 10 },
+  { "Yaw expo", "ye", nil, nil, nil, 0, 100, 1 },
   { "Camera tilt", "tilt", nil, nil, "", 0, 60, 5 },
   { "Field of view", "fov", nil, nil, "", 70, 130, 10 },
   { "Race laps", "laps", { 1, 2, 3, 5, 10 } },
@@ -1410,6 +1411,7 @@ local function optIndex(o)
   return 1
 end
 
+local stepT, stepN, stepO = 0, 0, nil
 optStep = function(o, d)
   local key = o[2]
   if RKEYS[key] and S.rates < 4 then
@@ -1424,7 +1426,11 @@ optStep = function(o, d)
     if j < 1 then j = #vals elseif j > #vals then j = 1 end
     S[key] = vals[j]
   else
-    local v = S[key] + d * o[8]
+    -- fine steps, five times bigger after eight quick ones in a row (held key, fast wheel)
+    local t = getTime()
+    stepN = (o == stepO and t - stepT < 20) and stepN + 1 or 0
+    stepT, stepO = t, o
+    local v = S[key] + d * o[8] * (stepN >= 8 and 5 or 1)
     if v < o[6] then v = o[6] elseif v > o[7] then v = o[7] end
     S[key] = v
   end
@@ -1436,7 +1442,7 @@ optText = function(o)
   local key = o[2]
   local v, j = S[key], RKEYS[key]
   if j and S.rates < 4 then v = RATES[S.rates][j] end
-  if key == "re" or key == "ye" then return fmt("0.%02d", v) end
+  if key == "re" or key == "ye" then return fmt("%.2f", v / 100) end
   return v .. (o[5] or "")
 end
 end
@@ -1608,9 +1614,9 @@ end)()
 local handleEvent
 ;(function()
   local function listNav(event, n)
-    if event == EV.NEXT then
+    if event == EV.NEXT or event == EV.NEXTR then
       focus = focus % n + 1
-    elseif event == EV.PREV then
+    elseif event == EV.PREV or event == EV.PREVR then
       focus = (focus - 2) % n + 1
     end
   end
@@ -1655,8 +1661,8 @@ local handleEvent
       end
       if editing then
         -- INC / DEC only: on radios with +/- keys NEXT is the minus key
-        if event == EV.INC then stepTrack(1)
-        elseif event == EV.DEC then stepTrack(-1)
+        if event == EV.INC or event == EV.INCR then stepTrack(1)
+        elseif event == EV.DEC or event == EV.DECR then stepTrack(-1)
         elseif event == EV.ENTER or event == EV.EXIT then editing = false end
         return 0
       end
@@ -1676,8 +1682,8 @@ local handleEvent
         focus = tapI
         if tapI == n then event = EV.EXIT else optStep(OPTS[tapI], tapF < 0.4 and -1 or 1) end
       elseif editing then
-        if event == EV.INC then optStep(OPTS[focus], 1)
-        elseif event == EV.DEC then optStep(OPTS[focus], -1)
+        if event == EV.INC or event == EV.INCR then optStep(OPTS[focus], 1)
+        elseif event == EV.DEC or event == EV.DECR then optStep(OPTS[focus], -1)
         elseif event == EV.ENTER or event == EV.EXIT then editing = false end
         return 0
       else
