@@ -65,7 +65,7 @@ The layout follows `LCD_W` / `LCD_H` and the radio's real font sizes, so new scr
 
 ## Faster firmware (optional)
 
-Stock EdgeTX runs a tool at most every 50 ms (20 fps) and shows each frame one cycle late. The [`fast-lua-20ms` prerelease](https://github.com/juricabi/edgetx/releases/tag/fast-lua-20ms) has firmware for every color radio (EdgeTX `main` plus [`firmware/edgetx-fast-lua.patch`](firmware/edgetx-fast-lua.patch)): Lua tools run every 20 ms, frames show at once, and drawing is much faster. On the HelloRadioSky V12 it also runs the Lua interpreter from ITCM and sends frames to the screen in the background: 38 fps even in the Bando. Stick-to-screen latency drops from about 90 ms to about 40 ms. With **Show FPS** on, StickTime shows how long each frame took to run and to reach the screen. These are test builds: back up your SD card first.
+Stock EdgeTX runs a tool at most every 50 ms (20 fps) and shows each frame one cycle late. The [`fast-lua-20ms` prerelease](https://github.com/juricabi/edgetx/releases/tag/fast-lua-20ms) has firmware for every color radio (EdgeTX `main` plus [`firmware/edgetx-fast-lua.patch`](firmware/edgetx-fast-lua.patch)): Lua tools run every 20 ms, frames show at once, and drawing is much faster. On every STM32H750 radio (RadioMaster TX16S MK3, TX15 and GX15, Jumper T15 Pro, HelloRadioSky V12 and V15, and more) it also runs the Lua interpreter from ITCM. On the HelloRadioSky V12 it also sends frames to the screen in the background: 38 fps even in the Bando, and stick-to-screen latency drops from about 90 ms to about 40 ms. With **Show FPS** on, StickTime shows how long each frame took to run and to reach the screen. These are test builds: back up your SD card first.
 
 <details>
 <summary>What the patch changes</summary>
@@ -78,10 +78,9 @@ While a Lua tool is open:
 - H7 radios no longer flush the whole data cache on every `lcd.drawLine`;
 - the tool gets `TOOL_RUN_US` and `TOOL_SHOW_US`: how long its last `run()` and putting that frame on the screen took.
 
-On the HelloRadioSky V12 (STM32H750, firmware in SDRAM, 320×240 SPI screen) it also:
+On the STM32H750 radios (every target linked with `stm32h750_sdram`: tx16smk3, tx15, gx15, t15pro, t15h7, t22, pa01, st16, c14, h17, v12, v15), whose firmware runs from SDRAM through a 16 KB instruction cache, the Lua interpreter and the drawing code behind the `lcd` functions run from the H750's 64 KB ITCM, which stock EdgeTX leaves empty, compiled for speed (about 49 KB of it). The STM32F429 radios have no ITCM, and need it less: their firmware runs from internal flash.
 
-- runs the Lua interpreter from the H750's 64 KB ITCM, which stock EdgeTX leaves empty, compiled for speed;
-- sends frames in the background: the screen's vertical blank (FMARK) starts the 13 ms SPI transfer and its interrupt finishes it, while the CPU already runs the next frame.
+On the HelloRadioSky V12 (320×240 SPI screen) frames also go out in the background: the screen's vertical blank (FMARK) starts the 13 ms SPI transfer and its interrupt finishes it, while the CPU already runs the next frame.
 
 The mixer task (sticks, mixes, RF, telemetry) keeps its higher priority and is not touched. `tools/build_firmware.sh v12` clones EdgeTX `main`, applies the patch and builds one radio's firmware (any target from EdgeTX's `tools/build-common.sh`, ARM GCC 14.2 on the `PATH`). The same changes are on the `fast-lua-20ms` branch of [juricabi/edgetx](https://github.com/juricabi/edgetx/tree/fast-lua-20ms), whose CI publishes the prerelease.
 

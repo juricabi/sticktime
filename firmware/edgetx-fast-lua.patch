@@ -663,17 +663,21 @@ index e9274a074..03a92a211 100644
            }
          } else if (lua_isstring(lsStandalone, -1)) {
 diff --git a/radio/src/lua/CMakeLists.txt b/radio/src/lua/CMakeLists.txt
-index 47e576c8a..1deaef2cf 100644
+index 47e576c8a..95835c624 100644
 --- a/radio/src/lua/CMakeLists.txt
 +++ b/radio/src/lua/CMakeLists.txt
-@@ -71,3 +71,14 @@ add_compile_definitions(LUA_COMPAT_5_2)
+@@ -71,3 +71,18 @@ add_compile_definitions(LUA_COMPAT_5_2)
  foreach(FILE ${LUA_SRC})
    set(SRC ${SRC} ${LUA_DIR}/${FILE})
  endforeach()
 +
-+# StickTime build: on targets that set LUA_FAST_CODE_ITCM (firmware in SDRAM, ITCM free),
-+# the functions marked LUAI_FASTCODE run from ITCM, and the files that hold the
-+# interpreter's hot paths are compiled for speed instead of size.
++# StickTime build: the STM32H750 radios (every target linked with stm32h750_sdram) run their
++# firmware from SDRAM and leave the 64 KB ITCM empty. With LUA_FAST_CODE_ITCM the functions
++# marked LUAI_FASTCODE run from ITCM instead, and the files that hold the interpreter's hot
++# paths are compiled for speed instead of size.
++if(TARGET_LINKER_DIR STREQUAL "stm32h750_sdram")
++  set(LUA_FAST_CODE_ITCM ON)
++endif()
 +if(LUA_FAST_CODE_ITCM)
 +  add_definitions(-DLUA_FAST_CODE_ITCM)
 +  foreach(FILE lapi.c ldo.c lfunc.c lgc.c lmem.c lobject.c lstate.c lstring.c ltable.c ltm.c
@@ -819,21 +823,6 @@ index d13e69ca0..a3e1999ed 100644
  void DMAInit();
  void DMAFillRect(uint16_t * dest, uint16_t destw, uint16_t desth, uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t color);
  void DMACopyBitmap(uint16_t * dest, uint16_t destw, uint16_t desth, uint16_t x, uint16_t y, const uint16_t * src, uint16_t srcw, uint16_t srch, uint16_t srcx, uint16_t srcy, uint16_t w, uint16_t h);
-diff --git a/radio/src/targets/hrs/v12/CMakeLists.txt b/radio/src/targets/hrs/v12/CMakeLists.txt
-index 3771abf1e..dc4ec4751 100644
---- a/radio/src/targets/hrs/v12/CMakeLists.txt
-+++ b/radio/src/targets/hrs/v12/CMakeLists.txt
-@@ -71,6 +71,10 @@ add_definitions(
- 
- set(SDRAM ON)
- 
-+# StickTime build: the firmware runs from SDRAM and leaves the 64 KB ITCM empty, so the
-+# Lua interpreter's hot code goes there (see lua/CMakeLists.txt)
-+set(LUA_FAST_CODE_ITCM ON)
-+
- # UART4 on the internal 3-pin header (no switchable power rail)
- set(AUX_SERIAL YES)
- 
 diff --git a/radio/src/tasks.cpp b/radio/src/tasks.cpp
 index 0c70b79e0..49100a0d2 100644
 --- a/radio/src/tasks.cpp
