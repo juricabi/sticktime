@@ -65,7 +65,7 @@ The layout follows `LCD_W` / `LCD_H` and the radio's real font sizes, so new scr
 
 ## Faster firmware (optional)
 
-Stock EdgeTX runs a tool at most every 50 ms (20 fps) and shows each frame one cycle late. The [`fast-lua-20ms` prerelease](https://github.com/juricabi/edgetx/releases/tag/fast-lua-20ms) has firmware for every color radio (EdgeTX `main` plus [`firmware/edgetx-fast-lua.patch`](firmware/edgetx-fast-lua.patch)): Lua tools run every 20 ms, frames show at once, and drawing is much faster. On the HelloRadioSky V12 it runs the Lua interpreter from ITCM, sends frames to the screen in the background and paces them evenly, for a steady 38 fps. Stick-to-screen latency drops from about 90 ms to about 40 ms. With **Show FPS** on, StickTime shows how long each frame took to run and to reach the screen. These are test builds: back up your SD card first.
+Stock EdgeTX runs a tool at most every 50 ms (20 fps) and shows each frame one cycle late. The [`fast-lua-20ms` prerelease](https://github.com/juricabi/edgetx/releases/tag/fast-lua-20ms) has firmware for every color radio (EdgeTX `main` plus [`firmware/edgetx-fast-lua.patch`](firmware/edgetx-fast-lua.patch)): Lua tools run every 20 ms, frames show at once, and drawing is much faster. On the HelloRadioSky V12 it also runs the Lua interpreter from ITCM and sends frames to the screen in the background: 38 fps even in the Bando. Stick-to-screen latency drops from about 90 ms to about 40 ms. With **Show FPS** on, StickTime shows how long each frame took to run and to reach the screen. These are test builds: back up your SD card first.
 
 <details>
 <summary>What the patch changes</summary>
@@ -81,8 +81,7 @@ While a Lua tool is open:
 On the HelloRadioSky V12 (STM32H750, firmware in SDRAM, 320×240 SPI screen) it also:
 
 - runs the Lua interpreter from the H750's 64 KB ITCM, which stock EdgeTX leaves empty, compiled for speed;
-- sends frames in the background: the screen's vertical blank (FMARK) starts the 13 ms SPI transfer and its interrupt finishes it, while the CPU already runs the next frame;
-- starts a frame no sooner than 20 ms after the previous one, so every frame goes out on every second screen refresh. Otherwise a light game such as StickTime BW mixes 13 ms and 26 ms frames, which looks less smooth even at a higher average fps.
+- sends frames in the background: the screen's vertical blank (FMARK) starts the 13 ms SPI transfer and its interrupt finishes it, while the CPU already runs the next frame.
 
 The mixer task (sticks, mixes, RF, telemetry) keeps its higher priority and is not touched. `tools/build_firmware.sh v12` clones EdgeTX `main`, applies the patch and builds one radio's firmware (any target from EdgeTX's `tools/build-common.sh`, ARM GCC 14.2 on the `PATH`). The same changes are on the `fast-lua-20ms` branch of [juricabi/edgetx](https://github.com/juricabi/edgetx/tree/fast-lua-20ms), whose CI publishes the prerelease.
 
