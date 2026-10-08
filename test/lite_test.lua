@@ -383,7 +383,7 @@ do
     nIdle, fIdle, fFull, tostring(bgt.flags), tostring(bgt.vol), tostring(bgt.len)))
   if nIdle < 4 then fail("motor sound: no background tone while flying") end
   if bgt.flags ~= PLAY_BACKGROUND + PLAY_NOW or bgt.vol ~= 3 or not bgt.len or bgt.len < 100 then fail("motor sound: wrong playTone arguments") end
-  if fIdle < 250 or fIdle > 350 or fFull < 950 or fFull > 1200 then fail("motor sound: pitch should rise from about 290 to 1080 Hz") end
+  if fIdle < 160 or fIdle > 220 or fFull < 480 or fFull > 620 then fail("motor sound: pitch should rise from about 190 to 540 Hz") end
   sticks.thr = -300
   frame(EVT_VIRTUAL_EXIT)                                -- pause
   frame(0)

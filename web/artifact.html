@@ -1236,7 +1236,7 @@ if (typeof module !== 'undefined') module.exports = EdgeTX;
 <script type="text/plain" id="lua-color">
 local toolName = "TNS|StickTime|TNE"
 --[[ ======================================================================
-  StickTime v1.6  -  a real 3D FPV quad simulator that runs on your radio
+  StickTime v1.6.1  -  a real 3D FPV quad simulator that runs on your radio
   Color version - every EdgeTX color radio (480x272, 480x320, 320x480, 320x240, 800x480)
 
   Install : copy this file to /SCRIPTS/TOOLS/ on the radio SD card and
@@ -1665,15 +1665,15 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
   end
 
   -- motor sound: a tone on the radio's background channel (the vario's), its pitch following
-  -- the motors' speed, which goes with the square root of their thrust: about 290 Hz at idle,
-  -- 590 Hz at a 5:1 hover and 1080 Hz flat out, up to 7% higher while the quad rotates fast.
+  -- the motors' speed, which goes with the square root of their thrust: about 190 Hz at idle,
+  -- 320 Hz at a 5:1 hover and 540 Hz flat out, up to 7% higher while the quad rotates fast.
   -- Each call restarts the tone's 200 ms, so it plays on as long as frames keep coming.
   local SNDV, sndOn = { 1, 3, 5 }, false          -- tone volume (1-5) for Low, Mid, High
   motorSound = function(on)
     if not (playTone and PLAY_BACKGROUND) then return end
     if on and S.snd > 0 then
       local w = sqrt(P.wr * P.wr + P.wp * P.wp + P.wy * P.wy)
-      local f = (180 + 900 * sqrt(Tm / (P.twr * G))) * (1 + (w < 12 and w or 12) * 0.006)
+      local f = (140 + 400 * sqrt(Tm / (P.twr * G))) * (1 + (w < 12 and w or 12) * 0.006)
       playTone(floor(f), 200, 0, PLAY_BACKGROUND + PLAY_NOW, 0, SNDV[S.snd])
       sndOn = true
     elseif sndOn then
@@ -2215,14 +2215,15 @@ local F, tanH = 160, 1.4
 -- screens show a frame one script cycle after it is drawn (50 ms on stock EdgeTX), so the
 -- prediction follows the measured frame interval and stays right on faster firmware too.
 -- STICKTIME_LAT (seconds) overrides it, e.g. in the emulator when frames show at once
--- (FPVSIM_LAT: its name before the rename to StickTime).
+-- (FPVSIM_LAT: its name before the rename to StickTime). StickTime BW on a color radio has
+-- the color screen's delay too: its color.lua sets STICKTIME_LATK to the color factor.
 -- The turn is predicted over a third of that time only: the stick can center at any moment,
 -- and a fast roll drawn the whole delay ahead overshoots for a frame and swings back when it
 -- stops (about 35 deg at 850 deg/s). A third is about as long as the quad keeps turning after
 -- the stick centers, so the picture no longer swings back, and still gains 20 ms.
 local function fpvCamera()
   local c, s = P.tc, P.ts
-  local d = (state == FLY or state == DONE) and (STICKTIME_LAT or FPVSIM_LAT or R.fi * 0.011) or 0
+  local d = (state == FLY or state == DONE) and (STICKTIME_LAT or FPVSIM_LAT or R.fi * (STICKTIME_LATK or 0.011)) or 0
   local a1, a2, a3, b1, b2, b3, e1, e2, e3 = rx, ry, rz, ux, uy, uz, fx, fy, fz
   local dr = d * 0.35
   if d > 0 then rotate(P.wr * dr, P.wp * dr, P.wy * dr) end
@@ -3878,7 +3879,7 @@ return { init = init, run = run }
 <script type="text/plain" id="lua-bw">
 local toolName = "TNS|StickTime BW|TNE"
 --[[ ======================================================================
-  StickTime BW v1.6  -  a real 3D FPV quad simulator that runs on your radio
+  StickTime BW v1.6.1  -  a real 3D FPV quad simulator that runs on your radio
   Black & white version - 128x64 and 212x64 radios with an STM32F4 (TX12 MkII, Zorro, Boxer,
   Pocket, MT12, GX12, X9D+ 2019, X9E, T14, T20 ...)
 
@@ -4293,15 +4294,15 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
   end
 
   -- motor sound: a tone on the radio's background channel (the vario's), its pitch following
-  -- the motors' speed, which goes with the square root of their thrust: about 290 Hz at idle,
-  -- 590 Hz at a 5:1 hover and 1080 Hz flat out, up to 7% higher while the quad rotates fast.
+  -- the motors' speed, which goes with the square root of their thrust: about 190 Hz at idle,
+  -- 320 Hz at a 5:1 hover and 540 Hz flat out, up to 7% higher while the quad rotates fast.
   -- Each call restarts the tone's 200 ms, so it plays on as long as frames keep coming.
   local SNDV, sndOn = { 1, 3, 5 }, false          -- tone volume (1-5) for Low, Mid, High
   motorSound = function(on)
     if not (playTone and PLAY_BACKGROUND) then return end
     if on and S.snd > 0 then
       local w = sqrt(P.wr * P.wr + P.wp * P.wp + P.wy * P.wy)
-      local f = (180 + 900 * sqrt(Tm / (P.twr * G))) * (1 + (w < 12 and w or 12) * 0.006)
+      local f = (140 + 400 * sqrt(Tm / (P.twr * G))) * (1 + (w < 12 and w or 12) * 0.006)
       playTone(floor(f), 200, 0, PLAY_BACKGROUND + PLAY_NOW, 0, SNDV[S.snd])
       sndOn = true
     elseif sndOn then
@@ -4843,14 +4844,15 @@ local F, tanH = 160, 1.4
 -- screens show a frame one script cycle after it is drawn (50 ms on stock EdgeTX), so the
 -- prediction follows the measured frame interval and stays right on faster firmware too.
 -- STICKTIME_LAT (seconds) overrides it, e.g. in the emulator when frames show at once
--- (FPVSIM_LAT: its name before the rename to StickTime).
+-- (FPVSIM_LAT: its name before the rename to StickTime). StickTime BW on a color radio has
+-- the color screen's delay too: its color.lua sets STICKTIME_LATK to the color factor.
 -- The turn is predicted over a third of that time only: the stick can center at any moment,
 -- and a fast roll drawn the whole delay ahead overshoots for a frame and swings back when it
 -- stops (about 35 deg at 850 deg/s). A third is about as long as the quad keeps turning after
 -- the stick centers, so the picture no longer swings back, and still gains 20 ms.
 local function fpvCamera()
   local c, s = P.tc, P.ts
-  local d = (state == FLY or state == DONE) and (STICKTIME_LAT or FPVSIM_LAT or R.fi * 0.003) or 0
+  local d = (state == FLY or state == DONE) and (STICKTIME_LAT or FPVSIM_LAT or R.fi * (STICKTIME_LATK or 0.003)) or 0
   local a1, a2, a3, b1, b2, b3, e1, e2, e3 = rx, ry, rz, ux, uy, uz, fx, fy, fz
   local dr = d * 0.35
   if d > 0 then rotate(P.wr * dr, P.wp * dr, P.wy * dr) end
@@ -5678,7 +5680,7 @@ return { init = init, run = run }
 <script type="text/plain" id="lua-lite">
 local toolName = "TNS|StickTime Lite|TNE"
 --[[ ======================================================================
-StickTime Lite v1.6  -  the small edition of StickTime for B&W radios.
+StickTime Lite v1.6.1  -  the small edition of StickTime for B&W radios.
 Made for radios with little memory (STM32F2: X7, X9D, X9D+, X9 Lite,
 X-Lite, TX12 MkI, T12, T8, T-Lite, T-Pro, LR3 Pro). Runs on every
 black & white EdgeTX radio with EdgeTX 2.11 or newer.
@@ -6221,7 +6223,7 @@ local sndOn = false
 local function motorSound(on)
 if on and S.snd > 0 and PLAY_BACKGROUND then
 local w = sqrt(wr0 * wr0 + wp0 * wp0 + wy0 * wy0)
-playTone(floor((180 + 900 * sqrt(Tm / (S.twr * 9.81))) * (1 + (w < 12 and w or 12) * 0.006)), 200, 0,
+playTone(floor((140 + 400 * sqrt(Tm / (S.twr * 9.81))) * (1 + (w < 12 and w or 12) * 0.006)), 200, 0,
 PLAY_BACKGROUND + PLAY_NOW, 0, S.snd * 2 - 1)
 sndOn = true
 elseif sndOn then
@@ -6368,9 +6370,10 @@ end
 return
 end
 do
-local d = (state == 4 or state == 8) and fi * 0.003 or 0
+local d = (state == 4 or state == 8) and fi * (STICKTIME_LATK or 0.003) or 0
 local a1, a2, a3, b1, b2, b3, e1, e2, e3 = rx, ry, rz, ux, uy, uz, fx, fy, fz
-rotate(wr0 * d, wp0 * d, wy0 * d)
+local dr = d * 0.35                               -- the turn over a third: no overshoot
+rotate(wr0 * dr, wp0 * dr, wy0 * dr)
 kx, ky, kz = px + vx * d, py + vy * d, pz + vz * d
 if ky < 0.05 then ky = 0.05 end
 krx, kry, krz = rx, ry, rz
@@ -6699,6 +6702,9 @@ if U < 1 then U = 1 end
 -- nothing else sees the change, and it ends with the tool.
 lcd = L
 STICKTIME_UI, GREY = U, false
+-- a color screen shows a frame one script cycle after it is drawn (a B&W screen at once): the
+-- camera is drawn that much ahead, with the color game's factor (seconds per 10 ms of frame time)
+STICKTIME_LATK = 0.011
 LEFT, RIGHT, CENTER, INVERS, BLINK, BOLD, FORCE, ERASE = B.LEFT, B.RIGHT, B.CENTER, B.INVERS, B.BLINK, B.BOLD, B.FORCE, B.ERASE
 PREC1, PREC2, SMLSIZE, MIDSIZE, DBLSIZE, TINSIZE, XXLSIZE = B.PREC1, B.PREC2, B.SMLSIZE, B.MIDSIZE, B.DBLSIZE, B.TINSIZE, B.XXLSIZE
 local f = loadScript(CORE, "b") or loadScript(CORE, "bt")
@@ -6781,6 +6787,9 @@ if U < 1 then U = 1 end
 -- nothing else sees the change, and it ends with the tool.
 lcd = L
 STICKTIME_UI, GREY = U, false
+-- a color screen shows a frame one script cycle after it is drawn (a B&W screen at once): the
+-- camera is drawn that much ahead, with the color game's factor (seconds per 10 ms of frame time)
+STICKTIME_LATK = 0.011
 LEFT, RIGHT, CENTER, INVERS, BLINK, BOLD, FORCE, ERASE = B.LEFT, B.RIGHT, B.CENTER, B.INVERS, B.BLINK, B.BOLD, B.FORCE, B.ERASE
 PREC1, PREC2, SMLSIZE, MIDSIZE, DBLSIZE, TINSIZE, XXLSIZE = B.PREC1, B.PREC2, B.SMLSIZE, B.MIDSIZE, B.DBLSIZE, B.TINSIZE, B.XXLSIZE
 local f = loadScript(CORE, "b") or loadScript(CORE, "bt")

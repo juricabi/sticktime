@@ -1,6 +1,6 @@
 local toolName = "TNS|StickTime Lite|TNE"
 --[[ ======================================================================
-StickTime Lite v1.6  -  the small edition of StickTime for B&W radios.
+StickTime Lite v1.6.1  -  the small edition of StickTime for B&W radios.
 Made for radios with little memory (STM32F2: X7, X9D, X9D+, X9 Lite,
 X-Lite, TX12 MkI, T12, T8, T-Lite, T-Pro, LR3 Pro). Runs on every
 black & white EdgeTX radio with EdgeTX 2.11 or newer.
@@ -543,7 +543,7 @@ local sndOn = false
 local function motorSound(on)
 if on and S.snd > 0 and PLAY_BACKGROUND then
 local w = sqrt(wr0 * wr0 + wp0 * wp0 + wy0 * wy0)
-playTone(floor((180 + 900 * sqrt(Tm / (S.twr * 9.81))) * (1 + (w < 12 and w or 12) * 0.006)), 200, 0,
+playTone(floor((140 + 400 * sqrt(Tm / (S.twr * 9.81))) * (1 + (w < 12 and w or 12) * 0.006)), 200, 0,
 PLAY_BACKGROUND + PLAY_NOW, 0, S.snd * 2 - 1)
 sndOn = true
 elseif sndOn then
@@ -690,9 +690,10 @@ end
 return
 end
 do
-local d = (state == 4 or state == 8) and fi * 0.003 or 0
+local d = (state == 4 or state == 8) and fi * (STICKTIME_LATK or 0.003) or 0
 local a1, a2, a3, b1, b2, b3, e1, e2, e3 = rx, ry, rz, ux, uy, uz, fx, fy, fz
-rotate(wr0 * d, wp0 * d, wy0 * d)
+local dr = d * 0.35                               -- the turn over a third: no overshoot
+rotate(wr0 * dr, wp0 * dr, wy0 * dr)
 kx, ky, kz = px + vx * d, py + vy * d, pz + vz * d
 if ky < 0.05 then ky = 0.05 end
 krx, kry, krz = rx, ry, rz

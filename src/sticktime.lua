@@ -1,6 +1,6 @@
 local toolName = "TNS|@TOOLNAME@|TNE"
 --[[ ======================================================================
-  @TITLE@ v1.6  -  a real 3D FPV quad simulator that runs on your radio
+  @TITLE@ v1.6.1  -  a real 3D FPV quad simulator that runs on your radio
   @VARIANT@
 
   Install : @INSTALL@
@@ -443,15 +443,15 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
   end
 
   -- motor sound: a tone on the radio's background channel (the vario's), its pitch following
-  -- the motors' speed, which goes with the square root of their thrust: about 290 Hz at idle,
-  -- 590 Hz at a 5:1 hover and 1080 Hz flat out, up to 7% higher while the quad rotates fast.
+  -- the motors' speed, which goes with the square root of their thrust: about 190 Hz at idle,
+  -- 320 Hz at a 5:1 hover and 540 Hz flat out, up to 7% higher while the quad rotates fast.
   -- Each call restarts the tone's 200 ms, so it plays on as long as frames keep coming.
   local SNDV, sndOn = { 1, 3, 5 }, false          -- tone volume (1-5) for Low, Mid, High
   motorSound = function(on)
     if not (playTone and PLAY_BACKGROUND) then return end
     if on and S.snd > 0 then
       local w = sqrt(P.wr * P.wr + P.wp * P.wp + P.wy * P.wy)
-      local f = (180 + 900 * sqrt(Tm / (P.twr * G))) * (1 + (w < 12 and w or 12) * 0.006)
+      local f = (140 + 400 * sqrt(Tm / (P.twr * G))) * (1 + (w < 12 and w or 12) * 0.006)
       playTone(floor(f), 200, 0, PLAY_BACKGROUND + PLAY_NOW, 0, SNDV[S.snd])
       sndOn = true
     elseif sndOn then
@@ -993,14 +993,15 @@ local F, tanH = 160, 1.4
 -- screens show a frame one script cycle after it is drawn (50 ms on stock EdgeTX), so the
 -- prediction follows the measured frame interval and stays right on faster firmware too.
 -- STICKTIME_LAT (seconds) overrides it, e.g. in the emulator when frames show at once
--- (FPVSIM_LAT: its name before the rename to StickTime).
+-- (FPVSIM_LAT: its name before the rename to StickTime). StickTime BW on a color radio has
+-- the color screen's delay too: its color.lua sets STICKTIME_LATK to the color factor.
 -- The turn is predicted over a third of that time only: the stick can center at any moment,
 -- and a fast roll drawn the whole delay ahead overshoots for a frame and swings back when it
 -- stops (about 35 deg at 850 deg/s). A third is about as long as the quad keeps turning after
 -- the stick centers, so the picture no longer swings back, and still gains 20 ms.
 local function fpvCamera()
   local c, s = P.tc, P.ts
-  local d = (state == FLY or state == DONE) and (STICKTIME_LAT or FPVSIM_LAT or R.fi * @LATK@) or 0
+  local d = (state == FLY or state == DONE) and (STICKTIME_LAT or FPVSIM_LAT or R.fi * (STICKTIME_LATK or @LATK@)) or 0
   local a1, a2, a3, b1, b2, b3, e1, e2, e3 = rx, ry, rz, ux, uy, uz, fx, fy, fz
   local dr = d * 0.35
   if d > 0 then rotate(P.wr * dr, P.wp * dr, P.wy * dr) end

@@ -73,6 +73,9 @@ if U < 1 then U = 1 end
 -- nothing else sees the change, and it ends with the tool.
 lcd = L
 STICKTIME_UI, GREY = U, false
+-- a color screen shows a frame one script cycle after it is drawn (a B&W screen at once): the
+-- camera is drawn that much ahead, with the color game's factor (seconds per 10 ms of frame time)
+STICKTIME_LATK = 0.011
 LEFT, RIGHT, CENTER, INVERS, BLINK, BOLD, FORCE, ERASE = B.LEFT, B.RIGHT, B.CENTER, B.INVERS, B.BLINK, B.BOLD, B.FORCE, B.ERASE
 PREC1, PREC2, SMLSIZE, MIDSIZE, DBLSIZE, TINSIZE, XXLSIZE = B.PREC1, B.PREC2, B.SMLSIZE, B.MIDSIZE, B.DBLSIZE, B.TINSIZE, B.XXLSIZE
 local f = loadScript(CORE, "b") or loadScript(CORE, "bt")
