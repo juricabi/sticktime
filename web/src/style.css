@@ -208,9 +208,10 @@ kbd { font: 500 11px/1 var(--font-mono); padding: 2px 5px; border-radius: 4px; b
 
 .padpick { display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 6px; align-items: center; margin-top: 8px; font-size: 12.5px; }
 .padpick select { height: 28px; padding: 0 6px; min-width: 0; width: 100%; }
-.axes { display: grid; gap: 6px; margin-top: 8px; }
-.axis { display: grid; grid-template-columns: 54px 1fr 60px 34px; gap: 6px; align-items: center; font-size: 12.5px; }
-.axis select { height: 28px; padding: 0 6px; }
+/* one grid for all four rows: the axis pickers share a column as wide as the longest name */
+.axes { display: grid; grid-template-columns: 54px minmax(0, 1fr) max-content max-content; gap: 6px; align-items: center; margin-top: 8px; font-size: 12.5px; }
+.axis { display: contents; }
+.axis select { height: 28px; padding: 0 6px; width: 100%; }
 .axis label { display: flex; align-items: center; gap: 3px; color: var(--muted); }
 .meter { height: 8px; background: var(--surface-2); border-radius: 4px; position: relative; overflow: hidden; }
 .meter i { position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; background: var(--accent); }
