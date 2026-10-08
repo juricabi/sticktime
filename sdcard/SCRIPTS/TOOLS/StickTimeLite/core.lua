@@ -1,6 +1,6 @@
 local toolName = "TNS|StickTime Lite|TNE"
 --[[ ======================================================================
-StickTime Lite v1.6.2  -  the small edition of StickTime for B&W radios.
+StickTime Lite v1.6.3  -  the small edition of StickTime for B&W radios.
 Made for radios with little memory (STM32F2: X7, X9D, X9D+, X9 Lite,
 X-Lite, TX12 MkI, T12, T8, T-Lite, T-Pro, LR3 Pro). Runs on every
 black & white EdgeTX radio with EdgeTX 2.11 or newer.
@@ -19,6 +19,7 @@ local getValue, getTime, drawLine, drawText, playTone = getValue, getTime, lcd.d
 local XM, YM, CX, CY = LCD_W - 1, LCD_H - 1, LCD_W / 2, LCD_H / 2
 local SOLID, DOTTED, BLK, SML, INV = SOLID, DOTTED, FORCE, SMLSIZE, INVERS
 local U = STICKTIME_UI or 1          -- menus and HUD grow with a color radio's fonts (color.lua)
+local focus, scroll, editing = 1, 0, false     -- menus: focused row, list scroll, editing a value
 local function nums(s)
 local t, n, v, sg, fr, byte = {}, 0, nil, 1, 0, string.byte
 for i = 1, #s + 1 do
@@ -271,7 +272,7 @@ place(spx, 0.15, spz, shx, shz)
 end
 end
 local function finish()
-state, tState = 8, gt
+state, tState, focus = 8, gt, 1                -- the end screen starts on "Again"
 save()
 playTone(1800, 120, 0, 0)
 playTone(2400, 300, 0, 0)
@@ -631,7 +632,6 @@ line3(b1, b2, b3, c1, c2, c3, p, BLK)
 line3(c1, c2, c3, d1, d2, d3, p, BLK)
 line3(d1, d2, d3, a1, a2, a3, p, BLK)
 end
-local focus, scroll, editing = 1, 0, false
 local MAIN = { "Time trial", "Practice", "Freestyle", "Gate rush", "Track", "Settings", "Exit" }
 local PAUSE = { "Resume", "Restart", "Menu" }
 local function optIdx(o)
@@ -790,7 +790,8 @@ box(4)
 drawText(12 * U, 7 * U, newBest and "NEW RECORD!" or gm == 4 and "TIME UP" or "FINISHED", SML + INV)
 drawText(12 * U, 17 * U, gm == 4 and "Gates " .. rn .. "  best " .. BG[S.track] or "Total " .. timeStr(total), SML)
 if gm < 3 then drawText(12 * U, 26 * U, "Best lap " .. timeStr(BL[S.track]), SML) end
-drawText(12 * U, YM - 15 * U, "ENTER again  EXIT menu", SML)
+drawText(12 * U, YM - 15 * U, "Again", SML + (focus ~= 2 and INV or 0))
+drawText(48 * U, YM - 15 * U, "Menu", SML + (focus == 2 and INV or 0))
 return
 end
 do
@@ -886,7 +887,9 @@ if e == E_EXIT or (e == E_ENTER and focus == 1) then state = from
 elseif e == E_ENTER and focus == 2 then start(gm)
 elseif e == E_ENTER then state, focus, scroll = 1, 1, 0 end
 elseif state == 8 then
-if e == E_ENTER then start(gm) elseif e == E_EXIT then state, focus, scroll = 1, 1, 0 end
+if nav ~= 0 or e == EVT_VIRTUAL_NEXT_PAGE or e == EVT_VIRTUAL_PREV_PAGE then focus = 3 - focus end
+if e == E_ENTER and focus ~= 2 then start(gm)
+elseif e == E_ENTER or e == E_EXIT then state, focus, scroll = 1, 1, 0 end
 elseif e == E_EXIT then
 from, state, focus = state, 7, 1
 end

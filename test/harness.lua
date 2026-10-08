@@ -278,7 +278,18 @@ for track = 1, NT do
   if crashes > 0 then fail("track " .. track .. ": autopilot crashed " .. crashes .. " times") end
   -- let the AI pilots finish, the result screen keeps the player's place
   steps(20 * 60)
-  frame(EVT_VIRTUAL_EXIT)
+  if track == 1 then
+    -- the end screen: the wheel moves from Again to Menu, ENTER takes it
+    frame(EVT_VIRTUAL_NEXT) frame(EVT_VIRTUAL_ENTER)
+    if state() ~= 1 then fail("end screen: wheel and ENTER should open the menu (state " .. state() .. ")") end
+  elseif track == 2 then
+    -- ENTER on Again (where the end screen starts) races again
+    frame(EVT_VIRTUAL_ENTER)
+    if state() ~= 3 then fail("end screen: ENTER should race again (state " .. state() .. ")") end
+    T.state(1)
+  else
+    frame(EVT_VIRTUAL_EXIT)
+  end
   frame(0)
 end
 T.set("ai", 0)

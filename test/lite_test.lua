@@ -124,7 +124,7 @@ end
 local function state() local t = { T.get() } return t[16], t end
 local function steps(n) for _ = 1, n do frame(0) end end
 local function idle() sticks.ail, sticks.ele, sticks.rud, sticks.thr = 0, 0, 0, -1024 end
-local FLY, CRASHED, READY, PAUSED, DONE, MENU, SETUP = 4, 5, 6, 7, 8, 1, 2
+local FLY, CRASHED, READY, PAUSED, DONE, MENU, SETUP, COUNT = 4, 5, 6, 7, 8, 1, 2, 3
 
 -- angle-mode autopilot: steer toward a lead point on the gate axis, hold the gate height
 local function autopilot(target)
@@ -225,8 +225,19 @@ for t = 1, NT do
   if crashes > 0 then fail("track " .. t .. ": autopilot crashed " .. crashes .. " times") end
   if br <= 0 or bl <= 0 or br < bl * 2 then fail("track " .. t .. ": best race/lap not recorded right") end
   idle()
-  frame(EVT_VIRTUAL_EXIT)                              -- results -> menu
-  if state() ~= MENU then fail("EXIT on the results should go to the menu") end
+  if t == 1 then
+    -- the results start on Again: ENTER races again
+    frame(EVT_VIRTUAL_ENTER)
+    if state() ~= COUNT then fail("ENTER on the results should race again (state " .. state() .. ")") end
+    T.state(MENU)
+  elseif t == 2 then
+    -- the wheel moves to Menu, ENTER takes it
+    frame(EVT_VIRTUAL_NEXT) frame(EVT_VIRTUAL_ENTER)
+    if state() ~= MENU then fail("wheel and ENTER on the results should go to the menu") end
+  else
+    frame(EVT_VIRTUAL_EXIT)                            -- results -> menu
+    if state() ~= MENU then fail("EXIT on the results should go to the menu") end
+  end
 end
 
 -- practice in strong wind: laps keep counting

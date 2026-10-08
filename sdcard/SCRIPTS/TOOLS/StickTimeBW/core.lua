@@ -1,6 +1,6 @@
 local toolName = "TNS|StickTime BW|TNE"
 --[[ ======================================================================
-  StickTime BW v1.6.2  -  a real 3D FPV quad simulator that runs on your radio
+  StickTime BW v1.6.3  -  a real 3D FPV quad simulator that runs on your radio
   Black & white version - 128x64 and 212x64 radios with an STM32F4 (TX12 MkII, Zorro, Boxer,
   Pocket, MT12, GX12, X9D+ 2019, X9E, T14, T20 ...)
 
@@ -33,11 +33,12 @@ local EV = {
   ENTER = EVT_VIRTUAL_ENTER or EVT_ENTER_BREAK, EXIT = EVT_VIRTUAL_EXIT or EVT_EXIT_BREAK,
   NEXT = EVT_VIRTUAL_NEXT, PREV = EVT_VIRTUAL_PREV, INC = EVT_VIRTUAL_INC, DEC = EVT_VIRTUAL_DEC,
   NEXTR = EVT_VIRTUAL_NEXT_REPT, PREVR = EVT_VIRTUAL_PREV_REPT, INCR = EVT_VIRTUAL_INC_REPT, DECR = EVT_VIRTUAL_DEC_REPT,
-  TAP = EVT_TOUCH_TAP,
+  PGN = EVT_VIRTUAL_NEXT_PAGE, PGP = EVT_VIRTUAL_PREV_PAGE, TAP = EVT_TOUCH_TAP,
 }
 
 -- game states; game modes (gmode): 1 race, 2 practice, 3 freestyle, 4 gate rush
 local MENU, SETUP, COUNT, FLY, CRASHED, READY, PAUSED, DONE = 1, 2, 3, 4, 5, 6, 7, 8
+local focus, scroll, editing = 1, 0, false     -- menus: focused row, list scroll, editing a value
 
 -- ------------------------------------------------------------ settings
 local S = { track = 1, quad = 1, twr = 6, mode = 1, rates = 2, rc = 100, rm = 600, re = 50, yc = 100, ym = 500, ye = 40,
@@ -525,7 +526,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
       if AI.d[a] > 0 then p = p + 1 end
     end
     R.pos = p
-    state, tState = DONE, gt
+    state, tState, focus = DONE, gt, 1
     saveData()
     beep(1800, 120)
     beep(2400, 300)
@@ -1382,14 +1383,13 @@ local function update(dt)
       local t = S.track
       if R.rn > BEST.g[t] then BEST.g[t], R.newBest = R.rn, true end
       saveData()
-      state, tState = DONE, gt
+      state, tState, focus = DONE, gt, 1
       beep(900, 300)
     end
   end
 end
 
 -- menus
-local focus, scroll, editing = 1, 0, false
 local MAIN_ITEMS = { "Race", "Practice", "Freestyle", "Gate Rush", "Track", "Settings", "Exit" }
 local PAUSE_ITEMS = { "Resume", "Restart", "Settings", "Main menu" }
 
@@ -1600,7 +1600,8 @@ local render, hitTest, pauseHit, initUI
         drawText(x, 26 * U, "Best lap " .. timeStr(b), SMLSIZE)
         if AI.n > 0 then drawText(x, 35 * U, place(R.pos) .. " of " .. (AI.n + 1), SMLSIZE) end
       end
-      drawText(x, H - 16 * U, "ENTER again  EXIT menu", SMLSIZE)
+      drawText(x, H - 16 * U, "Again", SMLSIZE + (focus ~= 2 and INVERS or 0))
+      drawText(x + 36 * U, H - 16 * U, "Menu", SMLSIZE + (focus == 2 and INVERS or 0))
     end
     if R.msg and state == FLY then
       if gt - R.msgT < 200 then
@@ -1715,8 +1716,13 @@ local handleEvent
       if event == EV.ENTER then pauseSelect(focus)
       elseif event == EV.EXIT then state = pausedFrom end
     elseif state == DONE then
-      if tapI == 1 or event == EV.ENTER then startRace(gmode)
-      elseif tapI == 2 or event == EV.EXIT then toMenu() end
+      -- Again or Menu: the wheel or the page keys pick one, ENTER (or a tap) takes it, EXIT is Menu
+      listNav(event, 2)
+      if event == EV.PGN or event == EV.PGP then focus = 3 - focus end
+      if tapI then focus = tapI end
+      if tapI or event == EV.ENTER then
+        if focus == 2 then toMenu() else startRace(gmode) end
+      elseif event == EV.EXIT then toMenu() end
     else
       -- flying: EXIT or the on-screen pause button pauses
       if event == EV.EXIT or (EV.TAP and event == EV.TAP and touch and pauseHit(touch.x, touch.y)) then
