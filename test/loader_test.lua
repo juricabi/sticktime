@@ -8,12 +8,13 @@ lcd = setmetatable({}, { __index = function() return function() return 0 end end
 SOLID, DOTTED, FORCE, ERASE = 0xff, 0x55, 2, 4
 local ok = true
 
-local function check(loader, haveLuac)
+local function check(loader, haveLuac, oom)
   local calls = {}
   function loadScript(path, mode)
     mode = mode or "bt"
     local rel = path:match("TOOLS/(.*)%.lua$")
     calls[#calls + 1] = rel:match("[^/]*$") .. ":" .. mode
+    if oom then return nil, "not enough memory" end
     local f = haveLuac and io.open(ROOT .. rel .. ".luac", "rb")
     if f then
       local s = f:read("a")
@@ -26,20 +27,26 @@ local function check(loader, haveLuac)
   local good, m = pcall(dofile, ROOT .. loader)
   local seq = table.concat(calls, " ")
   local want = "game:b"
-  if haveLuac then
+  if oom then
+    -- the full B&W game on a radio with too little memory points to the Lite
+    local hint = loader == "StickTimeBW.lua" and "StickTime Lite" or "not enough memory"
+    good = not good and string.find(tostring(m), hint, 1, true) ~= nil and seq == want
+  elseif haveLuac then
     good = good and type(m) == "table" and type(m.init) == "function" and type(m.run) == "function" and seq == want
   else
     local dir = loader:gsub("%.lua$", "")
     good = not good and string.find(tostring(m), dir, 1, true) ~= nil and seq == want
   end
-  print(string.format("%-18s %-21s loadScript calls: %-8s %s", loader, haveLuac and "with game.luac" or "without game.luac",
-    seq, good and (haveLuac and "ok" or "ok, stops: " .. tostring(m):match("[^:]*: (.*)$")) or ("FAIL (want " .. want .. ")")))
+  print(string.format("%-18s %-21s loadScript calls: %-8s %s", loader,
+    oom and "out of memory" or haveLuac and "with game.luac" or "without game.luac",
+    seq, good and ((haveLuac and not oom) and "ok" or "ok, stops: " .. tostring(m):match("^[^:]*:%d+: (.*)$")) or ("FAIL (want " .. want .. ")")))
   ok = ok and good
 end
 
 for _, loader in ipairs({ "StickTimeBW.lua", "StickTimeLite.lua" }) do
   check(loader, true)
   check(loader, false)
+  check(loader, true, true)
 end
 
 -- started on a color radio: the loader runs <DIR>/color.lua, which replaces lcd and the flags

@@ -17,5 +17,9 @@ if LCD_W > 212 then
   if m then return m() end
 end
 local f, err = loadScript("/SCRIPTS/TOOLS/@DIR@/game.lua", "b")
-if not f then error("@TITLE@ (needs EdgeTX 2.11+ and the @DIR@ folder): " .. tostring(err)) end
+if not f then
+  err = tostring(err)
+  if string.find(err, "memory", 1, true) then error("@TITLE@: not enough memory@OOMHINT@") end
+  error("@TITLE@ needs EdgeTX 2.11+ and the @DIR@ folder (" .. err .. ")")
+end
 return f()

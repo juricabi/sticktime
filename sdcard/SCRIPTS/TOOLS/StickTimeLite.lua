@@ -17,5 +17,9 @@ if LCD_W > 212 then
   if m then return m() end
 end
 local f, err = loadScript("/SCRIPTS/TOOLS/StickTimeLite/game.lua", "b")
-if not f then error("StickTime Lite (needs EdgeTX 2.11+ and the StickTimeLite folder): " .. tostring(err)) end
+if not f then
+  err = tostring(err)
+  if string.find(err, "memory", 1, true) then error("StickTime Lite: not enough memory") end
+  error("StickTime Lite needs EdgeTX 2.11+ and the StickTimeLite folder (" .. err .. ")")
+end
 return f()

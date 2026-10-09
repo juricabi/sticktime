@@ -17,5 +17,9 @@ if LCD_W > 212 then
   if m then return m() end
 end
 local f, err = loadScript("/SCRIPTS/TOOLS/StickTimeBW/game.lua", "b")
-if not f then error("StickTime BW (needs EdgeTX 2.11+ and the StickTimeBW folder): " .. tostring(err)) end
+if not f then
+  err = tostring(err)
+  if string.find(err, "memory", 1, true) then error("StickTime BW: not enough memory on this radio: use StickTime Lite") end
+  error("StickTime BW needs EdgeTX 2.11+ and the StickTimeBW folder (" .. err .. ")")
+end
 return f()

@@ -44,6 +44,7 @@ VARIANTS = {
         "INSTALL": "copy StickTimeBW.lua and the StickTimeBW folder to /SCRIPTS/TOOLS/ and",
         "TOOLNAME": "StickTime BW",
         "TITLE": "StickTime BW",
+        "OOMHINT": " on this radio: use StickTime Lite",
         "VARIANT": "Black & white version - 128x64 and 212x64 radios with an STM32F4 (TX12 MkII, Zorro, Boxer,\n  Pocket, MT12, GX12, X9D+ 2019, X9E, T14, T20 ...)",
         "TILT": "20",
         "FOV": "100",
@@ -65,6 +66,7 @@ VARIANTS = {
         "strip": True,
         "TOOLNAME": "StickTime Lite",
         "TITLE": "StickTime Lite",
+        "OOMHINT": "",
         "DIR": "StickTimeLite",
     },
 }
