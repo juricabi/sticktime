@@ -53,7 +53,7 @@ local ENTER, EXIT, NEXT, PREV, INC = 514, 513, 7680, 7424, 7680
 local function fly()
   for i = 1, 200 do
     -- some throttle and pitch, alternating roll: flies, passes or hits things, crashes
-    frame(0, (i // 40) % 2 == 0 and 200 or -200, 300, 250, 0)
+    frame(0, math.floor(i / 40) % 2 == 0 and 200 or -200, 300, 250, 0)
     local l = radio.mem()
     if l > peakLua then peakLua = l end
   end

@@ -4,6 +4,7 @@
 # Needs gcc-multilib. Set EDGETX_SRC to an EdgeTX checkout to skip the download.
 #   tools/build_etxhost.sh            EdgeTX main         -> .tools/etxhost
 #   tools/build_etxhost.sh v2.11.4    a release's Lua     -> .tools/etxhost-v2.11.4
+#   tools/build_etxhost.sh v2.10.7    2.10's Lua 5.2 (B&W radios: ETX_MODEL=f2, no CCM)
 # 2.11's Lua keeps a whole int for each value's type tag, where main packs it into a byte, so
 # the same script needs about 10% more memory there: test/run_all.sh checks both.
 set -e
@@ -24,12 +25,14 @@ if [ ! -d "$SRC/radio/src/thirdparty/Lua/src" ]; then
 fi
 # 2.11's luaconf.h includes the firmware's debug.h even in a host build
 printf '#pragma once\n#include <stdio.h>\n#define TRACE_DEBUG_WP(...) fprintf(stderr, __VA_ARGS__)\n' > "$DIR/stub/debug.h"
+# 2.10's Lua 5.2 takes PACK from the firmware's definitions.h and calls TRACE_LUA_INTERNALS
+printf '#pragma once\n#include <inttypes.h>\n#include <stdbool.h>\n#include <stddef.h>\n#define PACK(d) d __attribute__((__packed__))\n' > "$DIR/stub/definitions.h"
 L=$SRC/radio/src/thirdparty/Lua/src
 CORE="lapi.c lcode.c lctype.c ldebug.c ldo.c ldump.c lfunc.c lgc.c llex.c lmem.c lobject.c lopcodes.c lparser.c
   lstate.c lstring.c ltable.c ltm.c lundump.c lvm.c lzio.c lauxlib.c lbaselib.c lstrlib.c lmathlib.c lbitlib.c
   ltablib.c ldblib.c"
 FILES=""
 for f in $CORE; do FILES="$FILES $L/$f"; done
-gcc -m32 -O2 -std=gnu99 -w -DLUA_HOST_BUILD -DLUA_CROSS_COMPILER -DLUA_COMPAT_5_2 -I"$L" -I"$DIR/stub" \
+gcc -m32 -O2 -std=gnu99 -w -DLUA_HOST_BUILD -DLUA_CROSS_COMPILER -DLUA_COMPAT_5_2 -D'TRACE_LUA_INTERNALS(...)=' -I"$L" -I"$DIR/stub" \
   -o "$OUT" "$ROOT/tools/etxhost/host.c" $FILES -lm
 echo "built $OUT"

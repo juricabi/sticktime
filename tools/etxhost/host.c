@@ -1,6 +1,7 @@
 /*
  * etxhost: EdgeTX's own Lua 5.3 (rotables, packed values, 32-bit numbers) on the host,
- * with a model of how B&W radios allocate Lua memory. Used to measure what a script
+ * with a model of how B&W radios allocate Lua memory. Also builds on EdgeTX 2.10's Lua 5.2
+ * (doubles; B&W radios there give Lua bins + malloc, no CCM: ETX_MODEL=f2). Used to measure what a script
  * needs on an STM32F2 / STM32F4 radio, including heap fragmentation.
  *
  *   etxhost script.lua [args]       run a Lua file (arg table as in lua.c)
@@ -15,10 +16,12 @@
  *
  * Lua gets etx.mem() -> heap high-water mark (sbrk top), heap in use, bins/CCM in use,
  * Lua's own count; etx.resetpeak(); etx.loadfile(path [, mode]) streams a file through
- * luaL_loadfilex like the radio does.
+ * luaL_loadfilex like the radio does; etx.dump(f, strip) is string.dump with strip on 5.2 too.
  */
 #define LUA_CORE
-#include "lprefix.h"
+#if defined(__has_include) && __has_include("lprefix.h")
+#include "lprefix.h"                 /* Lua 5.3; EdgeTX 2.10 and older have Lua 5.2 */
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -33,6 +36,11 @@
 #include "lobject.h"
 #include "lro_defs.h"
 #include "lfunc.h"
+#include "lundump.h"
+
+#if LUA_VERSION_NUM < 503                /* EdgeTX 2.10 and older: Lua 5.2, every number a double */
+#define lua_isinteger(L, i) (lua_type(L, (i)) == LUA_TNUMBER && lua_tonumber(L, (i)) == (lua_Number)lua_tointeger(L, (i)))
+#endif
 
 /* ------------------------------------------------------------------ allocator model */
 enum { K_HEAP = 0, K_BIN1, K_BIN2, K_CCM };
@@ -203,7 +211,9 @@ extern LROT_TABLE(strlib);
 extern LROT_TABLE(mathlib);
 extern LROT_TABLE(bitlib);
 extern LROT_TABLE(tablib);
-extern LROT_TABLE(dblib);
+#if LUA_VERSION_NUM >= 503
+extern LROT_TABLE(dblib);                 /* Lua 5.2 has the debug library in RAM */
+#endif
 extern LROT_TABLE(base_func);
 extern LROT_TABLE(rotables_meta);
 
@@ -258,7 +268,27 @@ static int etx_writefile(lua_State *L) {         /* host only: write a string to
   return 0;
 }
 
+static int dumpWriter(lua_State *L, const void *p, size_t n, void *B) {
+  (void)L; luaL_addlstring((luaL_Buffer *)B, (const char *)p, n); return 0;
+}
+static int etx_dump(lua_State *L) {              /* string.dump(f, strip), also on Lua 5.2 */
+  int strip = lua_toboolean(L, 2), st;
+  luaL_Buffer b;
+  luaL_checktype(L, 1, LUA_TFUNCTION);
+  lua_settop(L, 1);
+  luaL_buffinit(L, &b);
+#if LUA_VERSION_NUM >= 503
+  st = lua_dump(L, dumpWriter, &b, strip);
+#else
+  st = isLfunction(L->top - 1) ? luaU_dump(L, getproto(L->top - 1), dumpWriter, &b, strip) : 1;
+#endif
+  if (st != 0) return luaL_error(L, "unable to dump given function");
+  luaL_pushresult(&b);
+  return 1;
+}
+
 LROT_BEGIN(etxhostlib, NULL, 0)
+  LROT_FUNCENTRY(dump, etx_dump)
   LROT_FUNCENTRY(mem, etx_mem)
   LROT_FUNCENTRY(resetpeak, etx_resetpeak)
   LROT_FUNCENTRY(heapinfo, etx_heapinfo)
@@ -701,6 +731,9 @@ static int d_sdroot(lua_State *L) { snprintf(sdRoot, sizeof(sdRoot), "%s", luaL_
 static int d_heap(lua_State *L) { heapSize = (unsigned)luaL_checkinteger(L, 1); if (lua_isinteger(L, 2)) model = (int)lua_tointeger(L, 2); return 0; }
 
 /* radio.census(): what the radio state holds, by object type (sizes as Lua accounts them) */
+#if LUA_VERSION_NUM < 503
+static int d_census(lua_State *L) { lua_newtable(L); return 1; }   /* Lua 5.3 objects only */
+#else
 static int d_census(lua_State *L) {
   global_State *g = G(Lrad);
   GCObject *o;
@@ -746,6 +779,7 @@ static int d_census(lua_State *L) {
 #undef F
   return 1;
 }
+#endif
 
 LROT_BEGIN(driverlib, NULL, 0)
   LROT_FUNCENTRY(census, d_census)
@@ -786,7 +820,11 @@ int main(int argc, char **argv) {
   if (radioMode) { lua_pushrotable(L, LROT_TABLEREF(driverlib)); lua_setglobal(L, "radio"); }
   if (radioMode || getenv("ETX_TESTLIBS")) {
     lua_pushrotable(L, LROT_TABLEREF(tablib)); lua_setglobal(L, "table");
+#if LUA_VERSION_NUM >= 503
     lua_pushrotable(L, LROT_TABLEREF(dblib)); lua_setglobal(L, "debug");
+#else
+    luaL_requiref(L, "debug", luaopen_debug, 1); lua_pop(L, 1);
+#endif
     lua_pushrotable(L, LROT_TABLEREF(oshost)); lua_setglobal(L, "os");
   }
   lua_createtable(L, argc, 0);
