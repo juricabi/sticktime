@@ -60,6 +60,10 @@ if [ -x ../.tools/etxhost ]; then
     echo "memory $1: $(echo "$2" | head -1 | sed 's/^.*TOOLS\///') | $(echo "$2" | tail -1)"
     [ "$(echo "$2" | tail -1)" = "MEM OK" ] || fail=1
   }
+  msg() {
+    echo "message $1: $(echo "$2" | head -1) | $(echo "$2" | tail -1)"
+    [ "$(echo "$2" | tail -1)" = "MSG OK" ] || fail=1
+  }
   for wh in "128 64" "212 64"; do
     set -- $wh
     mem F2 "$(ETX_MODEL=f2 ETX_HEAP=63300 ../.tools/etxhost -radio memtest.lua "$S/StickTimeLite.lua" $1 $2 2>&1)"
@@ -71,6 +75,19 @@ if [ -x ../.tools/etxhost ]; then
   if [ -x $H211 ]; then
     mem "F2 2.11" "$(ETX_MODEL=f2 ETX_HEAP=63300 $H211 -radio memtest.lua "$S/StickTimeLite.lua" 128 64 2>&1)"
     mem "F4 2.11" "$(ETX_MODEL=f4 ETX_HEAP=113600 ETX_CCM=34816 $H211 -radio memtest.lua "$S/StickTimeBW.lua" 128 64 2>&1)"
+    # the full game on an STM32F2 radio (2.11 is their last EdgeTX): the loader runs out of
+    # memory loading it and says so on its own screen, pointing to the Lite
+    msg "F2 2.11" "$(ETX_MODEL=f2 ETX_HEAP=63300 $H211 -radio msgtest.lua "$S/StickTimeBW.lua" "Use StickTime Lite" 2>&1)"
+  fi
+  # EdgeTX 2.10's Lua (tools/build_etxhost.sh v2.10.7) is 5.2, which can't read the binary: the
+  # B&W loaders say "Needs EdgeTX 2.11" on their own screen, and a color radio on 2.10 still
+  # plays both, compiling core.lua
+  H210=../.tools/etxhost-v2.10.7
+  if [ -x $H210 ]; then
+    for f in StickTimeBW.lua StickTimeLite.lua; do
+      msg "2.10" "$(ETX_MODEL=f2 ETX_HEAP=63300 $H210 -radio msgtest.lua "$S/$f" "Needs EdgeTX 2.11" 2>&1)"
+      mem "color 2.10" "$(ETX_MODEL=f4 ETX_HEAP=2000000 ETX_CCM=0 $H210 -radio memtest.lua "$S/$f" 320 240 color 2>&1)"
+    done
   fi
   # both B&W loaders on a color radio (V12 screen): through color.lua, with EdgeTX's own
   # loadScript behavior and Lua core, every track and mode played

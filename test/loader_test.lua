@@ -1,21 +1,35 @@
 -- The B&W loaders (StickTimeBW.lua, StickTimeLite.lua) with a mock loadScript, run by the 32-bit
 -- EdgeTX-config Lua: they must load the precompiled game.luac once, in "b" mode, and never ask
--- EdgeTX for the source: compiling it takes more memory than a B&W radio has. Without the
--- binary they stop with an error that names the folder.
+-- EdgeTX for the source: compiling it takes more memory than a B&W radio has. When the game
+-- doesn't load (no game.luac, too little memory, EdgeTX older than 2.11) the loader returns a
+-- tool of its own that says what to do, in lines that fit a 128 px screen, and closes on EXIT.
 local ROOT = "../sdcard/SCRIPTS/TOOLS/"
 LCD_W, LCD_H = 128, 64
-lcd = setmetatable({}, { __index = function() return function() return 0 end end })
+local shown = {}                                   -- what the B&W screen shows: text since lcd.clear()
+local function bwlcd()
+  return setmetatable({ clear = function() shown = {} end, drawText = function(x, y, t) shown[#shown + 1] = tostring(t) end },
+                      { __index = function() return function() return 0 end end })
+end
+lcd = bwlcd()
 SOLID, DOTTED, FORCE, ERASE = 0xff, 0x55, 2, 4
+EVT_VIRTUAL_EXIT, EVT_EXIT_BREAK = 513, 513
+local VERSION
+function getVersion() return table.unpack(VERSION) end
 local ok = true
 
-local function check(loader, haveLuac, oom)
+-- case: "game" (game.luac loads), "nofile" (no game.luac), "oom" (too little memory to load it),
+-- "old" (EdgeTX 2.10, whose Lua 5.2 can't read the binary)
+local LABEL = { game = "with game.luac", nofile = "without game.luac", oom = "out of memory", old = "on EdgeTX 2.10" }
+local function check(loader, case)
   local calls = {}
+  VERSION = case == "old" and { "2.10.7", "x9d+", 2, 10, 7, "EdgeTX" } or { "2.11.4", "x9d+", 2, 11, 4, "EdgeTX" }
   function loadScript(path, mode)
     mode = mode or "bt"
     local rel = path:match("TOOLS/(.*)%.lua$")
     calls[#calls + 1] = rel:match("[^/]*$") .. ":" .. mode
-    if oom then return nil, "not enough memory" end
-    local f = haveLuac and io.open(ROOT .. rel .. ".luac", "rb")
+    if case == "oom" then return nil, "not enough memory" end
+    if case == "old" then return nil, "/SCRIPTS/TOOLS/" .. rel .. ".luac: version mismatch in precompiled chunk" end
+    local f = case == "game" and io.open(ROOT .. rel .. ".luac", "rb")
     if f then
       local s = f:read("a")
       f:close()
@@ -26,27 +40,31 @@ local function check(loader, haveLuac, oom)
   end
   local good, m = pcall(dofile, ROOT .. loader)
   local seq = table.concat(calls, " ")
-  local want = "game:b"
-  if oom then
-    -- the full B&W game on a radio with too little memory points to the Lite
-    local hint = loader == "StickTimeBW.lua" and "StickTime Lite" or "not enough memory"
-    good = not good and string.find(tostring(m), hint, 1, true) ~= nil and seq == want
-  elseif haveLuac then
+  local want, screen = "game:b", ""
+  if case == "game" then
     good = good and type(m) == "table" and type(m.init) == "function" and type(m.run) == "function" and seq == want
   else
-    local dir = loader:gsub("%.lua$", "")
-    good = not good and string.find(tostring(m), dir, 1, true) ~= nil and seq == want
+    good = good and type(m) == "table" and m.init == nil and type(m.run) == "function" and seq == want
+    if good then
+      local r0 = m.run(0)
+      screen = table.concat(shown, " / ")
+      local r1 = m.run(EVT_VIRTUAL_EXIT)
+      local need = case == "oom" and (loader == "StickTimeBW.lua" and "Use StickTime Lite" or "Not enough memory")
+        or case == "old" and "Needs EdgeTX 2.11" or loader:gsub("%.lua$", "") .. " into"
+      good = r0 == 0 and r1 == 1 and string.find(screen, need, 1, true) ~= nil
+        and (case ~= "old" or string.find(screen, "2.10.7", 1, true) ~= nil)
+      for _, t in ipairs(shown) do
+        if #t > 21 then good = false end           -- 21 characters of 6 px: 126 of 128 px
+      end
+    end
   end
-  print(string.format("%-18s %-21s loadScript calls: %-8s %s", loader,
-    oom and "out of memory" or haveLuac and "with game.luac" or "without game.luac",
-    seq, good and ((haveLuac and not oom) and "ok" or "ok, stops: " .. tostring(m):match("^[^:]*:%d+: (.*)$")) or ("FAIL (want " .. want .. ")")))
+  print(string.format("%-18s %-18s loadScript calls: %-7s %s", loader, LABEL[case], seq,
+    good and (case == "game" and "ok" or "ok, shows: " .. screen) or ("FAIL (want " .. want .. ", got " .. tostring(m) .. " " .. screen .. ")")))
   ok = ok and good
 end
 
 for _, loader in ipairs({ "StickTimeBW.lua", "StickTimeLite.lua" }) do
-  check(loader, true)
-  check(loader, false)
-  check(loader, true, true)
+  for _, case in ipairs({ "game", "nofile", "oom", "old" }) do check(loader, case) end
 end
 
 -- started on a color radio: the loader runs <DIR>/color.lua, which replaces lcd and the flags
@@ -85,7 +103,7 @@ for _, loader in ipairs({ "StickTimeBW.lua", "StickTimeLite.lua" }) do
     ok = ok and good
   end
 end
-lcd = setmetatable({}, { __index = function() return function() return 0 end end })
+lcd = bwlcd()
 SOLID, DOTTED, FORCE, ERASE = 0xff, 0x55, 2, 4
 LCD_W, LCD_H = 128, 64
 print(ok and "loaders: ok" or "loaders: FAIL")

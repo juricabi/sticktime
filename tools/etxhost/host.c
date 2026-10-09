@@ -353,6 +353,22 @@ static int radW = 128, radH = 64;
 static long radClock = 0;                          /* ms */
 static int radStick[4] = { 0, 0, -1024, 0 };
 static long lcdCalls = 0, lcdBad = 0, lcdLines = 0;
+static char lcdText[1024];                         /* the text drawn since the last lcd.clear() */
+static size_t lcdTextLen = 0;
+
+#ifndef ETX_VERSION
+#define ETX_VERSION "0.0.0"                        /* tools/build_etxhost.sh sets the source's own */
+#endif
+static int r_getVersion(lua_State *L) {            /* as EdgeTX's: version, radio, major, minor, revision, os */
+  const char *v = getenv("ETX_VERSION");
+  int a = 0, b = 0, c = 0;
+  if (!v) v = ETX_VERSION;
+  sscanf(v, "%d.%d.%d", &a, &b, &c);
+  lua_pushstring(L, v); lua_pushstring(L, "etxhost");
+  lua_pushnumber(L, a); lua_pushnumber(L, b); lua_pushnumber(L, c);
+  lua_pushstring(L, "EdgeTX");
+  return 6;
+}
 
 static int r_getTime(lua_State *L) { lua_pushinteger(L, radClock / 10); return 1; }
 static int r_getValue(lua_State *L) {
@@ -370,6 +386,19 @@ static int r_getFieldInfo(lua_State *L) {
   return 1;
 }
 static int r_nop(lua_State *L) { (void)L; lcdCalls++; return 0; }
+static int r_clear(lua_State *L) { (void)L; lcdCalls++; lcdTextLen = 0; lcdText[0] = 0; return 0; }
+static int r_text(lua_State *L) {                  /* drawText(x, y, text [, flags]): kept for radio.lcd() */
+  size_t l = 0;
+  const char *t = (lua_type(L, 3) == LUA_TSTRING || lua_type(L, 3) == LUA_TNUMBER) ? lua_tolstring(L, 3, &l) : NULL;
+  lcdCalls++;
+  if (t && lcdTextLen + l + 2 < sizeof(lcdText)) {
+    if (lcdTextLen) lcdText[lcdTextLen++] = '|';
+    memcpy(lcdText + lcdTextLen, t, l);
+    lcdTextLen += l;
+    lcdText[lcdTextLen] = 0;
+  }
+  return 0;
+}
 static int r_grey(lua_State *L) { lua_pushinteger(L, luaL_checkinteger(L, 1) * 0x10000); return 1; }
 static int r_line(lua_State *L) {                  /* B&W: every point must be on the screen */
   int i; lcdCalls++; lcdLines++;
@@ -513,9 +542,9 @@ static int r_loadScriptFile(lua_State *L, const char *fn, const char *mode) {
 }
 
 LROT_BEGIN(radio_lcd, NULL, 0)
-  LROT_FUNCENTRY(clear, r_nop)
+  LROT_FUNCENTRY(clear, r_clear)
   LROT_FUNCENTRY(drawLine, r_line)
-  LROT_FUNCENTRY(drawText, r_nop)
+  LROT_FUNCENTRY(drawText, r_text)
   LROT_FUNCENTRY(drawNumber, r_nop)
   LROT_FUNCENTRY(drawRectangle, r_nop)
   LROT_FUNCENTRY(drawFilledRectangle, r_nop)
@@ -536,6 +565,7 @@ LROT_BEGIN(radio_api, NULL, 0)
   LROT_FUNCENTRY(getTime, r_getTime)
   LROT_FUNCENTRY(getValue, r_getValue)
   LROT_FUNCENTRY(getFieldInfo, r_getFieldInfo)
+  LROT_FUNCENTRY(getVersion, r_getVersion)
   LROT_FUNCENTRY(playTone, r_nop)
   LROT_FUNCENTRY(playFile, r_nop)
   LROT_FUNCENTRY(playHaptic, r_nop)
@@ -604,7 +634,7 @@ static int d_new(lua_State *L) {                   /* radio.new(W, H [, color]):
   bin1 = bin2 = bin1Peak = bin2Peak = 0; failures = 0;
   while (heapFree) { Free *f = heapFree; heapFree = f->next; free(f); }
   while (ccmFree) { Free *f = ccmFree; ccmFree = f->next; free(f); } ccmInit = 0;
-  lcdCalls = lcdBad = lcdLines = 0;
+  lcdCalls = lcdBad = lcdLines = 0; lcdTextLen = 0; lcdText[0] = 0;
   memset(vfs, 0, sizeof(vfs));
   Lrad = lua_newstate(modelAlloc, NULL);
   if (!Lrad) return luaL_error(L, "no radio state");
@@ -620,7 +650,7 @@ static int d_new(lua_State *L) {                   /* radio.new(W, H [, color]):
   if (radW == 212) { lua_pushcfunction(Lrad, r_grey); lua_setglobal(Lrad, "GREY"); }
   if (color) {                                     /* a color radio: its lcd and flag values */
     static const struct { const char *n; lua_CFunction f; } fn[] = {
-      { "clear", r_nop }, { "drawLine", r_cline }, { "drawText", r_nop }, { "drawNumber", r_nop },
+      { "clear", r_clear }, { "drawLine", r_cline }, { "drawText", r_text }, { "drawNumber", r_nop },
       { "drawRectangle", r_nop }, { "drawFilledRectangle", r_nop }, { "drawPoint", r_nop },
       { "RGB", r_rgb }, { "sizeText", r_sizeText } };
     static const struct { const char *n; lua_Integer v; } cst[] = {
@@ -707,9 +737,10 @@ static int d_resetpeak(lua_State *L) {
   (void)L; heapTopPeak = heapTop; heapPeakUsed = heapUsed; bin1Peak = bin1; bin2Peak = bin2; ccmPeak = ccmUsed;
   return 0;
 }
-static int d_lcd(lua_State *L) {
+static int d_lcd(lua_State *L) {                   /* calls, lines, lines off a B&W screen, text on screen */
   lua_pushinteger(L, lcdCalls); lua_pushinteger(L, lcdLines); lua_pushinteger(L, lcdBad);
-  return 3;
+  lua_pushlstring(L, lcdText, lcdTextLen);
+  return 4;
 }
 static int d_file(lua_State *L) {                  /* radio.file(path): what the script wrote */
   int i = vfsFind(luaL_checkstring(L, 1), 0);

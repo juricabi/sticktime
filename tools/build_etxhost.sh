@@ -28,11 +28,14 @@ printf '#pragma once\n#include <stdio.h>\n#define TRACE_DEBUG_WP(...) fprintf(st
 # 2.10's Lua 5.2 takes PACK from the firmware's definitions.h and calls TRACE_LUA_INTERNALS
 printf '#pragma once\n#include <inttypes.h>\n#include <stdbool.h>\n#include <stddef.h>\n#define PACK(d) d __attribute__((__packed__))\n' > "$DIR/stub/definitions.h"
 L=$SRC/radio/src/thirdparty/Lua/src
+# the version getVersion() reports: the source's own, else the tag's
+VER=$(sed -n 's/^set(VERSION_\(MAJOR\|MINOR\|REVISION\) "\([0-9]*\)")/\2/p' "$SRC/CMakeLists.txt" 2>/dev/null | paste -sd. -)
+[ -n "$VER" ] || VER=$(echo "$REF" | sed -n 's/^v\([0-9][0-9.]*\).*/\1/p')
 CORE="lapi.c lcode.c lctype.c ldebug.c ldo.c ldump.c lfunc.c lgc.c llex.c lmem.c lobject.c lopcodes.c lparser.c
   lstate.c lstring.c ltable.c ltm.c lundump.c lvm.c lzio.c lauxlib.c lbaselib.c lstrlib.c lmathlib.c lbitlib.c
   ltablib.c ldblib.c"
 FILES=""
 for f in $CORE; do FILES="$FILES $L/$f"; done
-gcc -m32 -O2 -std=gnu99 -w -DLUA_HOST_BUILD -DLUA_CROSS_COMPILER -DLUA_COMPAT_5_2 -D'TRACE_LUA_INTERNALS(...)=' -I"$L" -I"$DIR/stub" \
+gcc -m32 -O2 -std=gnu99 -w -DLUA_HOST_BUILD -DLUA_CROSS_COMPILER -DLUA_COMPAT_5_2 -D'TRACE_LUA_INTERNALS(...)=' -DETX_VERSION="\"${VER:-0.0.0}\"" -I"$L" -I"$DIR/stub" \
   -o "$OUT" "$ROOT/tools/etxhost/host.c" $FILES -lm
-echo "built $OUT"
+echo "built $OUT (EdgeTX ${VER:-0.0.0})"

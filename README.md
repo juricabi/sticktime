@@ -18,7 +18,9 @@ Download `StickTime-<version>-sdcard.zip` from the [latest release](https://gith
 |---|---|---|
 | Any color screen | `StickTime.lua` | 2.11+, older works too |
 | B&W with an STM32F4: TX12 MkII, Zorro, Boxer, Pocket, MT12, GX12, X9D+ 2019, X9E, X7 ACCESS, T14, T20, T-Pro V2 / S, T12 Max, Bumblebee, Commando 8 | `StickTimeBW.lua` and the `StickTimeBW` folder | 2.11+ |
-| Older B&W (STM32F2): TX12 MkI, X7, X9D, X9D+, X9 Lite, X-Lite, T12, T8, T-Lite, T-Pro, LR3 Pro | `StickTimeLite.lua` and the `StickTimeLite` folder | 2.11+ |
+| Older B&W (STM32F2): TX12 MkI, X7, X9D, X9D+, X9 Lite, X-Lite, T12, T8, T-Lite, T-Pro, LR3 Pro | `StickTimeLite.lua` and the `StickTimeLite` folder | 2.11 (their last EdgeTX) |
+
+On EdgeTX 2.10 and older the B&W versions don't start: they say "Needs EdgeTX 2.11 or newer" on the radio.
 
 > **Safety:** the radio keeps transmitting your sticks while the sim runs. Unplug the quad's battery or switch the RF module off first.
 
@@ -102,16 +104,16 @@ Play at **[juricabi.github.io/sticktime](https://juricabi.github.io/sticktime/)*
 <details>
 <summary>Memory on B&W radios</summary>
 
-B&W radios have no external RAM, and compiling a script on the radio takes far more memory than running it. So both B&W versions ship precompiled: `game.luac` is EdgeTX's Lua 5.3 bytecode (made by EdgeTX's own Lua), and `StickTimeBW.lua` / `StickTimeLite.lua` are small loaders that load only that. Compiling on the radio would need about 200 KB for StickTime BW and 135 KB for the Lite, more than any B&W radio has, and running out of memory can crash the radio. That is also why the binary is not called `core.luac` next to its source `core.lua`: EdgeTX compiles `x.lua` instead of loading `x.luac` whenever the source's file time is newer, which a copy that does not keep file times can cause. EdgeTX 2.10 and older use Lua 5.2 and can't load the bytecode: hence EdgeTX 2.11+.
+B&W radios have no external RAM, and compiling a script on the radio takes far more memory than running it. So both B&W versions ship precompiled: `game.luac` is EdgeTX's Lua 5.3 bytecode (made by EdgeTX's own Lua), and `StickTimeBW.lua` / `StickTimeLite.lua` are small loaders that load only that. Compiling on the radio would need about 200 KB for StickTime BW and 135 KB for the Lite, more than any B&W radio has, and running out of memory can crash the radio. That is also why the binary is not called `core.luac` next to its source `core.lua`: EdgeTX compiles `x.lua` instead of loading `x.luac` whenever the source's file time is newer, which a copy that does not keep file times can cause. EdgeTX 2.10 and older use Lua 5.2 and can't load the bytecode: hence EdgeTX 2.11+. A Lua 5.2 build would not get StickTime BW onto them either: on 2.10's Lua it needs about 110 KB of heap, and 2.10 doesn't give STM32F4 radios the CCM pool that 2.11 added for Lua (`tools/build_etxhost.sh v2.10.7` builds 2.10's Lua for the memory test). When the game can't load (EdgeTX too old, too little memory, the folder missing), the loader says what to do on a screen of its own: EdgeTX's error box would show a 128×64 radio only the end of a long message.
 
 Measured on EdgeTX 2.11's own Lua core (the tests also run main's, which packs values tighter and needs about 10% less) with a model of the radio's allocator (newlib-nano malloc with its fragmentation, EdgeTX's small-block pools or CCM pool), loading through the loader and playing every track and mode:
 
 | | Heap for Lua (EdgeTX 2.11.3) | Lua memory while playing | Peak heap use |
 |---|---|---|---|
-| StickTime BW on STM32F4 | 114–121 KB + 34 KB CCM | about 90 KB | 80 KB + 34 KB CCM |
-| StickTime Lite on STM32F2 | 63–73 KB + 10 KB pools | about 48 KB | 56 KB + 10 KB pools |
+| StickTime BW on STM32F4 | 114–121 KB + 34 KB CCM | about 90 KB | 84 KB + 34 KB CCM |
+| StickTime Lite on STM32F2 | 63–73 KB + 10 KB pools | about 49 KB | 58 KB + 10 KB pools |
 
-The Lite still runs with a 56 KB heap, so about 7 KB of an X9D+ stays free. It reads each track from its file (`StickTimeLite/t1.txt` to `t8.txt`) only when you pick it, parses numbers without making a string for each, and collects garbage before the flight starts.
+The Lite still runs with a 58 KB heap, so about 5 KB of an X9D+ stays free. It reads each track from its file (`StickTimeLite/t1.txt` to `t8.txt`) only when you pick it, parses numbers without making a string for each, and collects garbage before the flight starts.
 </details>
 
 <details>
@@ -150,7 +152,7 @@ web/src/                emulator: engine.js (EdgeTX API + LCD), app.js (UI), sty
 tools/bundle_web.py     -> web/simulator.html (offline, single file) and web/artifact.html
 tools/build_etxlua.sh   Lua 5.3 with EdgeTX's number settings (native and 32-bit) for the tests
 tools/build_etxhost.sh  EdgeTX's own Lua core with a model of the B&W radios' allocator: makes the
-                        game.luac files and runs test/memtest.lua
+                        game.luac files and runs test/memtest.lua (main, or a release: v2.11.4, v2.10.7)
 tools/tune_physics.py   steady-state check of the flight model (top speed, punch-out, fall, braking)
 tools/build_firmware.sh EdgeTX main + firmware/edgetx-fast-lua.patch for one radio
 test/harness.lua        headless EdgeTX mock: autopilot races with AI pilots on every track, flags, hoops,
@@ -158,6 +160,7 @@ test/harness.lua        headless EdgeTX mock: autopilot races with AI pilots on 
 test/lite_test.lua      the same for the Lite, as a radio with +/- keys and without the libraries B&W lacks
 test/order_check.lua    ray-cast check of the draw order at the Bando
 test/memtest.lua        memory of the B&W versions through their loaders on F2 / F4 radio models
+test/msgtest.lua        the loaders' own screen where the game can't start (EdgeTX 2.10, too little memory)
 test/run_all.sh         all of the above, every screen size, Lua 5.3 and 5.2
 test/web_shots.py       Playwright screenshots of every radio and mode in the emulator
 .github/workflows/      pages.yml publishes the emulator as the project site; release.yml attaches
