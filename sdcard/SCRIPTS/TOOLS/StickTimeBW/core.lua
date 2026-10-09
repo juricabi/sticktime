@@ -1,6 +1,6 @@
 local toolName = "TNS|StickTime BW|TNE"
 --[[ ======================================================================
-  StickTime BW v1.6.3  -  a real 3D FPV quad simulator that runs on your radio
+  StickTime BW v1.6.4  -  a real 3D FPV quad simulator that runs on your radio
   Black & white version - 128x64 and 212x64 radios with an STM32F4 (TX12 MkII, Zorro, Boxer,
   Pocket, MT12, GX12, X9D+ 2019, X9E, T14, T20 ...)
 

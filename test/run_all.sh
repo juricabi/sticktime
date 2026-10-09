@@ -65,6 +65,13 @@ if [ -x ../.tools/etxhost ]; then
     mem F2 "$(ETX_MODEL=f2 ETX_HEAP=63300 ../.tools/etxhost -radio memtest.lua "$S/StickTimeLite.lua" $1 $2 2>&1)"
     mem F4 "$(ETX_MODEL=f4 ETX_HEAP=113600 ETX_CCM=34816 ../.tools/etxhost -radio memtest.lua "$S/StickTimeBW.lua" $1 $2 2>&1)"
   done
+  # the same on EdgeTX 2.11's Lua (tools/build_etxhost.sh v2.11.4), which needs more memory
+  # for the same script: what the radios run today
+  H211=../.tools/etxhost-v2.11.4
+  if [ -x $H211 ]; then
+    mem "F2 2.11" "$(ETX_MODEL=f2 ETX_HEAP=63300 $H211 -radio memtest.lua "$S/StickTimeLite.lua" 128 64 2>&1)"
+    mem "F4 2.11" "$(ETX_MODEL=f4 ETX_HEAP=113600 ETX_CCM=34816 $H211 -radio memtest.lua "$S/StickTimeBW.lua" 128 64 2>&1)"
+  fi
   # both B&W loaders on a color radio (V12 screen): through color.lua, with EdgeTX's own
   # loadScript behavior and Lua core, every track and mode played
   for f in StickTimeBW.lua StickTimeLite.lua; do

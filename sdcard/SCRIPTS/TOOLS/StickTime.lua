@@ -1,6 +1,6 @@
 local toolName = "TNS|StickTime|TNE"
 --[[ ======================================================================
-  StickTime v1.6.3  -  a real 3D FPV quad simulator that runs on your radio
+  StickTime v1.6.4  -  a real 3D FPV quad simulator that runs on your radio
   Color version - every EdgeTX color radio (480x272, 480x320, 320x480, 320x240, 800x480)
 
   Install : copy this file to /SCRIPTS/TOOLS/ on the radio SD card and

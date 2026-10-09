@@ -102,16 +102,16 @@ Play at **[juricabi.github.io/sticktime](https://juricabi.github.io/sticktime/)*
 <details>
 <summary>Memory on B&W radios</summary>
 
-B&W radios have no external RAM, and compiling a script on the radio takes far more memory than running it. So both B&W versions ship precompiled: `core.luac` is EdgeTX's Lua 5.3 bytecode (made by EdgeTX's own Lua) next to its source `core.lua`, and `StickTimeBW.lua` / `StickTimeLite.lua` are small loaders that take `core.luac` first. EdgeTX 2.10 and older use Lua 5.2 and can't load it, and compiling on the radio would need more than 150 KB for StickTime BW and about 120 KB for the Lite: hence EdgeTX 2.11+.
+B&W radios have no external RAM, and compiling a script on the radio takes far more memory than running it. So both B&W versions ship precompiled: `game.luac` is EdgeTX's Lua 5.3 bytecode (made by EdgeTX's own Lua), and `StickTimeBW.lua` / `StickTimeLite.lua` are small loaders that load only that. Compiling on the radio would need about 200 KB for StickTime BW and 135 KB for the Lite, more than any B&W radio has, and running out of memory can crash the radio. That is also why the binary is not called `core.luac` next to its source `core.lua`: EdgeTX compiles `x.lua` instead of loading `x.luac` whenever the source's file time is newer, which a copy that does not keep file times can cause. EdgeTX 2.10 and older use Lua 5.2 and can't load the bytecode: hence EdgeTX 2.11+.
 
-Measured on EdgeTX's own Lua core with a model of the radio's allocator (newlib-nano malloc with its fragmentation, EdgeTX's small-block pools or CCM pool), loading through the loader and playing every track and mode:
+Measured on EdgeTX 2.11's own Lua core (the tests also run main's, which packs values tighter and needs about 10% less) with a model of the radio's allocator (newlib-nano malloc with its fragmentation, EdgeTX's small-block pools or CCM pool), loading through the loader and playing every track and mode:
 
 | | Heap for Lua (EdgeTX 2.11.3) | Lua memory while playing | Peak heap use |
 |---|---|---|---|
-| StickTime BW on STM32F4 | 114–121 KB + 34 KB CCM | about 78 KB | 66 KB + 34 KB CCM |
-| StickTime Lite on STM32F2 | 63–73 KB + 10 KB pools | about 43 KB | 48 KB + 10 KB pools |
+| StickTime BW on STM32F4 | 114–121 KB + 34 KB CCM | about 90 KB | 80 KB + 34 KB CCM |
+| StickTime Lite on STM32F2 | 63–73 KB + 10 KB pools | about 48 KB | 56 KB + 10 KB pools |
 
-The Lite still runs with a 49.5 KB heap, so about 14 KB of an X9D+ stays free. It reads each track from its file (`StickTimeLite/t1.txt` to `t7.txt`) only when you pick it, parses numbers without making a string for each, and collects garbage before the flight starts.
+The Lite still runs with a 56 KB heap, so about 7 KB of an X9D+ stays free. It reads each track from its file (`StickTimeLite/t1.txt` to `t8.txt`) only when you pick it, parses numbers without making a string for each, and collects garbage before the flight starts.
 </details>
 
 <details>
@@ -142,15 +142,15 @@ The Lite still runs with a 49.5 KB heap, so about 14 KB of an X9D+ stays free. I
 src/sticktime.lua       single source of the color and B&W versions (--#if COLOR / --#if BW blocks)
 src/sticktime_lite.lua  StickTime Lite (--#if TEST: hooks for the tests, left out of the radio file)
 src/sticktime_lite_tracks.txt
-                        the Lite's tracks (build.py writes StickTimeLite/t1.txt ... t7.txt)
-src/bwloader.lua        the B&W loaders (precompiled core.luac first)
+                        the Lite's tracks (build.py writes StickTimeLite/t1.txt ... t8.txt)
+src/bwloader.lua        the B&W loaders (they load only the precompiled game.luac)
 src/bwcolor.lua         StickTimeBW/color.lua and StickTimeLite/color.lua: the B&W core on a color radio
 build.py                -> sdcard/SCRIPTS/TOOLS/ (StickTime.lua, StickTimeBW*, StickTimeLite*)
 web/src/                emulator: engine.js (EdgeTX API + LCD), app.js (UI), style.css, index.html
 tools/bundle_web.py     -> web/simulator.html (offline, single file) and web/artifact.html
 tools/build_etxlua.sh   Lua 5.3 with EdgeTX's number settings (native and 32-bit) for the tests
 tools/build_etxhost.sh  EdgeTX's own Lua core with a model of the B&W radios' allocator: makes the
-                        core.luac files and runs test/memtest.lua
+                        game.luac files and runs test/memtest.lua
 tools/tune_physics.py   steady-state check of the flight model (top speed, punch-out, fall, braking)
 tools/build_firmware.sh EdgeTX main + firmware/edgetx-fast-lua.patch for one radio
 test/harness.lua        headless EdgeTX mock: autopilot races with AI pilots on every track, flags, hoops,

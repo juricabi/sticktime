@@ -4,7 +4,7 @@
 -- here they get values of their own, and lcd becomes a set of functions that draw them in
 -- B&W colors. STICKTIME_UI scales the menus and HUD to the color fonts; the 3D view uses
 -- every pixel.
-local CORE = "/SCRIPTS/TOOLS/@DIR@/core.lua"
+local DIR = "/SCRIPTS/TOOLS/@DIR@/"
 local floor, fmt, tostring = math.floor, string.format, tostring
 local LCD = lcd
 local clear, line, fill, frame, text, size =
@@ -78,6 +78,7 @@ STICKTIME_UI, GREY = U, false
 STICKTIME_LATK = 0.011
 LEFT, RIGHT, CENTER, INVERS, BLINK, BOLD, FORCE, ERASE = B.LEFT, B.RIGHT, B.CENTER, B.INVERS, B.BLINK, B.BOLD, B.FORCE, B.ERASE
 PREC1, PREC2, SMLSIZE, MIDSIZE, DBLSIZE, TINSIZE, XXLSIZE = B.PREC1, B.PREC2, B.SMLSIZE, B.MIDSIZE, B.DBLSIZE, B.TINSIZE, B.XXLSIZE
-local f = loadScript(CORE, "b") or loadScript(CORE, "bt")
-if not f then error("@TITLE@: cannot load " .. CORE) end
+-- the precompiled game, or else its source: a color radio has the memory to compile it
+local f = loadScript(DIR .. "game.lua", "b") or loadScript(DIR .. "core.lua", "bt")
+if not f then error("@TITLE@: cannot load " .. DIR .. "game.luac") end
 return f()

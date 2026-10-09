@@ -6,8 +6,9 @@ matching variant. @PLACEHOLDERS@ are substituted per variant.
 
 Color radios get one file, StickTime.lua. B&W radios get a small loader,
 StickTimeBW.lua, plus the game in StickTimeBW/core.lua and, when the 32-bit
-EdgeTX-config Lua is available (tools/build_etxlua.sh), a precompiled
-StickTimeBW/core.luac for EdgeTX 2.11+ so the radio never has to compile it.
+EdgeTX-config Lua is available (tools/build_etxlua.sh), the game precompiled
+for EdgeTX 2.11+ as StickTimeBW/game.luac, which is all the radio loads: it
+does not have the memory to compile the game.
 StickTime Lite (StickTimeLite.lua + StickTimeLite/) has its own source.
 """
 import os
@@ -133,10 +134,10 @@ def placeholders(text: str, cfg: dict) -> str:
     return text
 
 
-def precompile(src: pathlib.Path):
+def precompile(src: pathlib.Path, out: pathlib.Path = None):
     """Lua 5.3 bytecode in EdgeTX's format (32-bit ints and floats), stripped. Made by EdgeTX's
     own Lua (tools/build_etxhost.sh) when it is built, else by the 32-bit EdgeTX-config Lua."""
-    out = src.with_suffix(".luac")
+    out = out or src.with_suffix(".luac")
     host, m32 = ROOT / ".tools" / "etxhost", ROOT / ".tools" / "etxlua53_m32"
     if host.exists():
         code = ROOT / ".tools" / "dump.lua"
@@ -148,9 +149,6 @@ def precompile(src: pathlib.Path):
     else:
         print("  (no .tools/etxhost or .tools/etxlua53_m32: skipping the precompiled .luac)")
         return
-    # same time or newer than the source: EdgeTX then loads the binary ("bt" mode)
-    st = src.stat()
-    os.utime(out, (st.st_atime, st.st_mtime + 2))
     print(f"{out.relative_to(ROOT)}: {out.stat().st_size} bytes (EdgeTX 2.11+ bytecode)")
 
 
@@ -197,7 +195,12 @@ def main():
             # what the loader shows on a color radio instead of the game
             ct = placeholders((ROOT / "src" / "bwcolor.lua").read_text(encoding="utf-8"), cfg)
             (OUT / cfg["DIR"] / "color.lua").write_text(ct, encoding="utf-8")
-            precompile(path)
+            # game.luac, not core.luac: EdgeTX pairs x.luac with x.lua and compiles the source
+            # when its file looks newer, which a B&W radio has not the memory for
+            precompile(path, OUT / cfg["DIR"] / "game.luac")
+            old = OUT / cfg["DIR"] / "core.luac"
+            if old.exists():
+                old.unlink()
 
 
 if __name__ == "__main__":

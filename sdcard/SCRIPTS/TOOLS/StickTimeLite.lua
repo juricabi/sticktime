@@ -1,28 +1,21 @@
 local toolName = "TNS|StickTime Lite|TNE"
 --[[ ======================================================================
-  StickTime Lite v1.6.3  -  loader for black & white radios
+  StickTime Lite v1.6.4  -  loader for black & white radios
 
-  The game itself is in /SCRIPTS/TOOLS/StickTimeLite/ (copy that folder too):
-  core.luac, precompiled for EdgeTX 2.11 and newer, and its source
-  core.lua. B&W radios have little RAM: compiling the game on the radio
-  needs far more memory than running it, and a script compiled on the
-  radio keeps its debug info for that run. So this loader takes the
-  precompiled core.luac. Only without it EdgeTX compiles core.lua (and
-  saves core.luac); that copy is dropped and core.luac is loaded.
-  If you edit core.lua, delete core.luac.
+  The game itself is in /SCRIPTS/TOOLS/StickTimeLite/ (copy that whole folder too):
+  game.luac, the game precompiled for EdgeTX 2.11 and newer, and core.lua,
+  its source. A B&W radio cannot compile the game: that takes more memory
+  than any of them has, and running out of it can crash the radio. So this
+  loader only loads game.luac. There is no game.lua next to it, so EdgeTX
+  takes the binary whatever the file times are (with a source of the same
+  name it compiles the source when its file looks newer). To change the
+  game, edit core.lua and compile it to game.luac on a computer (build.py).
 ====================================================================== ]]
 -- made for black & white screens: on a color radio, color.lua says which game to start instead
 if LCD_W > 212 then
   local m = loadScript("/SCRIPTS/TOOLS/StickTimeLite/color.lua")
   if m then return m() end
 end
-local CORE = "/SCRIPTS/TOOLS/StickTimeLite/core.lua"
-local f = loadScript(CORE, "b")
-if not f then
-  f = loadScript(CORE)
-  f = nil
-  collectgarbage()
-  f = loadScript(CORE, "b") or loadScript(CORE)
-end
-if not f then error("StickTime Lite: cannot load " .. CORE) end
+local f, err = loadScript("/SCRIPTS/TOOLS/StickTimeLite/game.lua", "b")
+if not f then error("StickTime Lite (needs EdgeTX 2.11+ and the StickTimeLite folder): " .. tostring(err)) end
 return f()

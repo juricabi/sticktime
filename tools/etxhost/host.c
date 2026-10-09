@@ -437,7 +437,8 @@ static int r_write(lua_State *L) {
 static int r_close(lua_State *L) { (void)L; return 0; }
 
 /* loadScript(file [, mode [, env]]): like the radio, .luac for "b", .lua for "t", "bt" = binary
-   first (the radio takes the newer of the two; release files are made so that is the binary).
+   first (the radio takes the newer of the two). A binary that does not load gives its own error
+   in "b" mode (out of memory, for one), as on the radio.
    env as in EdgeTX's api_general.cpp, which clears the stack before it reads that argument: a
    chunk loaded with one gets nil as its _ENV, no globals at all. */
 static int r_loadScriptFile(lua_State *L, const char *fn, const char *mode);
@@ -467,6 +468,7 @@ static int r_loadScriptFile(lua_State *L, const char *fn, const char *mode) {
     if (f) {
       fclose(f);
       if (luaL_loadfilex(L, path, NULL) == LUA_OK) return 1;
+      if (!strchr(mode, 't')) { lua_pushnil(L); lua_insert(L, -2); return 2; }
       lua_pop(L, 1);
     }
   }

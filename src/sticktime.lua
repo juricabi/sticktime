@@ -1,6 +1,6 @@
 local toolName = "TNS|@TOOLNAME@|TNE"
 --[[ ======================================================================
-  @TITLE@ v1.6.3  -  a real 3D FPV quad simulator that runs on your radio
+  @TITLE@ v1.6.4  -  a real 3D FPV quad simulator that runs on your radio
   @VARIANT@
 
   Install : @INSTALL@

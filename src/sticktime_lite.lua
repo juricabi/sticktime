@@ -1,6 +1,6 @@
 local toolName = "TNS|StickTime Lite|TNE"
 --[[ ======================================================================
-  StickTime Lite v1.6.3  -  the small edition of StickTime for B&W radios.
+  StickTime Lite v1.6.4  -  the small edition of StickTime for B&W radios.
   Made for radios with little memory (STM32F2: X7, X9D, X9D+, X9 Lite,
   X-Lite, TX12 MkI, T12, T8, T-Lite, T-Pro, LR3 Pro). Runs on every
   black & white EdgeTX radio with EdgeTX 2.11 or newer.

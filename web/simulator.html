@@ -1262,7 +1262,7 @@ if (typeof module !== 'undefined') module.exports = EdgeTX;
 <script type="text/plain" id="lua-color">
 local toolName = "TNS|StickTime|TNE"
 --[[ ======================================================================
-  StickTime v1.6.3  -  a real 3D FPV quad simulator that runs on your radio
+  StickTime v1.6.4  -  a real 3D FPV quad simulator that runs on your radio
   Color version - every EdgeTX color radio (480x272, 480x320, 320x480, 320x240, 800x480)
 
   Install : copy this file to /SCRIPTS/TOOLS/ on the radio SD card and
@@ -3927,7 +3927,7 @@ return { init = init, run = run }
 <script type="text/plain" id="lua-bw">
 local toolName = "TNS|StickTime BW|TNE"
 --[[ ======================================================================
-  StickTime BW v1.6.3  -  a real 3D FPV quad simulator that runs on your radio
+  StickTime BW v1.6.4  -  a real 3D FPV quad simulator that runs on your radio
   Black & white version - 128x64 and 212x64 radios with an STM32F4 (TX12 MkII, Zorro, Boxer,
   Pocket, MT12, GX12, X9D+ 2019, X9E, T14, T20 ...)
 
@@ -5738,7 +5738,7 @@ return { init = init, run = run }
 <script type="text/plain" id="lua-lite">
 local toolName = "TNS|StickTime Lite|TNE"
 --[[ ======================================================================
-StickTime Lite v1.6.3  -  the small edition of StickTime for B&W radios.
+StickTime Lite v1.6.4  -  the small edition of StickTime for B&W radios.
 Made for radios with little memory (STM32F2: X7, X9D, X9D+, X9 Lite,
 X-Lite, TX12 MkI, T12, T8, T-Lite, T-Pro, LR3 Pro). Runs on every
 black & white EdgeTX radio with EdgeTX 2.11 or newer.
@@ -6695,7 +6695,7 @@ return { init = init, run = run }
 -- here they get values of their own, and lcd becomes a set of functions that draw them in
 -- B&W colors. STICKTIME_UI scales the menus and HUD to the color fonts; the 3D view uses
 -- every pixel.
-local CORE = "/SCRIPTS/TOOLS/StickTimeBW/core.lua"
+local DIR = "/SCRIPTS/TOOLS/StickTimeBW/"
 local floor, fmt, tostring = math.floor, string.format, tostring
 local LCD = lcd
 local clear, line, fill, frame, text, size =
@@ -6769,8 +6769,9 @@ STICKTIME_UI, GREY = U, false
 STICKTIME_LATK = 0.011
 LEFT, RIGHT, CENTER, INVERS, BLINK, BOLD, FORCE, ERASE = B.LEFT, B.RIGHT, B.CENTER, B.INVERS, B.BLINK, B.BOLD, B.FORCE, B.ERASE
 PREC1, PREC2, SMLSIZE, MIDSIZE, DBLSIZE, TINSIZE, XXLSIZE = B.PREC1, B.PREC2, B.SMLSIZE, B.MIDSIZE, B.DBLSIZE, B.TINSIZE, B.XXLSIZE
-local f = loadScript(CORE, "b") or loadScript(CORE, "bt")
-if not f then error("StickTime BW: cannot load " .. CORE) end
+-- the precompiled game, or else its source: a color radio has the memory to compile it
+local f = loadScript(DIR .. "game.lua", "b") or loadScript(DIR .. "core.lua", "bt")
+if not f then error("StickTime BW: cannot load " .. DIR .. "game.luac") end
 return f()
 </script>
 <script type="text/plain" id="lua-litecolor">
@@ -6780,7 +6781,7 @@ return f()
 -- here they get values of their own, and lcd becomes a set of functions that draw them in
 -- B&W colors. STICKTIME_UI scales the menus and HUD to the color fonts; the 3D view uses
 -- every pixel.
-local CORE = "/SCRIPTS/TOOLS/StickTimeLite/core.lua"
+local DIR = "/SCRIPTS/TOOLS/StickTimeLite/"
 local floor, fmt, tostring = math.floor, string.format, tostring
 local LCD = lcd
 local clear, line, fill, frame, text, size =
@@ -6854,8 +6855,9 @@ STICKTIME_UI, GREY = U, false
 STICKTIME_LATK = 0.011
 LEFT, RIGHT, CENTER, INVERS, BLINK, BOLD, FORCE, ERASE = B.LEFT, B.RIGHT, B.CENTER, B.INVERS, B.BLINK, B.BOLD, B.FORCE, B.ERASE
 PREC1, PREC2, SMLSIZE, MIDSIZE, DBLSIZE, TINSIZE, XXLSIZE = B.PREC1, B.PREC2, B.SMLSIZE, B.MIDSIZE, B.DBLSIZE, B.TINSIZE, B.XXLSIZE
-local f = loadScript(CORE, "b") or loadScript(CORE, "bt")
-if not f then error("StickTime Lite: cannot load " .. CORE) end
+-- the precompiled game, or else its source: a color radio has the memory to compile it
+local f = loadScript(DIR .. "game.lua", "b") or loadScript(DIR .. "core.lua", "bt")
+if not f then error("StickTime Lite: cannot load " .. DIR .. "game.luac") end
 return f()
 </script>
 <script>
