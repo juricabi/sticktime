@@ -6,7 +6,8 @@ name: Release
 # Run by hand (Actions > Release > Run workflow) with a tag that has no release yet, it
 # publishes that release itself from the branch it runs on, with docs/releases/<tag>.md as
 # the notes. With a tag that has a release, it attaches the zip again and takes the notes
-# from the branch it runs on (to correct them after the release).
+# from the branch it runs on (to correct them after the release). With "move tag" on, it
+# first moves that release's tag to the branch, so the zip has the branch's fixes too.
 on:
   release:
     types:
@@ -16,6 +17,10 @@ on:
       tag:
         description: 'Release tag, e.g. v1.6 (a new one is published from this branch)'
         required: true
+      move_tag:
+        description: 'Move an existing release tag to this branch (re-release with later fixes)'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -47,6 +52,10 @@ jobs:
             gh release create "$TAG" --target "$GITHUB_SHA" --title "StickTime ${TAG#v}" \
               --notes-file "$notes" --repo "$GITHUB_REPOSITORY"
             git fetch -q --tags
+          elif [ "${{ inputs.move_tag }}" = "true" ]; then
+            # the release stays (link, downloads); its tag and so its zip follow the branch
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/$TAG" -f sha="$GITHUB_SHA" -F force=true > /dev/null
+            git fetch -q --tags --force
           fi
           git checkout -q "$TAG"
 
