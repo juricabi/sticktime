@@ -77,6 +77,11 @@ select { max-width: 270px; }
 .btn:hover { border-color: var(--muted); }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: #1c0c00; font-weight: 600; }
 .btn[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
+/* the sound slider is its own switch: 0 dims it to "off" */
+.btn input[type="range"] { accent-color: var(--accent); }
+.btn.snd-off { opacity: .48; filter: saturate(.2); }
+.btn.snd-off input[type="range"] { accent-color: var(--muted); }
+.btn.snd-off { transition: opacity .18s, filter .18s; }
 .file-btn { position: relative; overflow: hidden; }
 .file-btn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 

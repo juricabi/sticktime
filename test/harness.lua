@@ -176,6 +176,13 @@ local function state() local t = { T.get() } return t[16], t end
 local function steps(n) for i = 1, math.max(1, math.floor(n * 50 / FRAME_MS + 0.5)) do frame(0) end end
 
 -- ------------------------------------------------------------ autopilot
+-- stick (0..1) that gives `load` times the weight in thrust: inverse of the quad's thrust curve
+function hoverStick(load)
+  local twr, i0, n, dz = T.thrust()
+  local x = math.max(0, (load / twr - i0) / (1 - i0)) ^ (1 / n)
+  return dz + (1 - dz) * x
+end
+
 -- angle mode: steer toward a lead point on the gate axis, hold the aim height
 local function autopilot(target)
   local _, s = state()
@@ -210,9 +217,8 @@ local function autopilot(target)
   if k < 6 and k ~= 3 and py - ty > 0.7 then vdes = math.min(vdes, math.max(0.5, 2 * hd / (py - ty))) end
   sticks.ele = math.max(-0.75, math.min(0.75, (vdes - vf) * 0.12)) * 1024
   sticks.ail = math.max(-0.6, math.min(0.6, -vs * 0.15 + herr * 0.25)) * 1024
-  local _, twr = T.info()
   local tilt = math.min(0.8, math.abs(sticks.ele / 1024) * 0.9)
-  local hover = ((1 / twr - 0.015) / 0.985) ^ (1 / 1.6) / math.cos(tilt)
+  local hover = hoverStick(1 / math.cos(tilt))
   local t = hover + (ty - py) * 0.08 - vy * 0.1
   sticks.thr = (math.max(0, math.min(1, t)) * 2 - 1) * 1024
 end
@@ -380,7 +386,7 @@ idleSticks()
 do
   local mode, twr = T.S.mode, T.S.twr
   T.set("mode", 2) T.set("twr", 5)
-  local hover = (((1 / 5 - 0.015) / 0.985) ^ (1 / 1.6) * 2 - 1) * 1024
+  local hover = (hoverStick(1) * 2 - 1) * 1024
   local function vyAfter(y)
     T.track(1) T.start(2) steps(70) T.state(4)
     local _, s0 = state()

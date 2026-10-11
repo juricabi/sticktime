@@ -1,91 +1,126 @@
 #!/usr/bin/env python3
-"""Steady-state check of the quad model used in src/sticktime.lua.
-Usage: tools/tune_physics.py [KH=0.48 VP=68 KQS=0.0082 KQU=0.026]
+"""Steady-state check of the quad classes in src/sticktime.lua (read from its QP strings).
+Usage: tools/tune_physics.py [class number 1-5] [key=value ...]   e.g. tools/tune_physics.py 1 vp=60
 
-Model (mass-normalised, body axes r/u/f):
-  T  = Tmax*(0.015 + 0.985*thr^1.6)       motor thrust, lagged with TAU_M
-  Ta = T - vu*sqrt(T*Tmax)/VP            props lose thrust with axial airspeed (pitch speed ~ rpm)
-  kh = KH*sqrt(T/(5g) + 0.02)            rotor drag in the prop plane (same at hover for any TWR)
-  a  = u*(Ta - KQU|vu|vu) + r*(-kh vr - KQS|vr|vr) + f*(-kh vf - KQS|vf|vf) - g
+Model (mass-normalised, body axes r/u/f; the same steps as physics() in src/sticktime.lua):
+  T   = Tmax*(i0 + (1-i0)*x^tn),  x = max(0, (thr-dz)/(1-dz))      stick -> thrust, lagged with tm
+  Ta  = max(0, T - vu*sqrt(T*Tmax)/(vp + vu*vk))  climbing (vk: the loss bends, the prop unloads);
+       min(cq*T, T - vu*sqrt(T*Tmax)/vq)  descending
+  Ta *= 1 - wl*wash*fade  (Prop wash on: sinking into your own downwash, see src/sticktime.lua)
+  Ta *= 1 + tl*min(1,(Tmax/(T*twr))^te)*e2/(e2 + vt^2)   translational lift, fading with throttle
+  S   = (ks|vr| + ku|vu| + kf|vf|)*(1 + er*(1 - smoothstep(|v|/vd)))     drag along the flow: a = -S*v
+  frame lift: s = vu/|v|, q = lr*s*0.813*(2|s|sqrt(1-s^2))^0.6*S*|v|/sqrt(1-s^2)
+              a_u -= q*(1-s^2), a_r += q*s*vr/|v|, a_f += q*s*vf/|v|
+  gravity 10.78 (1.1 g)
+The class values were fitted to a detailed per-prop model of each class; the targets they were
+fitted to are in docs/flight-model.md.
 """
 import math
+import pathlib
+import re
 import sys
 
-G = 9.81
-# racer profile in src/sticktime.lua (QP); freestyle: KH=0.48 VP=68 KQS=0.0082 KQU=0.026
-P = dict(KQS=0.009, KQU=0.028, KH=0.55, VP=90.0)
+G = 10.78
+ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
-def accel(v, th, thr, twr, p):
-    """v: (vy, vz) world velocity, th: nose-down tilt (rad). returns world accel (ay, az)."""
-    Tmax = twr * G
-    T = Tmax * (0.015 + 0.985 * thr ** 1.6)
-    # body axes in the y-z plane: u = (cos th, sin th), f = (-sin th, cos th)
-    uy, uz, fy, fz = math.cos(th), math.sin(th), -math.sin(th), math.cos(th)
-    vy, vz = v
-    vu = vy * uy + vz * uz
-    vf = vy * fy + vz * fz
-    Ta = T - vu * math.sqrt(T * Tmax) / p["VP"]
+def classes():
+    src = (ROOT / "src" / "sticktime.lua").read_text(encoding="utf-8")
+    keys = re.search(r"local QK = \{([^}]*)\}", src).group(1)
+    keys = re.findall(r'"(\w+)"', keys)
+    block = re.search(r"local QP = \{(.*?)\n\}", src, re.S).group(1)
+    out = []
+    for line in block.splitlines():
+        m = re.match(r'\s*"([^"]+)",?\s*--\s*(.*)', line)
+        if m:
+            p = dict(zip(keys, (float(x) for x in m.group(1).split())))
+            p["name"] = m.group(2)
+            out.append(p)
+    return out
+
+
+def thrust(p, s):
+    x = max(0.0, (s - p["dz"]) / (1 - p["dz"]))
+    return p["twr"] * G * (p["i0"] + (1 - p["i0"]) * x ** p["tn"])
+
+
+def accel(p, Tm, vu, vr, vf):
+    """body-axis accelerations (u, r, f) from props, drag and frame lift"""
+    Tmax = p["twr"] * G
     if vu < 0:
-        Ta = min(Ta, T * 1.25)
-    Ta = max(0.0, Ta)
-    kh = p["KH"] * math.sqrt(T / (5 * G) + 0.02)
-    au = Ta - p["KQU"] * abs(vu) * vu
-    af = -kh * vf - p["KQS"] * abs(vf) * vf
-    return uy * au + fy * af - G, uz * au + fz * af
+        Ta = min(p["cq"] * Tm, Tm - vu * math.sqrt(Tm * Tmax) / p["vq"])
+    else:
+        Ta = max(0.0, Tm - vu * math.sqrt(Tm * Tmax) / (p["vp"] + vu * p.get("vk", 0.0)))
+    e2 = vr * vr + vf * vf
+    tl = p["tl"] * min(1.0, (Tmax / (Tm * p["twr"])) ** p.get("te", 0.0))
+    Ta *= 1 + tl * e2 / (e2 + p["vt"] ** 2)
+    au, ar, af = Ta, 0.0, 0.0
+    v2 = vu * vu + e2
+    if v2 > 1e-4:
+        v = math.sqrt(v2)
+        S = p["ks"] * abs(vr) + p["ku"] * abs(vu) + p["kf"] * abs(vf)
+        xd = min(1.0, v / p["vd"])
+        S *= 1 + p["er"] * (1 - xd * xd * (3 - 2 * xd))
+        au, ar, af = Ta - S * vu, -S * vr, -S * vf
+        sn = vu / v
+        c2 = 1 - sn * sn
+        if c2 > 1e-4:
+            c = math.sqrt(c2)
+            q = p["lr"] * sn * 0.813 * (2 * abs(sn) * c) ** 0.6 * S * v / c
+            au -= q * c2
+            ar += q * sn * vr / v
+            af += q * sn * vf / v
+    return au, ar, af
 
 
-def settle(th, thr, twr, p, secs=25.0, v0=(0.0, 0.0)):
-    v = list(v0)
-    h = 0.005
-    for _ in range(int(secs / h)):
-        ay, az = accel(v, th, thr, twr, p)
-        v[0] += ay * h
-        v[1] += az * h
-    return v
-
-
-def top_speed(twr, p):
-    """best level speed at full throttle: find tilt where vertical speed ~ 0."""
-    best = None
-    for deg in range(30, 89):
-        th = math.radians(deg)
-        vy, vz = settle(th, 1.0, twr, p)
-        if vy >= -0.05 and (best is None or vz > best[1]):
-            best = (deg, vz, vy)
-    return best
-
-
-def slide_half_life(twr, p, v0=15.0):
-    """level at hover thrust, sliding sideways at v0: seconds until half that speed is left
-    (a real 5-inch quad: about 2 s, mostly rotor drag)"""
-    kh = p["KH"] * math.sqrt(1 / 5 + 0.02)
-    v, t, h = v0, 0.0, 0.001
-    while v > v0 / 2:
-        v -= (kh + p["KQS"] * v) * v * h
+def fly(p, thr, pitch_deg, v0=(0.0, 0.0), secs=14.0, h=0.0125, hold_alt=False, until=None):
+    """attitude held at pitch_deg nose down (yaw 0, wings level); returns (t, vy, vz) world"""
+    a = math.radians(pitch_deg)
+    uy, uz, fy, fz = math.cos(a), math.sin(a), -math.sin(a), math.cos(a)
+    vy, vz = v0
+    Tm = thrust(p, thr)
+    t = 0.0
+    while t < secs:
+        vu, vf = vy * uy + vz * uz, vy * fy + vz * fz
+        au, _, af = accel(p, Tm, vu, 0.0, vf)
+        vy = 0.0 if hold_alt else vy + (uy * au + fy * af - G) * h
+        vz += (uz * au + fz * af) * h
         t += h
-    return t
+        if until and until(vy, vz):
+            break
+    return t, vy, vz
+
+
+def report(p):
+    r = (1 / p["twr"] - p["i0"]) / (1 - p["i0"])
+    hover = p["dz"] + (1 - p["dz"]) * max(0.0, r) ** (1 / p["tn"])
+    _, climb, _ = fly(p, 1.0, 0.0, secs=8)
+    _, fall, _ = fly(p, 0.0, 0.0, secs=10)
+    best = None
+    for deg in [x * 2.5 for x in range(8, 35)]:
+        _, vy, vz = fly(p, 1.0, deg, v0=(0.0, 25.0))
+        if vy > -0.3 and (best is None or vz > best[1]):
+            best = (deg, vz)
+    # sideways slide at hover throttle, altitude held: seconds until half of 15 m/s is left
+    Tm, v, t, h = thrust(p, hover), 15.0, 0.0, 0.0125
+    while v > 7.5 and t < 30:
+        _, ar, _ = accel(p, Tm, 0.0, v, 0.0)
+        v += ar * h
+        t += h
+    print(f"{p['name']:44s} stock {p['twr']:.1f}:1  hover stick {hover:.2f}  punch-out {climb * 3.6:4.0f} km/h  "
+          f"flat fall {-fall * 3.6:3.0f} km/h  top {best[1] * 3.6:4.0f} km/h at {best[0]:.1f} deg  slide half-life {t:.1f} s")
 
 
 def main():
-    p = dict(P)
-    for a in sys.argv[1:]:
-        k, v = a.split("=")
-        p[k] = float(v)
-    for twr in (3, 5, 8, 12):
-        hover = ((1 / twr - 0.015) / 0.985) ** (1 / 1.6)
-        climb = settle(0.0, 1.0, twr, p)[0]
-        fall = settle(0.0, 0.0, twr, p)[0]
-        deg, vz, vy = top_speed(twr, p)
-        # braking: from top speed, flip to 60 deg nose-up full throttle; time to reach 5 m/s
-        v = [0.0, vz]
-        t, h = 0.0, 0.005
-        while v[1] > 5 and t < 10:
-            ay, az = accel(v, math.radians(-60), 1.0, twr, p)
-            v[0] += ay * h; v[1] += az * h; t += h
-        print(f"TWR {twr}: hover {hover*100:4.1f}%  top {vz*3.6:5.1f} km/h at {deg} deg  punch-out {climb*3.6:5.1f} km/h  "
-              f"flat fall {-fall*3.6:5.1f} km/h  brake {vz*3.6:3.0f}->18 km/h in {t:.2f}s  "
-              f"slide half-life {slide_half_life(twr, p):.2f}s")
+    cls = classes()
+    pick = [a for a in sys.argv[1:] if "=" not in a]
+    sel = [cls[int(i) - 1] for i in pick] if pick else cls
+    for p in sel:
+        for a in sys.argv[1:]:
+            if "=" in a:
+                k, v = a.split("=")
+                p[k] = float(v)
+        report(p)
 
 
 if __name__ == "__main__":

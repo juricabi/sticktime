@@ -1,6 +1,6 @@
 local toolName = "TNS|StickTime|TNE"
 --[[ ======================================================================
-  StickTime v1.6.4  -  a real 3D FPV quad simulator that runs on your radio
+  StickTime v1.6.5  -  a real 3D FPV quad simulator that runs on your radio
   Color version - every EdgeTX color radio (480x272, 480x320, 320x480, 320x240, 800x480)
 
   Install : copy this file to /SCRIPTS/TOOLS/ on the radio SD card and
@@ -37,12 +37,12 @@ local MENU, SETUP, COUNT, FLY, CRASHED, READY, PAUSED, DONE = 1, 2, 3, 4, 5, 6, 
 local focus, scroll, editing = 1, 0, false     -- menus: focused row, list scroll, editing a value
 
 -- ------------------------------------------------------------ settings
-local S = { track = 1, quad = 1, twr = 6, mode = 1, rates = 2, rc = 100, rm = 600, re = 50, yc = 100, ym = 500, ye = 40,
+local S = { track = 1, quad = 1, twr = 0, mode = 1, rates = 2, rc = 100, rm = 600, re = 50, yc = 100, ym = 500, ye = 40,
             tilt = 25, fov = 110, laps = 3, ai = 2, skill = 2, wind = 0, wash = 0, vib = 1, map = 1, sticks = 0, fps = 0 }
 -- rows: label, key, then either a value list (+ names, suffix) or nil, nil, suffix, min, max, step
 local OPTS = {
-  { "Quad", "quad", { 1, 2 }, { "Racer", "Freestyle" } },
-  { "Power", "twr", { 3, 4, 5, 6, 7, 8, 10, 12 }, nil, ":1" },
+  { "Quad", "quad", { 1, 2, 3, 4 }, { 'Racer 5"', 'Freestyle 5"', '3" toothpick', 'Whoop 65mm' } },
+  { "Power", "twr", { 0, 3, 4, 5, 6, 7, 8, 10, 12 }, { "Stock", "3:1", "4:1", "5:1", "6:1", "7:1", "8:1", "10:1", "12:1" } },
   { "Flight mode", "mode", { 1, 2 }, { "Acro", "Angle" } },
   { "Rates", "rates", { 1, 2, 3, 4 }, { "Soft", "Normal", "Fast", "Custom" } },
   { "R/P center", "rc", nil, nil, "°/s", 10, 500, 10 },
@@ -57,7 +57,7 @@ local OPTS = {
   { "Opponents", "ai", { 0, 1, 2, 3 } },
   { "AI skill", "skill", { 1, 2, 3 }, { "Easy", "Medium", "Hard" } },
   { "Wind", "wind", { 0, 1, 2 }, { "Off", "Light", "Strong" } },
-  { "Prop wash", "wash", { 0, 1 }, { "Off", "On" } },
+  { "Prop wash", "wash", { 0, 1, 2 }, { "Off", "Stock", "Max" } },
   { "Vibration", "vib", { 0, 1 }, { "Off", "On" } },
   { "Minimap", "map", { 0, 1 }, { "Off", "On" } },
   { "Stick view", "sticks", { 0, 1 }, { "Off", "On" } },
@@ -66,10 +66,24 @@ local OPTS = {
 -- Betaflight "actual" rate presets: roll/pitch center, max (deg/s), expo %, then yaw
 local RATES = { { 70, 400, 35, 70, 350, 30 }, { 100, 600, 50, 100, 500, 40 }, { 150, 850, 45, 130, 700, 40 } }
 local RKEYS = { rc = 1, rm = 2, re = 3, yc = 4, ym = 5, ye = 6 }
--- quad profiles (racer, freestyle): prop pitch speed m/s, rotor drag, side and top
--- drag, motor and rate response time (s) of a well-tuned quad, prop wash strength
-local QP = { vp = { 90, 68 }, kh = { 0.55, 0.48 }, ks = { 0.009, 0.0082 }, ku = { 0.028, 0.026 },
-             tm = { 0.02, 0.025 }, tr = { 0.012, 0.016 }, pw = { 0.5, 1 } }
+-- quad profiles (Racer 5", Freestyle 5", 3" toothpick, Whoop 65mm), each fitted to a detailed model
+-- of that class (blade-element props on rpm-governed motors, a Betaflight-style PID loop; see
+-- docs/flight-model.md). twr stock thrust/weight; thrust curve: i0 idle, tn exponent, dz bottom dead
+-- zone; vp prop pitch speed climbing (m/s); tl, vt translational lift gain and speed (m/s); ks, kf, ku
+-- side, front, top drag per kg; er, vd extra drag at low speed and the speed it fades by (m/s); lr
+-- frame lift / drag; gg, gl, gw ground effect gain, ray length and fade (m); tm thrust, tr roll/pitch,
+-- ty yaw response time (s); pw/wl/wv prop wash Max: wobble, thrust loss, the sink speed where the loss
+-- has faded out (m/s); wls/wvs/pws the same at the class's Stock setting; vq, cq descending:
+-- pitch speed (m/s) and the most thrust gained.
+-- One string per class (parsed for the class in use only: tables of numbers cost radio memory):
+local QK = { "twr", "i0", "tn", "dz", "vp", "vk", "tl", "vt", "te", "ks", "kf", "ku", "er", "vd", "lr", "gg", "gl", "gw", "tm", "tr", "ty", "pw", "wl", "wv", "vq", "cq", "wls", "wvs", "pws" }
+local QP = {
+  -- twr i0 tn dz vp vk tl vt te ks kf ku er vd lr gg gl gw tm tr ty pw wl wv vq cq wls wvs pws
+  "7.67 .0315 2.16 0 60.4 0 .54 6 .276 .0152 .00819 .0245 .357 15 .229 .24 .25 .113 .006 .009 .02 .5 .326 6.01 26.3 1.32 .119 3.8 .274",     -- Racer 5": 0.49 kg, 2500KV, 5045 tri-blade
+  "7.88 .026 1.52 .08 59.2 0 .48 5.4 .419 .0126 .00728 .0181 .357 15 .257 .27 .25 .113 .006 .007 .02 1 .348 6.54 26.9 1.33 .128 4.25 .548",  -- Freestyle 5": O4 build, 0.58 kg, 2400KV, 5045
+  "5.35 .0221 1.72 .03 49.5 0 .96 9.8 .982 .0176 .0167 .0384 .5 15 .1 .44 .15 .135 .006 .009 .02 1 .291 7.04 15.8 1.61 .103 5.17 .548",      -- 3" toothpick: 0.11 kg, 3S, 5000KV, 76 mm
+  "2.58 .0059 .9 .11 57.3 0 1.02 9.4 .805 .0741 .07 .0858 .286 7 0 .17 .0625 .0344 .006 .02 .02 1 .237 5.61 14.1 1.33 .0243 2.5 .316",       -- Whoop 65mm: ducted 1S, 24 g, 28000KV, 31 mm
+}
 
 -- -------------------------------------------------------------- tracks
 -- gates: x, z, type, yaw (deg), center height (0 = default). Types: 1 gate, 2 high gate,
@@ -390,6 +404,7 @@ end
 local px, py, pz, vx, vy, vz = 0, 0.15, 0, 0, 0, 0                 -- quad position / velocity (m, m/s)
 local rx, ry, rz, ux, uy, uz, fx, fy, fz = 1, 0, 0, 0, 1, 0, 0, 0, 1 -- quad right / up / forward axes
 local sA, sE, sT, sR, speed = 0, 0, 0, 0, 0                           -- sticks, speed
+local aTf, aVu, aE2, aW = 0, 0, 0, 0                                  -- sound state (thrust frac, sink, edge speed, wash)
 local DR, NEAR = 0.15, 0.2                                            -- quad radius, camera near plane
 local P = { rc = 100, rm = 600, re = 0.5, yc = 100, ym = 500, ye = 0.4, twr = 6, angle = false, tc = 0.9, ts = 0.42,
             wr = 0, wp = 0, wy = 0 }                                  -- settings in use, body rates (rad/s)
@@ -425,12 +440,12 @@ end
 -- -------------------------------------------------------------- physics
 local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rushNext
 ;(function()
-  local G = 9.81
+  local G = 10.78                               -- 1.1 g: a heavier, more planted feel
   local SRC = { "ail", "ele", "thr", "rud" }
   local grounded = true
   local nearG, nearP, nearB = {}, {}, {}
   local Tm = 0                                   -- motor thrust (lags the throttle)
-  local wob1, wob2 = 0, 0                        -- prop wash wobble (rad/s)
+  local wob1, wob2, sW, wl = 0, 0, 0, 0         -- prop wash wobble (rad/s), wash build-up (0..1), thrust loss
   local seed = 7
 
   rnd = function()
@@ -499,7 +514,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     hx, hz = hx / l, hz / l
     fx, fy, fz, rx, ry, rz, ux, uy, uz = hx, 0, hz, hz, 0, -hx, 0, 1, 0
     grounded = y <= DR + 0.01
-    speed, Tm, P.wr, P.wp, P.wy = 0, 0, 0, 0, 0
+    speed, Tm, P.wr, P.wp, P.wy, sW = 0, 0, 0, 0, 0, 0
     for i = 1, NG do
       gd[i] = (px - gx[i]) * gnx[i] + (py - gy[i]) * gny[i] + (pz - gz[i]) * gnz[i]
     end
@@ -610,15 +625,35 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
       wr, wp = rate(sA, P.rc, P.rm, P.re), -rate(sE, P.rc, P.rm, P.re)
     end
     local wy = rate(sR, P.yc, P.ym, P.ye)
-    local T = Tmax * (0.015 + 0.985 * sT ^ 1.6)        -- 1.5% at idle, like DShot idle on a tuned quad
-    -- prop wash (setting, off by default): descending into your own downwash
-    -- makes the quad wobble. Smoothed noise, so it reads as a wobble, not jitter.
-    if S.wash == 1 then
+    -- stick -> thrust: idle (min_throttle), the bottom dead zone, then the class curve (rpm ~ stick, thrust ~ rpm^2)
+    local tx = (sT - P.dz) / (1 - P.dz)
+    if tx < 0 then tx = 0 end
+    local T = Tmax * (P.i0 + (1 - P.i0) * tx ^ P.tn)
+    -- prop wash (setting, off by default): sinking into your own downwash. The props build up a
+    -- wash over ~0.2 s while they move down their own axis, less the faster they also move edgewise.
+    -- It costs thrust (up to wl, from a 0.6 m/s sink until it fades out at wv m/s: the quad sinks
+    -- and feels mushy) and, falling faster with throttle on, shakes it (smoothed noise, so it reads
+    -- as a wobble, not jitter).
+    wl = 0
+    if S.wash > 0 then
       local vu0 = vx * ux + vy * uy + vz * uz
+      if vu0 < 0 then
+        local vr0, vf0 = vx * rx + vy * ry + vz * rz, vx * fx + vy * fy + vz * fz
+        local k = dt * 5
+        if k > 1 then k = 1 end
+        sW = sW + (1 / (1 + sqrt(vr0 * vr0 + vf0 * vf0)) - sW) * k
+        if vu0 < -0.6 then
+          local f = (P.wv + vu0) / (P.wv - 2)
+          if f > 1 then f = 1 elseif f < 0 then f = 0 end
+          wl = P.wl * sW * f
+        end
+      end
       if vu0 < -2 and sT > 0.2 then
         local a = (-vu0 - 2) * 0.2
         if a > 1 then a = 1 end
-        a = a * sT * P.pw * 2.5
+        -- scaled by the real wash build-up (faster edgewise flight clears it); Max carries
+        -- the full-strength set, Stock the class's own
+        a = a * sT * P.pw * 2.5 * sW
         wob1, wob2 = wob1 * 0.6 + (rnd() - 0.5) * a, wob2 * 0.6 + (rnd() - 0.5) * a
         wr, wp = wr + wob1, wp + wob2
       else
@@ -639,8 +674,10 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     end
     local n = floor(dt * 80) + 1
     local h = dt / n
-    local km, kr = h / (P.tm + h), h / (P.tr + h)
-    local KH, VP, KS, KU, sTx = P.kh, P.vp, P.ks, P.ku, sqrt(Tmax)
+    local km, kr, ky = h / (P.tm + h), h / (P.tr + h), h / (P.ty + h)
+    local VP, VK, KS, KF, KU, sTx = P.vp, P.vk, P.ks, P.kf, P.ku, sqrt(Tmax)
+    local TL, VT2, TE, ER, VD, LR, GG, GL, GW = P.tl, P.vt * P.vt, P.te, P.er, P.vd, P.lr, P.gg, P.gl, P.gw
+    local VQ, CQ = P.vq, P.cq
     local x0, x1, z0, z1 = TR.x0 - 160, TR.x1 + 160, TR.z0 - 160, TR.z1 + 160
     local bx0, bx1, by0, by1, bz0, bz1 = BX.x0, BX.x1, BX.y0, BX.y1, BX.z0, BX.z1
     -- broad phase once per frame: only objects within reach get tested per substep
@@ -678,30 +715,65 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     local pwr, pwp, pwy = P.wr, P.wp, P.wy
     for _ = 1, n do
       Tm = Tm + (T - Tm) * km
-      pwr, pwp, pwy = pwr + (wr - pwr) * kr, pwp + (wp - pwp) * kr, pwy + (wy - pwy) * kr
+      pwr, pwp, pwy = pwr + (wr - pwr) * kr, pwp + (wp - pwp) * kr, pwy + (wy - pwy) * ky
       rotate(pwr * h, pwp * h, pwy * h)
       -- air-relative velocity in body axes
       local ax_, az_ = vx - wx, vz - wz
       local vu = ax_ * ux + vy * uy + az_ * uz
       local vr = ax_ * rx + vy * ry + az_ * rz
       local vf = ax_ * fx + vy * fy + az_ * fz
-      -- props lose thrust with inflow speed; rotor drag in the prop plane (grows with the air
-      -- the props move, so with thrust: the same at hover for any power); quadratic body drag
-      local Ta = Tm - vu * sqrt(Tm) * sTx / VP
-      if Ta > Tm * 1.25 then Ta = Tm * 1.25 elseif Ta < 0 then Ta = 0 end
-      -- ground effect: near the ground or a roof the props push their air against it and get
-      -- more thrust: +12% skimming it, +3% at 30 cm, nothing to speak of from 1 m up. Less when
-      -- tilted, and it fades with speed as the quad leaves its downwash behind.
-      local hg = py - fl
-      if hg < 1.2 and uy > 0.3 then
-        if hg < 0.15 then hg = 0.15 end
-        local k = 0.049 * uy / hg
-        Ta = Ta / (1 - k * k / (1 + (vx * vx + vz * vz) * 0.018))
+      -- props lose thrust as the air through them speeds up (climbing) and gain thrust descending:
+      -- up to cq, about 2.5 times as fast as they lose it climbing (a cushion when you sink)
+      local Ta
+      if vu < 0 then
+        Ta = Tm - vu * sqrt(Tm) * sTx / VQ
+        if Ta > Tm * CQ then Ta = Tm * CQ end
+      else
+        Ta = Tm - vu * sqrt(Tm) * sTx / (VP + vu * VK)
+        if Ta < 0 then Ta = 0 end
       end
-      local kh = KH * sqrt(Tm * 0.0204 + 0.02)   -- 0.0204 = 1 / (5 G)
-      local au = Ta - KU * (vu < 0 and -vu or vu) * vu
-      local ar = -(kh + KS * (vr < 0 and -vr or vr)) * vr
-      local af = -(kh + KS * (vf < 0 and -vf or vf)) * vf
+      Ta = Ta * (1 - wl)
+      -- translational lift: flying edgewise the props reach fresh air, the induced inflow drops
+      -- and the same rpm gives more thrust (a 5": +25% at 6 m/s, +50% from 15 m/s)
+      local e2 = vr * vr + vf * vf
+      -- the edgewise gain is a hover-throttle effect; it fades as thrust grows (te)
+      local u = Tmax / (Tm * P.twr)
+      if u > 1 then u = 1 end
+      Ta = Ta * (1 + TL * u ^ TE * e2 / (e2 + VT2))
+      -- ground effect: within a twentieth of the prop diameter of the ground or a roof the props
+      -- push their inflow against it (measured along body-down): up to
+      -- +25% on a 5", +45% on a 3". Less when tilted (the ray is longer), fades with speed.
+      if uy > 0.3 then
+        local d = (py - fl - DR) / uy + 0.03
+        if d < GL then
+          local k = (GL - d) / GW
+          if k > 1 then k = 1 end
+          Ta = Ta * (1 + GG * k / (1 + e2 * 0.0125))
+        end
+      end
+      -- body drag along the flow: each face's area weighted by the flow through it
+      -- (a = -S v), somewhat more at low speed. No rotor drag: the quad keeps its momentum.
+      local au, ar, af = Ta, 0, 0
+      local v2 = vu * vu + e2
+      if v2 > 1e-4 then
+        local v = sqrt(v2)
+        local S_ = KS * (vr < 0 and -vr or vr) + KU * (vu < 0 and -vu or vu) + KF * (vf < 0 and -vf or vf)
+        local xd = v / VD
+        if xd > 1 then xd = 1 end
+        S_ = S_ * (1 + ER * (1 - xd * xd * (3 - 2 * xd)))
+        au, ar, af = Ta - S_ * vu, -S_ * vr, -S_ * vf
+        -- frame lift: air on the top of the frame (nose down at speed) pushes it down, air under
+        -- the belly lifts it; strongest with the flow 45 deg to the frame, across the flow
+        local sn = vu / v
+        local c2 = 1 - sn * sn
+        if c2 > 1e-4 then
+          local c = sqrt(c2)
+          local q = LR * sn * 0.813 * (2 * (sn < 0 and -sn or sn) * c) ^ 0.6 * S_ * v / c
+          au = au - q * c2
+          q = q * sn / v
+          ar, af = ar + q * vr, af + q * vf
+        end
+      end
       vx = vx + (ux * au + rx * ar + fx * af) * h
       vy = vy + (uy * au + ry * ar + fy * af - G) * h
       vz = vz + (uz * au + rz * ar + fz * af) * h
@@ -759,6 +831,14 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     P.wr, P.wp, P.wy = pwr, pwp, pwy
     orthonormalize()
     speed = sqrt(vx * vx + vy * vy + vz * vz)
+    if STICKTIME_TEST then
+      -- motor sound state for the web emulator: what the synth needs (rpm from the thrust
+      -- fraction, axial and edgewise flow, wash build-up)
+      aTf = Tm / Tmax
+      aVu = vx * ux + vy * uy + vz * uz
+      aE2 = sqrt((vx * rx + vy * ry + vz * rz) ^ 2 + (vx * fx + vy * fy + vz * fz) ^ 2)
+      aW = sW
+    end
     if gmode == 3 then
       -- distance to the nearest surface, for proximity tricks
       local m = py + 0.7
@@ -890,7 +970,7 @@ end
 AI.start = function()
   local n = gmode == 1 and S.ai or 0
   AI.n = n
-  AI.vt = ({ 9, 13, 17.5 })[S.skill] * (0.75 + 0.05 * S.twr)
+  AI.vt = ({ 9, 13, 17.5 })[S.skill] * (0.75 + 0.05 * P.twr)
   for a = 1, n do
     local L = a == 1 and 2.2 or (a == 2 and -2.2 or 0)
     local B = a == 3 and 3 or 0
@@ -1012,8 +1092,13 @@ local function applySettings()
   else
     P.rc, P.rm, P.re, P.yc, P.ym, P.ye = S.rc, S.rm, S.re * 0.01, S.yc, S.ym, S.ye * 0.01
   end
-  for k, v in pairs(QP) do P[k] = v[S.quad] or v[1] end
-  P.twr = S.twr
+  local i = 0
+  for v in string.gmatch(QP[S.quad] or QP[1], "%S+") do
+    i = i + 1
+    P[QK[i]] = tonumber(v)
+  end
+  if S.twr > 0 then P.twr = S.twr end       -- 0: the class's stock power
+  if S.wash == 1 then P.wl, P.wv, P.pw = P.wls, P.wvs, P.pws end  -- Stock: the class's own wash
   P.angle = S.mode == 2
   local t = S.tilt * 0.0174533
   P.tc, P.ts = cos(t), sin(t)
@@ -2614,6 +2699,8 @@ local function init()
     TEST.next = function(i) nextGate, lastGate = i, (i - 2) % NG + 1 end
     TEST.race = function() return lastGate, lapStart, R.n, R.laps, R.total, R.crashes, tStart end
     TEST.info = function() return NT, P.twr, gmode, R.pos, AI.n, R.sc, R.rn, R.rt, R.chn, BX.n, TRACKS[S.track][1] end
+    TEST.thrust = function() return P.twr, P.i0, P.tn, P.dz end
+    TEST.audio = function() return sT, S.quad, state, aTf, aVu, aE2, aW, sA, sE, sR end
     TEST.ai = function(a) return AI.x[a], AI.y[a], AI.z[a], AI.k[a], AI.d[a], AI.v[a], AI.seg[a] end
     TEST.best = function(t) return BEST.l[t], BEST.r[t], BEST.g[t], BEST.f[t] end
     TEST.box = function(b) return BX.x0[b], BX.x1[b], BX.y0[b], BX.y1[b], BX.z0[b], BX.z1[b] end

@@ -22,7 +22,7 @@
       </select>
     </label>
     <button class="btn" id="restartBtn" type="button" title="Restart the script (R)">Restart</button>
-    <button class="btn" id="soundBtn" type="button" aria-pressed="false">Sound off</button>
+    <label class="btn" title="Sound volume (0 is off)">Sound <input type="range" id="soundVol" min="0" max="1" step="0.05" value="0.8" style="width:80px;vertical-align:middle"></label>
     <label class="btn file-btn" title="Run any EdgeTX tool script">Open .lua<input type="file" id="fileIn" accept=".lua,.txt"></label>
     <button class="btn" id="copyBtn" type="button" title="Copy the running script to the clipboard">Copy .lua</button>
   </div>

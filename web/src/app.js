@@ -24,7 +24,7 @@
     rate: store.get('rate', 50),
     ghost: store.get('ghost', true),
     delay: store.get('delay', true),
-    sound: false,
+    vol: store.get('vol', 0.8),
     mode: store.get('mode', 2),
     input: 'mix',
     cpu: null,
@@ -71,7 +71,7 @@
     g.setTargetAtTime(0, now + dur / 1000, 0.01);
   }
   function tone(freq, dur, pause, flags, incr, vol) {
-    if (!app.sound || !actx) return;
+    if (!(app.vol > 0) || !actx) return;
     if (flags & 0x20) { bgTone(freq, dur, vol); return; }        // PLAY_BACKGROUND
     const now = actx.currentTime;
     if (flags & 0x10) { live.forEach((o) => { try { o.stop(); } catch (e) { /* already stopped */ } }); live = []; toneEnd = now; }
@@ -93,6 +93,187 @@
     const r = $('radio');
     r.classList.remove('buzz'); void r.offsetWidth; r.classList.add('buzz');
     try { if (navigator.vibrate) navigator.vibrate(Math.min(200, ms * 10)); } catch (e) { /* blocked */ }
+  }
+
+  // Motor sound v3, synthesized in the browser (the radio itself can't do better than the
+  // plain tone that was removed in 1.6.4). What makes a quad sound like a quad, per motor:
+  //   - the blade-pass buzz: a custom periodic wave (fundamental + 5 harmonics, not a raw saw)
+  //     through a lowpass that opens with rpm - dark at idle, raspy at speed
+  //   - the shaft tone at rotation frequency (the low growl)
+  //   - the electrical whine at 7x shaft speed (12N14P motors; the whoop's scream at 4-6.6 kHz)
+  //   - a narrow noise band: air rush with speed, prop wash when sinking through dirty air
+  // Each motor runs at its own rpm from a Quad-X stick mix (inputs are audible), has its own
+  // timbre and sits left/right (heard from the camera: FL/FR wide, RR/RL narrow), and an
+  // irregular ~2-7 Hz flutter (random-walk gain and detune, like turbulence over the discs)
+  // replaces the steady drone. The master swells on spool-up and dips on chop, into a high
+  // shelf and a compressor. Class rpm/timbre from each class's measured hover/full rpm.
+  const ACLASS = [
+    { rpm: 31679, blades: 3, poles: 7, buzz: 1.0, whine: 0.14, shaft: 0.1, noise: 0.45 },  // 5" racer
+    { rpm: 31679, blades: 3, poles: 7, buzz: 0.9, whine: 0.16, shaft: 0.12, noise: 0.55 }, // 5" freestyle
+    { rpm: 36301, blades: 3, poles: 7, buzz: 0.8, whine: 0.18, shaft: 0.1, noise: 0.65 },  // 3" toothpick
+    { rpm: 56381, blades: 3, poles: 7, buzz: 0.4, whine: 0.4, shaft: 0.05, noise: 1.0 },   // 65 mm whoop
+  ];
+  const MIX = [[-1, 1, -1], [1, 1, 1], [1, -1, 1], [-1, -1, -1]];   // [roll, pitch, yaw] weight per motor
+  const PAN = [-0.55, 0.55, -0.3, 0.3];                              // FL, FR, RR, RL as heard from the camera
+  const TIMBRE = [[1, 1], [0.9, 0.85], [1.08, 1.12], [0.94, 0.88]];  // per-motor buzz / whine scale
+  let synth = null;
+  function startSynth() {
+    const master = actx.createGain();
+    master.gain.value = 0;
+    const shelf = actx.createBiquadFilter();
+    shelf.type = 'highshelf'; shelf.frequency.value = 3800; shelf.gain.value = -6;
+    const comp = actx.createDynamicsCompressor();
+    comp.threshold.value = -20; comp.knee.value = 18; comp.ratio.value = 5;
+    comp.attack.value = 0.004; comp.release.value = 0.18;
+    master.connect(shelf); shelf.connect(comp); comp.connect(actx.destination);
+    const sum = actx.createGain();                                  // the flutter modulates this node
+    sum.gain.value = 1;
+    const shaper = actx.createWaveShaper();                         // soft saturation: warmth and grit
+    const curve = new Float32Array(257);
+    for (let i = 0; i < 257; i++) { const x = i / 128 - 1; curve[i] = Math.tanh(2.2 * x) / Math.tanh(2.2); }
+    shaper.curve = curve; shaper.oversample = '2x';
+    const drive = actx.createGain(); drive.gain.value = 1.6;        // into the shaper, then back off after
+    const trim = actx.createGain(); trim.gain.value = 0.62;
+    sum.connect(drive); drive.connect(shaper); shaper.connect(trim); trim.connect(master);
+    const wave = actx.createPeriodicWave(new Float32Array(7), new Float32Array([0, 1, 0.6, 0.28, 0.14, 0.07, 0.03]));
+    const buf = actx.createBuffer(1, actx.sampleRate * 2, actx.sampleRate);
+    const ch = buf.getChannelData(0);
+    for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
+    const motors = [];
+    for (let m = 0; m < 4; m++) {
+      let dest = sum;
+      if (actx.createStereoPanner) {
+        const p = actx.createStereoPanner();
+        p.pan.value = PAN[m]; p.connect(sum); dest = p;
+      }
+      const lp = actx.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 1500; lp.Q.value = 0.8; lp.connect(dest);
+      const buzz = actx.createOscillator(), bg = actx.createGain();
+      buzz.setPeriodicWave(wave); buzz.frequency.value = 200; bg.gain.value = 0;
+      buzz.connect(bg); bg.connect(lp); buzz.start();
+      const buzz2 = actx.createOscillator(), b2g = actx.createGain();   // chorus: thickens the buzz
+      buzz2.setPeriodicWave(wave); buzz2.frequency.value = 201.4; b2g.gain.value = 0;
+      buzz2.connect(b2g); b2g.connect(lp); buzz2.start();
+      const shaft = actx.createOscillator(), sg = actx.createGain();
+      shaft.type = 'sine'; shaft.frequency.value = 70; sg.gain.value = 0;
+      shaft.connect(sg); sg.connect(lp); shaft.start();
+      const whine = actx.createOscillator(), wg = actx.createGain();
+      whine.type = 'sine'; whine.frequency.value = 1400; wg.gain.value = 0;
+      whine.connect(wg); wg.connect(dest); whine.start();
+      const whine2 = actx.createOscillator(), w2g = actx.createGain();  // second, slightly sharp partial
+      whine2.type = 'sine'; whine2.frequency.value = 2830; w2g.gain.value = 0;
+      whine2.connect(w2g); w2g.connect(dest); whine2.start();
+      const ns = actx.createBufferSource();
+      ns.buffer = buf; ns.loop = true; ns.playbackRate.value = 0.9 + 0.05 * m;
+      const bp = actx.createBiquadFilter();
+      bp.type = 'bandpass'; bp.frequency.value = 600; bp.Q.value = 1.4;
+      const ng = actx.createGain(); ng.gain.value = 0;
+      ns.connect(bp); bp.connect(ng); ng.connect(dest); ns.start();
+      motors.push({ buzz, bg, buzz2, b2g, shaft, sg, whine, wg, whine2, w2g, ns, bp, ng, lp });
+    }
+    // airflow: the wind rush over the frame grows with airspeed (its own voice, not the motors')
+    const ws = actx.createBufferSource();
+    ws.buffer = buf; ws.loop = true; ws.playbackRate.value = 0.8;
+    const wf = actx.createBiquadFilter();
+    wf.type = 'lowpass'; wf.frequency.value = 200; wf.Q.value = 0.5;
+    const wgn = actx.createGain(); wgn.gain.value = 0;
+    ws.connect(wf); wf.connect(wgn); wgn.connect(master); ws.start();
+    synth = { master, sum, motors, buf, ws, wf, wgn, rpmS: [0, 0, 0, 0], prev: 0, state: 0,
+              vol: 0, flT: 0, flG: 1, flD: [1, 1, 1, 1] };
+  }
+  function stopSynth() {
+    if (!synth) return;
+    const s = synth;
+    synth = null;
+    try {
+      s.master.gain.setTargetAtTime(0, actx.currentTime, 0.04);
+      setTimeout(() => {
+        s.motors.forEach((m) => {
+          try { m.buzz.stop(); m.buzz2.stop(); m.shaft.stop(); m.whine.stop(); m.whine2.stop(); m.ns.stop(); s.ws.stop(); } catch (e) { /* gone */ }
+        });
+      }, 300);
+    } catch (e) { /* context closed */ }
+  }
+  function motorSound(dt) {
+    if (!actx || !(app.vol > 0)) return;
+    if (!synth) startSynth();
+    const now = actx.currentTime;
+    let a = null;
+    if (app.engine && !app.engine.error) { try { a = app.engine.callTest('audio'); } catch (e) { /* hook absent */ } }
+    const live = a && a.length >= 10;
+    const c = live ? ACLASS[Math.max(1, Math.min(4, a[1] | 0)) - 1] : ACLASS[0];
+    let on = 0, frac = 0, load = 0, speed = 0, chop = 0;
+    if (live) {
+      frac = Math.max(0, Math.min(1, a[3]));                  // lagged thrust / Tmax
+      load = 0.35 * (a[4] - a[5]) - a[6] * 6;                 // PropLoad: dirty air is negative
+      speed = Math.abs(a[4]) + a[5];                          // airspeed over the discs
+      on = (a[2] === 4 && !app.paused) ? 1 : 0;               // motors live only while flying
+      for (let i = 0; i < 4; i++) {
+        const mix = MIX[i][0] * a[7] * 0.3 + MIX[i][1] * a[8] * 0.3 + MIX[i][2] * a[9] * 0.22;
+        const tf = Math.max(0.008, Math.min(1.15, frac * (1 + mix)));
+        const rpm = c.rpm * Math.max(0.1, Math.sqrt(tf)) * (1 - 0.15 * a[6]);  // wash loads the motors
+        synth.rpmS[i] += 0.12 * (rpm - synth.rpmS[i]);        // rpm smoothing EMA (0.12/frame)
+      }
+    } else {
+      for (let i = 0; i < 4; i++) synth.rpmS[i] *= 0.92;
+    }
+    // a crash: a short thud, and the motors cut with it
+    if (live && synth.state === 4 && a[2] === 5) {
+      const t = actx.currentTime;
+      const bs = actx.createBufferSource();
+      bs.buffer = synth.buf;
+      const f = actx.createBiquadFilter();
+      f.type = 'lowpass'; f.frequency.value = 420;
+      const g = actx.createGain();
+      g.gain.setValueAtTime(0.9, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+      bs.connect(f); f.connect(g); g.connect(synth.master);
+      bs.start(t); bs.stop(t + 0.22);
+      for (let i = 0; i < 4; i++) synth.rpmS[i] *= 0.3;
+    }
+    if (live) synth.state = a[2];
+    const mean = (synth.rpmS[0] + synth.rpmS[1] + synth.rpmS[2] + synth.rpmS[3]) / 4;
+    const slope = Math.max(-0.5, Math.min(0.5, (synth.prev - mean) / 2000));
+    synth.prev = mean;
+    chop = Math.max(0, slope);
+    const swell = Math.max(0.6, Math.min(1.4, 1 - slope));    // spool-up swells, chop dips
+    synth.vol += (on * swell - synth.vol) * Math.min(1, dt / 90);
+    synth.master.gain.setTargetAtTime(0.5 * app.vol * synth.vol, now, 0.06);
+    // irregular flutter (random walk, new target every ~140 ms): gain +-13%, detune +-0.4%
+    synth.flT -= dt;
+    if (synth.flT <= 0) {
+      synth.flT = 110 + Math.random() * 60;
+      const rough = 0.13 + 0.22 * (1 - Math.min(1, mean / c.rpm));   // lumpy idle
+      synth.flG = 1 + (Math.random() - 0.5) * 2 * rough;
+      for (let i = 0; i < 4; i++) synth.flD[i] = 1 + (Math.random() - 0.5) * 0.008;
+      synth.sum.gain.setTargetAtTime(synth.flG, now, 0.05);
+    }
+    const nAmt = c.noise * Math.max(0.08, Math.min(1.3, 0.2 + 0.5 * frac - Math.min(0, load) * 0.05
+      + speed * 0.02 + chop * 0.6));
+    for (let i = 0; i < 4; i++) {
+      const m = synth.motors[i];
+      const mech = synth.rpmS[i] / 60;
+      const bpf = mech * c.blades * synth.flD[i];
+      const rf = Math.min(1, synth.rpmS[i] / c.rpm);
+      m.buzz.frequency.setTargetAtTime(Math.max(30, bpf), now, 0.02);
+      m.buzz2.frequency.setTargetAtTime(Math.max(30, bpf * 1.0068), now, 0.02);
+      m.shaft.frequency.setTargetAtTime(Math.max(20, mech), now, 0.02);
+      const elec = mech * c.poles * (1 + (synth.flD[i] - 1) * 2);
+      m.whine.frequency.setTargetAtTime(Math.min(11000, elec), now, 0.03);
+      m.whine2.frequency.setTargetAtTime(Math.min(14000, elec * 2.02), now, 0.03);
+      m.lp.frequency.setTargetAtTime(Math.min(9500, 250 + bpf * 2.2), now, 0.05);
+      m.bp.frequency.setTargetAtTime(Math.min(9000, 300 + bpf * 1.5 + speed * 8), now, 0.05);
+      m.bg.gain.setTargetAtTime(on * c.buzz * TIMBRE[i][0] * (0.12 + 0.3 * rf), now, 0.04);
+      m.b2g.gain.setTargetAtTime(on * c.buzz * TIMBRE[i][0] * 0.55 * (0.12 + 0.3 * rf), now, 0.04);
+      m.sg.gain.setTargetAtTime(on * c.shaft * (0.1 + 0.9 * rf), now, 0.04);
+      const loadW = 1 + 0.3 * Math.max(0, Math.min(1, load / 6));      // a loaded motor whines louder
+      m.wg.gain.setTargetAtTime(on * c.whine * TIMBRE[i][1] * (0.2 + 0.8 * rf) * loadW, now, 0.04);
+      m.w2g.gain.setTargetAtTime(on * c.whine * TIMBRE[i][1] * 0.3 * (0.2 + 0.8 * rf), now, 0.04);
+      m.ng.gain.setTargetAtTime(on * 0.1 * nAmt * TIMBRE[i][0], now, 0.07);
+    }
+    // the wind rush: quiet to 15 m/s, loud by 30, brighter with speed
+    synth.wgn.gain.setTargetAtTime(on * Math.min(0.3, (speed / 28) * (speed / 28)) * 0.9, now, 0.1);
+    synth.wf.frequency.setTargetAtTime(Math.min(4000, 180 + speed * 36), now, 0.1);
   }
 
   // ----------------------------------------------------------- engine
@@ -446,6 +627,7 @@
     }
     if (ts - emuT >= 1000) { emuFps = emuN; emuN = 0; emuT = ts; }
     updateStats();
+    motorSound(dt);
     requestAnimationFrame(loop);
   }
 
@@ -517,13 +699,23 @@
     });
     $('restartBtn').addEventListener('click', boot);
     $('ovBtn').addEventListener('click', boot);
-    $('soundBtn').addEventListener('click', () => {
-      app.sound = !app.sound;
-      if (!app.sound && motor && actx) bgTone(0, 0, 0);
-      if (app.sound && !actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { app.sound = false; } }
+    // one control: the slider is the switch too (0 = off); moving it is the user gesture
+    // the browser needs before audio may start
+    const vol = $('soundVol');
+    const volLbl = vol.parentElement;
+    const volShow = () => {
+      volLbl.classList.toggle('snd-off', !(app.vol > 0));
+      volLbl.title = app.vol > 0 ? 'Sound volume: ' + Math.round(app.vol * 100) + '%' : 'Sound off';
+    };
+    vol.value = app.vol;
+    volShow();
+    vol.addEventListener('input', () => {
+      app.vol = parseFloat(vol.value) || 0;
+      store.set('vol', app.vol);
+      volShow();
+      if (app.vol > 0 && !actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { app.vol = 0; vol.value = 0; volShow(); } }
       if (actx && actx.state === 'suspended') actx.resume();
-      $('soundBtn').setAttribute('aria-pressed', String(app.sound));
-      $('soundBtn').textContent = app.sound ? 'Sound on' : 'Sound off';
+      if (app.vol <= 0) { if (motor && actx) bgTone(0, 0, 0); stopSynth(); }
     });
     $('fileIn').addEventListener('change', (ev) => {
       const f = ev.target.files[0];
