@@ -1328,7 +1328,7 @@ local focus, scroll, editing = 1, 0, false     -- menus: focused row, list scrol
 
 -- ------------------------------------------------------------ settings
 local S = { track = 1, quad = 1, twr = 0, mode = 1, rates = 2, rc = 100, rm = 600, re = 50, yc = 100, ym = 500, ye = 40,
-            tilt = 25, fov = 110, laps = 3, ai = 2, skill = 2, wind = 0, wash = 0, grip = 0, vib = 1, map = 1, sticks = 0, fps = 0 }
+            tilt = 25, fov = 110, laps = 3, ai = 2, skill = 2, wind = 0, wash = 0, grip = 1, vib = 1, map = 1, sticks = 0, fps = 0 }
 -- rows: label, key, then either a value list (+ names, suffix) or nil, nil, suffix, min, max, step
 local OPTS = {
   { "Quad", "quad", { 1, 2, 3, 4, 5 }, { 'Racer 5"', 'Freestyle 5"', '3" toothpick', 'Whoop 65mm', 'Whoop 75mm' } },
@@ -1348,7 +1348,7 @@ local OPTS = {
   { "AI skill", "skill", { 1, 2, 3 }, { "Easy", "Medium", "Hard" } },
   { "Wind", "wind", { 0, 1, 2 }, { "Off", "Light", "Strong" } },
   { "Prop wash", "wash", { 0, 1, 2 }, { "Off", "Stock", "Max" } },
-  { "Grip", "grip", { 0, 1, 2 }, { "Sim", "Medium", "High" } },
+  { "Grip", "grip", { 0, 1, 2 }, { "Low", "Medium", "High" } },
   { "Vibration", "vib", { 0, 1 }, { "Off", "On" } },
   { "Minimap", "map", { 0, 1 }, { "Off", "On" } },
   { "Stick view", "sticks", { 0, 1 }, { "Off", "On" } },
@@ -1369,7 +1369,7 @@ local RKEYS = { rc = 1, rm = 2, re = 3, yc = 4, ym = 5, ye = 6 }
 -- ce, se, rf descending: the cushion peaks at cq (less by ce near full stick) at a sink of sq*tf^se m/s,
 -- then stalls down to rf; pf the prop wash shake's frequency (Hz); tlo, thi the Power settings that
 -- suit the class (thrust/weight of real quads of its kind; Stock is always there); kh rotor drag at
--- Grip High (1/s, times sqrt(Tm/5g + 0.02); Medium 0.4 of it, Sim none, as in the reference).
+-- Grip High (1/s, times sqrt(Tm/5g + 0.02); Medium, the default, 0.4 of it; Low none, as in the reference).
 -- One string per class (parsed for the class in use only: tables of numbers cost radio memory):
 local QK = { "twr", "i0", "tn", "dz", "vp", "vk", "tl", "vt", "te", "ks", "kf", "ku", "er", "vd", "lr", "gg", "gl", "gw", "tm", "tr", "ty", "pw", "wl", "wv", "sq", "cq", "wls", "wvs", "pws", "vc", "ta", "ce", "se", "rf", "pf", "tlo", "thi", "kh" }
 local QP = {
@@ -2109,7 +2109,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
           ar, af = ar + q * vr, af + q * vf
         end
       end
-      -- rotor drag (the Grip setting; the reference model has none: Sim): props moving edgewise are
+      -- rotor drag (the Grip setting; the reference model has none: Low): props moving edgewise are
       -- pushed back, harder the faster they spin (~ sqrt of the thrust)
       if KH > 0 then
         local k = KH * sqrt(Tm * 0.0186 + 0.02)            -- 0.0186 = 1 / (5 G)
@@ -4139,7 +4139,7 @@ local focus, scroll, editing = 1, 0, false     -- menus: focused row, list scrol
 
 -- ------------------------------------------------------------ settings
 local S = { track = 1, quad = 1, twr = 0, mode = 1, rates = 2, rc = 100, rm = 600, re = 50, yc = 100, ym = 500, ye = 40,
-            tilt = 20, fov = 100, laps = 3, ai = 2, skill = 2, wind = 0, wash = 0, grip = 0, vib = 1, map = 1, sticks = 0, fps = 0 }
+            tilt = 20, fov = 100, laps = 3, ai = 2, skill = 2, wind = 0, wash = 0, grip = 1, vib = 1, map = 1, sticks = 0, fps = 0 }
 -- rows: label, key, then either a value list (+ names, suffix) or nil, nil, suffix, min, max, step
 local OPTS = {
   { "Quad", "quad", { 1, 2, 3, 4, 5 }, { 'Racer 5"', 'Freestyle 5"', '3" toothpick', 'Whoop 65mm', 'Whoop 75mm' } },
@@ -4159,7 +4159,7 @@ local OPTS = {
   { "AI skill", "skill", { 1, 2, 3 }, { "Easy", "Medium", "Hard" } },
   { "Wind", "wind", { 0, 1, 2 }, { "Off", "Light", "Strong" } },
   { "Prop wash", "wash", { 0, 1, 2 }, { "Off", "Stock", "Max" } },
-  { "Grip", "grip", { 0, 1, 2 }, { "Sim", "Medium", "High" } },
+  { "Grip", "grip", { 0, 1, 2 }, { "Low", "Medium", "High" } },
   { "Vibration", "vib", { 0, 1 }, { "Off", "On" } },
   { "Show FPS", "fps", { 0, 1 }, { "Off", "On" } },
 }
@@ -4178,7 +4178,7 @@ local RKEYS = { rc = 1, rm = 2, re = 3, yc = 4, ym = 5, ye = 6 }
 -- ce, se, rf descending: the cushion peaks at cq (less by ce near full stick) at a sink of sq*tf^se m/s,
 -- then stalls down to rf; pf the prop wash shake's frequency (Hz); tlo, thi the Power settings that
 -- suit the class (thrust/weight of real quads of its kind; Stock is always there); kh rotor drag at
--- Grip High (1/s, times sqrt(Tm/5g + 0.02); Medium 0.4 of it, Sim none, as in the reference).
+-- Grip High (1/s, times sqrt(Tm/5g + 0.02); Medium, the default, 0.4 of it; Low none, as in the reference).
 -- One string per class (parsed for the class in use only: tables of numbers cost radio memory):
 local QK = { "twr", "i0", "tn", "dz", "vp", "vk", "tl", "vt", "te", "ks", "kf", "ku", "er", "vd", "lr", "gg", "gl", "gw", "tm", "tr", "ty", "pw", "wl", "wv", "sq", "cq", "wls", "wvs", "pws", "vc", "ta", "ce", "se", "rf", "pf", "tlo", "thi", "kh" }
 local QP = {
@@ -4902,7 +4902,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
           ar, af = ar + q * vr, af + q * vf
         end
       end
-      -- rotor drag (the Grip setting; the reference model has none: Sim): props moving edgewise are
+      -- rotor drag (the Grip setting; the reference model has none: Low): props moving edgewise are
       -- pushed back, harder the faster they spin (~ sqrt of the thrust)
       if KH > 0 then
         local k = KH * sqrt(Tm * 0.0186 + 0.02)            -- 0.0186 = 1 / (5 G)
@@ -6087,7 +6087,7 @@ end
 end
 return t
 end
-local S = { track = 1, quad = 1, twr = 0, mode = 1, rates = 2, tilt = 20, laps = 3, wind = 0, wash = 0, grip = 0, vib = 1 }
+local S = { track = 1, quad = 1, twr = 0, mode = 1, rates = 2, tilt = 20, laps = 3, wind = 0, wash = 0, grip = 1, vib = 1 }
 local V3, QN = { 0, 1, 2 }, ""                                       -- shared values; the quad's name
 local OPTS = {
 { "Quad", "quad", nums("1 2 3 4 5") },                                -- names: StickTimeLite/q<n>.txt
@@ -6098,7 +6098,7 @@ local OPTS = {
 { "Laps", "laps", nums("1 2 3 5 10") },
 { "Wind", "wind", V3, { "Off", "Light", "Strong" } },
 { "Prop wash", "wash", V3, { "Off", "Stock", "Max" } },
-{ "Grip", "grip", V3, { "Sim", "Medium", "High" } },
+{ "Grip", "grip", V3, { "Low", "Medium", "High" } },
 { "Vibration", "vib", { 0, 1 }, { "Off", "On" } },
 }
 local RATES = nums("70 400 35 70 350 30 100 600 50 100 500 40 150 850 45 130 700 40")

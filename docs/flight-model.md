@@ -64,10 +64,10 @@ top speed) and to its steady flight at 0-65 deg pitch and half to full stick; th
 (`sq cq ce se rf`) to its thrust map while sinking at idle to full stick. Over those steady flight
 states StickTime is within 0.4-0.9 m/s of the per-prop model on average, with no vertical bias.
 The **Grip** setting adds it: props moving edgewise are pushed back, harder the faster they spin,
-so `a = -kh * sqrt(Tm/5g + 0.02) * v` in the prop plane (the 1.6.4 form). Sim leaves it out, as
+so `a = -kh * sqrt(Tm/5g + 0.02) * v` in the prop plane (the 1.6.4 form). Low leaves it out, as
 the reference does (pilots rate that momentum as the closest to a real racer); High is set per
 class so that the sideways slide half-life halves (a racer: 4 s to 2 s, where quads with rotor
-drag modelled sit), Medium is 0.4 of High (~3 s).
+drag modelled sit), Medium, the default, is 0.4 of High (~3 s).
 
 ## Classes
 

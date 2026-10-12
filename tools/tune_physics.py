@@ -78,7 +78,8 @@ def accel(p, Tm, vu, vr, vf):
             au -= q * c2
             ar += q * sn * vr / v
             af += q * sn * vf / v
-    # rotor drag (the Grip setting, grip=0/1/2 on the command line: Sim / Medium / High)
+    # rotor drag (the Grip setting, grip=0/1/2 on the command line: Low / Medium / High;
+    # 0, the fitted model, unless given: the game's default is Medium)
     kh = p.get("kh", 0.0) * (0.0, 0.4, 1.0)[int(p.get("grip", 0))]
     if kh > 0:
         k = kh * math.sqrt(Tm * 0.0186 + 0.02)

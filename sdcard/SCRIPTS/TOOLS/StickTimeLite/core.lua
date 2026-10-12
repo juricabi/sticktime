@@ -37,7 +37,7 @@ end
 end
 return t
 end
-local S = { track = 1, quad = 1, twr = 0, mode = 1, rates = 2, tilt = 20, laps = 3, wind = 0, wash = 0, grip = 0, vib = 1 }
+local S = { track = 1, quad = 1, twr = 0, mode = 1, rates = 2, tilt = 20, laps = 3, wind = 0, wash = 0, grip = 1, vib = 1 }
 local V3, QN = { 0, 1, 2 }, ""                                       -- shared values; the quad's name
 local OPTS = {
 { "Quad", "quad", nums("1 2 3 4 5") },                                -- names: StickTimeLite/q<n>.txt
@@ -48,7 +48,7 @@ local OPTS = {
 { "Laps", "laps", nums("1 2 3 5 10") },
 { "Wind", "wind", V3, { "Off", "Light", "Strong" } },
 { "Prop wash", "wash", V3, { "Off", "Stock", "Max" } },
-{ "Grip", "grip", V3, { "Sim", "Medium", "High" } },
+{ "Grip", "grip", V3, { "Low", "Medium", "High" } },
 { "Vibration", "vib", { 0, 1 }, { "Off", "On" } },
 }
 local RATES = nums("70 400 35 70 350 30 100 600 50 100 500 40 150 850 45 130 700 40")
