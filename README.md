@@ -93,7 +93,7 @@ The script is ready for any frame rate: physics runs in 80 Hz substeps on the me
 
 Play at **[juricabi.github.io/sticktime](https://juricabi.github.io/sticktime/)**, or open `web/simulator.html` (one file, works offline) in Chrome, Edge or Firefox. It runs the real `.lua` files in a Lua 5.3 VM with an EdgeTX-style API, drawn pixel by pixel the way the firmware draws.
 
-- Any radio screen, color or B&W, or **PC screen** (1280×720 at 60 fps); **Fullscreen** with F.
+- Any radio screen, color or B&W, or **PC screen** (1280×720 or Full HD 1920×1080, at 60 fps); **Fullscreen** with F.
 - Fly with the keyboard (W/S throttle, A/D yaw, arrows for pitch and roll), the on-screen gimbals, or your radio as a USB joystick (**Radio / gamepad**, then map the axes).
 - **Sound**: the slider sets the volume of the beeps and the synthesized motor sound (0 is off, the
   speaker mutes and unmutes, the mouse wheel steps it). Four motors, each with its own rpm (they

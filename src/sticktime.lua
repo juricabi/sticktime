@@ -1,6 +1,6 @@
 local toolName = "TNS|@TOOLNAME@|TNE"
 --[[ ======================================================================
-  @TITLE@ v1.6.5  -  a real 3D FPV quad simulator that runs on your radio
+  @TITLE@ v1.6.6  -  a real 3D FPV quad simulator that runs on your radio
   @VARIANT@
 
   Install : @INSTALL@
@@ -1234,11 +1234,11 @@ do
       DO[j + 1] = o
     end
   end
-  -- this frame's draw order, for the next frame's depthOrder
+  -- this frame's depth order, where the next frame's depthOrder starts from
   local function keepOrder(n)
     stp = stp + 1
     for k = 1, n do
-      local key = ordN[ordP[k]]
+      local key = ordN[DO[k]]
       LPOS[key], LST[key] = k, stp
     end
     lastN = n
@@ -1731,13 +1731,14 @@ local render3D, initGfx
   end
 
   -- one side of the horizon (where c + (x-CX)*a - (y-CY)*b < 0) within the view: one rectangle
-  -- + one thin wedge triangle (filled triangles cost one call per scanline on the radio)
-  local function fillSide(a, b, c, g)
+  -- + one thin wedge triangle (filled triangles cost one call per scanline on the radio). With
+  -- e, only the wedge and e pixels of the rectangle next to it: the side along the horizon
+  local function fillSide(a, b, c, g, e)
     local x0, y0, x1, y1 = VX, VY, VX + VW, VY + VH
     local A, B = a < 0 and -a or a, b < 0 and -b or b
     if A <= B then
       if B < 1e-5 then
-        if c < 0 then fillRect(x0, y0, VW, VH, g) end
+        if c < 0 and not e then fillRect(x0, y0, VW, VH, g) end
         return
       end
       local yL, yR = CY + (c + (x0 - CX) * a) / b, CY + (c + (x1 - CX) * a) / b
@@ -1745,19 +1746,26 @@ local render3D, initGfx
       if lo > hi then lo, hi = hi, lo end
       if b > 0 then
         if lo < y1 then
-          if hi <= y0 then fillRect(x0, y0, VW, VH, g)
+          if hi <= y0 then
+            if not e then fillRect(x0, y0, VW, VH, g) end
           else
             if hi < y1 then
               local t = hi > y0 and hi or y0
-              fillRect(x0, t, VW, y1 - t + 1, g)
+              local h = y1 - t + 1
+              fillRect(x0, t, VW, e and e < h and e or h, g)
             end
             if yL < yR then fillTri(x0, yL, x1, yR, x0, yR, g) else fillTri(x0, yL, x1, yR, x1, yL, g) end
           end
         end
       elseif hi > y0 then
-        if lo >= y1 then fillRect(x0, y0, VW, VH, g)
+        if lo >= y1 then
+          if not e then fillRect(x0, y0, VW, VH, g) end
         else
-          if lo > y0 then fillRect(x0, y0, VW, (lo < y1 and lo or y1) - y0 + 1, g) end
+          if lo > y0 then
+            local h = (lo < y1 and lo or y1) - y0 + 1
+            local s = e and e < h and h - e or 0
+            fillRect(x0, y0 + s, VW, h - s, g)
+          end
           if yL > yR then fillTri(x0, yL, x1, yR, x0, yR, g) else fillTri(x0, yL, x1, yR, x1, yL, g) end
         end
       end
@@ -1767,18 +1775,25 @@ local render3D, initGfx
       if lo > hi then lo, hi = hi, lo end
       if a > 0 then
         if hi > x0 then
-          if lo >= x1 then fillRect(x0, y0, VW, VH, g)
+          if lo >= x1 then
+            if not e then fillRect(x0, y0, VW, VH, g) end
           else
-            if lo > x0 then fillRect(x0, y0, (lo < x1 and lo or x1) - x0 + 1, VH, g) end
+            if lo > x0 then
+              local w = (lo < x1 and lo or x1) - x0 + 1
+              local s = e and e < w and w - e or 0
+              fillRect(x0 + s, y0, w - s, VH, g)
+            end
             if xT < xB then fillTri(xT, y0, xB, y1, xT, y1, g) else fillTri(xT, y0, xB, y1, xB, y0, g) end
           end
         end
       elseif lo < x1 then
-        if hi <= x0 then fillRect(x0, y0, VW, VH, g)
+        if hi <= x0 then
+          if not e then fillRect(x0, y0, VW, VH, g) end
         else
           if hi < x1 then
             local t = hi > x0 and hi or x0
-            fillRect(t, y0, x1 - t + 1, VH, g)
+            local w = x1 - t + 1
+            fillRect(t, y0, e and e < w and e or w, VH, g)
           end
           if xT > xB then fillTri(xT, y0, xB, y1, xT, y1, g) else fillTri(xT, y0, xB, y1, xB, y0, g) end
         end
@@ -1788,7 +1803,9 @@ local render3D, initGfx
 
   -- sky, ground and the mountains between them, every pixel painted about once: lcd.clear()
   -- paints the larger of sky and ground (and comes first in the frame, so firmware that keeps
-  -- the last frame need not copy it), then only the other side is filled
+  -- the last frame need not copy it), then only the other side is filled. The ground goes
+  -- over the mountains' bases and the sky's edge (a pixel past the horizon): with the sky
+  -- larger in the usual order, with the ground larger again along the horizon
   local function drawGround()
     local a, b, c = kry, kuy, F * kfy      -- ground where c + (x-CX)*a - (y-CY)*b < 0
     local x0, y0, x1, y1 = VX, VY, VX + VW, VY + VH
@@ -1806,11 +1823,13 @@ local render3D, initGfx
     if f > 0.5 then
       lcd.clear(cGround)
       fillSide(-a, -b, -c, cSky)
+      drawMountains()
+      fillSide(a, b, c, cGround, 2)
     else
       lcd.clear(cSky)
+      drawMountains()
       fillSide(a, b, c, cGround)
     end
-    drawMountains()
     local hx0, hy0, hx1, hy1
     if A <= B then
       if B < 1e-5 then return end
