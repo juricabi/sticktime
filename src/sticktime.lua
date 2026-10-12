@@ -46,10 +46,10 @@ local focus, scroll, editing = 1, 0, false     -- menus: focused row, list scrol
 
 -- ------------------------------------------------------------ settings
 local S = { track = 1, quad = 1, twr = 0, mode = 1, rates = 2, rc = 100, rm = 600, re = 50, yc = 100, ym = 500, ye = 40,
-            tilt = @TILT@, fov = @FOV@, laps = 3, ai = 2, skill = 2, wind = 0, wash = 0, vib = 1, map = 1, sticks = 0, fps = 0 }
+            tilt = @TILT@, fov = @FOV@, laps = 3, ai = 2, skill = 2, wind = 0, wash = 0, grip = 0, vib = 1, map = 1, sticks = 0, fps = 0 }
 -- rows: label, key, then either a value list (+ names, suffix) or nil, nil, suffix, min, max, step
 local OPTS = {
-  { "Quad", "quad", { 1, 2, 3, 4 }, { 'Racer 5"', 'Freestyle 5"', '3" toothpick', 'Whoop 65mm' } },
+  { "Quad", "quad", { 1, 2, 3, 4, 5 }, { 'Racer 5"', 'Freestyle 5"', '3" toothpick', 'Whoop 65mm', 'Whoop 75mm' } },
   { "Power", "twr", { 0, 3, 4, 5, 6, 7, 8, 10, 12 }, { "Stock", "3:1", "4:1", "5:1", "6:1", "7:1", "8:1", "10:1", "12:1" } },
   { "Flight mode", "mode", { 1, 2 }, { "Acro", "Angle" } },
   { "Rates", "rates", { 1, 2, 3, 4 }, { "Soft", "Normal", "Fast", "Custom" } },
@@ -66,6 +66,7 @@ local OPTS = {
   { "AI skill", "skill", { 1, 2, 3 }, { "Easy", "Medium", "Hard" } },
   { "Wind", "wind", { 0, 1, 2 }, { "Off", "Light", "Strong" } },
   { "Prop wash", "wash", { 0, 1, 2 }, { "Off", "Stock", "Max" } },
+  { "Grip", "grip", { 0, 1, 2 }, { "Sim", "Medium", "High" } },
   { "Vibration", "vib", { 0, 1 }, { "Off", "On" } },
 --#if COLOR
   { "Minimap", "map", { 0, 1 }, { "Off", "On" } },
@@ -76,7 +77,7 @@ local OPTS = {
 -- Betaflight "actual" rate presets: roll/pitch center, max (deg/s), expo %, then yaw
 local RATES = { { 70, 400, 35, 70, 350, 30 }, { 100, 600, 50, 100, 500, 40 }, { 150, 850, 45, 130, 700, 40 } }
 local RKEYS = { rc = 1, rm = 2, re = 3, yc = 4, ym = 5, ye = 6 }
--- quad profiles (Racer 5", Freestyle 5", 3" toothpick, Whoop 65mm), each fitted to a detailed model
+-- quad profiles (Racer 5", Freestyle 5", 3" toothpick, Whoop 65mm, Whoop 75mm), each fitted to a detailed model
 -- of that class (blade-element props on rpm-governed motors, a Betaflight-style PID loop; see
 -- docs/flight-model.md). twr stock thrust/weight; thrust curve: i0 idle, tn exponent, dz bottom dead
 -- zone; vp, vc, vk climbing: prop pitch speed (m/s), throttle exponent and bend of the inflow loss; tl, vt
@@ -87,15 +88,17 @@ local RKEYS = { rc = 1, rm = 2, re = 3, yc = 4, ym = 5, ye = 6 }
 -- speed where the loss has faded out (m/s); wls/wvs/pws the same at the class's Stock setting; sq, cq,
 -- ce, se, rf descending: the cushion peaks at cq (less by ce near full stick) at a sink of sq*tf^se m/s,
 -- then stalls down to rf; pf the prop wash shake's frequency (Hz); tlo, thi the Power settings that
--- suit the class (thrust/weight of real quads of its kind; Stock is always there).
+-- suit the class (thrust/weight of real quads of its kind; Stock is always there); kh rotor drag at
+-- Grip High (1/s, times sqrt(Tm/5g + 0.02); Medium 0.4 of it, Sim none, as in the reference).
 -- One string per class (parsed for the class in use only: tables of numbers cost radio memory):
-local QK = { "twr", "i0", "tn", "dz", "vp", "vk", "tl", "vt", "te", "ks", "kf", "ku", "er", "vd", "lr", "gg", "gl", "gw", "tm", "tr", "ty", "pw", "wl", "wv", "sq", "cq", "wls", "wvs", "pws", "vc", "ta", "ce", "se", "rf", "pf", "tlo", "thi" }
+local QK = { "twr", "i0", "tn", "dz", "vp", "vk", "tl", "vt", "te", "ks", "kf", "ku", "er", "vd", "lr", "gg", "gl", "gw", "tm", "tr", "ty", "pw", "wl", "wv", "sq", "cq", "wls", "wvs", "pws", "vc", "ta", "ce", "se", "rf", "pf", "tlo", "thi", "kh" }
 local QP = {
-  -- twr i0 tn dz vp vk tl vt te ks kf ku er vd lr gg gl gw tm tr ty pw wl wv sq cq wls wvs pws vc ta ce se rf pf tlo thi
-  "7.67 .0315 2.16 0 77.4 .101 .854 8.6 .402 .0152 .00819 .0287 .357 15 .229 .24 .25 .113 .006 .009 .02 .347 .326 6.01 15.5 1.35 .119 3.8 .19 .584 35.1 .544 .579 .756 26 5 12",  -- Racer 5": 0.49 kg, 2500KV, 5045 tri-blade
-  "6.88 .026 1.52 .08 75.5 -.283 .685 9.14 .514 .011 .00635 .0184 .357 15 .257 .26 .25 .113 .006 .008 .02 .347 .348 7 13.5 1.39 .132 4.56 .19 .524 90.5 .722 .497 .722 24 4 10",  -- Freestyle 5": HD, 0.66 kg, 2400KV, 5045
-  "5.35 .0221 1.72 .03 67.6 -.77 1.01 9.33 0 .0176 .0167 .0417 .5 15 .1 .44 .15 .135 .006 .009 .02 .42 .291 7.04 15.5 1.61 .103 5.17 .23 .681 12.2 .21 .525 .881 35 3 10",        -- 3" toothpick: 0.11 kg, 3S, 5000KV, 76 mm
-  "2.58 .0059 .9 .11 72.9 -1 1.14 9.97 .019 .0741 .07 .0875 .286 7 0 .17 .0625 .0344 .006 .02 .02 .854 .237 5.61 9.08 1.37 .0243 2.5 .27 .891 23.6 .174 .557 .9 45 3 8",          -- Whoop 65mm: ducted 1S, 24 g, 28000KV, 31 mm
+  -- twr i0 tn dz vp vk tl vt te ks kf ku er vd lr gg gl gw tm tr ty pw wl wv sq cq wls wvs pws vc ta ce se rf pf tlo thi kh
+  "7.67 .0315 2.16 0 77.4 .101 .854 8.6 .402 .0152 .00819 .0287 .357 15 .229 .24 .25 .113 .006 .009 .02 .347 .326 6.01 15.5 1.35 .119 3.8 .19 .584 35.1 .544 .579 .756 26 5 12 .363",  -- Racer 5": 0.49 kg, 2500KV, 5045 tri-blade
+  "6.88 .026 1.52 .08 75.5 -.283 .685 9.14 .514 .011 .00635 .0184 .357 15 .257 .26 .25 .113 .006 .008 .02 .347 .348 7 13.5 1.39 .132 4.56 .19 .524 90.5 .722 .497 .722 24 4 10 .263",  -- Freestyle 5": HD, 0.66 kg, 2400KV, 5045
+  "5.35 .0221 1.72 .03 67.6 -.77 1.01 9.33 0 .0176 .0167 .0417 .5 15 .1 .44 .15 .135 .006 .009 .02 .42 .291 7.04 15.5 1.61 .103 5.17 .23 .681 12.2 .21 .525 .881 35 3 10 .433",        -- 3" toothpick: 0.11 kg, 3S, 5000KV, 76 mm
+  "2.58 .0059 .9 .11 72.9 -1 1.14 9.97 .019 .0741 .07 .0875 .286 7 0 .17 .0625 .0344 .006 .02 .02 .854 .237 5.61 9.08 1.37 .0243 2.5 .27 .891 23.6 .174 .557 .9 45 3 8 1.59",          -- Whoop 65mm: ducted 1S, 24 g, 28000KV, 31 mm
+  "3.54 .0198 .84 .11 74.5 -1 1.11 9.17 0 .0962 .0822 .0288 .556 15 .4 .19 .08 .036 .006 .016 .02 .456 .285 5.61 14.1 1.12 .0949 3.63 .25 .826 29 -1 .474 .454 40 3 8 2.38",           -- Whoop 75mm: ducted 2S, 47 g, 12000KV, 4-blade 40 mm
 }
 
 -- -------------------------------------------------------------- tracks
@@ -720,6 +723,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     local VP, VK, VC, KS, KF, KU = P.vp, P.vk, P.vc, P.ks, P.kf, P.ku
     local TL, VT2, TE, TA, ER, VD, LR, GG, GL, GW = P.tl, P.vt * P.vt, P.te, P.ta, P.er, P.vd, P.lr, P.gg, P.gl, P.gw
     local SQ, CQ, CE, SE, RF = P.sq, P.cq, P.ce, P.se, P.rf
+    local KH = (P.kh or 0) * (S.grip == 2 and 1 or S.grip == 1 and 0.4 or 0)
     local x0, x1, z0, z1 = TR.x0 - 160, TR.x1 + 160, TR.z0 - 160, TR.z1 + 160
     local bx0, bx1, by0, by1, bz0, bz1 = BX.x0, BX.x1, BX.y0, BX.y1, BX.z0, BX.z1
     -- broad phase once per frame: only objects within reach get tested per substep
@@ -828,6 +832,12 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
           q = q * sn / v
           ar, af = ar + q * vr, af + q * vf
         end
+      end
+      -- rotor drag (the Grip setting; the reference model has none: Sim): props moving edgewise are
+      -- pushed back, harder the faster they spin (~ sqrt of the thrust)
+      if KH > 0 then
+        local k = KH * sqrt(Tm * 0.0186 + 0.02)            -- 0.0186 = 1 / (5 G)
+        ar, af = ar - k * vr, af - k * vf
       end
       vx = vx + (ux * au + rx * ar + fx * af) * h
       vy = vy + (uy * au + ry * ar + fy * af - G) * h

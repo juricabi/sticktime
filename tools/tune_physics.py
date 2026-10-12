@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Steady-state check of the quad classes in src/sticktime.lua (read from its QP strings).
-Usage: tools/tune_physics.py [class number 1-4] [key=value ...]   e.g. tools/tune_physics.py 1 vp=60
+Usage: tools/tune_physics.py [class number 1-5] [key=value ...]   e.g. tools/tune_physics.py 1 vp=60 grip=2
 
 Model (mass-normalised, body axes r/u/f; the same steps as physics() in src/sticktime.lua):
   T   = Tmax*(i0 + (1-i0)*x^tn),  x = max(0, (thr-dz)/(1-dz))      stick -> thrust, lagged with tm
@@ -78,6 +78,12 @@ def accel(p, Tm, vu, vr, vf):
             au -= q * c2
             ar += q * sn * vr / v
             af += q * sn * vf / v
+    # rotor drag (the Grip setting, grip=0/1/2 on the command line: Sim / Medium / High)
+    kh = p.get("kh", 0.0) * (0.0, 0.4, 1.0)[int(p.get("grip", 0))]
+    if kh > 0:
+        k = kh * math.sqrt(Tm * 0.0186 + 0.02)
+        ar -= k * vr
+        af -= k * vf
     return au, ar, af
 
 

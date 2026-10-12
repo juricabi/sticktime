@@ -129,6 +129,7 @@
     { rpm: 31679, blades: 3, poles: 7, buzz: 0.9, whine: 0.16, shaft: 0.12, noise: 0.5, wave: 0 },  // 5" freestyle
     { rpm: 36301, blades: 3, poles: 7, buzz: 0.8, whine: 0.18, shaft: 0.1, noise: 0.5, wave: 0 },   // 3" toothpick
     { rpm: 56381, blades: 3, poles: 7, buzz: 0.4, whine: 0.4, shaft: 0.05, noise: 0.4, wave: 1 },   // 65 mm whoop
+    { rpm: 46605, blades: 4, poles: 7, buzz: 0.5, whine: 0.32, shaft: 0.06, noise: 0.4, wave: 1 },  // 75 mm whoop (2S)
   ];
   // blade-pass harmonics: a prop's tone, and the whoop's buzz (from the recordings' spectra)
   const WAVES = [[0, 1, 0.2, 0.08, 0.06, 0.04, 0.02], [0, 1, 0.8, 0.6, 0.35, 0.3, 0.15]];
@@ -275,7 +276,7 @@
     let a = null;
     if (app.engine && !app.engine.error) { try { a = app.engine.callTest('audio'); } catch (e) { /* hook absent */ } }
     const live = a && a.length >= 10;
-    const c = live ? ACLASS[Math.max(1, Math.min(4, a[1] | 0)) - 1] : ACLASS[0];
+    const c = live ? ACLASS[Math.max(1, Math.min(ACLASS.length, a[1] | 0)) - 1] : ACLASS[0];
     if (c.wave !== synth.wave) {
       synth.wave = c.wave;
       synth.motors.forEach((m) => { m.buzz.setPeriodicWave(synth.waves[c.wave]); m.buzz2.setPeriodicWave(synth.waves[c.wave]); });

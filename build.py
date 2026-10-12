@@ -174,18 +174,24 @@ def lite_tracks(cfg: dict):
     print(f"sdcard/SCRIPTS/TOOLS/StickTimeLite/t1-{len(names)}.txt: {len(names)} tracks")
 
 
-def lite_quads():
-    """The quad classes for the Lite: StickTimeLite/q<n>.txt, one line of numbers each, straight from
-    the QP strings of src/sticktime.lua (the Lite reads the one in use, so they cost it no memory)."""
+def lite_quads(cfg: dict):
+    """The quad classes for the Lite: StickTimeLite/q<n>.txt, the class's numbers on one line and its
+    name on the next, straight from the QP strings and the Quad menu of src/sticktime.lua (the Lite
+    reads the one in use, so they cost it no memory)."""
     src = (ROOT / "src" / "sticktime.lua").read_text(encoding="utf-8")
     block = src[src.index("local QP = {"):]
     block = block[:block.index("\n}")]
     rows = re.findall(r'^\s*"([0-9.\- e]+)",', block, re.M)
     assert rows, "no QP strings in src/sticktime.lua"
-    for n, row in enumerate(rows, 1):
+    menu = re.search(r'\{ "Quad", "quad", \{[^}]*\}, \{([^}]*)\} \}', src).group(1)
+    names = re.findall(r"'([^']*)'", menu)
+    assert len(names) == len(rows), "the Quad menu and the QP strings disagree"
+    for n, (row, name) in enumerate(zip(rows, names), 1):
         # the Lite reads at most 300 bytes of a class file (io.read(f, 300))
-        assert len(row) < 300, f"Lite class {n}: {len(row)} bytes, the Lite reads at most 299"
-        (OUT / "StickTimeLite" / f"q{n}.txt").write_text(row + "\n", encoding="utf-8")
+        data = row + "\n" + name + "\n"
+        assert len(data) < 300, f"Lite class {n}: {len(data)} bytes, the Lite reads at most 299"
+        (OUT / "StickTimeLite" / f"q{n}.txt").write_text(data, encoding="utf-8")
+    cfg["QUADS"] = " ".join(str(n) for n in range(1, len(rows) + 1))
     print(f"sdcard/SCRIPTS/TOOLS/StickTimeLite/q1-{len(rows)}.txt: {len(rows)} quad classes")
 
 
@@ -193,7 +199,7 @@ def main():
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "StickTimeLite").mkdir(exist_ok=True)
     lite_tracks(VARIANTS["LITE"])
-    lite_quads()
+    lite_quads(VARIANTS["LITE"])
     for variant, cfg in VARIANTS.items():
         text = build(variant, cfg, strip=cfg.get("strip", False))
         path = OUT / cfg["file"]

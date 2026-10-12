@@ -231,7 +231,7 @@ local function idleSticks() sticks.ail, sticks.ele, sticks.rud, sticks.thr = 0, 
 
 -- ------------------------------------------------------------ scenarios
 -- 1. menus: walk every item, open settings, change every option both ways
-local OPTN = GAME_COLOR and 21 or 19
+local OPTN = GAME_COLOR and 22 or 20
 steps(20)
 for i = 1, 9 do frame(EVT_VIRTUAL_NEXT) frame(0) end
 for i = 1, 9 do frame(EVT_VIRTUAL_PREV) frame(0) end

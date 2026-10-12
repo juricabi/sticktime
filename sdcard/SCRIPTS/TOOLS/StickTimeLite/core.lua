@@ -37,16 +37,18 @@ end
 end
 return t
 end
-local S = { track = 1, quad = 1, twr = 0, mode = 1, rates = 2, tilt = 20, laps = 3, wind = 0, wash = 0, vib = 1 }
+local S = { track = 1, quad = 1, twr = 0, mode = 1, rates = 2, tilt = 20, laps = 3, wind = 0, wash = 0, grip = 0, vib = 1 }
+local V3, QN = { 0, 1, 2 }, ""                                       -- shared values; the quad's name
 local OPTS = {
-{ "Quad", "quad", { 1, 2, 3, 4 }, { 'Racer 5"', 'Freestyle 5"', '3" toothpick', 'Whoop 65mm' } },
+{ "Quad", "quad", nums("1 2 3 4 5") },                                -- names: StickTimeLite/q<n>.txt
 { "Power", "twr", nums("0 3 4 5 6 7 8 10 12"), ":1" },                -- 0: Stock
 { "Flight mode", "mode", { 1, 2 }, { "Acro", "Angle" } },
 { "Rates", "rates", { 1, 2, 3 }, { "Soft", "Normal", "Fast" } },
 { "Camera tilt", "tilt", nums("0 10 15 20 25 30 35 40 50") },
 { "Laps", "laps", nums("1 2 3 5 10") },
-{ "Wind", "wind", { 0, 1, 2 }, { "Off", "Light", "Strong" } },
-{ "Prop wash", "wash", { 0, 1, 2 }, { "Off", "Stock", "Max" } },
+{ "Wind", "wind", V3, { "Off", "Light", "Strong" } },
+{ "Prop wash", "wash", V3, { "Off", "Stock", "Max" } },
+{ "Grip", "grip", V3, { "Sim", "Medium", "High" } },
 { "Vibration", "vib", { 0, 1 }, { "Off", "On" } },
 }
 local RATES = nums("70 400 35 70 350 30 100 600 50 100 500 40 150 850 45 130 700 40")
@@ -227,6 +229,7 @@ for i = 1, 6 do P[i] = RATES[r + i] end
 local f = io.open("/SCRIPTS/TOOLS/StickTimeLite/q" .. S.quad .. ".txt", "r")
 local s, i = f and io.read(f, 300) or "", 6
 if f then io.close(f) end
+QN = string.match(s, "\n([^\r\n]+)") or ""                        -- (its words parse as nothing)
 for v in string.gmatch(s, "%S+") do
 i = i + 1
 P[i] = tonumber(v)
@@ -448,6 +451,7 @@ local VP, VK, TL, VT2, TE, VC, TA = P[11], P[12], P[13], P[14] * P[14], P[15], P
 local KS, KF, KU, ER, VD, LR = P[16], P[17], P[18], P[19], P[20], P[21]
 local GG, GL, GEW, SQ, CQ = P[22], P[23], P[24], P[31], P[32]                     -- GEW: not GW (gate widths)
 local CE, SE, RF = P[38], P[39], P[40]
+local KH = P[44] * (S.grip > 1 and 1 or S.grip * 0.4)                       -- Grip: rotor drag
 local fl = 0
 for i = 1, NB do
 if px > bx0[i] and px < bx1[i] and pz > bz0[i] and pz < bz1[i] and py > by1[i] and by1[i] > fl then fl = by1[i] end
@@ -527,6 +531,8 @@ q = q * sn / v
 ar, af = ar + q * vr, af + q * vf
 end
 end
+local k = KH * sqrt(Tm * 0.0186 + 0.02)         -- rotor drag (Grip): edgewise, ~ sqrt of the thrust
+ar, af = ar - k * vr, af - k * vf
 vx = vx + (ux * au + rx * ar + fx * af) * h
 vy = vy + (uy * au + ry * ar + fy * af - G) * h
 vz = vz + (uz * au + rz * ar + fz * af) * h
@@ -744,7 +750,7 @@ if v then v = v < 1 and "--" or i < 3 and timeStr(v) or v .. "" end
 if i == 5 then l = editing and "< " .. TRACKS[t] .. " >" or "Track: " .. TRACKS[t] end
 elseif o then
 local j = optIdx(o)
-v = type(o[4]) == "table" and o[4][j] or o[3][j] == 0 and o[4] == ":1" and "Stock" or o[3][j] .. (o[4] or "")
+v = i == 1 and QN or type(o[4]) == "table" and o[4][j] or o[3][j] == 0 and o[4] == ":1" and "Stock" or o[3][j] .. (o[4] or "")
 end
 drawText(2 * U, y, l, SML + ((editing and state == 2) and 0 or f))
 if v then drawText(XM - U, y, v, SML + RIGHT + ((editing and state == 2) and f or 0)) end

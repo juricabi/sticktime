@@ -41,7 +41,7 @@ local buzz = 0
 function playHaptic() buzz = buzz + 1 end
 -- the SD card: the track files from the repository, then what the script writes
 local SD = {}
-for _, n in ipairs({ "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9", "q1", "q2", "q3", "q4" }) do
+for _, n in ipairs({ "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9", "q1", "q2", "q3", "q4", "q5" }) do
   local fh = io.open("../sdcard/SCRIPTS/TOOLS/StickTimeLite/" .. n .. ".txt", "r")
   if fh then SD["/SCRIPTS/TOOLS/StickTimeLite/" .. n .. ".txt"] = fh:read("*a") fh:close() end
 end
@@ -182,7 +182,7 @@ frame(EVT_VIRTUAL_ENTER)
 if state() ~= SETUP then fail("settings did not open") end
 local before = {}
 for k, v in pairs(T.S) do before[k] = v end
-for i = 1, 9 do                                        -- the nine settings rows, then Back
+for i = 1, 10 do                                       -- the ten settings rows, then Back
   frame(EVT_VIRTUAL_ENTER)
   frame(EVT_VIRTUAL_INC) frame(0)
   frame(EVT_VIRTUAL_DEC) frame(EVT_VIRTUAL_DEC) frame(0)
