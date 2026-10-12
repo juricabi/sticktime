@@ -51,7 +51,8 @@ end
 -- settings: label, key, values, names or suffix
 local S = { track = 1, quad = 1, twr = 0, mode = 1, rates = 2, tilt = 20, laps = 3, wind = 0, wash = 0, vib = 1 }
 local OPTS = {
-  { "Quad", "quad", { 1, 2, 3, 4 }, { 'Racer 5"', 'Freestyle 5"', '3" toothpick', 'Whoop 65mm' } },
+  { "Quad", "quad", nums("1 2 3 4 5 6 7 8 9 10 11"), { '5" Freestyle', '5" Light', '5" Heavy', '5" Chonker', '5" Racer',
+    '5" Beginner', '3.5" Quad', '2.5" Analog', '2.5" HD', '85mm Whoop', '65mm Whoop' } },
   { "Power", "twr", nums("0 3 4 5 6 7 8 10 12"), ":1" },                -- 0: Stock
   { "Flight mode", "mode", { 1, 2 }, { "Acro", "Angle" } },
   { "Rates", "rates", { 1, 2, 3 }, { "Soft", "Normal", "Fast" } },
@@ -63,9 +64,9 @@ local OPTS = {
 }
 -- Betaflight "actual" rates: roll/pitch center, max (deg/s), expo %, then yaw (Soft, Normal, Fast)
 local RATES = nums("70 400 35 70 350 30 100 600 50 100 500 40 150 850 45 130 700 40")
--- the quad classes: one line of numbers each in StickTimeLite/q<class>.txt (made by build.py from
--- the color game's QP), read when the class is picked. Order: twr i0 tn dz vp vk tl vt te ks kf
--- ku er vd lr gg gl gw tm tr ty pw wl wv sq cq wls wvs pws vc ta ce se rf pf tlo thi (P[7]..P[43])
+-- the quad presets: one line of numbers each in StickTimeLite/q<preset>.txt (made by build.py from
+-- the color game's QP), read when the preset is picked. Order: twr top kx ky kz cd tr ty snd pw wl
+-- wv wls wvs pws pf tlo thi (P[7]..P[24])
 
 -- tracks: the names; each track's gates and structures are in StickTimeLite/t<number>.txt (made
 -- by build.py from src/sticktime_lite_tracks.txt) and only read when the track is picked
@@ -254,7 +255,7 @@ end
 local px, py, pz, vx, vy, vz = 0, DR, 0, 0, 0, 0                      -- position, velocity (m, m/s)
 local rx, ry, rz, ux, uy, uz, fx, fy, fz = 1, 0, 0, 0, 1, 0, 0, 0, 1   -- right, up, forward
 local sA, sE, sT, sR, speed = 0, 0, 0, 0, 0
-local wr0, wp0, wy0, Tm, grounded = 0, 0, 0, 0, true                  -- body rates (rad/s), thrust
+local wr0, wp0, wy0, Rm, grounded = 0, 0, 0, 0, true                  -- body rates (rad/s), rpm (of full)
 local sW = 0                                                          -- prop wash build-up
 --#if TEST
 local aTf, aVu, aE2, aW = 0, 0, 0, 0                                  -- sound state for the web emulator
@@ -281,9 +282,9 @@ local function apply()
     i = i + 1
     P[i] = tonumber(v)
   end
-  if S.twr > 0 and (S.twr < P[42] or S.twr > P[43]) then S.twr = 0 end -- not for this class: Stock
+  if S.twr > 0 and (S.twr < P[23] or S.twr > P[24]) then S.twr = 0 end -- not for this quad: Stock
   if S.twr > 0 then P[7] = S.twr end                                   -- 0: the class's stock power
-  if S.wash == 1 then P[29], P[30] = P[33], P[34] end                  -- Stock: the class's own wash
+  if S.wash == 1 then P[17], P[18] = P[19], P[20] end                  -- Stock: the class's own wash
   local t = S.tilt * 0.0174533
   tc, ts = cos(t), sin(t)
   F = CX / 1.19                                                        -- 100 deg field of view
@@ -323,7 +324,7 @@ local function place(x, y, z, hx, hz)
   hx, hz = hx / l, hz / l
   px, py, pz, vx, vy, vz = x, y, z, 0, 0, 0
   fx, fy, fz, rx, ry, rz, ux, uy, uz = hx, 0, hz, hz, 0, -hx, 0, 1, 0
-  grounded, speed, Tm, wr0, wp0, wy0, sW = y <= DR + 0.01, 0, 0, 0, 0, 0, 0
+  grounded, speed, Rm, wr0, wp0, wy0, sW = y <= DR + 0.01, 0, 0, 0, 0, 0, 0
   for i = 1, NG do
     gd[i] = (px - gx[i]) * gnx[i] + (py - gy[i]) * gny[i] + (pz - gz[i]) * gnz[i]
   end
@@ -466,12 +467,33 @@ local function gatePassed(i, fwd)
   lapStart = gt
 end
 
-local physics
+local physics, stickFor
 do
 local nearG, nearP = {}, {}
+local G, IDLE = 9.8, 0.0386                                        -- idle: 1 200 of 31 080 rpm
+-- the motor curve: thrust per rpm rises steeply at low rpm (10 points, 1% buckets)
+local RC = nums("0.1 0.4 0.5 0.6 0.7 0.79 0.84 0.9 0.95 1")
+local function rpmCurve(f)
+  local b = floor(f * 100)
+  if b > 98 then return 1 elseif b < 0 then b = 0 end
+  local i, j = floor(b / 11) + 1, b % 11
+  return j == 10 and RC[i + 1] or RC[i] + (RC[i + 1] - RC[i]) * j * 0.1
+end
+-- static thrust (of the full) at a stick, and the stick for a thrust (tests)
+local function thrustAt(t)
+  if t < IDLE then t = IDLE end
+  return t * rpmCurve(t)
+end
+stickFor = function(f)
+  local lo, hi = 0, 1
+  for _ = 1, 20 do
+    local m = (lo + hi) * 0.5
+    if thrustAt(m) < f then lo = m else hi = m end
+  end
+  return hi
+end
 -- returns true on a crash
 physics = function(dt)
-  local G = 10.78                            -- 1.1 g: a heavier, more planted feel
   local Tmax, wr, wp = P[7] * G, 0, 0
   if S.mode == 2 then
     -- angle mode: steer the up vector towards the stick tilt (45 deg at full stick)
@@ -485,9 +507,7 @@ physics = function(dt)
     wr, wp = rate(sA, P[1], P[2], P[3]), -rate(sE, P[1], P[2], P[3])
   end
   local wy = rate(sR, P[4], P[5], P[6])
-  local x = (sT - P[10]) / (1 - P[10])                         -- the class curve: bottom dead zone,
-  if x < 0 then x = 0 end                                       -- idle, then thrust ~ rpm^2
-  local T = Tmax * (P[8] + (1 - P[8]) * x ^ P[9])
+  local T = Tmax * thrustAt(sT)                                 -- the thrust the stick asks for
   -- prop wash (setting): sinking into your own downwash costs thrust (Stock: the class's own
   -- dose, Max: full). No shake here: at its real size (tenths of a degree) it is under a pixel on
   -- these screens, and this radio has no memory to spare
@@ -500,9 +520,9 @@ physics = function(dt)
       if k > 1 then k = 1 end
       sW = sW + (1 / (1 + sqrt(vr0 * vr0 + vf0 * vf0)) - sW) * k
       if vu0 < -0.6 then
-        local f = (P[30] + vu0) / (P[30] - 2)
+        local f = (P[18] + vu0) / (P[18] - 2)
         if f > 1 then f = 1 elseif f < 0 then f = 0 end
-        wl = P[29] * sW * f
+        wl = P[17] * sW * f
       end
     end
   end
@@ -520,16 +540,7 @@ physics = function(dt)
   end
   local n = floor(dt * 80) + 1
   local h = dt / n
-  local km, kr, ky = h / (P[25] + h), h / (P[26] + h), h / (P[27] + h)
-  local VP, VK, TL, VT2, TE, VC, TA = P[11], P[12], P[13], P[14] * P[14], P[15], P[36], P[37]
-  local KS, KF, KU, ER, VD, LR = P[16], P[17], P[18], P[19], P[20], P[21]
-  local GG, GL, GEW, SQ, CQ = P[22], P[23], P[24], P[31], P[32]                     -- GEW: not GW (gate widths)
-  local CE, SE, RF = P[38], P[39], P[40]
-  -- the surface under the quad, for ground effect: the ground, or the top of a structure
-  local fl = 0
-  for i = 1, NB do
-    if px > bx0[i] and px < bx1[i] and pz > bz0[i] and pz < bz1[i] and py > by1[i] and by1[i] > fl then fl = by1[i] end
-  end
+  local kr, ky, RS, KS, KU, KF, CD = h / (P[13] + h), h / (P[14] + h), 5.47 * h, P[9], P[10], P[11], P[12]
   -- broad phase once per frame (flags: their zone reaches 12 m from the center)
   local reach, ng, np = speed * dt + 7, 0, 0
   for i = 1, NG do
@@ -549,75 +560,32 @@ physics = function(dt)
     end
   end
   for _ = 1, n do
-    Tm = Tm + (T - Tm) * km
+    -- motors: rpm (of full) follows the stick, not below idle, at up to 170 000 rpm/s; each axis
+    -- lagging its rate by 120 deg/s or more adds a third of full rpm (snaps add thrust)
+    local er, ep, ey = wr - wr0, wp - wp0, wy - wy0
+    er, ep, ey = er < 0 and -er or er, ep < 0 and -ep or ep, ey < 0 and -ey or ey
+    local d = (sT > IDLE and sT or IDLE) + ((er > 2.094 and 2.094 or er) + (ep > 2.094 and 2.094 or ep)
+      + (ey > 2.094 and 2.094 or ey)) * 0.1592 - Rm
+    Rm = Rm + (d > RS and RS or d < -RS and -RS or d)
     wr0, wp0, wy0 = wr0 + (wr - wr0) * kr, wp0 + (wp - wp0) * kr, wy0 + (wy - wy0) * ky
     rotate(wr0 * h, wp0 * h, wy0 * h)
     -- air-relative velocity in body axes
     local ax_, az_ = vx - wx, vz - wz
     local vu, vr, vf = ax_ * ux + vy * uy + az_ * uz, ax_ * rx + vy * ry + az_ * rz, ax_ * fx + vy * fy + az_ * fz
-    -- props lose thrust as the air through them speeds up (climbing) and gain thrust sinking,
-    -- until the blades stall in a fast drop
-    local tf = Tm / Tmax                              -- thrust fraction
-    local Ta
-    if vu < 0 then
-      -- descending: a cushion that rises to cq at a sink of sq*tf^se, then stalls away (to rf)
-      local x = 9
-      if tf > 0.001 then x = -vu / (SQ * tf ^ SE) end
-      local r = 1 + (CQ - 1) * (1 - CE * tf) * (2 * x - x * x)
-      if r < RF then r = RF end
-      Ta = Tm * r
-    else
-      if Tm > 0 then                                -- the loss grows with thrust as Tm*(Tmax/Tm)^VC
-        local den = VP + vu * VK                    -- and bends with VK as the inflow grows
-        if den < VP * 0.3 then den = VP * 0.3 end
-        Ta = Tm - vu * Tm * (Tmax / Tm) ^ VC / den
-      else
-        Ta = 0
-      end
-      if Ta < 0 then Ta = 0 end
+    -- thrust: rpm times the motor curve, less as air comes through the props climbing (half at top)
+    local Ta = Tmax * Rm * rpmCurve(Rm) * (1 - wl)
+    if vu > 0 then
+      local b = floor(vu / P[8] * 100)
+      Ta = Ta * (1 - 0.005 * (b > 99 and 99 or b))
     end
-    Ta = Ta * (1 - wl)
-    -- translational lift: edgewise the props reach fresh air; it fades near full stick (te) and
-    -- with axial inflow (ta)
-    local e2 = vr * vr + vf * vf
-    local t2 = tf * tf
-    local fa = 1 - TE * t2 * t2
-    if fa < 0 then fa = 0 end
-    if vu > 0 then fa = fa / (1 + vu / TA) end
-    Ta = Ta * (1 + TL * fa * e2 / (e2 + VT2))
-    -- ground effect: within a twentieth of the prop diameter of the ground or a roof
-    if uy > 0.3 then
-      local d = (py - fl - DR) / uy + 0.03
-      if d < GL then
-        local k = (GL - d) / GEW
-        if k > 1 then k = 1 end
-        Ta = Ta * (1 + GG * k / (1 + e2 * 0.0125))
-      end
-    end
-    -- body drag along the flow (each face weighted by the flow through it), more at low speed
-    local au, ar, af = Ta, 0, 0
-    local v2 = vu * vu + e2
-    if v2 > 1e-4 then
-      local v = sqrt(v2)
-      local S_ = KS * (vr < 0 and -vr or vr) + KU * (vu < 0 and -vu or vu) + KF * (vf < 0 and -vf or vf)
-      local xd = v / VD
-      if xd > 1 then xd = 1 end
-      S_ = S_ * (1 + ER * (1 - xd * xd * (3 - 2 * xd)))
-      au, ar, af = Ta - S_ * vu, -S_ * vr, -S_ * vf
-      -- frame lift: nose down at speed pushes the quad down, strongest with the flow at 45 deg
-      local sn = vu / v
-      local c2 = 1 - sn * sn
-      if c2 > 1e-4 then
-        local c = sqrt(c2)
-        local q = LR * sn * 0.813 * (2 * (sn < 0 and -sn or sn) * c) ^ 0.6 * S_ * v / c
-        au = au - q * c2
-        q = q * sn / v
-        ar, af = ar + q * vr, af + q * vf
-      end
-    end
+    -- drag along the flow, each face weighted by the flow through it, growing with rpm; a = -S v
+    local S_ = (KS * (vr < 0 and -vr or vr) + KU * (vu < 0 and -vu or vu) + KF * (vf < 0 and -vf or vf)) * (1 + CD * Rm)
+    local au, ar, af = Ta - S_ * vu, -S_ * vr, -S_ * vf
     vx = vx + (ux * au + rx * ar + fx * af) * h
     vy = vy + (uy * au + ry * ar + fy * af - G) * h
     vz = vz + (uz * au + rz * ar + fz * af) * h
+    local dm = 1 - 0.1 * h                          -- air damping
+    vx, vy, vz = vx * dm, vy * dm, vz * dm
     local ox_, oy_, oz_ = px, py, pz
     px, py, pz = px + vx * h, py + vy * h, pz + vz * h
     grounded = py < DR
@@ -675,7 +643,7 @@ physics = function(dt)
   if STICKTIME_TEST then
     -- motor sound state for the web emulator: rpm from the thrust fraction, axial and edgewise
     -- flow, wash build-up
-    aTf = Tm / Tmax
+    aTf = Rm * Rm
     aVu = vx * ux + vy * uy + vz * uz
     aE2 = sqrt((vx * rx + vy * ry + vz * rz) ^ 2 + (vx * fx + vy * fy + vz * fz) ^ 2)
     aW = sW
@@ -1077,7 +1045,7 @@ handle = function(e)
         repeat                                                         -- Power: what suits the quad
           j = (j + d - 1) % #o[3] + 1
           v = o[3][j]
-        until o[2] ~= "twr" or v == 0 or v >= P[42] and v <= P[43]
+        until o[2] ~= "twr" or v == 0 or v >= P[23] and v <= P[24]
         S[o[2]] = v
         apply()
       elseif e == E_ENTER or e == E_EXIT then
@@ -1145,8 +1113,9 @@ local function init()
     T.next = function(i) nextGate, lastGate = i, (i - 2) % NG + 1 end
     T.lapclock = function(t) lapStart, tStart, msgT = gt - t, gt - t, gt - 1000 if lap < 1 then lap = 1 end end
     T.info = function() return NT, P[7], gm, lap, total, rn, rt, TRACKS[S.track], NP, sc, chn, NB end
-    T.thrust = function() return P[7], P[8], P[9], P[10] end
-    T.audio = function() return sT, S.quad, state, aTf, aVu, aE2, aW, sA, sE, sR end
+    T.thrust = function() return P[7] end
+    T.stick = function(load) return stickFor(load / P[7]) end
+    T.audio = function() return sT, P[15], state, aTf, aVu, aE2, aW, sA, sE, sR end
     T.best = function(t) return BL[t], BR[t], BG[t], BF[t] end
     T.ntracks = function() return NT end
     T.nmodes = function() return 4 end

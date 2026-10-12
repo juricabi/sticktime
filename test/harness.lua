@@ -129,8 +129,8 @@ collectgarbage()
 local memInit = collectgarbage("count")
 
 -- settings and bests migrated from the version 1 file
--- (the old 4:1 is below the racer's Power range: it comes back as Stock)
-if T.S.track ~= 2 or T.S.rates ~= 3 or T.S.tilt ~= 30 or T.S.twr ~= 0 or T.S.laps ~= 5 then
+-- (the old 4:1 suits the default 5" freestyle)
+if T.S.track ~= 2 or T.S.rates ~= 3 or T.S.tilt ~= 30 or T.S.twr ~= 4 or T.S.laps ~= 5 then
   fail(string.format("v1 settings not migrated: track %s rates %s tilt %s twr %s laps %s", T.S.track, T.S.rates, T.S.tilt, T.S.twr, T.S.laps))
 end
 do
@@ -179,6 +179,7 @@ local function steps(n) for i = 1, math.max(1, math.floor(n * 50 / FRAME_MS + 0.
 -- ------------------------------------------------------------ autopilot
 -- stick (0..1) that gives `load` times the weight in thrust: inverse of the quad's thrust curve
 function hoverStick(load)
+  if T.stick then return T.stick(load) end           -- the game inverts its own thrust curve
   local twr, i0, n, dz = T.thrust()
   local x = math.max(0, (load / twr - i0) / (1 - i0)) ^ (1 / n)
   return dz + (1 - dz) * x
@@ -386,7 +387,8 @@ do
 end
 idleSticks()
 
--- 5b. ground effect: at the throttle that holds a hover high up, the quad rises near the ground
+-- 5b. no ground effect in flight model 2: at the hover throttle the quad does the same near the
+-- ground as high up
 do
   local mode, twr = T.S.mode, T.S.twr
   T.set("mode", 2) T.set("twr", 5)
@@ -402,8 +404,8 @@ do
   end
   local vLow, stLow = vyAfter(0.3)
   local vHigh, stHigh = vyAfter(6)
-  print(string.format("ground effect: hover throttle, after 0.5 s: %.2f m/s up from 0.3 m, %.2f m/s from 6 m", vLow, vHigh))
-  if stLow ~= 4 or stHigh ~= 4 or not (vLow > vHigh + 0.05) then fail("no ground effect near the ground") end
+  print(string.format("ground effect (none): hover throttle, after 0.5 s: %.2f m/s up from 0.3 m, %.2f m/s from 6 m", vLow, vHigh))
+  if stLow ~= 4 or stHigh ~= 4 or math.abs(vLow - vHigh) > 0.05 then fail("near the ground the quad should hover as high up") end
   T.set("mode", mode) T.set("twr", twr)
   idleSticks()
 end

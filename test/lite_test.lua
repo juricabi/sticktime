@@ -41,7 +41,7 @@ local buzz = 0
 function playHaptic() buzz = buzz + 1 end
 -- the SD card: the track files from the repository, then what the script writes
 local SD = {}
-for _, n in ipairs({ "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9", "q1", "q2", "q3", "q4" }) do
+for _, n in ipairs({ "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9", "q1", "q2", "q3", "q4", "q5", "q6", "q7", "q8", "q9", "q10", "q11" }) do
   local fh = io.open("../sdcard/SCRIPTS/TOOLS/StickTimeLite/" .. n .. ".txt", "r")
   if fh then SD["/SCRIPTS/TOOLS/StickTimeLite/" .. n .. ".txt"] = fh:read("*a") fh:close() end
 end
@@ -129,6 +129,7 @@ local FLY, CRASHED, READY, PAUSED, DONE, MENU, SETUP, COUNT = 4, 5, 6, 7, 8, 1, 
 -- angle-mode autopilot: steer toward a lead point on the gate axis, hold the gate height
 -- stick (0..1) that gives `load` times the weight in thrust: inverse of the quad's thrust curve
 local function hoverStick(load)
+  if T.stick then return T.stick(load) end           -- the game inverts its own thrust curve
   local twr, i0, n, dz = T.thrust()
   local x = math.max(0, (load / twr - i0) / (1 - i0)) ^ (1 / n)
   return dz + (1 - dz) * x
@@ -361,7 +362,8 @@ sticks.thr = 0
 steps(15)
 if state() ~= CRASHED then fail("no crash into the gate frame (state " .. state() .. ")") end
 
--- ground effect: at the throttle that holds a hover high up, the quad rises near the ground
+-- no ground effect in flight model 2: at the hover throttle the quad does the same near the ground
+-- as high up
 do
   local hover = (hoverStick(1) * 2 - 1) * 1024
   local function vyAfter(y)
@@ -375,8 +377,8 @@ do
   end
   local vLow, stLow = vyAfter(0.3)
   local vHigh, stHigh = vyAfter(6)
-  print(string.format("ground effect: hover throttle, after 0.5 s: %.2f m/s up from 0.3 m, %.2f m/s from 6 m", vLow, vHigh))
-  if stLow ~= FLY or stHigh ~= FLY or not (vLow > vHigh + 0.05) then fail("no ground effect near the ground") end
+  print(string.format("ground effect (none): hover throttle, after 0.5 s: %.2f m/s up from 0.3 m, %.2f m/s from 6 m", vLow, vHigh))
+  if stLow ~= FLY or stHigh ~= FLY or math.abs(vLow - vHigh) > 0.05 then fail("near the ground the quad should hover as high up") end
   idle()
 end
 idle()

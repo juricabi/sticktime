@@ -28,8 +28,8 @@ StickTime BW and StickTime Lite also run on color radios, drawn in B&W style at 
 
 ## Features
 
-- **Flight model.** Fitted class by class to a detailed per-prop model (see [docs/flight-model.md](docs/flight-model.md)): props lose thrust as the air through them speeds up and gain some descending; translational lift (flying edgewise, the same throttle gives up to 50% more thrust); ground effect within a twentieth of a prop diameter of the ground or a roof (up to 25% more thrust on a 5", 45% on a 3"); body drag along the flow with no rotor drag, so the quad keeps its momentum (a 5" racer's sideways slide halves in about 4 s); downforce from the frame when it flies nose-down at speed; a Betaflight-style idle and throttle curve; motors that spool up in about 5 ms; 1.1 g gravity for a planted feel. All at 80 Hz. The stock Racer 5": about 140 km/h top speed, 120 km/h punch-outs, 62 km/h flat fall.
-- **Your quad.** **Racer 5"** (0.49 kg, 7.7:1, snappy), **Freestyle 5"** (a 0.66 kg HD freestyler, 6.9:1, heavier and floatier than the racer), **3" toothpick** (0.11 kg 3S, 5.3:1, light and draggy) or **Whoop 65mm** (a 24 g ducted 1S whoop, 2.6:1, slow and grippy). Power **Stock** (the class's own) or the range quads of its kind have: 5:1 to 12:1 on the racer, 4:1 to 10:1 on the freestyler and the 3", 3:1 to 8:1 on the whoop. Acro or Angle mode.
+- **Flight model 2.** An rpm-curve model (see [docs/flight-model.md](docs/flight-model.md)): thrust straight from the motors' rpm through a curve that rises steeply at low rpm, so the quads hover low on the stick; less thrust as air comes through the props climbing; quadratic drag on each face that grows with throttle, so the quads stop quickly (a 5" slide halves in under 2 s); motors that change speed at 170 000 rpm/s, pushed up by hard flips and snaps; attitude that follows the sticks almost at once; 1 g gravity. No descent cushion, ground effect or translational lift. All at 80 Hz. The 5" Freestyle: about 115 km/h top speed, 113 km/h punch-outs, 65 km/h flat fall.
+- **Your quad.** Eleven presets: **5" Freestyle** (680 g, 8.1:1), **5" Light** (620 g), **5" Heavy** (740 g), **5" Chonker** (800 g), **5" Racer** (480 g, 12.5:1), **5" Beginner** (680 g, 4.4:1), **3.5" Quad** (290 g 4S), **2.5" Analog** (83 g) and **2.5" HD** (95 g), **85mm Whoop** (69 g) and **65mm Whoop** (28 g). Power **Stock** (the preset's own) or the range that suits it: 5:1 to 12:1 on the racer, 4:1 to 10:1 on the 5" freestylers, 3:1 to 10:1 on the beginner, the 3.5" and the 2.5"s, 3:1 to 8:1 on the whoops. Acro or Angle mode.
 - **Rates.** Betaflight Actual rates: Soft, Normal and Fast presets, or Custom center sensitivity (10–500 deg/s), max rate (100–2000 deg/s) and expo (0.00–1.00) for roll/pitch and yaw, in Betaflight's own steps (10 deg/s and 0.01), so your Actual rates go in exactly as they are. Hold a key or spin the wheel quickly for five times bigger steps.
 - **Eight tracks.** Meadow, Figure 8, Dive Tower, Slalom, Hoop Forest, Grand Prix, the **Bando** (an open-roof ruin with doors to fly through, a 36 m tower for orbits and dives, and stacked containers) and **Pro Track**, laid out like a real race: lanes up and down the field joined by flag hairpins, a high gate and a dive gate on the start straight, and a split-S. Gates, high gates, dive gates, hoops, arches, flags (pass on the marked side, shown by a yellow marker) and gaps in walls. Trees, poles, walls and structures are solid.
 - **Four ways to play.**
@@ -37,7 +37,7 @@ StickTime BW and StickTime Lite also run on color radios, drawn in B&W style at 
     - **Practice**: lap times against your best.
     - **Freestyle**: flips, rolls, 360s, power loops, dives, hang time, gap shots and proximity runs score points; chain them within 2.5 s for up to a ×4 combo.
     - **Gate Rush**: 30 s on the clock, every gate adds time and lights the next one at random.
-- **Wind** (off, light, strong, with gusts; each track has its own direction, shown by a small arrow on the OSD: up is where your nose points), optional **prop wash** - Off, **Stock** (each class's own strength) or **Max** (sinking into your own downwash costs thrust and shakes the quad, hardest when you catch a dive), beeps for the countdown, gates and laps, and a **vibration** on crashes and laps (On, Off).
+- **Wind** (off, light, strong, with gusts; each track has its own direction, shown by a small arrow on the OSD: up is where your nose points), optional **prop wash** - Off (the model alone), **Stock** or **Max** (flight model 1's prop wash on top: sinking into your own downwash costs thrust and shakes the quad, hardest when you catch a dive), beeps for the countdown, gates and laps, and a **vibration** on crashes and laps (On, Off).
 - **Saved per track:** best lap, race, combo and Gate Rush score, plus all settings.
 - **Color radios:** filled sky and ground, haze and fog, mountains, shaded structures, an FPV-style OSD, a minimap with the AI pilots, optional stick view and FPS, and touch. **B&W radios:** the same game in wireframe, with greyscale ground on 212×64 screens. **Lite:** the same flight model, quads, prop wash and tracks, with Time trial, Practice, Freestyle and Gate Rush; no AI pilots or custom rates.
 
@@ -164,10 +164,10 @@ tools/bundle_web.py     -> web/simulator.html (offline, single file) and web/art
 tools/build_etxlua.sh   Lua 5.3 with EdgeTX's number settings (native and 32-bit) for the tests
 tools/build_etxhost.sh  EdgeTX's own Lua core with a model of the B&W radios' allocator: makes the
                         game.luac files and runs test/memtest.lua (main, or a release: v2.11.4, v2.10.7)
-tools/tune_physics.py   steady-state check of every quad class (hover, top speed, punch-out, fall, slide)
+tools/tune_physics.py   steady-state check of every quad preset (hover, top speed, punch-out, fall, slide)
 tools/build_firmware.sh EdgeTX main + firmware/edgetx-fast-lua.patch for one radio
 test/harness.lua        headless EdgeTX mock: autopilot races with AI pilots on every track, flags, hoops,
-                        dive gates, freestyle, gate rush, ground effect, vibration, menus, crashes, saves
+                        dive gates, freestyle, gate rush, vibration, menus, crashes, saves
 test/lite_test.lua      the same for the Lite, as a radio with +/- keys and without the libraries B&W lacks
 test/order_check.lua    ray-cast check of the draw order at the Bando
 test/memtest.lua        memory of the B&W versions through their loaders on F2 / F4 radio models

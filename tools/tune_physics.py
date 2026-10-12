@@ -1,36 +1,31 @@
 #!/usr/bin/env python3
-"""Steady-state check of the quad classes in src/sticktime.lua (read from its QP strings).
-Usage: tools/tune_physics.py [class number 1-4] [key=value ...]   e.g. tools/tune_physics.py 1 vp=60
+"""Steady-state check of the quad presets in src/sticktime.lua (read from its QP strings).
+Usage: tools/tune_physics.py [preset number 1-11] [key=value ...]   e.g. tools/tune_physics.py 5 twr=10
 
 Model (mass-normalised, body axes r/u/f; the same steps as physics() in src/sticktime.lua):
-  T   = Tmax*(i0 + (1-i0)*x^tn),  x = max(0, (thr-dz)/(1-dz))      stick -> thrust, lagged with tm
-  Ta  = max(0, T - vu*T*(Tmax/T)^vc/(vp + vu*vk))  climbing (vc: how the loss scales with thrust,
-                                                  vk: the loss bends, the prop unloads);
-       T*max(rf, 1 + (cq-1)*(1-ce*tf)*(2x - x^2)), x = sink/(sq*tf^se)  descending: a cushion that
-                                                  peaks, then the blades stall (tf = T/Tmax)
-  Ta *= 1 - wl*wash*fade  (Prop wash on: sinking into your own downwash, see src/sticktime.lua)
-  Ta *= 1 + tl*fade*e2/(e2 + vt^2)   translational lift; fade = (1 - te*(T/Tmax)^4)/(1 + vu/ta) near full
-                                       stick and with axial inflow
-  S   = (ks|vr| + ku|vu| + kf|vf|)*(1 + er*(1 - smoothstep(|v|/vd)))     drag along the flow: a = -S*v
-  frame lift: s = vu/|v|, q = lr*s*0.813*(2|s|sqrt(1-s^2))^0.6*S*|v|/sqrt(1-s^2)
-              a_u -= q*(1-s^2), a_r += q*s*vr/|v|, a_f += q*s*vf/|v|
-  gravity 10.78 (1.1 g)
-The class values were fitted to a detailed per-prop model of each class; the targets they were
-fitted to are in docs/flight-model.md.
+  rpm R (a fraction of full) follows the stick, not below idle (0.0386), at up to 5.47 per second
+  T   = twr*g * R * curve(R)               curve: 10 points (0.1 0.4 0.5 0.6 0.7 0.79 0.84 0.9 0.95 1)
+                                            in 1% buckets, so thrust per rpm rises steeply at low rpm
+  T  *= 1 - 0.005*floor(100*vu/top)        climbing: less thrust as the air comes through the props
+  S   = (kx|vr| + ky|vu| + kz|vf|) * (1 + cd*R)   drag along the flow, growing with rpm: a = -S*v
+  v  *= 1 - 0.1*dt                          air damping; gravity 9.8
+(Hard rotations also raise the rpm: a third of full per axis lagging its rate by 120 deg/s; not
+part of the steady states below.) The presets and what they give are in docs/flight-model.md.
 """
 import math
 import pathlib
 import re
 import sys
 
-G = 10.78
+G = 9.8
+IDLE = 0.0386
+RC = [0.1, 0.4, 0.5, 0.6, 0.7, 0.79, 0.84, 0.9, 0.95, 1.0]
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
-def classes():
+def presets():
     src = (ROOT / "src" / "sticktime.lua").read_text(encoding="utf-8")
-    keys = re.search(r"local QK = \{([^}]*)\}", src).group(1)
-    keys = re.findall(r'"(\w+)"', keys)
+    keys = re.findall(r'"(\w+)"', re.search(r"local QK = \{([^}]*)\}", src).group(1))
     block = re.search(r"local QP = \{(.*?)\n\}", src, re.S).group(1)
     out = []
     for line in block.splitlines():
@@ -42,92 +37,92 @@ def classes():
     return out
 
 
-def thrust(p, s):
-    x = max(0.0, (s - p["dz"]) / (1 - p["dz"]))
-    return p["twr"] * G * (p["i0"] + (1 - p["i0"]) * x ** p["tn"])
+def curve(f):
+    b = math.floor(f * 100)
+    if b > 98:
+        return 1.0
+    b = max(b, 0)
+    i, j = b // 11, b % 11
+    return RC[i + 1] if j == 10 else RC[i] + (RC[i + 1] - RC[i]) * j * 0.1
 
 
-def accel(p, Tm, vu, vr, vf):
-    """body-axis accelerations (u, r, f) from props, drag and frame lift"""
-    Tmax = p["twr"] * G
-    tf = Tm / Tmax
-    if vu < 0:                                                 # the cushion rises, then the blades stall
-        x = -vu / (p["sq"] * tf ** p["se"]) if tf > 0.001 else 9.0
-        Ta = Tm * max(p["rf"], 1 + (p["cq"] - 1) * (1 - p["ce"] * tf) * (2 * x - x * x))
-    else:
-        den = max(0.3 * p["vp"], p["vp"] + vu * p["vk"])
-        Ta = max(0.0, Tm - vu * Tm * (Tmax / Tm) ** p["vc"] / den) if Tm > 0 else 0.0
-    e2 = vr * vr + vf * vf
-    fa = max(0.0, 1 - p["te"] * tf ** 4)                       # translational lift fades near full stick
-    if vu > 0:
-        fa /= 1 + vu / p["ta"]                                 # and with axial inflow
-    Ta *= 1 + p["tl"] * fa * e2 / (e2 + p["vt"] ** 2)
-    au, ar, af = Ta, 0.0, 0.0
-    v2 = vu * vu + e2
-    if v2 > 1e-4:
-        v = math.sqrt(v2)
-        S = p["ks"] * abs(vr) + p["ku"] * abs(vu) + p["kf"] * abs(vf)
-        xd = min(1.0, v / p["vd"])
-        S *= 1 + p["er"] * (1 - xd * xd * (3 - 2 * xd))
-        au, ar, af = Ta - S * vu, -S * vr, -S * vf
-        sn = vu / v
-        c2 = 1 - sn * sn
-        if c2 > 1e-4:
-            c = math.sqrt(c2)
-            q = p["lr"] * sn * 0.813 * (2 * abs(sn) * c) ** 0.6 * S * v / c
-            au -= q * c2
-            ar += q * sn * vr / v
-            af += q * sn * vf / v
-    return au, ar, af
+def thrust_at(t):
+    t = max(t, IDLE)
+    return t * curve(t)
 
 
-def fly(p, thr, pitch_deg, v0=(0.0, 0.0), secs=14.0, h=0.0125, hold_alt=False, until=None):
-    """attitude held at pitch_deg nose down (yaw 0, wings level); returns (t, vy, vz) world"""
-    a = math.radians(pitch_deg)
-    uy, uz, fy, fz = math.cos(a), math.sin(a), -math.sin(a), math.cos(a)
-    vy, vz = v0
-    Tm = thrust(p, thr)
+def stick_for(f):
+    lo, hi = 0.0, 1.0
+    for _ in range(20):
+        m = (lo + hi) / 2
+        lo, hi = (m, hi) if thrust_at(m) < f else (lo, m)
+    return hi
+
+
+def fly(p, thr, pitch_deg, v0=(0.0, 0.0), secs=8.0, h=0.01, hold_alt=False, until=None):
+    """attitude held (nose down by pitch_deg); returns (vx forward, vy up, time) at the end or when
+    until(vx, vy) holds. v0 = (forward, up) at the start; sideways flight is the same with kx."""
+    c, s = math.cos(math.radians(pitch_deg)), math.sin(math.radians(pitch_deg))
+    vx, vy = v0
+    R = max(thr, IDLE)
     t = 0.0
     while t < secs:
-        vu, vf = vy * uy + vz * uz, vy * fy + vz * fz
-        au, _, af = accel(p, Tm, vu, 0.0, vf)
-        vy = 0.0 if hold_alt else vy + (uy * au + fy * af - G) * h
-        vz += (uz * au + fz * af) * h
+        want = max(thr, IDLE)
+        R += max(-5.47 * h, min(5.47 * h, want - R))
+        # body axes: up (u) tilted forward by pitch; forward (f) along the nose
+        vu = vx * s + vy * c
+        vf = vx * c - vy * s
+        Ta = p["twr"] * G * R * curve(R)
+        if vu > 0:
+            Ta *= 1 - 0.005 * min(99, math.floor(vu / p["top"] * 100))
+        S = (p["kx"] * 0 + p["ky"] * abs(vu) + p["kz"] * abs(vf)) * (1 + p["cd"] * R)
+        au, af = Ta - S * vu, -S * vf
+        ax = au * s + af * c
+        ay = au * c - af * s - G
+        vx, vy = vx + ax * h, (0.0 if hold_alt else vy + ay * h)
+        vx, vy = vx * (1 - 0.1 * h), vy * (1 - 0.1 * h)
         t += h
-        if until and until(vy, vz):
+        if until and until(vx, vy):
             break
-    return t, vy, vz
+    return vx, vy, t
+
+
+def slide(p, hover):
+    """sideways from 15 m/s at the hover stick, altitude held: the time to halve"""
+    v, R, t, h = 15.0, max(hover, IDLE), 0.0, 0.01
+    while v > 7.5 and t < 20:
+        S = p["kx"] * v * (1 + p["cd"] * R)
+        v += -S * v * h
+        v *= 1 - 0.1 * h
+        t += h
+    return t
 
 
 def report(p):
-    r = (1 / p["twr"] - p["i0"]) / (1 - p["i0"])
-    hover = p["dz"] + (1 - p["dz"]) * max(0.0, r) ** (1 / p["tn"])
-    _, climb, _ = fly(p, 1.0, 0.0, secs=8)
-    _, fall, _ = fly(p, 0.0, 0.0, secs=10)
-    best = None
-    for deg in [x * 2.5 for x in range(8, 35)]:
-        _, vy, vz = fly(p, 1.0, deg, v0=(0.0, 25.0))
-        if vy > -0.3 and (best is None or vz > best[1]):
-            best = (deg, vz)
-    # sideways slide at hover throttle, altitude held: seconds until half of 15 m/s is left
-    Tm, v, t, h = thrust(p, hover), 15.0, 0.0, 0.0125
-    while v > 7.5 and t < 30:
-        _, ar, _ = accel(p, Tm, 0.0, v, 0.0)
-        v += ar * h
-        t += h
-    print(f"{p['name']:44s} stock {p['twr']:.1f}:1  hover stick {hover:.2f}  punch-out {climb * 3.6:4.0f} km/h  "
-          f"flat fall {-fall * 3.6:3.0f} km/h  top {best[1] * 3.6:4.0f} km/h at {best[0]:.1f} deg  slide half-life {t:.1f} s")
+    hover = stick_for(1 / p["twr"])
+    climb = fly(p, 1.0, 0.0)[1]
+    fall = -fly(p, 0.0, 0.0, secs=10.0)[1]
+    best, best_a = 0.0, 0.0
+    for k in range(13):
+        a = 55 + 2.5 * k
+        vx, vy, _ = fly(p, 1.0, a, v0=(20.0, 0.0))
+        if vy > -0.3 and vx > best:
+            best, best_a = vx, a
+    print(f"{p['name']:58s} {p['twr']:.1f}:1  hover stick {hover:.2f}  punch-out {climb * 3.6:4.0f} km/h  "
+          f"flat fall {fall * 3.6:3.0f} km/h  top {best * 3.6:4.0f} km/h at {best_a:.1f} deg  "
+          f"slide half-life {slide(p, hover):.2f} s")
 
 
 def main():
-    cls = classes()
-    pick = [a for a in sys.argv[1:] if "=" not in a]
-    sel = [cls[int(i) - 1] for i in pick] if pick else cls
-    for p in sel:
-        for a in sys.argv[1:]:
-            if "=" in a:
-                k, v = a.split("=")
-                p[k] = float(v)
+    args = sys.argv[1:]
+    sel = int(args.pop(0)) if args and args[0].isdigit() else None
+    ps = presets()
+    for i, p in enumerate(ps, 1):
+        if sel and i != sel:
+            continue
+        for a in args:
+            k, v = a.split("=")
+            p[k] = float(v)
         report(p)
 
 

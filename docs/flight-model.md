@@ -1,112 +1,74 @@
-# Flight model
+# Flight model 2
 
 StickTime's quad is a point mass with an attitude, integrated in 80 Hz substeps, with everything
-expressed per unit mass in body axes (r right, u up, f forward). Each quad class was measured in a
-detailed per-prop model (four blade-element props on rpm-governed motors, a Betaflight-style PID
-loop and mixer, body drag and frame lift) and StickTime's reduced model was fitted to the same
-measurements.
+expressed per unit mass in body axes (r right, u up, f forward). This branch flies flight model 2:
+an rpm-curve model with eleven presets. It is simple on purpose: thrust straight from the motors'
+rpm, quadratic drag that grows with throttle, and attitude that follows the sticks almost at once.
+It has no descent cushion, translational lift, ground effect or frame lift.
 
 ## Per substep
 
-```
-x   = max(0, (thr - dz)/(1 - dz))
-T   = Tmax*(i0 + (1 - i0)*x^tn)               Tmax = power * g; lagged with tm
-tf  = T/Tmax
-Ta  = max(0, T - vu*T*(Tmax/T)^vc/(vp + vu*vk))  climbing loses thrust: how the loss scales with
-                                               thrust (vc) and bends as the inflow grows (vk)
-Ta  = T*max(rf, 1 + (cq-1)*(1-ce*tf)*(2x - x^2)) descending, x = sink/(sq*tf^se): a cushion that
-                                               peaks at cq, then the blades stall in a fast drop
-Ta *= 1 - wl*w*min(1, (wv - sink)/(wv - 2))      Prop wash on, sinking faster than 0.6 m/s: w builds
-                                               toward 1/(1 + edgewise speed) with a 0.2 s lag
-Ta *= 1 + tl*fade*e2/(e2 + vt^2)                translational lift, e2 = vr^2 + vf^2; it fades near
-                                               full stick and with axial inflow:
-                                               fade = (1 - te*tf^4)/(1 + max(0, vu)/ta)
-Ta *= 1 + gg*min(1, (gl - d)/gw)/(1 + e2/80)   ground effect when d < gl; d = height above the
-                                               surface along body-down (+3 cm, the frame's skids)
-S   = (ks|vr| + ku|vu| + kf|vf|) * (1 + er*(1 - smoothstep(|v|/vd)))
-a   = Ta*u - S*v                               drag along the flow (each face weighted by the flow
-                                               through it), a little more at low speed
-s   = vu/|v|                                   frame lift, strongest with the flow at 45 deg:
-q   = lr*s*0.813*(2|s|sqrt(1-s^2))^0.6*S*|v|/sqrt(1-s^2)
-a_u -= q*(1 - s^2);  a_r += q*s*vr/|v|;  a_f += q*s*vf/|v|
-g   = 10.78                                    1.1 g: a heavier, more planted feel
-```
+    rpm R (a fraction of full):  R -> max(stick, 0.0386) + boost, at up to 5.47 per second
+                                 (170 000 of 31 080 rpm a second, both ways); 0.0386 is idle
+    boost                        = (e_roll + e_pitch + e_yaw) / 3, e = min(1, rate error / 120 deg/s):
+                                 a rate the quad has not reached yet pushes the motors up, so hard
+                                 flips and snaps add thrust
+    thrust  Ta = twr*g * R * curve(R)
+            curve: 10 points (0.1 0.4 0.5 0.6 0.7 0.79 0.84 0.9 0.95 1) in 1% buckets (10 linear
+            steps per segment), so thrust per rpm rises steeply at low rpm: quads hover at 17-36%
+            stick
+            climbing (air coming through the props, vu > 0): Ta *= 1 - 0.005*floor(100*vu/top)
+            (half the thrust at `top`; it is not a speed limit)
+    drag    S = (kx|vr| + ky|vu| + kz|vf|) * (1 + cd*R),  a = -S*v
+            k = 0.5*0.38*1.225*area/mass per face; cd: more drag with throttle ("corner grip")
+    air     v *= 1 - 0.1*dt; gravity 9.8; wind blows the air the drag is taken against
+    rates   StickTime's rate settings; the body rates follow them with `tr` (roll/pitch) and `ty`
+            (yaw) response times of a few milliseconds
 
-Body rates follow the stick's Betaflight Actual rates through a first-order lag (`tr` roll and
-pitch, `ty` yaw). Wind works as before.
+Prop wash (setting, off by default, so the model above is all there is): Stock and Max add flight
+model 1's prop wash on top, from the class of the same size (5", 3", whoop): sinking into your own
+downwash costs thrust and the quad shakes by tenths of a degree at 20-45 Hz (not in the Lite).
 
-Prop wash (setting): in the per-prop model it is a thrust loss, not a shake: all four props sink
-into the same downwash, so the quad mushes and sinks faster (a 5" at the same throttle sinks at
-3.2 m/s instead of 1 m/s). It needs a mostly vertical sink: 4 m/s of edgewise speed clears it.
-StickTime adds the shake a real quad has, sized from real Betaflight blackbox logs (a 6S 5"
-freestyler and a 4S quad, gyro against setpoint in the 12-110 Hz band, integrated to an angle):
-after a throttle chop the frame jitters by tenths of a degree (peaks of 0.1-0.25 deg, the worst
-~0.6 deg, up to 2 deg falling through the wash at idle) at 20-31 Hz on the 5", 35-45 Hz on the
-smaller quad. So `pws` is the jitter's rms in degrees at full wash with the throttle chopped (0.19
-on the 5"s, 0.23 on the 3", 0.27 on the whoop, scaled from an Air65's tracking error), about half
-that with throttle on, each wash its own severity (most catches mild, a few nasty), and `pf` its
-frequency (26, 24, 35, 45 Hz); past what the frame rate can show it shakes as fast as the screen
-can. It starts at a 0.5 m/s sink, dies away over ~0.2 s once the sink stops and is cleared by
-edgewise speed through the same wash build-up. On a radio screen it is barely visible, as in real
-life: what you feel is the mush, and in the browser emulator the motors' chatter. The Lite leaves
-it out: under a pixel on its screens, and its radios have no memory to spare. The setting "Stock"
-gives each class its own strength, measured the same way: the 3" and both 5"s at prop wash 30 (the
-5"s carry none by default; 30 is the standard non-zero choice), the ducted whoop at its stock 10 -
-on the whoop it is a whisper, on a 5" a shallow-sink mush. "Max" carries the full-strength set
-(`wl/wv/pw`), fitted the same way from the level-100 measurements, its shake scaled like the wash.
-Both levels are the same physics; Stock is each class's own dose of it.
+The Lite flies the same model; it reads the preset in use from `StickTimeLite/q<n>.txt`.
 
-There is no rotor drag (in-plane H-force): the per-prop model has none, so quads keep their
-momentum (a 5" slide halves in ~4 s). Drag is the measured coefficient of each face, untrimmed.
-The thrust shape (`vp vk vc tl vt te ta`) is fitted jointly to the per-prop model's thrust map
-over each class's own flight envelope (axial inflow up to its climb rate, edgewise flow up to its
-top speed) and to its steady flight at 0-65 deg pitch and half to full stick; the descent cushion
-(`sq cq ce se rf`) to its thrust map while sinking at idle to full stick. Over those steady flight
-states StickTime is within 0.4-0.9 m/s of the per-prop model on average, with no vertical bias.
+## Presets
 
-## Classes
+Parameters (`QP` in `src/sticktime.lua`, one string per preset): `twr` thrust/weight, `top` (m/s),
+`kx ky kz` (1/m), `cd`, `tr ty` (s), `snd` the motor sound class, the optional prop wash (`pw wl wv`
+at Max, `wls wvs pws` at Stock, `pf` Hz) and `tlo`-`thi`, the Power settings offered (Stock is
+always there).
 
-Parameters (`QP` in `src/sticktime.lua`, one string per class):
+| Preset | weight | thrust | twr | top | kx / ky / kz (1/m) | cd | Power |
+|---|---|---|---|---|---|---|---|
+| 5" Freestyle | 680 g | 5.5 kg | 8.1 | 160 km/h | .0229 / .0219 / .0222 | .8 | 4-10:1 |
+| 5" Light | 620 g | 5.2 kg | 8.4 | 160 km/h | .0252 / .0240 / .0244 | .8 | 4-10:1 |
+| 5" Heavy | 740 g | 6.2 kg | 8.4 | 160 km/h | .0211 / .0201 / .0204 | .8 | 4-10:1 |
+| 5" Chonker | 800 g | 6.2 kg | 7.75 | 160 km/h | .0195 / .0186 / .0189 | .8 | 4-10:1 |
+| 5" Racer | 480 g | 6.0 kg | 12.5 | 200 km/h | .0310 / .0286 / .0305 | .8 | 5-12:1 |
+| 5" Beginner | 680 g | 3.0 kg | 4.4 | 100 km/h | .0229 / .0219 / .0222 | .8 | 3-10:1 |
+| 3.5" Quad | 290 g | 1.8 kg | 6.2 | 130 km/h | .0215 / .0180 / .0205 | .8 | 3-10:1 |
+| 2.5" Analog | 83 g | 550 g | 6.6 | 80 km/h | .0292 / .0278 / .0283 | .8 | 3-10:1 |
+| 2.5" HD | 95 g | 640 g | 6.7 | 90 km/h | .0255 / .0243 / .0247 | .8 | 3-10:1 |
+| 85mm Whoop | 69 g | 400 g | 5.8 | 50 km/h | .0378 / .0398 / .0378 | .6 | 3-8:1 |
+| 65mm Whoop | 28 g | 160 g | 5.7 | 40 km/h | .0648 / .0698 / .0648 | .6 | 3-8:1 |
 
-| | Racer 5" | Freestyle 5" | 3" toothpick | Whoop 65mm |
-|---|---|---|---|---|
-| stock power `twr`, Power settings offered `tlo`-`thi` | 7.67, 5-12:1 | 6.88, 4-10:1 | 5.35, 3-10:1 | 2.58, 3-8:1 |
-| idle `i0`, curve `tn`, dead zone `dz` | .031, 2.16, 0 | .026, 1.52, .08 | .022, 1.72, .03 | .0059, .9, .11 |
-| climbing: prop pitch speed `vp` (m/s), throttle exponent `vc`, bend `vk` | 77.4, .58, .1 | 75.5, .52, -.28 | 67.6, .68, -.77 | 72.9, .89, -1 |
-| descending cushion: peak `cq` at sink `sq`*tf^`se` (m/s), full-stick fade `ce`, stalled `rf` | 1.35 at 15.5*tf^.58, .54, .76 | 1.39 at 13.5*tf^.5, .72, .72 | 1.61 at 15.5*tf^.52, .21, .88 | 1.37 at 9.08*tf^.56, .17, .9 |
-| translational lift `tl`, `vt` (m/s), fades: full stick `te`, axial inflow `ta` (m/s) | .85, 8.6, .4, 35.1 | .69, 9.14, .51, 90.5 | 1, 9.33, 0, 12.2 | 1.1, 9.97, .019, 23.6 |
-| drag side/front/top `ks kf ku` (1/m) | .0152 .00819 .0287 | .011 .00635 .0184 | .0176 .0167 .0417 | .0741 .07 .0875 |
-| low-speed drag `er`, `vd` (m/s) | .36, 15 | .36, 15 | .5, 15 | .29, 7 |
-| frame lift `lr` | .229 | .257 | .1 | 0 |
-| ground effect `gg`, `gl`, `gw` (m) | .24, .25, .113 | .26, .25, .113 | .44, .15, .135 | .17, .0625, .0344 |
-| prop wash loss / fade-out (m/s) / shake rms (deg), stock | .12, 3.8, .19 | .13, 4.6, .19 | .1, 5.2, .23 | .024, 2.5, .27 |
-| prop wash loss / fade-out (m/s) / shake rms (deg), max | .33, 6, .35 | .35, 7, .35 | .29, 7, .42 | .24, 5.6, .85 |
-| prop wash shake frequency `pf` (Hz) | 26 | 24 | 35 | 45 |
-| response `tm`, `tr`, `ty` (s) | .006 .009 .02 | .006 .008 .02 | .006 .009 .02 | .006 .02 .02 |
+What they give (`tools/tune_physics.py`; the same in the game, color and Lite): hover stick,
+punch-out (vertical speed after 8 s of full throttle), flat fall (after 10 s at idle), top speed
+(best pitch held, full throttle, not sinking) and the half-life of a 15 m/s sideways slide.
 
-Each class is the most common configuration of its kind in the reference set (for the whoop: the
-current ducted 65 mm 1S generation, with its acro tune). What they were fitted to (per-prop model,
-stock power, attitude held) and what StickTime gives (`tools/tune_physics.py`):
+| Preset | hover | punch-out | flat fall | top speed | slide |
+|---|---|---|---|---|---|
+| 5" Freestyle | 0.24 | 113 km/h | 65 km/h | 115 km/h at 77.5 deg | 1.8 s |
+| 5" Light | 0.23 | 111 km/h | 62 km/h | 113 km/h at 80 deg | 1.7 s |
+| 5" Heavy | 0.23 | 118 km/h | 68 km/h | 120 km/h at 77.5 deg | 1.9 s |
+| 5" Chonker | 0.25 | 117 km/h | 70 km/h | 120 km/h at 77.5 deg | 2.0 s |
+| 5" Racer | 0.17 | 132 km/h | 57 km/h | 133 km/h at 82.5 deg | 1.5 s |
+| 5" Beginner | 0.36 | 72 km/h | 66 km/h | 78 km/h at 70 deg | 1.7 s |
+| 3.5" Quad | 0.29 | 100 km/h | 72 km/h | 103 km/h at 75 deg | 1.8 s |
+| 2.5" Analog | 0.27 | 76 km/h | 59 km/h | 79 km/h at 72.5 deg | 1.5 s |
+| 2.5" HD | 0.27 | 84 km/h | 63 km/h | 87 km/h at 72.5 deg | 1.6 s |
+| 85mm Whoop | 0.30 | 59 km/h | 50 km/h | 64 km/h at 70 deg | 1.2 s |
+| 65mm Whoop | 0.30 | 45 km/h | 39 km/h | 48 km/h at 70 deg | 0.8 s |
 
-| | Racer 5" | Freestyle 5" | 3" toothpick | Whoop 65mm |
-|---|---|---|---|---|
-| mass (kg) | 0.487 | 0.661 | 0.108 | 0.024 |
-| hover stick, target / StickTime | 0.33 / 0.35 | 0.30 / 0.31 | 0.38 / 0.37 | 0.43 / 0.42 |
-| full-throttle climb (m/s) | 34.2 / 35.3 | 35.0 / 35.5 | 22.9 / 22.5 | 11.6 / 11.6 |
-| idle fall (m/s) | 17.5 / 17.5 | 22.8 / 22.6 | 15.5 / 15.2 | 11.1 / 11.0 |
-| top speed (m/s) at pitch (deg) | 38.9 @ 67.5 / 40.3 @ 70 | 41.4 @ 62.5 / 41.5 @ 62.5 | 26.5 @ 67.5 / 26.4 @ 67.5 | 14.4 @ 65 / 14.7 @ 65 |
-| sideways slide half-life from 15 m/s (s) | 4.03 / 4.03 | 5.57 / 5.57 | 3.39 / 3.38 | 0.90 / 0.90 |
-| edgewise thrust gain at 6 / 15 m/s | +27% / +48% | +26% / +43% | +26% / +68% | +29% / +73% |
-| thrust at 2 / 6 m/s sink, wash off / on | 1.21 / 1.31, 0.82 / 1.27 | 1.20 / 1.34, 0.79 / 1.17 | 1.29 / 1.61, 0.93 / 1.43 | 1.23 / 1.33, 0.95 / 1.32 |
-| thrust response, 63% (hover to full) | 6 ms | 6 ms | 6 ms | 6 ms |
-| roll rate step, 63% time (half / full stick) | 6 / 12 ms | 6 / 10 ms | 8 / 10 ms | 10 / 30 ms |
-
-## What the per-prop model has that this one leaves out
-
-- Four props, each with its own airflow: rotating the quad changes each prop's inflow, which damps
-  roll and pitch. Whoop props stall in fast vertical drops (they lose thrust beyond 4 m/s).
-- The PID loop itself: rate steps overshoot by 35-70% before they settle (strong feedforward on a
-  filtered gyro), motors saturate on full-stick flips, yaw is limited to 10000 deg/s^2.
-- Battery sag and capacity (rarely on in other sims either), prop deformation at full power,
-  bent props after crashes.
-- Spec classes and bigger quads.
+Compared with flight model 1 the quads stop much sooner (slides of 1-2 s instead of ~4 s), punch
+out a little slower for their power, and hover lower on the stick.
