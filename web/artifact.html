@@ -100,6 +100,9 @@ select { max-width: 270px; }
   font: 500 12px/1 var(--font-display); color: var(--muted); cursor: pointer; }
 .music .songs:hover { background: var(--accent-soft); color: inherit; }
 .music .songs input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.music #songsClear { width: 22px; color: var(--muted); }
+.music #songsClear:hover { color: inherit; }
+.music #songsClear[hidden] { display: none; }
 .file-btn { position: relative; overflow: hidden; }
 .file-btn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 
@@ -278,6 +281,7 @@ footer.credits a { color: inherit; }
       <input type="range" id="musicVol" min="0" max="1" step="0.05" value="0.6" aria-label="Music volume">
       <button type="button" id="musicNext" class="mute" aria-label="Next song" title="Next song"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 5l9 7-9 7zM16 5h3v14h-3z" fill="currentColor"/></svg></button>
       <label class="songs" title="Play your own music files instead (MP3, OGG, WAV...)">Songs<input type="file" id="songIn" accept="audio/*" multiple></label>
+      <button type="button" id="songsClear" class="mute" aria-label="Back to the generated music" title="Back to the generated music" hidden><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button>
     </div>
     <label class="btn file-btn" title="Run any EdgeTX tool script">Open .lua<input type="file" id="fileIn" accept=".lua,.txt"></label>
     <button class="btn" id="copyBtn" type="button" title="Copy the running script to the clipboard">Copy .lua</button>
@@ -8448,6 +8452,7 @@ const ROBOTO = { r: "d09GMgABAAAAAFV8ABIAAAAAsBgAAFUTAAEAAAAAAAAAAAAAAAAAAAAAAAA
     const mBox = $('musicBox'), mVol = $('musicVol');
     const musicShow = () => {
       mBox.classList.toggle('snd-off', !app.musicOn);
+      $('songsClear').hidden = !MUSIC.files.length;             // only with your own songs loaded
       $('musicBtn').setAttribute('aria-pressed', String(app.musicOn));
       $('musicBtn').title = app.musicOn ? 'Music off' : 'Music on';
       musicTitle();
@@ -8471,6 +8476,8 @@ const ROBOTO = { r: "d09GMgABAAAAAFV8ABIAAAAAsBgAAFUTAAEAAAAAAAAAAAAAAAAAAAAAAAA
       ev.target.value = '';
       if (!app.musicOn) musicOn(true); else musicShow();
     });
+    // x: forget your own songs, back to the generated music
+    $('songsClear').addEventListener('click', () => { musicFiles([]); musicShow(); });
     mBox.addEventListener('wheel', (e) => { e.preventDefault(); setMusicVol(app.musicVol + (e.deltaY < 0 ? 0.05 : -0.05)); }, { passive: false });
     musicShow();
     // browsers only start audio after a user gesture: with the volume already up (the saved

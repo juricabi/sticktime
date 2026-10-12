@@ -1185,6 +1185,7 @@
     const mBox = $('musicBox'), mVol = $('musicVol');
     const musicShow = () => {
       mBox.classList.toggle('snd-off', !app.musicOn);
+      $('songsClear').hidden = !MUSIC.files.length;             // only with your own songs loaded
       $('musicBtn').setAttribute('aria-pressed', String(app.musicOn));
       $('musicBtn').title = app.musicOn ? 'Music off' : 'Music on';
       musicTitle();
@@ -1208,6 +1209,8 @@
       ev.target.value = '';
       if (!app.musicOn) musicOn(true); else musicShow();
     });
+    // x: forget your own songs, back to the generated music
+    $('songsClear').addEventListener('click', () => { musicFiles([]); musicShow(); });
     mBox.addEventListener('wheel', (e) => { e.preventDefault(); setMusicVol(app.musicVol + (e.deltaY < 0 ? 0.05 : -0.05)); }, { passive: false });
     musicShow();
     // browsers only start audio after a user gesture: with the volume already up (the saved

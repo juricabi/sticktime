@@ -95,6 +95,9 @@ select { max-width: 270px; }
   font: 500 12px/1 var(--font-display); color: var(--muted); cursor: pointer; }
 .music .songs:hover { background: var(--accent-soft); color: inherit; }
 .music .songs input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.music #songsClear { width: 22px; color: var(--muted); }
+.music #songsClear:hover { color: inherit; }
+.music #songsClear[hidden] { display: none; }
 .file-btn { position: relative; overflow: hidden; }
 .file-btn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 
