@@ -98,11 +98,24 @@ select { max-width: 270px; }
 .btn:hover { border-color: var(--muted); }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: #1c0c00; font-weight: 600; }
 .btn[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
-/* the sound slider is its own switch: 0 dims it to "off" */
-.btn input[type="range"] { accent-color: var(--accent); }
-.btn.snd-off { opacity: .48; filter: saturate(.2); }
-.btn.snd-off input[type="range"] { accent-color: var(--muted); }
-.btn.snd-off { transition: opacity .18s, filter .18s; }
+/* sound: speaker (mute), slider (0 is off), level; off dims it */
+.sound { cursor: default; gap: 4px; padding: 0 8px 0 3px; }
+.sound .mute { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 6px;
+  background: none; color: inherit; cursor: pointer; }
+.sound .mute:hover { background: var(--accent-soft); }
+.sound .mute .cross { display: none; }
+.sound input[type="range"] { width: 90px; accent-color: var(--accent); cursor: pointer; }
+.sound output { min-width: 3.2em; text-align: right; font: 500 12px/1 var(--font-mono); color: var(--muted); }
+.sound.snd-off .wave { display: none; }
+.sound.snd-off .cross { display: inline; }
+.sound.snd-off input[type="range"] { accent-color: var(--muted); opacity: .55; }
+.sound.snd-off output { opacity: .7; }
+.music input[type="range"] { width: 70px; }
+.music.snd-off svg { opacity: .55; }
+.music .songs { position: relative; overflow: hidden; margin-left: 2px; padding: 3px 7px; border-radius: 6px;
+  font: 500 12px/1 var(--font-display); color: var(--muted); cursor: pointer; }
+.music .songs:hover { background: var(--accent-soft); color: inherit; }
+.music .songs input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .file-btn { position: relative; overflow: hidden; }
 .file-btn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 
@@ -271,7 +284,17 @@ footer.credits a { color: inherit; }
       </select>
     </label>
     <button class="btn" id="restartBtn" type="button" title="Restart the script (R)">Restart</button>
-    <label class="btn" title="Sound volume (0 is off)">Sound <input type="range" id="soundVol" min="0" max="1" step="0.05" value="0.8" style="width:80px;vertical-align:middle"></label>
+    <div class="btn sound" id="soundBox" title="Sound volume (wheel: 5% steps)">
+      <button type="button" id="muteBtn" class="mute" aria-label="Mute" aria-pressed="false"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path class="wave" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path class="cross" d="M16 9l5 6M21 9l-5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+      <input type="range" id="soundVol" min="0" max="1" step="0.05" value="0.8" aria-label="Sound volume">
+      <output id="volOut" for="soundVol">80%</output>
+    </div>
+    <div class="btn sound music" id="musicBox" title="Music">
+      <button type="button" id="musicBtn" class="mute" aria-label="Music" aria-pressed="false"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 17.5V5.5l11-2v12" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="6.5" cy="17.5" r="2.6" fill="currentColor"/><circle cx="17.5" cy="15.5" r="2.6" fill="currentColor"/></svg></button>
+      <input type="range" id="musicVol" min="0" max="1" step="0.05" value="0.6" aria-label="Music volume">
+      <button type="button" id="musicNext" class="mute" aria-label="Next song" title="Next song"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 5l9 7-9 7zM16 5h3v14h-3z" fill="currentColor"/></svg></button>
+      <label class="songs" title="Play your own music files instead (MP3, OGG, WAV...)">Songs<input type="file" id="songIn" accept="audio/*" multiple></label>
+    </div>
     <label class="btn file-btn" title="Run any EdgeTX tool script">Open .lua<input type="file" id="fileIn" accept=".lua,.txt"></label>
     <button class="btn" id="copyBtn" type="button" title="Copy the running script to the clipboard">Copy .lua</button>
   </div>
@@ -1336,20 +1359,23 @@ local RKEYS = { rc = 1, rm = 2, re = 3, yc = 4, ym = 5, ye = 6 }
 -- quad profiles (Racer 5", Freestyle 5", 3" toothpick, Whoop 65mm), each fitted to a detailed model
 -- of that class (blade-element props on rpm-governed motors, a Betaflight-style PID loop; see
 -- docs/flight-model.md). twr stock thrust/weight; thrust curve: i0 idle, tn exponent, dz bottom dead
--- zone; vp prop pitch speed climbing (m/s); tl, vt translational lift gain and speed (m/s); ks, kf, ku
+-- zone; vp, vc, vk climbing: prop pitch speed (m/s), throttle exponent and bend of the inflow loss; tl, vt
+-- translational lift gain and speed (m/s), te, ta its fades near full stick and with axial inflow (m/s); ks, kf, ku
 -- side, front, top drag per kg; er, vd extra drag at low speed and the speed it fades by (m/s); lr
 -- frame lift / drag; gg, gl, gw ground effect gain, ray length and fade (m); tm thrust, tr roll/pitch,
--- ty yaw response time (s); pw/wl/wv prop wash Max: wobble, thrust loss, the sink speed where the loss
--- has faded out (m/s); wls/wvs/pws the same at the class's Stock setting; vq, cq descending:
--- pitch speed (m/s) and the most thrust gained.
+-- ty yaw response time (s); pw/wl/wv prop wash Max: shake rms at full wash (deg), thrust loss, the sink
+-- speed where the loss has faded out (m/s); wls/wvs/pws the same at the class's Stock setting; sq, cq,
+-- ce, se, rf descending: the cushion peaks at cq (less by ce near full stick) at a sink of sq*tf^se m/s,
+-- then stalls down to rf; pf the prop wash shake's frequency (Hz); tlo, thi the Power settings that
+-- suit the class (thrust/weight of real quads of its kind; Stock is always there).
 -- One string per class (parsed for the class in use only: tables of numbers cost radio memory):
-local QK = { "twr", "i0", "tn", "dz", "vp", "vk", "tl", "vt", "te", "ks", "kf", "ku", "er", "vd", "lr", "gg", "gl", "gw", "tm", "tr", "ty", "pw", "wl", "wv", "vq", "cq", "wls", "wvs", "pws" }
+local QK = { "twr", "i0", "tn", "dz", "vp", "vk", "tl", "vt", "te", "ks", "kf", "ku", "er", "vd", "lr", "gg", "gl", "gw", "tm", "tr", "ty", "pw", "wl", "wv", "sq", "cq", "wls", "wvs", "pws", "vc", "ta", "ce", "se", "rf", "pf", "tlo", "thi" }
 local QP = {
-  -- twr i0 tn dz vp vk tl vt te ks kf ku er vd lr gg gl gw tm tr ty pw wl wv vq cq wls wvs pws
-  "7.67 .0315 2.16 0 60.4 0 .54 6 .276 .0152 .00819 .0245 .357 15 .229 .24 .25 .113 .006 .009 .02 .5 .326 6.01 26.3 1.32 .119 3.8 .274",     -- Racer 5": 0.49 kg, 2500KV, 5045 tri-blade
-  "7.88 .026 1.52 .08 59.2 0 .48 5.4 .419 .0126 .00728 .0181 .357 15 .257 .27 .25 .113 .006 .007 .02 1 .348 6.54 26.9 1.33 .128 4.25 .548",  -- Freestyle 5": O4 build, 0.58 kg, 2400KV, 5045
-  "5.35 .0221 1.72 .03 49.5 0 .96 9.8 .982 .0176 .0167 .0384 .5 15 .1 .44 .15 .135 .006 .009 .02 1 .291 7.04 15.8 1.61 .103 5.17 .548",      -- 3" toothpick: 0.11 kg, 3S, 5000KV, 76 mm
-  "2.58 .0059 .9 .11 57.3 0 1.02 9.4 .805 .0741 .07 .0858 .286 7 0 .17 .0625 .0344 .006 .02 .02 1 .237 5.61 14.1 1.33 .0243 2.5 .316",       -- Whoop 65mm: ducted 1S, 24 g, 28000KV, 31 mm
+  -- twr i0 tn dz vp vk tl vt te ks kf ku er vd lr gg gl gw tm tr ty pw wl wv sq cq wls wvs pws vc ta ce se rf pf tlo thi
+  "7.67 .0315 2.16 0 77.4 .101 .854 8.6 .402 .0152 .00819 .0287 .357 15 .229 .24 .25 .113 .006 .009 .02 .347 .326 6.01 15.5 1.35 .119 3.8 .19 .584 35.1 .544 .579 .756 26 5 12",  -- Racer 5": 0.49 kg, 2500KV, 5045 tri-blade
+  "6.88 .026 1.52 .08 75.5 -.283 .685 9.14 .514 .011 .00635 .0184 .357 15 .257 .26 .25 .113 .006 .008 .02 .347 .348 7 13.5 1.39 .132 4.56 .19 .524 90.5 .722 .497 .722 24 4 10",  -- Freestyle 5": HD, 0.66 kg, 2400KV, 5045
+  "5.35 .0221 1.72 .03 67.6 -.77 1.01 9.33 0 .0176 .0167 .0417 .5 15 .1 .44 .15 .135 .006 .009 .02 .42 .291 7.04 15.5 1.61 .103 5.17 .23 .681 12.2 .21 .525 .881 35 3 10",        -- 3" toothpick: 0.11 kg, 3S, 5000KV, 76 mm
+  "2.58 .0059 .9 .11 72.9 -1 1.14 9.97 .019 .0741 .07 .0875 .286 7 0 .17 .0625 .0344 .006 .02 .02 .854 .237 5.61 9.08 1.37 .0243 2.5 .27 .891 23.6 .174 .557 .9 45 3 8",          -- Whoop 65mm: ducted 1S, 24 g, 28000KV, 31 mm
 }
 
 -- -------------------------------------------------------------- tracks
@@ -1374,7 +1400,7 @@ local TRACKS = {
     { -6.225,34,4.025,0.25,0,7,1, 6.225,34,4.025,0.25,0,7,1, 0,34,2.2,0.25,3.6,7,1,
       -6.225,46,4.025,0.25,0,7,1, 6.225,46,4.025,0.25,0,7,1, 0,46,2.2,0.25,3.6,7,1,
       -10,40,0.25,5.75,0,7,1, 10,36.025,0.25,1.775,0,7,1, 10,43.975,0.25,1.775,0,7,1, 10,40,0.25,2.2,3.6,7,1,
-      46,64,2,2,0,24,1, 33.6,10,1.25,3,0,2.6,2, 40.5,10,1.25,3,0,2.6,3, 47.4,10,1.25,3,0,2.6,2,
+      46,64,2,2,0,36,1, 33.6,10,1.25,3,0,2.6,2, 40.5,10,1.25,3,0,2.6,3, 47.4,10,1.25,3,0,2.6,2,
       -30,20,3,1.25,0,5.2,3, -36,50,4,4,0,3,1 } },
   -- laid out like a real race: lanes up and down the field joined by flag hairpins, a high
   -- gate and a dive gate on the start straight, a split-S (through the high gate, back
@@ -1671,7 +1697,7 @@ end
 local px, py, pz, vx, vy, vz = 0, 0.15, 0, 0, 0, 0                 -- quad position / velocity (m, m/s)
 local rx, ry, rz, ux, uy, uz, fx, fy, fz = 1, 0, 0, 0, 1, 0, 0, 0, 1 -- quad right / up / forward axes
 local sA, sE, sT, sR, speed = 0, 0, 0, 0, 0                           -- sticks, speed
-local aTf, aVu, aE2, aW = 0, 0, 0, 0                                  -- sound state (thrust frac, sink, edge speed, wash)
+local aTf, aVu, aE2, aW, aS, aF = 0, 0, 0, 0, 0, 0  -- sound state (thrust frac, sink, edge speed, wash, shake)
 local DR, NEAR = 0.15, 0.2                                            -- quad radius, camera near plane
 local P = { rc = 100, rm = 600, re = 0.5, yc = 100, ym = 500, ye = 0.4, twr = 6, angle = false, tc = 0.9, ts = 0.42,
             wr = 0, wp = 0, wy = 0 }                                  -- settings in use, body rates (rad/s)
@@ -1712,7 +1738,9 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
   local grounded = true
   local nearG, nearP, nearB = {}, {}, {}
   local Tm = 0                                   -- motor thrust (lags the throttle)
-  local wob1, wob2, sW, wl = 0, 0, 0, 0         -- prop wash wobble (rad/s), wash build-up (0..1), thrust loss
+  -- prop wash: shake (rad) and its turning part, wash build-up (0..1), shake size and severity,
+  -- thrust loss
+  local wob1, wob2, wob3, wq1, wq2, wq3, sW, sH, sV, wl = 0, 0, 0, 0, 0, 0, 0, 0, 1, 0
   local seed = 7
 
   rnd = function()
@@ -1781,7 +1809,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     hx, hz = hx / l, hz / l
     fx, fy, fz, rx, ry, rz, ux, uy, uz = hx, 0, hz, hz, 0, -hx, 0, 1, 0
     grounded = y <= DR + 0.01
-    speed, Tm, P.wr, P.wp, P.wy, sW = 0, 0, 0, 0, 0, 0
+    speed, Tm, P.wr, P.wp, P.wy, sW, sH, wob1, wob2, wob3, wq1, wq2, wq3 = 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
     for i = 1, NG do
       gd[i] = (px - gx[i]) * gnx[i] + (py - gy[i]) * gny[i] + (pz - gz[i]) * gnz[i]
     end
@@ -1899,8 +1927,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     -- prop wash (setting, off by default): sinking into your own downwash. The props build up a
     -- wash over ~0.2 s while they move down their own axis, less the faster they also move edgewise.
     -- It costs thrust (up to wl, from a 0.6 m/s sink until it fades out at wv m/s: the quad sinks
-    -- and feels mushy) and, falling faster with throttle on, shakes it (smoothed noise, so it reads
-    -- as a wobble, not jitter).
+    -- and feels mushy) and shakes it.
     wl = 0
     if S.wash > 0 then
       local vu0 = vx * ux + vy * uy + vz * uz
@@ -1915,16 +1942,40 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
           wl = P.wl * sW * f
         end
       end
-      if vu0 < -2 and sT > 0.2 then
-        local a = (-vu0 - 2) * 0.2
+      -- the shake: the props chop through their own turbulent wake and the quad rings at its wash
+      -- frequency. Sized from real Betaflight blackbox logs: pw is the jitter's rms in degrees at full
+      -- wash with the throttle chopped (tenths of a degree; about half with throttle on, when the
+      -- motors have the authority to fight it), each wash its own severity. From a 0.5 m/s sink, gone
+      -- in forward flight, no drift (the rates are its steps); the wake keeps buffeting it for ~0.2 s
+      -- after the sink stops
+      local a = 0
+      if vu0 < -0.5 and dt > 0 then
+        a = (-vu0 - 0.5) * 0.5
         if a > 1 then a = 1 end
-        -- scaled by the real wash build-up (faster edgewise flight clears it); Max carries
-        -- the full-strength set, Stock the class's own
-        a = a * sT * P.pw * 2.5 * sW
-        wob1, wob2 = wob1 * 0.6 + (rnd() - 0.5) * a, wob2 * 0.6 + (rnd() - 0.5) * a
-        wr, wp = wr + wob1, wp + wob2
-      else
-        wob1, wob2 = 0, 0
+        local th = sT * 2 - 0.2
+        if th < 0 then th = 0 elseif th > 1 then th = 1 end
+        if sH < 1e-4 then sV = 0.4 + 1.8 * rnd() ^ 2 end   -- a new wash: how bad this one is
+        a = a * sW * (1 - 0.45 * th) * sV * P.pw * 0.0504  -- rad: its rms is 0.346 a
+      end
+      local k = dt * 5
+      if k > 1 then k = 1 end
+      if a < sH then a = sH + (a - sH) * k end
+      sH = a
+      local rh = dt * 9                                -- the same jitter at any frame rate:
+      if rh > 1 then rh = 1 end                        -- 0.55 of it kept per 50 ms frame
+      local g = a * sqrt(rh * (2 - rh)) * 1.2
+      -- each axis is a fading phasor turning at the class's wash frequency (real quads: 20-45 Hz);
+      -- past what the frame rate can show, as fast as the screen can (2.5 rad a frame)
+      local w = dt * P.pf * 6.283
+      if w > 2.5 then w = 2.5 end
+      local c, s = cos(w) * (1 - rh), sin(w) * (1 - rh)
+      local j1, j2, j3 = wob1 * c - wq1 * s + (rnd() - 0.5) * g, wob2 * c - wq2 * s + (rnd() - 0.5) * g,
+        wob3 * c - wq3 * s + (rnd() - 0.5) * g * 0.35
+      if dt > 0 then
+        wr, wp, wy = wr + (j1 - wob1) / dt, wp + (j2 - wob2) / dt, wy + (j3 - wob3) / dt
+        wq1, wq2, wq3 = wob1 * s + wq1 * c + (rnd() - 0.5) * g, wob2 * s + wq2 * c + (rnd() - 0.5) * g,
+          wob3 * s + wq3 * c + (rnd() - 0.5) * g * 0.35
+        wob1, wob2, wob3 = j1, j2, j3
       end
     end
     if grounded and T < G * 1.02 then
@@ -1942,9 +1993,9 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     local n = floor(dt * 80) + 1
     local h = dt / n
     local km, kr, ky = h / (P.tm + h), h / (P.tr + h), h / (P.ty + h)
-    local VP, VK, KS, KF, KU, sTx = P.vp, P.vk, P.ks, P.kf, P.ku, sqrt(Tmax)
-    local TL, VT2, TE, ER, VD, LR, GG, GL, GW = P.tl, P.vt * P.vt, P.te, P.er, P.vd, P.lr, P.gg, P.gl, P.gw
-    local VQ, CQ = P.vq, P.cq
+    local VP, VK, VC, KS, KF, KU = P.vp, P.vk, P.vc, P.ks, P.kf, P.ku
+    local TL, VT2, TE, TA, ER, VD, LR, GG, GL, GW = P.tl, P.vt * P.vt, P.te, P.ta, P.er, P.vd, P.lr, P.gg, P.gl, P.gw
+    local SQ, CQ, CE, SE, RF = P.sq, P.cq, P.ce, P.se, P.rf
     local x0, x1, z0, z1 = TR.x0 - 160, TR.x1 + 160, TR.z0 - 160, TR.z1 + 160
     local bx0, bx1, by0, by1, bz0, bz1 = BX.x0, BX.x1, BX.y0, BX.y1, BX.z0, BX.z1
     -- broad phase once per frame: only objects within reach get tested per substep
@@ -1989,24 +2040,37 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
       local vu = ax_ * ux + vy * uy + az_ * uz
       local vr = ax_ * rx + vy * ry + az_ * rz
       local vf = ax_ * fx + vy * fy + az_ * fz
-      -- props lose thrust as the air through them speeds up (climbing) and gain thrust descending:
-      -- up to cq, about 2.5 times as fast as they lose it climbing (a cushion when you sink)
+      -- props lose thrust as the air through them speeds up (climbing) and gain thrust sinking,
+      -- until the blades stall in a fast drop
+      local tf = Tm / Tmax                              -- thrust fraction
       local Ta
       if vu < 0 then
-        Ta = Tm - vu * sqrt(Tm) * sTx / VQ
-        if Ta > Tm * CQ then Ta = Tm * CQ end
+        -- descending: a cushion that rises to cq at a sink of sq*tf^se, then stalls away (to rf)
+        local x = 9
+        if tf > 0.001 then x = -vu / (SQ * tf ^ SE) end
+        local r = 1 + (CQ - 1) * (1 - CE * tf) * (2 * x - x * x)
+        if r < RF then r = RF end
+        Ta = Tm * r
       else
-        Ta = Tm - vu * sqrt(Tm) * sTx / (VP + vu * VK)
+        if Tm > 0 then                                -- the loss grows with thrust as Tm*(Tmax/Tm)^VC
+          local den = VP + vu * VK                    -- and bends with VK as the inflow grows
+          if den < VP * 0.3 then den = VP * 0.3 end
+          Ta = Tm - vu * Tm * (Tmax / Tm) ^ VC / den
+        else
+          Ta = 0
+        end
         if Ta < 0 then Ta = 0 end
       end
       Ta = Ta * (1 - wl)
       -- translational lift: flying edgewise the props reach fresh air, the induced inflow drops
       -- and the same rpm gives more thrust (a 5": +25% at 6 m/s, +50% from 15 m/s)
       local e2 = vr * vr + vf * vf
-      -- the edgewise gain is a hover-throttle effect; it fades as thrust grows (te)
-      local u = Tmax / (Tm * P.twr)
-      if u > 1 then u = 1 end
-      Ta = Ta * (1 + TL * u ^ TE * e2 / (e2 + VT2))
+      -- the gain fades near full stick (te) and as air comes through the props axially (ta, m/s)
+      local t2 = tf * tf
+      local fa = 1 - TE * t2 * t2
+      if fa < 0 then fa = 0 end
+      if vu > 0 then fa = fa / (1 + vu / TA) end
+      Ta = Ta * (1 + TL * fa * e2 / (e2 + VT2))
       -- ground effect: within a twentieth of the prop diameter of the ground or a roof the props
       -- push their inflow against it (measured along body-down): up to
       -- +25% on a 5", +45% on a 3". Less when tilted (the ray is longer), fades with speed.
@@ -2100,8 +2164,8 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     speed = sqrt(vx * vx + vy * vy + vz * vz)
     if STICKTIME_TEST then
       -- motor sound state for the web emulator: what the synth needs (rpm from the thrust
-      -- fraction, axial and edgewise flow, wash build-up)
-      aTf = Tm / Tmax
+      -- fraction, axial and edgewise flow, wash build-up, the shake's rms (deg) and frequency)
+      aTf, aS, aF = Tm / Tmax, sH * 19.8, P.pf
       aVu = vx * ux + vy * uy + vz * uz
       aE2 = sqrt((vx * rx + vy * ry + vz * rz) ^ 2 + (vx * fx + vy * fy + vz * fz) ^ 2)
       aW = sW
@@ -2364,6 +2428,7 @@ local function applySettings()
     i = i + 1
     P[QK[i]] = tonumber(v)
   end
+  if S.twr > 0 and (S.twr < P.tlo or S.twr > P.thi) then S.twr = 0 end   -- not for this class: Stock
   if S.twr > 0 then P.twr = S.twr end       -- 0: the class's stock power
   if S.wash == 1 then P.wl, P.wv, P.pw = P.wls, P.wvs, P.pws end  -- Stock: the class's own wash
   P.angle = S.mode == 2
@@ -3329,8 +3394,11 @@ optStep = function(o, d)
   end
   local vals = o[3]
   if vals then
-    local j = optIndex(o) + d
-    if j < 1 then j = #vals elseif j > #vals then j = 1 end
+    local j = optIndex(o)
+    repeat                                     -- Power: only what suits the quad
+      j = j + d
+      if j < 1 then j = #vals elseif j > #vals then j = 1 end
+    until key ~= "twr" or vals[j] == 0 or vals[j] >= P.tlo and vals[j] <= P.thi
     S[key] = vals[j]
   else
     -- fine steps, five times bigger after eight quick ones in a row (held key, fast wheel)
@@ -3967,7 +4035,7 @@ local function init()
     TEST.race = function() return lastGate, lapStart, R.n, R.laps, R.total, R.crashes, tStart end
     TEST.info = function() return NT, P.twr, gmode, R.pos, AI.n, R.sc, R.rn, R.rt, R.chn, BX.n, TRACKS[S.track][1] end
     TEST.thrust = function() return P.twr, P.i0, P.tn, P.dz end
-    TEST.audio = function() return sT, S.quad, state, aTf, aVu, aE2, aW, sA, sE, sR end
+    TEST.audio = function() return sT, S.quad, state, aTf, aVu, aE2, aW, sA, sE, sR, aS, aF end
     TEST.ai = function(a) return AI.x[a], AI.y[a], AI.z[a], AI.k[a], AI.d[a], AI.v[a], AI.seg[a] end
     TEST.best = function(t) return BEST.l[t], BEST.r[t], BEST.g[t], BEST.f[t] end
     TEST.box = function(b) return BX.x0[b], BX.x1[b], BX.y0[b], BX.y1[b], BX.z0[b], BX.z1[b] end
@@ -4090,20 +4158,23 @@ local RKEYS = { rc = 1, rm = 2, re = 3, yc = 4, ym = 5, ye = 6 }
 -- quad profiles (Racer 5", Freestyle 5", 3" toothpick, Whoop 65mm), each fitted to a detailed model
 -- of that class (blade-element props on rpm-governed motors, a Betaflight-style PID loop; see
 -- docs/flight-model.md). twr stock thrust/weight; thrust curve: i0 idle, tn exponent, dz bottom dead
--- zone; vp prop pitch speed climbing (m/s); tl, vt translational lift gain and speed (m/s); ks, kf, ku
+-- zone; vp, vc, vk climbing: prop pitch speed (m/s), throttle exponent and bend of the inflow loss; tl, vt
+-- translational lift gain and speed (m/s), te, ta its fades near full stick and with axial inflow (m/s); ks, kf, ku
 -- side, front, top drag per kg; er, vd extra drag at low speed and the speed it fades by (m/s); lr
 -- frame lift / drag; gg, gl, gw ground effect gain, ray length and fade (m); tm thrust, tr roll/pitch,
--- ty yaw response time (s); pw/wl/wv prop wash Max: wobble, thrust loss, the sink speed where the loss
--- has faded out (m/s); wls/wvs/pws the same at the class's Stock setting; vq, cq descending:
--- pitch speed (m/s) and the most thrust gained.
+-- ty yaw response time (s); pw/wl/wv prop wash Max: shake rms at full wash (deg), thrust loss, the sink
+-- speed where the loss has faded out (m/s); wls/wvs/pws the same at the class's Stock setting; sq, cq,
+-- ce, se, rf descending: the cushion peaks at cq (less by ce near full stick) at a sink of sq*tf^se m/s,
+-- then stalls down to rf; pf the prop wash shake's frequency (Hz); tlo, thi the Power settings that
+-- suit the class (thrust/weight of real quads of its kind; Stock is always there).
 -- One string per class (parsed for the class in use only: tables of numbers cost radio memory):
-local QK = { "twr", "i0", "tn", "dz", "vp", "vk", "tl", "vt", "te", "ks", "kf", "ku", "er", "vd", "lr", "gg", "gl", "gw", "tm", "tr", "ty", "pw", "wl", "wv", "vq", "cq", "wls", "wvs", "pws" }
+local QK = { "twr", "i0", "tn", "dz", "vp", "vk", "tl", "vt", "te", "ks", "kf", "ku", "er", "vd", "lr", "gg", "gl", "gw", "tm", "tr", "ty", "pw", "wl", "wv", "sq", "cq", "wls", "wvs", "pws", "vc", "ta", "ce", "se", "rf", "pf", "tlo", "thi" }
 local QP = {
-  -- twr i0 tn dz vp vk tl vt te ks kf ku er vd lr gg gl gw tm tr ty pw wl wv vq cq wls wvs pws
-  "7.67 .0315 2.16 0 60.4 0 .54 6 .276 .0152 .00819 .0245 .357 15 .229 .24 .25 .113 .006 .009 .02 .5 .326 6.01 26.3 1.32 .119 3.8 .274",     -- Racer 5": 0.49 kg, 2500KV, 5045 tri-blade
-  "7.88 .026 1.52 .08 59.2 0 .48 5.4 .419 .0126 .00728 .0181 .357 15 .257 .27 .25 .113 .006 .007 .02 1 .348 6.54 26.9 1.33 .128 4.25 .548",  -- Freestyle 5": O4 build, 0.58 kg, 2400KV, 5045
-  "5.35 .0221 1.72 .03 49.5 0 .96 9.8 .982 .0176 .0167 .0384 .5 15 .1 .44 .15 .135 .006 .009 .02 1 .291 7.04 15.8 1.61 .103 5.17 .548",      -- 3" toothpick: 0.11 kg, 3S, 5000KV, 76 mm
-  "2.58 .0059 .9 .11 57.3 0 1.02 9.4 .805 .0741 .07 .0858 .286 7 0 .17 .0625 .0344 .006 .02 .02 1 .237 5.61 14.1 1.33 .0243 2.5 .316",       -- Whoop 65mm: ducted 1S, 24 g, 28000KV, 31 mm
+  -- twr i0 tn dz vp vk tl vt te ks kf ku er vd lr gg gl gw tm tr ty pw wl wv sq cq wls wvs pws vc ta ce se rf pf tlo thi
+  "7.67 .0315 2.16 0 77.4 .101 .854 8.6 .402 .0152 .00819 .0287 .357 15 .229 .24 .25 .113 .006 .009 .02 .347 .326 6.01 15.5 1.35 .119 3.8 .19 .584 35.1 .544 .579 .756 26 5 12",  -- Racer 5": 0.49 kg, 2500KV, 5045 tri-blade
+  "6.88 .026 1.52 .08 75.5 -.283 .685 9.14 .514 .011 .00635 .0184 .357 15 .257 .26 .25 .113 .006 .008 .02 .347 .348 7 13.5 1.39 .132 4.56 .19 .524 90.5 .722 .497 .722 24 4 10",  -- Freestyle 5": HD, 0.66 kg, 2400KV, 5045
+  "5.35 .0221 1.72 .03 67.6 -.77 1.01 9.33 0 .0176 .0167 .0417 .5 15 .1 .44 .15 .135 .006 .009 .02 .42 .291 7.04 15.5 1.61 .103 5.17 .23 .681 12.2 .21 .525 .881 35 3 10",        -- 3" toothpick: 0.11 kg, 3S, 5000KV, 76 mm
+  "2.58 .0059 .9 .11 72.9 -1 1.14 9.97 .019 .0741 .07 .0875 .286 7 0 .17 .0625 .0344 .006 .02 .02 .854 .237 5.61 9.08 1.37 .0243 2.5 .27 .891 23.6 .174 .557 .9 45 3 8",          -- Whoop 65mm: ducted 1S, 24 g, 28000KV, 31 mm
 }
 
 -- -------------------------------------------------------------- tracks
@@ -4128,7 +4199,7 @@ local TRACKS = {
     { -6.225,34,4.025,0.25,0,7,1, 6.225,34,4.025,0.25,0,7,1, 0,34,2.2,0.25,3.6,7,1,
       -6.225,46,4.025,0.25,0,7,1, 6.225,46,4.025,0.25,0,7,1, 0,46,2.2,0.25,3.6,7,1,
       -10,40,0.25,5.75,0,7,1, 10,36.025,0.25,1.775,0,7,1, 10,43.975,0.25,1.775,0,7,1, 10,40,0.25,2.2,3.6,7,1,
-      46,64,2,2,0,24,1, 33.6,10,1.25,3,0,2.6,2, 40.5,10,1.25,3,0,2.6,3, 47.4,10,1.25,3,0,2.6,2,
+      46,64,2,2,0,36,1, 33.6,10,1.25,3,0,2.6,2, 40.5,10,1.25,3,0,2.6,3, 47.4,10,1.25,3,0,2.6,2,
       -30,20,3,1.25,0,5.2,3, -36,50,4,4,0,3,1 } },
   -- laid out like a real race: lanes up and down the field joined by flag hairpins, a high
   -- gate and a dive gate on the start straight, a split-S (through the high gate, back
@@ -4409,7 +4480,7 @@ end
 local px, py, pz, vx, vy, vz = 0, 0.15, 0, 0, 0, 0                 -- quad position / velocity (m, m/s)
 local rx, ry, rz, ux, uy, uz, fx, fy, fz = 1, 0, 0, 0, 1, 0, 0, 0, 1 -- quad right / up / forward axes
 local sA, sE, sT, sR, speed = 0, 0, 0, 0, 0                           -- sticks, speed
-local aTf, aVu, aE2, aW = 0, 0, 0, 0                                  -- sound state (thrust frac, sink, edge speed, wash)
+local aTf, aVu, aE2, aW, aS, aF = 0, 0, 0, 0, 0, 0  -- sound state (thrust frac, sink, edge speed, wash, shake)
 local DR, NEAR = 0.15, 0.2                                            -- quad radius, camera near plane
 local P = { rc = 100, rm = 600, re = 0.5, yc = 100, ym = 500, ye = 0.4, twr = 6, angle = false, tc = 0.9, ts = 0.42,
             wr = 0, wp = 0, wy = 0 }                                  -- settings in use, body rates (rad/s)
@@ -4450,7 +4521,9 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
   local grounded = true
   local nearG, nearP, nearB = {}, {}, {}
   local Tm = 0                                   -- motor thrust (lags the throttle)
-  local wob1, wob2, sW, wl = 0, 0, 0, 0         -- prop wash wobble (rad/s), wash build-up (0..1), thrust loss
+  -- prop wash: shake (rad) and its turning part, wash build-up (0..1), shake size and severity,
+  -- thrust loss
+  local wob1, wob2, wob3, wq1, wq2, wq3, sW, sH, sV, wl = 0, 0, 0, 0, 0, 0, 0, 0, 1, 0
   local seed = 7
 
   rnd = function()
@@ -4519,7 +4592,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     hx, hz = hx / l, hz / l
     fx, fy, fz, rx, ry, rz, ux, uy, uz = hx, 0, hz, hz, 0, -hx, 0, 1, 0
     grounded = y <= DR + 0.01
-    speed, Tm, P.wr, P.wp, P.wy, sW = 0, 0, 0, 0, 0, 0
+    speed, Tm, P.wr, P.wp, P.wy, sW, sH, wob1, wob2, wob3, wq1, wq2, wq3 = 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
     for i = 1, NG do
       gd[i] = (px - gx[i]) * gnx[i] + (py - gy[i]) * gny[i] + (pz - gz[i]) * gnz[i]
     end
@@ -4637,8 +4710,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     -- prop wash (setting, off by default): sinking into your own downwash. The props build up a
     -- wash over ~0.2 s while they move down their own axis, less the faster they also move edgewise.
     -- It costs thrust (up to wl, from a 0.6 m/s sink until it fades out at wv m/s: the quad sinks
-    -- and feels mushy) and, falling faster with throttle on, shakes it (smoothed noise, so it reads
-    -- as a wobble, not jitter).
+    -- and feels mushy) and shakes it.
     wl = 0
     if S.wash > 0 then
       local vu0 = vx * ux + vy * uy + vz * uz
@@ -4653,16 +4725,40 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
           wl = P.wl * sW * f
         end
       end
-      if vu0 < -2 and sT > 0.2 then
-        local a = (-vu0 - 2) * 0.2
+      -- the shake: the props chop through their own turbulent wake and the quad rings at its wash
+      -- frequency. Sized from real Betaflight blackbox logs: pw is the jitter's rms in degrees at full
+      -- wash with the throttle chopped (tenths of a degree; about half with throttle on, when the
+      -- motors have the authority to fight it), each wash its own severity. From a 0.5 m/s sink, gone
+      -- in forward flight, no drift (the rates are its steps); the wake keeps buffeting it for ~0.2 s
+      -- after the sink stops
+      local a = 0
+      if vu0 < -0.5 and dt > 0 then
+        a = (-vu0 - 0.5) * 0.5
         if a > 1 then a = 1 end
-        -- scaled by the real wash build-up (faster edgewise flight clears it); Max carries
-        -- the full-strength set, Stock the class's own
-        a = a * sT * P.pw * 2.5 * sW
-        wob1, wob2 = wob1 * 0.6 + (rnd() - 0.5) * a, wob2 * 0.6 + (rnd() - 0.5) * a
-        wr, wp = wr + wob1, wp + wob2
-      else
-        wob1, wob2 = 0, 0
+        local th = sT * 2 - 0.2
+        if th < 0 then th = 0 elseif th > 1 then th = 1 end
+        if sH < 1e-4 then sV = 0.4 + 1.8 * rnd() ^ 2 end   -- a new wash: how bad this one is
+        a = a * sW * (1 - 0.45 * th) * sV * P.pw * 0.0504  -- rad: its rms is 0.346 a
+      end
+      local k = dt * 5
+      if k > 1 then k = 1 end
+      if a < sH then a = sH + (a - sH) * k end
+      sH = a
+      local rh = dt * 9                                -- the same jitter at any frame rate:
+      if rh > 1 then rh = 1 end                        -- 0.55 of it kept per 50 ms frame
+      local g = a * sqrt(rh * (2 - rh)) * 1.2
+      -- each axis is a fading phasor turning at the class's wash frequency (real quads: 20-45 Hz);
+      -- past what the frame rate can show, as fast as the screen can (2.5 rad a frame)
+      local w = dt * P.pf * 6.283
+      if w > 2.5 then w = 2.5 end
+      local c, s = cos(w) * (1 - rh), sin(w) * (1 - rh)
+      local j1, j2, j3 = wob1 * c - wq1 * s + (rnd() - 0.5) * g, wob2 * c - wq2 * s + (rnd() - 0.5) * g,
+        wob3 * c - wq3 * s + (rnd() - 0.5) * g * 0.35
+      if dt > 0 then
+        wr, wp, wy = wr + (j1 - wob1) / dt, wp + (j2 - wob2) / dt, wy + (j3 - wob3) / dt
+        wq1, wq2, wq3 = wob1 * s + wq1 * c + (rnd() - 0.5) * g, wob2 * s + wq2 * c + (rnd() - 0.5) * g,
+          wob3 * s + wq3 * c + (rnd() - 0.5) * g * 0.35
+        wob1, wob2, wob3 = j1, j2, j3
       end
     end
     if grounded and T < G * 1.02 then
@@ -4680,9 +4776,9 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     local n = floor(dt * 80) + 1
     local h = dt / n
     local km, kr, ky = h / (P.tm + h), h / (P.tr + h), h / (P.ty + h)
-    local VP, VK, KS, KF, KU, sTx = P.vp, P.vk, P.ks, P.kf, P.ku, sqrt(Tmax)
-    local TL, VT2, TE, ER, VD, LR, GG, GL, GW = P.tl, P.vt * P.vt, P.te, P.er, P.vd, P.lr, P.gg, P.gl, P.gw
-    local VQ, CQ = P.vq, P.cq
+    local VP, VK, VC, KS, KF, KU = P.vp, P.vk, P.vc, P.ks, P.kf, P.ku
+    local TL, VT2, TE, TA, ER, VD, LR, GG, GL, GW = P.tl, P.vt * P.vt, P.te, P.ta, P.er, P.vd, P.lr, P.gg, P.gl, P.gw
+    local SQ, CQ, CE, SE, RF = P.sq, P.cq, P.ce, P.se, P.rf
     local x0, x1, z0, z1 = TR.x0 - 160, TR.x1 + 160, TR.z0 - 160, TR.z1 + 160
     local bx0, bx1, by0, by1, bz0, bz1 = BX.x0, BX.x1, BX.y0, BX.y1, BX.z0, BX.z1
     -- broad phase once per frame: only objects within reach get tested per substep
@@ -4727,24 +4823,37 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
       local vu = ax_ * ux + vy * uy + az_ * uz
       local vr = ax_ * rx + vy * ry + az_ * rz
       local vf = ax_ * fx + vy * fy + az_ * fz
-      -- props lose thrust as the air through them speeds up (climbing) and gain thrust descending:
-      -- up to cq, about 2.5 times as fast as they lose it climbing (a cushion when you sink)
+      -- props lose thrust as the air through them speeds up (climbing) and gain thrust sinking,
+      -- until the blades stall in a fast drop
+      local tf = Tm / Tmax                              -- thrust fraction
       local Ta
       if vu < 0 then
-        Ta = Tm - vu * sqrt(Tm) * sTx / VQ
-        if Ta > Tm * CQ then Ta = Tm * CQ end
+        -- descending: a cushion that rises to cq at a sink of sq*tf^se, then stalls away (to rf)
+        local x = 9
+        if tf > 0.001 then x = -vu / (SQ * tf ^ SE) end
+        local r = 1 + (CQ - 1) * (1 - CE * tf) * (2 * x - x * x)
+        if r < RF then r = RF end
+        Ta = Tm * r
       else
-        Ta = Tm - vu * sqrt(Tm) * sTx / (VP + vu * VK)
+        if Tm > 0 then                                -- the loss grows with thrust as Tm*(Tmax/Tm)^VC
+          local den = VP + vu * VK                    -- and bends with VK as the inflow grows
+          if den < VP * 0.3 then den = VP * 0.3 end
+          Ta = Tm - vu * Tm * (Tmax / Tm) ^ VC / den
+        else
+          Ta = 0
+        end
         if Ta < 0 then Ta = 0 end
       end
       Ta = Ta * (1 - wl)
       -- translational lift: flying edgewise the props reach fresh air, the induced inflow drops
       -- and the same rpm gives more thrust (a 5": +25% at 6 m/s, +50% from 15 m/s)
       local e2 = vr * vr + vf * vf
-      -- the edgewise gain is a hover-throttle effect; it fades as thrust grows (te)
-      local u = Tmax / (Tm * P.twr)
-      if u > 1 then u = 1 end
-      Ta = Ta * (1 + TL * u ^ TE * e2 / (e2 + VT2))
+      -- the gain fades near full stick (te) and as air comes through the props axially (ta, m/s)
+      local t2 = tf * tf
+      local fa = 1 - TE * t2 * t2
+      if fa < 0 then fa = 0 end
+      if vu > 0 then fa = fa / (1 + vu / TA) end
+      Ta = Ta * (1 + TL * fa * e2 / (e2 + VT2))
       -- ground effect: within a twentieth of the prop diameter of the ground or a roof the props
       -- push their inflow against it (measured along body-down): up to
       -- +25% on a 5", +45% on a 3". Less when tilted (the ray is longer), fades with speed.
@@ -4838,8 +4947,8 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     speed = sqrt(vx * vx + vy * vy + vz * vz)
     if STICKTIME_TEST then
       -- motor sound state for the web emulator: what the synth needs (rpm from the thrust
-      -- fraction, axial and edgewise flow, wash build-up)
-      aTf = Tm / Tmax
+      -- fraction, axial and edgewise flow, wash build-up, the shake's rms (deg) and frequency)
+      aTf, aS, aF = Tm / Tmax, sH * 19.8, P.pf
       aVu = vx * ux + vy * uy + vz * uz
       aE2 = sqrt((vx * rx + vy * ry + vz * rz) ^ 2 + (vx * fx + vy * fy + vz * fz) ^ 2)
       aW = sW
@@ -5102,6 +5211,7 @@ local function applySettings()
     i = i + 1
     P[QK[i]] = tonumber(v)
   end
+  if S.twr > 0 and (S.twr < P.tlo or S.twr > P.thi) then S.twr = 0 end   -- not for this class: Stock
   if S.twr > 0 then P.twr = S.twr end       -- 0: the class's stock power
   if S.wash == 1 then P.wl, P.wv, P.pw = P.wls, P.wvs, P.pws end  -- Stock: the class's own wash
   P.angle = S.mode == 2
@@ -5518,8 +5628,11 @@ optStep = function(o, d)
   end
   local vals = o[3]
   if vals then
-    local j = optIndex(o) + d
-    if j < 1 then j = #vals elseif j > #vals then j = 1 end
+    local j = optIndex(o)
+    repeat                                     -- Power: only what suits the quad
+      j = j + d
+      if j < 1 then j = #vals elseif j > #vals then j = 1 end
+    until key ~= "twr" or vals[j] == 0 or vals[j] >= P.tlo and vals[j] <= P.thi
     S[key] = vals[j]
   else
     -- fine steps, five times bigger after eight quick ones in a row (held key, fast wheel)
@@ -5874,7 +5987,7 @@ local function init()
     TEST.race = function() return lastGate, lapStart, R.n, R.laps, R.total, R.crashes, tStart end
     TEST.info = function() return NT, P.twr, gmode, R.pos, AI.n, R.sc, R.rn, R.rt, R.chn, BX.n, TRACKS[S.track][1] end
     TEST.thrust = function() return P.twr, P.i0, P.tn, P.dz end
-    TEST.audio = function() return sT, S.quad, state, aTf, aVu, aE2, aW, sA, sE, sR end
+    TEST.audio = function() return sT, S.quad, state, aTf, aVu, aE2, aW, sA, sE, sR, aS, aF end
     TEST.ai = function(a) return AI.x[a], AI.y[a], AI.z[a], AI.k[a], AI.d[a], AI.v[a], AI.seg[a] end
     TEST.best = function(t) return BEST.l[t], BEST.r[t], BEST.g[t], BEST.f[t] end
     TEST.box = function(b) return BX.x0[b], BX.x1[b], BX.y0[b], BX.y1[b], BX.z0[b], BX.z1[b] end
@@ -5954,19 +6067,19 @@ end
 end
 return t
 end
-local S = { track = 1, quad = 1, twr = 6, mode = 1, rates = 2, tilt = 20, laps = 3, wind = 0, vib = 1 }
+local S = { track = 1, quad = 1, twr = 0, mode = 1, rates = 2, tilt = 20, laps = 3, wind = 0, wash = 0, vib = 1 }
 local OPTS = {
-{ "Quad", "quad", { 1, 2 }, { "Racer", "Freestyle" } },
-{ "Power", "twr", nums("3 4 5 6 7 8 10 12"), ":1" },
+{ "Quad", "quad", { 1, 2, 3, 4 }, { 'Racer 5"', 'Freestyle 5"', '3" toothpick', 'Whoop 65mm' } },
+{ "Power", "twr", nums("0 3 4 5 6 7 8 10 12"), ":1" },                -- 0: Stock
 { "Flight mode", "mode", { 1, 2 }, { "Acro", "Angle" } },
 { "Rates", "rates", { 1, 2, 3 }, { "Soft", "Normal", "Fast" } },
 { "Camera tilt", "tilt", nums("0 10 15 20 25 30 35 40 50") },
 { "Laps", "laps", nums("1 2 3 5 10") },
 { "Wind", "wind", { 0, 1, 2 }, { "Off", "Light", "Strong" } },
+{ "Prop wash", "wash", { 0, 1, 2 }, { "Off", "Stock", "Max" } },
 { "Vibration", "vib", { 0, 1 }, { "Off", "On" } },
 }
 local RATES = nums("70 400 35 70 350 30 100 600 50 100 500 40 150 850 45 130 700 40")
-local QP = nums("90 .55 .009 .028 .02 .012 68 .48 .0082 .026 .025 .016")
 local TRACKS = { "Meadow", "Figure 8", "Dive Tower", "Slalom", "Hoop Forest", "Grand Prix", "Bando", "Pro Track" }
 local GW = { 1.5, 1.5, 2, 1.25, 2.4, 6, 6, 2.2 }
 local GH = { 1, 1, 2, 1.25, 2.4, 30, 30, 1.8 }
@@ -6127,6 +6240,8 @@ local px, py, pz, vx, vy, vz = 0, 0.15, 0, 0, 0, 0                      -- posit
 local rx, ry, rz, ux, uy, uz, fx, fy, fz = 1, 0, 0, 0, 1, 0, 0, 0, 1   -- right, up, forward
 local sA, sE, sT, sR, speed = 0, 0, 0, 0, 0
 local wr0, wp0, wy0, Tm, grounded = 0, 0, 0, 0, true                  -- body rates (rad/s), thrust
+local sW = 0                                                          -- prop wash build-up
+local aTf, aVu, aE2, aW = 0, 0, 0, 0                                  -- sound state for the web emulator
 local state, gm, from = 1, 1, 4
 local gt, lastT, tState, tStart, fi, pt, smp = 0, 0, 0, 0, 5, 0, 0     -- clocks (10 ms ticks)
 local lap, nextGate, lastGate, lapStart, total = 0, 1, 0, nil, 0
@@ -6138,8 +6253,18 @@ local s = floor(cs / 100)
 return string.format("%d:%02d.%d", floor(s / 60), s % 60, floor(cs % 100 / 10))
 end
 local function apply()
-local r, q = S.rates * 6 - 6, S.quad * 6 - 6
-for i = 1, 6 do P[i], P[i + 6] = RATES[r + i], QP[q + i] end
+local r = S.rates * 6 - 6
+for i = 1, 6 do P[i] = RATES[r + i] end
+local f = io.open("/SCRIPTS/TOOLS/StickTimeLite/q" .. S.quad .. ".txt", "r")
+local s, i = f and io.read(f, 300) or "", 6
+if f then io.close(f) end
+for v in string.gmatch(s, "%S+") do
+i = i + 1
+P[i] = tonumber(v)
+end
+if S.twr > 0 and (S.twr < P[42] or S.twr > P[43]) then S.twr = 0 end -- not for this class: Stock
+if S.twr > 0 then P[7] = S.twr end                                   -- 0: the class's stock power
+if S.wash == 1 then P[29], P[30] = P[33], P[34] end                  -- Stock: the class's own wash
 local t = S.tilt * 0.0174533
 tc, ts = cos(t), sin(t)
 F = CX / 1.19                                                        -- 100 deg field of view
@@ -6173,7 +6298,7 @@ local l = sqrt(hx * hx + hz * hz) + 0.001
 hx, hz = hx / l, hz / l
 px, py, pz, vx, vy, vz = x, y, z, 0, 0, 0
 fx, fy, fz, rx, ry, rz, ux, uy, uz = hx, 0, hz, hz, 0, -hx, 0, 1, 0
-grounded, speed, Tm, wr0, wp0, wy0 = y <= 0.15 + 0.01, 0, 0, 0, 0, 0
+grounded, speed, Tm, wr0, wp0, wy0, sW = y <= 0.15 + 0.01, 0, 0, 0, 0, 0, 0
 for i = 1, NG do
 gd[i] = (px - gx[i]) * gnx[i] + (py - gy[i]) * gny[i] + (pz - gz[i]) * gnz[i]
 end
@@ -6306,7 +6431,8 @@ local physics
 do
 local nearG, nearP = {}, {}
 physics = function(dt)
-local Tmax, wr, wp = S.twr * 9.81, 0, 0
+local G = 10.78                            -- 1.1 g: a heavier, more planted feel
+local Tmax, wr, wp = P[7] * G, 0, 0
 if S.mode == 2 then
 local hx, hz = -rz, rx
 local l = sqrt(hx * hx + hz * hz) + 0.0001
@@ -6318,8 +6444,25 @@ else
 wr, wp = rate(sA, P[1], P[2], P[3]), -rate(sE, P[1], P[2], P[3])
 end
 local wy = rate(sR, P[4], P[5], P[6])
-local T = Tmax * (0.015 + 0.985 * sT ^ 1.6)                  -- 1.5% idle, like DShot idle
-if grounded and T < 10 then
+local x = (sT - P[10]) / (1 - P[10])                         -- the class curve: bottom dead zone,
+if x < 0 then x = 0 end                                       -- idle, then thrust ~ rpm^2
+local T = Tmax * (P[8] + (1 - P[8]) * x ^ P[9])
+local wl = 0
+if S.wash > 0 then
+local vu0 = vx * ux + vy * uy + vz * uz
+if vu0 < 0 then
+local vr0, vf0 = vx * rx + vy * ry + vz * rz, vx * fx + vy * fy + vz * fz
+local k = dt * 5
+if k > 1 then k = 1 end
+sW = sW + (1 / (1 + sqrt(vr0 * vr0 + vf0 * vf0)) - sW) * k
+if vu0 < -0.6 then
+local f = (P[30] + vu0) / (P[30] - 2)
+if f > 1 then f = 1 elseif f < 0 then f = 0 end
+wl = P[29] * sW * f
+end
+end
+end
+if grounded and T < G * 1.02 then
 wr, wp, wr0, wp0 = 0, 0, 0, 0
 if uy < 0.999 then place(px, 0.15, pz, fx, fz) end
 end
@@ -6331,7 +6474,11 @@ wx, wz = wdx * g, wdz * g
 end
 local n = floor(dt * 80) + 1
 local h = dt / n
-local km, kr, VP, KH, KS, KU, sTx = h / (P[11] + h), h / (P[12] + h), P[7], P[8], P[9], P[10], sqrt(Tmax)
+local km, kr, ky = h / (P[25] + h), h / (P[26] + h), h / (P[27] + h)
+local VP, VK, TL, VT2, TE, VC, TA = P[11], P[12], P[13], P[14] * P[14], P[15], P[36], P[37]
+local KS, KF, KU, ER, VD, LR = P[16], P[17], P[18], P[19], P[20], P[21]
+local GG, GL, GEW, SQ, CQ = P[22], P[23], P[24], P[31], P[32]                     -- GEW: not GW (gate widths)
+local CE, SE, RF = P[38], P[39], P[40]
 local fl = 0
 for i = 1, NB do
 if px > bx0[i] and px < bx1[i] and pz > bz0[i] and pz < bz1[i] and py > by1[i] and by1[i] > fl then fl = by1[i] end
@@ -6355,23 +6502,64 @@ end
 end
 for _ = 1, n do
 Tm = Tm + (T - Tm) * km
-wr0, wp0, wy0 = wr0 + (wr - wr0) * kr, wp0 + (wp - wp0) * kr, wy0 + (wy - wy0) * kr
+wr0, wp0, wy0 = wr0 + (wr - wr0) * kr, wp0 + (wp - wp0) * kr, wy0 + (wy - wy0) * ky
 rotate(wr0 * h, wp0 * h, wy0 * h)
 local ax_, az_ = vx - wx, vz - wz
 local vu, vr, vf = ax_ * ux + vy * uy + az_ * uz, ax_ * rx + vy * ry + az_ * rz, ax_ * fx + vy * fy + az_ * fz
-local Ta = Tm - vu * sqrt(Tm) * sTx / VP
-Ta = Ta > Tm * 1.25 and Tm * 1.25 or Ta < 0 and 0 or Ta
-local hg = py - fl
-if hg < 1.2 and uy > 0.3 then
-local k = 0.049 * uy / (hg < 0.15 and 0.15 or hg)
-Ta = Ta / (1 - k * k / (1 + (vx * vx + vz * vz) * 0.018))
+local tf = Tm / Tmax                              -- thrust fraction
+local Ta
+if vu < 0 then
+local x = 9
+if tf > 0.001 then x = -vu / (SQ * tf ^ SE) end
+local r = 1 + (CQ - 1) * (1 - CE * tf) * (2 * x - x * x)
+if r < RF then r = RF end
+Ta = Tm * r
+else
+if Tm > 0 then                                -- the loss grows with thrust as Tm*(Tmax/Tm)^VC
+local den = VP + vu * VK                    -- and bends with VK as the inflow grows
+if den < VP * 0.3 then den = VP * 0.3 end
+Ta = Tm - vu * Tm * (Tmax / Tm) ^ VC / den
+else
+Ta = 0
 end
-local kh = KH * sqrt(Tm * 0.0204 + 0.02)   -- rotor drag: 0.0204 = 1 / (5 G)
-local au = Ta - KU * (vu < 0 and -vu or vu) * vu
-local ar = -(kh + KS * (vr < 0 and -vr or vr)) * vr
-local af = -(kh + KS * (vf < 0 and -vf or vf)) * vf
+if Ta < 0 then Ta = 0 end
+end
+Ta = Ta * (1 - wl)
+local e2 = vr * vr + vf * vf
+local t2 = tf * tf
+local fa = 1 - TE * t2 * t2
+if fa < 0 then fa = 0 end
+if vu > 0 then fa = fa / (1 + vu / TA) end
+Ta = Ta * (1 + TL * fa * e2 / (e2 + VT2))
+if uy > 0.3 then
+local d = (py - fl - 0.15) / uy + 0.03
+if d < GL then
+local k = (GL - d) / GEW
+if k > 1 then k = 1 end
+Ta = Ta * (1 + GG * k / (1 + e2 * 0.0125))
+end
+end
+local au, ar, af = Ta, 0, 0
+local v2 = vu * vu + e2
+if v2 > 1e-4 then
+local v = sqrt(v2)
+local S_ = KS * (vr < 0 and -vr or vr) + KU * (vu < 0 and -vu or vu) + KF * (vf < 0 and -vf or vf)
+local xd = v / VD
+if xd > 1 then xd = 1 end
+S_ = S_ * (1 + ER * (1 - xd * xd * (3 - 2 * xd)))
+au, ar, af = Ta - S_ * vu, -S_ * vr, -S_ * vf
+local sn = vu / v
+local c2 = 1 - sn * sn
+if c2 > 1e-4 then
+local c = sqrt(c2)
+local q = LR * sn * 0.813 * (2 * (sn < 0 and -sn or sn) * c) ^ 0.6 * S_ * v / c
+au = au - q * c2
+q = q * sn / v
+ar, af = ar + q * vr, af + q * vf
+end
+end
 vx = vx + (ux * au + rx * ar + fx * af) * h
-vy = vy + (uy * au + ry * ar + fy * af - 9.81) * h
+vy = vy + (uy * au + ry * ar + fy * af - G) * h
 vz = vz + (uz * au + rz * ar + fz * af) * h
 local ox_, oy_, oz_ = px, py, pz
 px, py, pz = px + vx * h, py + vy * h, pz + vz * h
@@ -6422,6 +6610,12 @@ l = 1 / sqrt(rx * rx + ry * ry + rz * rz)
 rx, ry, rz = rx * l, ry * l, rz * l
 ux, uy, uz = fy * rz - fz * ry, fz * rx - fx * rz, fx * ry - fy * rx
 speed = sqrt(vx * vx + vy * vy + vz * vz)
+if STICKTIME_TEST then
+aTf = Tm / Tmax
+aVu = vx * ux + vy * uy + vz * uz
+aE2 = sqrt((vx * rx + vy * ry + vz * rz) ^ 2 + (vx * fx + vy * fy + vz * fz) ^ 2)
+aW = sW
+end
 if gm == 3 then
 local m = py + 0.7
 for j = 1, np do
@@ -6587,7 +6781,7 @@ if v then v = v < 1 and "--" or i < 3 and timeStr(v) or v .. "" end
 if i == 5 then l = editing and "< " .. TRACKS[t] .. " >" or "Track: " .. TRACKS[t] end
 elseif o then
 local j = optIdx(o)
-v = type(o[4]) == "table" and o[4][j] or o[3][j] .. (o[4] or "")
+v = type(o[4]) == "table" and o[4][j] or o[3][j] == 0 and o[4] == ":1" and "Stock" or o[3][j] .. (o[4] or "")
 end
 drawText(2 * U, y, l, SML + ((editing and state == 2) and 0 or f))
 if v then drawText(XM - U, y, v, SML + RIGHT + ((editing and state == 2) and f or 0)) end
@@ -6777,7 +6971,12 @@ selectTrack((S.track + d - 1) % 8 + 1)
 save()
 elseif d ~= 0 then
 local o = OPTS[focus]
-S[o[2]] = o[3][(optIdx(o) + d - 1) % #o[3] + 1]
+local j, v = optIdx(o)
+repeat                                                         -- Power: what suits the quad
+j = (j + d - 1) % #o[3] + 1
+v = o[3][j]
+until o[2] ~= "twr" or v == 0 or v >= P[42] and v <= P[43]
+S[o[2]] = v
 apply()
 elseif e == E_ENTER or e == E_EXIT then
 editing = false
@@ -6839,7 +7038,9 @@ end
 T.vel = function(a, b, c) vx, vy, vz = a, b, c end
 T.next = function(i) nextGate, lastGate = i, (i - 2) % NG + 1 end
 T.lapclock = function(t) lapStart, tStart, msgT = gt - t, gt - t, gt - 1000 if lap < 1 then lap = 1 end end
-T.info = function() return 8, S.twr, gm, lap, total, rn, rt, TRACKS[S.track], NP, sc, chn, NB end
+T.info = function() return 8, P[7], gm, lap, total, rn, rt, TRACKS[S.track], NP, sc, chn, NB end
+T.thrust = function() return P[7], P[8], P[9], P[10] end
+T.audio = function() return sT, S.quad, state, aTf, aVu, aE2, aW, sA, sE, sR end
 T.best = function(t) return BL[t], BR[t], BG[t], BF[t] end
 T.ntracks = function() return 8 end
 T.nmodes = function() return 4 end
@@ -7041,13 +7242,17 @@ return f()
 </script>
 <script>
 const LITE_TRACKS = {
+"/SCRIPTS/TOOLS/StickTimeLite/q1.txt": "7.67 .0315 2.16 0 77.4 .101 .854 8.6 .402 .0152 .00819 .0287 .357 15 .229 .24 .25 .113 .006 .009 .02 .347 .326 6.01 15.5 1.35 .119 3.8 .19 .584 35.1 .544 .579 .756 26 5 12\n",
+"/SCRIPTS/TOOLS/StickTimeLite/q2.txt": "6.88 .026 1.52 .08 75.5 -.283 .685 9.14 .514 .011 .00635 .0184 .357 15 .257 .26 .25 .113 .006 .008 .02 .347 .348 7 13.5 1.39 .132 4.56 .19 .524 90.5 .722 .497 .722 24 4 10\n",
+"/SCRIPTS/TOOLS/StickTimeLite/q3.txt": "5.35 .0221 1.72 .03 67.6 -.77 1.01 9.33 0 .0176 .0167 .0417 .5 15 .1 .44 .15 .135 .006 .009 .02 .42 .291 7.04 15.5 1.61 .103 5.17 .23 .681 12.2 .21 .525 .881 35 3 10\n",
+"/SCRIPTS/TOOLS/StickTimeLite/q4.txt": "2.58 .0059 .9 .11 72.9 -1 1.14 9.97 .019 .0741 .07 .0875 .286 7 0 .17 .0625 .0344 .006 .02 .02 .854 .237 5.61 9.08 1.37 .0243 2.5 .27 .891 23.6 .174 .557 .9 45 3 8\n",
 "/SCRIPTS/TOOLS/StickTimeLite/t1.txt": "11 9 0 0 1 0 0 6 34 1 20 0 26 58 2 70 0 56 52 1 120 0 66 22 1 180 0 52 -8 2 230 0 24 -22 1 270 0\n",
 "/SCRIPTS/TOOLS/StickTimeLite/t2.txt": "23 9 -14 10 1 0 0 6 46 2 40 0 18 68 1 0 0 0 88 1 -90 0 -18 68 1 180 0 18 16 1 180 0 0 -4 1 -90 0\n",
 "/SCRIPTS/TOOLS/StickTimeLite/t3.txt": "37 9 0 0 1 0 0 10 30 1 20 0 12 60 2 0 0 0 84 2 -90 0 -28 84 3 -90 0 -36 52 1 180 0 -28 20 1 160 0 -12 -14 1 60 0\n",
 "/SCRIPTS/TOOLS/StickTimeLite/t4.txt": "53 9 0 0 5 0 0 -2 22 7 0 0 6 40 6 0 0 -2 58 7 0 0 6 76 6 0 0 2 96 4 0 3 22 112 2 90 0 44 100 4 120 3 48 78 7 180 0 40 60 6 180 0 48 42 7 180 0 44 18 3 200 0 28 -22 1 -90 0\n",
 "/SCRIPTS/TOOLS/StickTimeLite/t5.txt": "61 18 0 0 1 0 0 8 24 4 20 2.4 24 44 4 50 4.5 48 54 4 90 6 72 46 2 130 0 80 22 4 180 2 70 -2 4 220 3.5 48 -14 3 247 0 24 -24 4 300 2.2\n",
 "/SCRIPTS/TOOLS/StickTimeLite/t6.txt": "71 9 0 0 5 0 0 0 40 1 0 0 10 80 2 20 6 36 104 4 70 3 64 106 7 100 0 88 96 6 120 0 110 76 3 180 0 112 44 1 180 0 104 14 4 200 2.2 84 -8 2 250 8 56 -18 1 270 0 30 -28 4 290 3\n",
-"/SCRIPTS/TOOLS/StickTimeLite/t7.txt": "83 9 0 0 1 0 0 0 34 8 0 1.8 0 46 8 0 1.8 20 66 4 60 4 40 88 3 146 0 56 64 1 180 0 43.95 10 8 180 1.3 22 -16 4 250 2.5 / -6.225 34 4.025 .25 0 7 6.225 34 4.025 .25 0 7 0 34 2.2 .25 3.6 7 -6.225 46 4.025 .25 0 7 6.225 46 4.025 .25 0 7 0 46 2.2 .25 3.6 7 -10 40 .25 5.75 0 7 10 36.025 .25 1.775 0 7 10 43.975 .25 1.775 0 7 10 40 .25 2.2 3.6 7 46 64 2 2 0 24 33.6 10 1.25 3 0 2.6 40.5 10 1.25 3 0 2.6 47.4 10 1.25 3 0 2.6 -30 20 3 1.25 0 5.2 -36 50 4 4 0 3\n",
+"/SCRIPTS/TOOLS/StickTimeLite/t7.txt": "83 9 0 0 1 0 0 0 34 8 0 1.8 0 46 8 0 1.8 20 66 4 60 4 40 88 3 146 0 56 64 1 180 0 43.95 10 8 180 1.3 22 -16 4 250 2.5 / -6.225 34 4.025 .25 0 7 6.225 34 4.025 .25 0 7 0 34 2.2 .25 3.6 7 -6.225 46 4.025 .25 0 7 6.225 46 4.025 .25 0 7 0 46 2.2 .25 3.6 7 -10 40 .25 5.75 0 7 10 36.025 .25 1.775 0 7 10 43.975 .25 1.775 0 7 10 40 .25 2.2 3.6 7 46 64 2 2 0 36 33.6 10 1.25 3 0 2.6 40.5 10 1.25 3 0 2.6 47.4 10 1.25 3 0 2.6 -30 20 3 1.25 0 5.2 -36 50 4 4 0 3\n",
 "/SCRIPTS/TOOLS/StickTimeLite/t8.txt": "97 9 0 0 1 0 0 0 22 2 0 0 0 44 3 0 0 8 62 7 90 0 16 44 4 180 0 16 22 1 180 0 24 4 6 90 0 32 22 1 0 0 32 46 2 0 0 32 46 1 180 0 46 26 4 160 3 48 4 1 180 0 46 -14 7 225 0 24 -22 1 270 0\n"
 };
 </script>
@@ -7082,8 +7287,11 @@ const ROBOTO = { r: "d09GMgABAAAAAFV8ABIAAAAAsBgAAFUTAAEAAAAAAAAAAAAAAAAAAAAAAAA
     ghost: store.get('ghost', true),
     delay: store.get('delay', true),
     vol: store.get('vol', 0.8),
+    lastVol: store.get('lastVol', 0.8),            // what unmuting goes back to
+    musicOn: store.get('musicOn', false),
+    musicVol: store.get('musicVol', 0.6),
     mode: store.get('mode', 2),
-    input: 'mix',
+    input: store.get('input', 'mix') === 'pad' ? 'pad' : 'mix',
     cpu: null,
     sd: new Map(Object.entries(store.get('sd', {}))),
     pad: store.get('padmap', { ail: [0, false], ele: [1, false], thr: [2, false], rud: [3, false] }),
@@ -7105,7 +7313,18 @@ const ROBOTO = { r: "d09GMgABAAAAAFV8ABIAAAAAsBgAAFUTAAEAAAAAAAAAAAAAAAAAAAAAAAA
   }
 
   // ------------------------------------------------------------- sound
-  let actx = null, toneEnd = 0, live = [], motor = null;
+  let actx = null, toneEnd = 0, live = [], motor = null, outGain = null;
+  // every sound goes through one gain, set from the slider on a loudness curve (ears hear power
+  // logarithmically: half way is about -12 dB) and eased, so beeps and motors follow it alike
+  const volGain = (v) => v * v;
+  function audioOut() {
+    if (!outGain) {
+      outGain = actx.createGain();
+      outGain.gain.value = volGain(app.vol);
+      outGain.connect(actx.destination);
+    }
+    return outGain;
+  }
   // EdgeTX's background channel (the vario's, StickTime's motor sound): one tone that each call
   // retunes and keeps going for its duration; a call with duration 0 silences it
   function bgTone(freq, dur, vol) {
@@ -7115,7 +7334,7 @@ const ROBOTO = { r: "d09GMgABAAAAAFV8ABIAAAAAsBgAAFUTAAEAAAAAAAAAAAAAAAAAAAAAAAA
       o.type = 'triangle';
       o.frequency.value = Math.max(50, freq);
       g.gain.value = 0;
-      o.connect(g).connect(actx.destination);
+      o.connect(g).connect(audioOut());
       o.start();
       motor = { o, g };
     }
@@ -7140,7 +7359,7 @@ const ROBOTO = { r: "d09GMgABAAAAAFV8ABIAAAAAsBgAAFUTAAEAAAAAAAAAAAAAAAAAAAAAAAA
     g.gain.exponentialRampToValueAtTime(0.045, t0 + 0.006);
     g.gain.setValueAtTime(0.045, Math.max(t0 + 0.007, t1 - 0.012));
     g.gain.exponentialRampToValueAtTime(0.0001, t1);
-    o.connect(g).connect(actx.destination);
+    o.connect(g).connect(audioOut());
     o.start(t0); o.stop(t1 + 0.02);
     live.push(o);
     o.onended = () => { live = live.filter((x) => x !== o); };
@@ -7152,50 +7371,85 @@ const ROBOTO = { r: "d09GMgABAAAAAFV8ABIAAAAAsBgAAFUTAAEAAAAAAAAAAAAAAAAAAAAAAAA
     try { if (navigator.vibrate) navigator.vibrate(Math.min(200, ms * 10)); } catch (e) { /* blocked */ }
   }
 
-  // Motor sound v3, synthesized in the browser (the radio itself can't do better than the
-  // plain tone that was removed in 1.6.4). What makes a quad sound like a quad, per motor:
-  //   - the blade-pass buzz: a custom periodic wave (fundamental + 5 harmonics, not a raw saw)
-  //     through a lowpass that opens with rpm - dark at idle, raspy at speed
-  //   - the shaft tone at rotation frequency (the low growl)
+  // Motor sound v4, synthesized in the browser (the radio itself can't do better than the
+  // plain tone that was removed in 1.6.4). Tuned against recordings of real quads, measured the
+  // same way (tone vs noise share, harmonic levels, amplitude wobble, pitch wander). Per motor:
+  //   - the blade-pass tone: nearly a pure tone (2nd harmonic ~15 dB down, the rest far below;
+  //     the whoop's is much buzzier), through a lowpass that opens with rpm
+  //   - the shaft tone at rotation frequency, and the props' imbalance wobbling the level at it
   //   - the electrical whine at 7x shaft speed (12N14P motors; the whoop's scream at 4-6.6 kHz)
-  //   - a narrow noise band: air rush with speed, prop wash when sinking through dirty air
+  //   - air noise, a whoosh up to ~2x blade pass (a tenth to a fifth of the sound; no hiss)
+  //   - a slow pitch wander (~25 cents) and, in prop wash, the rpm chatter of a real quad's
+  //     motors fighting it (a few % at the class's wash frequency, from blackbox logs), plus
+  //     the dark, fluttering rumble of dirty air the recordings have when descending
   // Each motor runs at its own rpm from a Quad-X stick mix (inputs are audible), has its own
-  // timbre and sits left/right (heard from the camera: FL/FR wide, RR/RL narrow), and an
-  // irregular ~2-7 Hz flutter (random-walk gain and detune, like turbulence over the discs)
-  // replaces the steady drone. The master swells on spool-up and dips on chop, into a high
-  // shelf and a compressor. Class rpm/timbre from each class's measured hover/full rpm.
+  // timbre and sits left/right (heard from the camera: FL/FR wide, RR/RL narrow); together they
+  // beat and flutter like four real props. The master swells on spool-up and dips on chop, into
+  // gentle saturation, a high shelf and a compressor. Class rpm from each class's hover/full rpm.
   const ACLASS = [
-    { rpm: 31679, blades: 3, poles: 7, buzz: 1.0, whine: 0.14, shaft: 0.1, noise: 0.45 },  // 5" racer
-    { rpm: 31679, blades: 3, poles: 7, buzz: 0.9, whine: 0.16, shaft: 0.12, noise: 0.55 }, // 5" freestyle
-    { rpm: 36301, blades: 3, poles: 7, buzz: 0.8, whine: 0.18, shaft: 0.1, noise: 0.65 },  // 3" toothpick
-    { rpm: 56381, blades: 3, poles: 7, buzz: 0.4, whine: 0.4, shaft: 0.05, noise: 1.0 },   // 65 mm whoop
+    { rpm: 31679, blades: 3, poles: 7, buzz: 1.0, whine: 0.14, shaft: 0.1, noise: 0.45, wave: 0 },  // 5" racer
+    { rpm: 31679, blades: 3, poles: 7, buzz: 0.9, whine: 0.16, shaft: 0.12, noise: 0.5, wave: 0 },  // 5" freestyle
+    { rpm: 36301, blades: 3, poles: 7, buzz: 0.8, whine: 0.18, shaft: 0.1, noise: 0.5, wave: 0 },   // 3" toothpick
+    { rpm: 56381, blades: 3, poles: 7, buzz: 0.4, whine: 0.4, shaft: 0.05, noise: 0.4, wave: 1 },   // 65 mm whoop
   ];
+  // blade-pass harmonics: a prop's tone, and the whoop's buzz (from the recordings' spectra)
+  const WAVES = [[0, 1, 0.2, 0.08, 0.06, 0.04, 0.02], [0, 1, 0.8, 0.6, 0.35, 0.3, 0.15]];
   const MIX = [[-1, 1, -1], [1, 1, 1], [1, -1, 1], [-1, -1, -1]];   // [roll, pitch, yaw] weight per motor
   const PAN = [-0.55, 0.55, -0.3, 0.3];                              // FL, FR, RR, RL as heard from the camera
   const TIMBRE = [[1, 1], [0.9, 0.85], [1.08, 1.12], [0.94, 0.88]];  // per-motor buzz / whine scale
+  const CENTS = 1731;                                                // cents per unit of rpm fraction
+  // a seamless looping modulator: random sines on an 8 s grid with a smooth band shape, rms 1
+  // (at 8 kHz, made by the two-term sine recurrence: fast to build)
+  function modBuffer(lo, hi, centre) {
+    const sr = 8000, n = sr * 8, buf = actx.createBuffer(1, n, sr), d = buf.getChannelData(0);
+    for (let k = Math.ceil(lo * 8); k <= hi * 8; k++) {
+      const f = k / 8, a = centre ? Math.exp(-0.5 * ((f - centre) / (centre / 6)) ** 2) : 1 / Math.sqrt(f);
+      const ph = Math.random() * 2 * Math.PI, w = 2 * Math.PI * f / sr, c2 = 2 * Math.cos(w);
+      let y1 = a * Math.sin(ph - w), y2 = a * Math.sin(ph - 2 * w);
+      for (let i = 0; i < n; i++) { const y = c2 * y1 - y2; d[i] += y; y2 = y1; y1 = y; }
+    }
+    let s = 0;
+    for (let i = 0; i < n; i++) s += d[i] * d[i];
+    const g = 1 / Math.sqrt(s / n);
+    for (let i = 0; i < n; i++) d[i] *= g;
+    return buf;
+  }
+  function loopSrc(buf, rate, all) {
+    const s = actx.createBufferSource();
+    s.buffer = buf; s.loop = true; s.playbackRate.value = rate; s.start();
+    all.push(s);
+    return s;
+  }
+  const gainNode = (v) => { const g = actx.createGain(); g.gain.value = v; return g; };
   let synth = null;
   function startSynth() {
-    const master = actx.createGain();
-    master.gain.value = 0;
+    const srcs = [], loop = (b, r) => loopSrc(b, r, srcs);         // every source, to stop them all
+    const master = gainNode(0);
     const shelf = actx.createBiquadFilter();
     shelf.type = 'highshelf'; shelf.frequency.value = 3800; shelf.gain.value = -6;
     const comp = actx.createDynamicsCompressor();
     comp.threshold.value = -20; comp.knee.value = 18; comp.ratio.value = 5;
     comp.attack.value = 0.004; comp.release.value = 0.18;
-    master.connect(shelf); shelf.connect(comp); comp.connect(actx.destination);
-    const sum = actx.createGain();                                  // the flutter modulates this node
-    sum.gain.value = 1;
-    const shaper = actx.createWaveShaper();                         // soft saturation: warmth and grit
+    master.connect(shelf); shelf.connect(comp); comp.connect(audioOut());
+    const sum = gainNode(1);                                        // the flutter modulates this node
+    const shaper = actx.createWaveShaper();                         // gentle saturation: warmth
     const curve = new Float32Array(257);
-    for (let i = 0; i < 257; i++) { const x = i / 128 - 1; curve[i] = Math.tanh(2.2 * x) / Math.tanh(2.2); }
+    for (let i = 0; i < 257; i++) { const x = i / 128 - 1; curve[i] = Math.tanh(1.2 * x) / Math.tanh(1.2); }
     shaper.curve = curve; shaper.oversample = '2x';
-    const drive = actx.createGain(); drive.gain.value = 1.6;        // into the shaper, then back off after
-    const trim = actx.createGain(); trim.gain.value = 0.62;
-    sum.connect(drive); drive.connect(shaper); shaper.connect(trim); trim.connect(master);
-    const wave = actx.createPeriodicWave(new Float32Array(7), new Float32Array([0, 1, 0.6, 0.28, 0.14, 0.07, 0.03]));
+    const drive = gainNode(1);
+    sum.connect(drive); drive.connect(shaper); shaper.connect(gainNode(0.62)).connect(master);
+    const waves = WAVES.map((w) => actx.createPeriodicWave(new Float32Array(w.length), new Float32Array(w)));
     const buf = actx.createBuffer(1, actx.sampleRate * 2, actx.sampleRate);
     const ch = buf.getChannelData(0);
     for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
+    // modulators: slow wander/flutter (0.5-6 Hz) and the prop wash chatter (around 30 Hz,
+    // retuned to the class's wash frequency by playback rate), one per roll / pitch axis
+    const slow = modBuffer(0.5, 6), chat = [modBuffer(15, 60, 30), modBuffer(15, 60, 30)];
+    const chatSrc = chat.map((b) => loop(b, 1));
+    const chatAm = chatSrc.map((s) => { const g = gainNode(0); s.connect(g); return g; });  // per axis, x depth
+    const chatFm = chatSrc.map((s) => { const g = gainNode(0); s.connect(g); return g; });
+    const flut = gainNode(0);
+    loop(slow, 1).connect(flut); flut.connect(sum.gain);
     const motors = [];
     for (let m = 0; m < 4; m++) {
       let dest = sum;
@@ -7203,40 +7457,66 @@ const ROBOTO = { r: "d09GMgABAAAAAFV8ABIAAAAAsBgAAFUTAAEAAAAAAAAAAAAAAAAAAAAAAAA
         const p = actx.createStereoPanner();
         p.pan.value = PAN[m]; p.connect(sum); dest = p;
       }
+      const amp = gainNode(1);                                      // level wobble: imbalance, chatter
+      amp.connect(dest);
       const lp = actx.createBiquadFilter();
-      lp.type = 'lowpass'; lp.frequency.value = 1500; lp.Q.value = 0.8; lp.connect(dest);
-      const buzz = actx.createOscillator(), bg = actx.createGain();
-      buzz.setPeriodicWave(wave); buzz.frequency.value = 200; bg.gain.value = 0;
+      lp.type = 'lowpass'; lp.frequency.value = 1500; lp.Q.value = 0.8; lp.connect(amp);
+      const buzz = actx.createOscillator(), bg = gainNode(0);
+      srcs.push(buzz);
+      buzz.setPeriodicWave(waves[0]); buzz.frequency.value = 200;
       buzz.connect(bg); bg.connect(lp); buzz.start();
-      const buzz2 = actx.createOscillator(), b2g = actx.createGain();   // chorus: thickens the buzz
-      buzz2.setPeriodicWave(wave); buzz2.frequency.value = 201.4; b2g.gain.value = 0;
+      const buzz2 = actx.createOscillator(), b2g = gainNode(0);   // chorus: thickens the tone
+      srcs.push(buzz2);
+      buzz2.setPeriodicWave(waves[0]); buzz2.frequency.value = 201.4;
       buzz2.connect(b2g); b2g.connect(lp); buzz2.start();
-      const shaft = actx.createOscillator(), sg = actx.createGain();
-      shaft.type = 'sine'; shaft.frequency.value = 70; sg.gain.value = 0;
+      const shaft = actx.createOscillator(), sg = gainNode(0);
+      srcs.push(shaft);
+      shaft.type = 'sine'; shaft.frequency.value = 70;
       shaft.connect(sg); sg.connect(lp); shaft.start();
-      const whine = actx.createOscillator(), wg = actx.createGain();
-      whine.type = 'sine'; whine.frequency.value = 1400; wg.gain.value = 0;
-      whine.connect(wg); wg.connect(dest); whine.start();
-      const whine2 = actx.createOscillator(), w2g = actx.createGain();  // second, slightly sharp partial
-      whine2.type = 'sine'; whine2.frequency.value = 2830; w2g.gain.value = 0;
-      whine2.connect(w2g); w2g.connect(dest); whine2.start();
-      const ns = actx.createBufferSource();
-      ns.buffer = buf; ns.loop = true; ns.playbackRate.value = 0.9 + 0.05 * m;
-      const bp = actx.createBiquadFilter();
-      bp.type = 'bandpass'; bp.frequency.value = 600; bp.Q.value = 1.4;
-      const ng = actx.createGain(); ng.gain.value = 0;
-      ns.connect(bp); bp.connect(ng); ng.connect(dest); ns.start();
-      motors.push({ buzz, bg, buzz2, b2g, shaft, sg, whine, wg, whine2, w2g, ns, bp, ng, lp });
+      shaft.connect(gainNode(0.12)).connect(amp.gain);             // the imbalance wobble
+      const whine = actx.createOscillator(), wg = gainNode(0);
+      srcs.push(whine);
+      whine.type = 'sine'; whine.frequency.value = 1400;
+      whine.connect(wg); wg.connect(amp); whine.start();
+      const whine2 = actx.createOscillator(), w2g = gainNode(0);  // second, slightly sharp partial
+      srcs.push(whine2);
+      whine2.type = 'sine'; whine2.frequency.value = 2830;
+      whine2.connect(w2g); w2g.connect(amp); whine2.start();
+      const ns = loop(buf, 0.9 + 0.05 * m);                      // broadband air noise
+      const nlp = actx.createBiquadFilter(), nhp = actx.createBiquadFilter();
+      nlp.type = 'lowpass'; nlp.Q.value = 0; nhp.type = 'highpass'; nhp.Q.value = 0;
+      const ng = gainNode(0);
+      ns.connect(nlp); nlp.connect(nhp); nhp.connect(ng); ng.connect(amp);
+      // pitch: this motor's own slow wander, plus the chatter of the axes it sits on
+      const wand = gainNode(0);
+      loop(slow, 0.8 + 0.17 * m).connect(wand);
+      const det = [buzz, buzz2, shaft, whine, whine2].map((o) => o.detune);
+      det.forEach((d) => wand.connect(d));
+      for (let ax = 0; ax < 2; ax++) {
+        const sAm = gainNode(MIX[m][ax] / Math.SQRT2), sFm = gainNode(MIX[m][ax] / Math.SQRT2);
+        chatAm[ax].connect(sAm); sAm.connect(amp.gain);
+        chatFm[ax].connect(sFm); det.forEach((d) => sFm.connect(d));
+      }
+      motors.push({ buzz, bg, buzz2, b2g, shaft, sg, whine, wg, whine2, w2g, ns, nlp, nhp, ng, lp, wand });
     }
+    // dirty air: a dark rumble that flutters, when descending into the wash
+    const dv = loop(buf, 0.71);
+    const dvf = actx.createBiquadFilter();
+    dvf.type = 'lowpass'; dvf.frequency.value = 400; dvf.Q.value = 0;
+    const dvg = gainNode(0), dvam = gainNode(1);
+    dv.connect(dvf); dvf.connect(dvg); dvg.connect(dvam); dvam.connect(drive);
+    const dvFl = gainNode(0.6);
+    loop(slow, 3.3).connect(dvFl); dvFl.connect(dvam.gain);
+    const dvCh = gainNode(0);
+    chatSrc[0].connect(dvCh); dvCh.connect(dvam.gain);
     // airflow: the wind rush over the frame grows with airspeed (its own voice, not the motors')
-    const ws = actx.createBufferSource();
-    ws.buffer = buf; ws.loop = true; ws.playbackRate.value = 0.8;
+    const ws = loop(buf, 0.8);
     const wf = actx.createBiquadFilter();
     wf.type = 'lowpass'; wf.frequency.value = 200; wf.Q.value = 0.5;
-    const wgn = actx.createGain(); wgn.gain.value = 0;
-    ws.connect(wf); wf.connect(wgn); wgn.connect(master); ws.start();
-    synth = { master, sum, motors, buf, ws, wf, wgn, rpmS: [0, 0, 0, 0], prev: 0, state: 0,
-              vol: 0, flT: 0, flG: 1, flD: [1, 1, 1, 1] };
+    const wgn = gainNode(0);
+    ws.connect(wf); wf.connect(wgn); wgn.connect(master);
+    synth = { master, sum, motors, buf, waves, wave: 0, chatSrc, chatAm, chatFm, flut, dvf, dvg, dvCh, wf, wgn,
+              rpmS: [0, 0, 0, 0], prev: 0, state: 0, vol: 0, dirty: 0, stop: srcs };
   }
   function stopSynth() {
     if (!synth) return;
@@ -7245,9 +7525,8 @@ const ROBOTO = { r: "d09GMgABAAAAAFV8ABIAAAAAsBgAAFUTAAEAAAAAAAAAAAAAAAAAAAAAAAA
     try {
       s.master.gain.setTargetAtTime(0, actx.currentTime, 0.04);
       setTimeout(() => {
-        s.motors.forEach((m) => {
-          try { m.buzz.stop(); m.buzz2.stop(); m.shaft.stop(); m.whine.stop(); m.whine2.stop(); m.ns.stop(); s.ws.stop(); } catch (e) { /* gone */ }
-        });
+        s.stop.forEach((o) => { try { o.stop(); } catch (e) { /* gone */ } });
+        try { s.master.disconnect(); } catch (e) { /* gone */ }
       }, 300);
     } catch (e) { /* context closed */ }
   }
@@ -7259,21 +7538,30 @@ const ROBOTO = { r: "d09GMgABAAAAAFV8ABIAAAAAsBgAAFUTAAEAAAAAAAAAAAAAAAAAAAAAAAA
     if (app.engine && !app.engine.error) { try { a = app.engine.callTest('audio'); } catch (e) { /* hook absent */ } }
     const live = a && a.length >= 10;
     const c = live ? ACLASS[Math.max(1, Math.min(4, a[1] | 0)) - 1] : ACLASS[0];
-    let on = 0, frac = 0, load = 0, speed = 0, chop = 0;
+    if (c.wave !== synth.wave) {
+      synth.wave = c.wave;
+      synth.motors.forEach((m) => { m.buzz.setPeriodicWave(synth.waves[c.wave]); m.buzz2.setPeriodicWave(synth.waves[c.wave]); });
+    }
+    let on = 0, frac = 0, speed = 0, chop = 0, dirty = 0, shake = 0, pf = 26;
     if (live) {
       frac = Math.max(0, Math.min(1, a[3]));                  // lagged thrust / Tmax
-      load = 0.35 * (a[4] - a[5]) - a[6] * 6;                 // PropLoad: dirty air is negative
       speed = Math.abs(a[4]) + a[5];                          // airspeed over the discs
       on = (a[2] === 4 && !app.paused) ? 1 : 0;               // motors live only while flying
+      // dirty air: sinking down the prop axis, cleared by edgewise speed; stronger with the prop
+      // wash setting on (its build-up), and the shake's rms (deg) drives the motors' chatter
+      dirty = Math.max(0, Math.min(1, (-a[4] - 0.5) / 3)) * Math.max(0, 1 - a[5] / 6) * (0.5 + 0.5 * a[6]);
+      shake = a.length >= 12 ? Math.max(0, a[10]) : 0;
+      pf = a.length >= 12 && a[11] > 0 ? a[11] : 26;
       for (let i = 0; i < 4; i++) {
         const mix = MIX[i][0] * a[7] * 0.3 + MIX[i][1] * a[8] * 0.3 + MIX[i][2] * a[9] * 0.22;
         const tf = Math.max(0.008, Math.min(1.15, frac * (1 + mix)));
-        const rpm = c.rpm * Math.max(0.1, Math.sqrt(tf)) * (1 - 0.15 * a[6]);  // wash loads the motors
+        const rpm = c.rpm * Math.max(0.1, Math.sqrt(tf)) * (1 - 0.06 * dirty);  // dirty air loads them
         synth.rpmS[i] += 0.12 * (rpm - synth.rpmS[i]);        // rpm smoothing EMA (0.12/frame)
       }
     } else {
       for (let i = 0; i < 4; i++) synth.rpmS[i] *= 0.92;
     }
+    synth.dirty += (dirty - synth.dirty) * Math.min(1, dt / 120);
     // a crash: a short thud, and the motors cut with it
     if (live && synth.state === 4 && a[2] === 5) {
       const t = actx.currentTime;
@@ -7295,42 +7583,410 @@ const ROBOTO = { r: "d09GMgABAAAAAFV8ABIAAAAAsBgAAFUTAAEAAAAAAAAAAAAAAAAAAAAAAAA
     chop = Math.max(0, slope);
     const swell = Math.max(0.6, Math.min(1.4, 1 - slope));    // spool-up swells, chop dips
     synth.vol += (on * swell - synth.vol) * Math.min(1, dt / 90);
-    synth.master.gain.setTargetAtTime(0.5 * app.vol * synth.vol, now, 0.06);
-    // irregular flutter (random walk, new target every ~140 ms): gain +-13%, detune +-0.4%
-    synth.flT -= dt;
-    if (synth.flT <= 0) {
-      synth.flT = 110 + Math.random() * 60;
-      const rough = 0.13 + 0.22 * (1 - Math.min(1, mean / c.rpm));   // lumpy idle
-      synth.flG = 1 + (Math.random() - 0.5) * 2 * rough;
-      for (let i = 0; i < 4; i++) synth.flD[i] = 1 + (Math.random() - 0.5) * 0.008;
-      synth.sum.gain.setTargetAtTime(synth.flG, now, 0.05);
+    synth.master.gain.setTargetAtTime(0.5 * synth.vol, now, 0.06);
+    const dw = synth.dirty;
+    const rough = 1 + 0.8 * (1 - Math.min(1, mean / c.rpm));             // lumpy idle
+    synth.flut.gain.setTargetAtTime(0.09 * rough * (1 + 1.6 * dw), now, 0.1);
+    // the chatter: rpm a few % at the wash frequency (~2.3% rms at 0.19 deg of shake), level 2.5x
+    const rpmCh = Math.min(0.12, 0.12 * shake);
+    for (let ax = 0; ax < 2; ax++) {
+      synth.chatSrc[ax].playbackRate.setTargetAtTime(pf / 30, now, 0.1);
+      synth.chatFm[ax].gain.setTargetAtTime(on * CENTS * rpmCh, now, 0.05);
+      synth.chatAm[ax].gain.setTargetAtTime(on * 2.5 * rpmCh, now, 0.05);
     }
-    const nAmt = c.noise * Math.max(0.08, Math.min(1.3, 0.2 + 0.5 * frac - Math.min(0, load) * 0.05
-      + speed * 0.02 + chop * 0.6));
+    const nAmt = c.noise * Math.max(0.08, Math.min(1.6, 0.2 + 0.3 * frac + 0.1 * dw + speed * 0.004 + chop * 0.6));
     for (let i = 0; i < 4; i++) {
       const m = synth.motors[i];
       const mech = synth.rpmS[i] / 60;
-      const bpf = mech * c.blades * synth.flD[i];
+      const bpf = mech * c.blades;
       const rf = Math.min(1, synth.rpmS[i] / c.rpm);
       m.buzz.frequency.setTargetAtTime(Math.max(30, bpf), now, 0.02);
       m.buzz2.frequency.setTargetAtTime(Math.max(30, bpf * 1.0068), now, 0.02);
       m.shaft.frequency.setTargetAtTime(Math.max(20, mech), now, 0.02);
-      const elec = mech * c.poles * (1 + (synth.flD[i] - 1) * 2);
-      m.whine.frequency.setTargetAtTime(Math.min(11000, elec), now, 0.03);
-      m.whine2.frequency.setTargetAtTime(Math.min(14000, elec * 2.02), now, 0.03);
-      m.lp.frequency.setTargetAtTime(Math.min(9500, 250 + bpf * 2.2), now, 0.05);
-      m.bp.frequency.setTargetAtTime(Math.min(9000, 300 + bpf * 1.5 + speed * 8), now, 0.05);
+      m.whine.frequency.setTargetAtTime(Math.min(11000, mech * c.poles), now, 0.03);
+      m.whine2.frequency.setTargetAtTime(Math.min(14000, mech * c.poles * 2.02), now, 0.03);
+      m.wand.gain.setTargetAtTime(CENTS * 0.002 * (1 + 3 * dw), now, 0.1);    // 3.5 cents, 14 in dirty air
+      m.lp.frequency.setTargetAtTime(Math.min(12000, 250 + bpf * 3), now, 0.05);
+      m.nlp.frequency.setTargetAtTime(Math.min(3000, 300 + bpf * 2.2), now, 0.05);
+      m.nhp.frequency.setTargetAtTime(Math.max(40, bpf * 0.3), now, 0.05);
       m.bg.gain.setTargetAtTime(on * c.buzz * TIMBRE[i][0] * (0.12 + 0.3 * rf), now, 0.04);
       m.b2g.gain.setTargetAtTime(on * c.buzz * TIMBRE[i][0] * 0.55 * (0.12 + 0.3 * rf), now, 0.04);
       m.sg.gain.setTargetAtTime(on * c.shaft * (0.1 + 0.9 * rf), now, 0.04);
-      const loadW = 1 + 0.3 * Math.max(0, Math.min(1, load / 6));      // a loaded motor whines louder
-      m.wg.gain.setTargetAtTime(on * c.whine * TIMBRE[i][1] * (0.2 + 0.8 * rf) * loadW, now, 0.04);
+      m.wg.gain.setTargetAtTime(on * c.whine * TIMBRE[i][1] * (0.2 + 0.8 * rf), now, 0.04);
       m.w2g.gain.setTargetAtTime(on * c.whine * TIMBRE[i][1] * 0.3 * (0.2 + 0.8 * rf), now, 0.04);
-      m.ng.gain.setTargetAtTime(on * 0.1 * nAmt * TIMBRE[i][0], now, 0.07);
+      m.ng.gain.setTargetAtTime(on * 2.5 * nAmt * TIMBRE[i][0], now, 0.07);
     }
-    // the wind rush: quiet to 15 m/s, loud by 30, brighter with speed
-    synth.wgn.gain.setTargetAtTime(on * Math.min(0.3, (speed / 28) * (speed / 28)) * 0.9, now, 0.1);
-    synth.wf.frequency.setTargetAtTime(Math.min(4000, 180 + speed * 36), now, 0.1);
+    // the dirty-air rumble: below the blade pass, louder the dirtier, fluttering with the chatter
+    const dvc = 120 + 0.4 * mean / 60 * c.blades;
+    synth.dvf.frequency.setTargetAtTime(dvc, now, 0.1);
+    const dvn = Math.sqrt(1.11 * dvc / (1.5 * actx.sampleRate));           // that noise's rms
+    synth.dvg.gain.setTargetAtTime(on * 0.1 * dw * (0.5 + frac) / dvn, now, 0.08);
+    synth.dvCh.gain.setTargetAtTime(Math.min(0.8, 2 * shake), now, 0.05);
+    // the wind rush: a dark whoosh under the motors, from ~15 m/s, never hissing
+    synth.wgn.gain.setTargetAtTime(on * Math.min(0.1, 0.1 * (speed / 35) * (speed / 35)), now, 0.1);
+    synth.wf.frequency.setTargetAtTime(Math.min(900, 150 + speed * 15), now, 0.1);
+  }
+
+  // ------------------------------------------------------------- music
+  // Built-in music, generated live (free by construction: nothing to license or download), in
+  // the spirit of FPV edits: melodic electronic tracks. Each song (~2.5 min) picks a minor key, a tempo, a progression of seventh chords voiced with smooth voice leading,
+  // a bass groove, an arpeggio and a hook: a two-bar motif developed over eight bars (A A' B A''),
+  // landing on chord tones. Arranged like a real track: a pad and a muffled kick swell in through
+  // an opening filter, the groove, a build with a riser and snare roll, the drop with the hook,
+  // a breakdown, a second drop, an outro that closes the filter; then the next song. Or the
+  // player's own files (Songs...). Music has its own on/off and level, apart from Sound.
+  const MUSIC = { bus: null, gen: null, el: null, src: null, files: [], idx: 0 };
+  const midiHz = (m) => 440 * Math.pow(2, (m - 69) / 12);
+  const pick = (a) => a[Math.floor(Math.random() * a.length)];
+  const AEOLIAN = [0, 2, 3, 5, 7, 8, 10];
+  // progressions as scale degrees (0 = i, 2 = III, 3 = iv, 4 = v, 5 = VI, 6 = VII)
+  const PROGS = [[0, 5, 2, 6], [0, 6, 5, 6], [5, 6, 0, 0], [0, 3, 5, 4], [0, 5, 3, 4], [5, 3, 0, 6], [3, 5, 0, 6],
+                 [0, 2, 6, 5]];
+  const BASSES = [
+    [1, 0, 1, 0, 1, 0, 2, 0, 1, 0, 1, 0, 1, 0, 2, 0],    // driving eighths, octave jumps
+    [0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1],    // offbeat
+    [1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 2, 0],    // rolling
+  ];
+  const ARPS = [[0, 1, 2, 3, 1, 2, 3, 4, 2, 3, 4, 5, 3, 2, 1, 2], [0, 2, 1, 3, 2, 4, 3, 5, 4, 3, 2, 4, 1, 3, 0, 2],
+                [0, 1, 2, 1, 3, 2, 4, 3, 5, 4, 3, 2, 4, 3, 2, 1]];
+  // two-bar hook rhythms: [step, length] in sixteenths
+  const RHY = [
+    [[0, 3], [3, 3], [6, 2], [8, 4], [12, 2], [14, 2], [16, 3], [19, 3], [22, 2], [24, 8]],
+    [[0, 2], [2, 2], [4, 4], [10, 2], [12, 4], [16, 2], [18, 2], [20, 4], [26, 6]],
+    [[2, 2], [4, 2], [6, 4], [12, 2], [14, 2], [16, 6], [24, 2], [26, 2], [28, 4]],
+    [[0, 6], [6, 6], [12, 4], [16, 3], [19, 3], [22, 2], [24, 8]],
+    [[0, 3], [3, 3], [6, 4], [10, 2], [12, 4], [16, 3], [19, 3], [22, 4], [28, 4]],
+  ];
+  // the arrangement: bars, then what plays (k kick, c clap, h hats 1/2, b bass, p pad, a arp,
+  // l lead, r riser, x crash + impact at the start) and the filter (in, out, build)
+  const FORM = [
+    { n: 8, k: 1, h: 1, p: 1, f: 'in', hFrom: 4 },
+    { n: 8, k: 1, c: 1, h: 1, b: 1, p: 1, a: 1, x: 1 },
+    { n: 8, k: 1, c: 1, h: 2, b: 1, p: 1, a: 1, r: 1, kickStop: 1 },
+    { n: 16, k: 1, c: 1, h: 2, b: 1, p: 1, a: 1, l: 1, x: 2 },
+    { n: 8, p: 1, a: 1, l: 1, f: 'build', r: 1, soft: 1 },
+    { n: 16, k: 1, c: 1, h: 2, b: 1, p: 1, a: 1, l: 1, x: 2 },
+    { n: 8, k: 1, h: 1, b: 1, p: 1, f: 'out' },
+  ];
+  const BARS = FORM.reduce((n, f) => n + f.n, 0);
+  function musicBus() {
+    if (!MUSIC.bus) {
+      MUSIC.bus = actx.createGain();
+      MUSIC.bus.gain.value = 0.6 * volGain(app.musicVol);
+      const comp = actx.createDynamicsCompressor();
+      comp.threshold.value = -16; comp.knee.value = 10; comp.ratio.value = 3; comp.attack.value = 0.01; comp.release.value = 0.2;
+      MUSIC.bus.connect(comp); comp.connect(actx.destination);
+    }
+    return MUSIC.bus;
+  }
+  // ---- the song: harmony, voicings, hook
+  function newSong(prev) {
+    const tonic = prev ? (prev.tonic + pick([5, 7, 3, 9])) % 12 : Math.floor(Math.random() * 12);
+    const scale = AEOLIAN;
+    const prog = pick(PROGS);
+    const deg = (d, i) => { const k = d + i; return scale[((k % 7) + 7) % 7] + 12 * Math.floor(k / 7); };
+    // each chord: its scale degree and the root, 3rd, 5th, 7th, 9th above the tonic (in semitones)
+    const chords = prog.map((d) => ({ d, t: [0, 2, 4, 6, 8].map((i) => deg(d, i)) }));
+    // pads: 4 voices (3rd, 5th, 7th, 9th or root) placed nearest to the previous chord's voices
+    let prevV = [57, 60, 64, 67];
+    chords.forEach((c) => {
+      const pcs = [c.t[1], c.t[2], c.t[3], Math.random() < 0.5 ? c.t[4] : c.t[0]];
+      c.v = pcs.map((pc, i) => {
+        let best = 0, bd = 99;
+        for (let o = 3; o <= 6; o++) {
+          const m = 12 * o + ((tonic + pc) % 12 + 12) % 12;
+          if (m >= 52 && m <= 76 && Math.abs(m - prevV[i]) < bd) { bd = Math.abs(m - prevV[i]); best = m; }
+        }
+        return best;
+      }).sort((a, b) => a - b);
+      prevV = c.v;
+      c.bass = 36 + ((tonic + c.t[0]) % 12 + 12) % 12;       // C2..B2
+    });
+    // the hook, in scale steps around the tonic (index 0 = tonic, D4..C#5)
+    const leadBase = 62 + (((tonic - 62) % 12) + 12) % 12;      // the tonic between D4 and C#5
+    const tones = (c) => [c.d, c.d + 2, c.d + 4];             // chord tones as scale indices
+    const nearest = (x, c, set) => {
+      let best = x, bd = 99;
+      for (const s of set.map((j) => tones(c)[j])) for (let o = -14; o <= 14; o += 7) {
+        const v = s + o;
+        if (v >= -3 && v <= 11 && Math.abs(v - x) < bd) { bd = Math.abs(v - x); best = v; }
+      }
+      return best;
+    };
+    function phrase(rhy, b0, start, endRoot) {
+      let x = start;
+      return rhy.map(([st, len], k) => {
+        const c = chords[(b0 + (st >> 4)) % 4];
+        if (k === rhy.length - 1 && endRoot) x = nearest(x, c, [0]);
+        else if (st % 8 === 0 || len >= 4) x = nearest(x + (Math.random() < 0.5 ? 1 : -1), c, [0, 1, 2]);
+        else x = Math.max(-3, Math.min(11, x + pick([-1, 1, 1, 2, -2, -1])));
+        return { st: st + 16 * b0, len, x };
+      });
+    }
+    const rA = pick(RHY), rB = pick(RHY);
+    const A = phrase(rA, 0, 4, false);
+    const fit = (ph, b0, endRoot) => ph.map((nt, k) => {          // the motif again over other chords
+      const st = nt.st % 32, c = chords[(b0 + (st >> 4)) % 4];
+      const x = (k === ph.length - 1 && endRoot) ? nearest(nt.x, c, [0]) : ((st % 8 === 0 || nt.len >= 4) ? nearest(nt.x, c, [0, 1, 2]) : nt.x);
+      return { st: st + 16 * b0, len: nt.len, x };
+    });
+    const B = phrase(rB, 4, A[A.length - 1].x + 2, false);
+    const hook = [...A, ...fit(A, 2, false), ...B, ...fit(A, 6, true)];
+    const toMidi = (x) => leadBase + scale[((x % 7) + 7) % 7] + 12 * Math.floor(x / 7);
+    hook.forEach((nt) => { nt.m = toMidi(nt.x); });
+    return { tonic, scale, chords, hook, bpm: 120 + Math.floor(Math.random() * 7), bass: pick(BASSES), arp: pick(ARPS),
+             swing: 0.02 + Math.random() * 0.03, padCut: 1300 + Math.random() * 900 };
+  }
+  // ---- the mixer: everything into a filter (the intro/outro sweeps), reverb and a dotted-eighth delay
+  function genStart() {
+    const sr = actx.sampleRate;
+    const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 18000; lp.Q.value = 0.5;
+    const out = actx.createGain(); out.gain.value = 1;
+    lp.connect(out); out.connect(musicBus());
+    const noise = actx.createBuffer(1, sr, sr), nd = noise.getChannelData(0);
+    for (let i = 0; i < sr; i++) nd[i] = Math.random() * 2 - 1;
+    const ir = actx.createBuffer(2, Math.floor(sr * 2.6), sr);
+    for (let c = 0; c < 2; c++) {
+      const d = ir.getChannelData(c);
+      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3.5);
+    }
+    const verb = actx.createConvolver(); verb.buffer = ir;
+    const verbOut = actx.createGain(); verbOut.gain.value = 0.3; verb.connect(verbOut); verbOut.connect(lp);
+    const delay = actx.createDelay(2), fb = actx.createGain(), dlp = actx.createBiquadFilter();
+    fb.gain.value = 0.35; dlp.type = 'lowpass'; dlp.frequency.value = 2400;
+    delay.connect(dlp); dlp.connect(fb); fb.connect(delay); dlp.connect(lp); dlp.connect(verb);
+    const duck = actx.createGain(); duck.connect(lp);           // bass, pad and arp pump with the kick
+    const send = (g) => { const s = actx.createGain(); s.gain.value = g; return s; };
+    const dSend = send(1), vSend = send(1);
+    dSend.connect(delay); vSend.connect(verb);
+    const g = { lp, out, noise, verb: vSend, delay: dSend, duck, song: newSong(null), bar: 0, step: 0, t: actx.currentTime + 0.1 };
+    delay.delayTime.value = 0.75 * 60 / g.song.bpm;
+    g.delayNode = delay;
+    MUSIC.gen = g;
+  }
+  function genStop() {
+    const g = MUSIC.gen;
+    if (!g) return;
+    MUSIC.gen = null;
+    g.out.gain.setTargetAtTime(0, actx.currentTime, 0.05);
+    setTimeout(() => { try { g.out.disconnect(); } catch (e) { /* gone */ } }, 400);
+  }
+  // ---- instruments
+  function panTo(dest, pan) {
+    if (!pan || !actx.createStereoPanner) return dest;
+    const p = actx.createStereoPanner();
+    p.pan.value = pan; p.connect(dest);
+    return p;
+  }
+  function env(gn, t, v, a, d) {                       // attack to v, exponential decay over d
+    gn.gain.setValueAtTime(0.0001, t);
+    gn.gain.exponentialRampToValueAtTime(v, t + a);
+    gn.gain.exponentialRampToValueAtTime(0.0001, t + a + d);
+  }
+  function osc(type, f, t, end, dest, detune) {
+    const o = actx.createOscillator();
+    o.type = type; o.frequency.value = f; if (detune) o.detune.value = detune;
+    o.connect(dest); o.start(t); o.stop(end);
+    return o;
+  }
+  function noiseHit(g, t, dur, type, freq, q, v, dest, pan) {
+    const s = actx.createBufferSource(), f = actx.createBiquadFilter(), gn = actx.createGain();
+    s.buffer = g.noise; f.type = type; f.frequency.value = freq; f.Q.value = q;
+    s.connect(f); f.connect(gn); gn.connect(panTo(dest || g.lp, pan));
+    env(gn, t, v, 0.002, dur);
+    s.start(t, Math.random() * 0.5); s.stop(t + dur + 0.05);
+  }
+  function kick(g, t) {
+    const o = actx.createOscillator(), gn = actx.createGain();
+    o.frequency.setValueAtTime(160, t); o.frequency.exponentialRampToValueAtTime(48, t + 0.1);
+    o.connect(gn); gn.connect(g.lp); env(gn, t, 0.85, 0.003, 0.38); o.start(t); o.stop(t + 0.45);
+    noiseHit(g, t, 0.01, 'highpass', 2500, 0.7, 0.1);
+    const d = g.duck.gain;                             // side-chain pump
+    d.cancelScheduledValues(t); d.setValueAtTime(0.35, t); d.linearRampToValueAtTime(1, t + 0.24);
+  }
+  function clap(g, t, v) {
+    for (let k = 0; k < 3; k++) noiseHit(g, t + k * 0.011, k < 2 ? 0.02 : 0.18, 'bandpass', 1500, 1.1, 0.6 * v);
+    noiseHit(g, t, 0.3, 'bandpass', 1500, 1, 0.2 * v, g.verb);
+  }
+  function hat(g, t, v, open) {
+    noiseHit(g, t + (Math.random() - 0.5) * 0.004, open ? 0.3 : 0.05, 'highpass', 6500, 0.7,
+      (open ? 0.75 : 0.7) * v * (0.9 + Math.random() * 0.2), null, open ? -0.2 : 0.25);
+  }
+  function crash(g, t) {
+    noiseHit(g, t, 1.8, 'highpass', 4500, 0.5, 0.35, null, 0.15);
+    noiseHit(g, t, 2.2, 'highpass', 4500, 0.5, 0.15, g.verb);
+  }
+  function impact(g, t) {                              // the drop: a sub boom under the crash
+    const o = actx.createOscillator(), gn = actx.createGain();
+    o.frequency.setValueAtTime(70, t); o.frequency.exponentialRampToValueAtTime(38, t + 0.9);
+    o.connect(gn); gn.connect(g.lp); env(gn, t, 0.5, 0.005, 1.1); o.start(t); o.stop(t + 1.2);
+  }
+  function bassNote(g, t, m, dur) {
+    const f = actx.createBiquadFilter(), gn = actx.createGain();
+    f.type = 'lowpass'; f.Q.value = 5;
+    f.frequency.setValueAtTime(200, t); f.frequency.exponentialRampToValueAtTime(900, t + 0.012);
+    f.frequency.exponentialRampToValueAtTime(280, t + dur);
+    f.connect(gn); gn.connect(g.duck);
+    gn.gain.setValueAtTime(0.0001, t); gn.gain.exponentialRampToValueAtTime(0.17, t + 0.006);
+    gn.gain.setValueAtTime(0.17, t + dur * 0.8); gn.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.04);
+    osc('sawtooth', midiHz(m), t, t + dur + 0.06, f, -6); osc('sawtooth', midiHz(m), t, t + dur + 0.06, f, 6);
+    const sub = actx.createGain(); sub.gain.value = 0.9; sub.connect(gn);
+    osc('sine', midiHz(m - 12), t, t + dur + 0.06, sub);
+  }
+  function padChord(g, t, notes, dur, cut) {
+    const f = actx.createBiquadFilter(), gn = actx.createGain();
+    f.type = 'lowpass'; f.Q.value = 1;
+    f.frequency.setValueAtTime(cut * 0.6, t); f.frequency.linearRampToValueAtTime(cut, t + dur * 0.6);
+    f.connect(gn); gn.connect(g.duck); gn.connect(g.verb);
+    gn.gain.setValueAtTime(0.0001, t); gn.gain.exponentialRampToValueAtTime(0.045, t + 0.4);
+    gn.gain.setValueAtTime(0.045, t + dur - 0.05); gn.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.9);
+    notes.forEach((m, i) => {
+      const p = panTo(f, i % 2 ? 0.3 : -0.3);
+      for (const dt of [-11, 0, 11]) osc('sawtooth', midiHz(m), t, t + dur + 1, p, dt + (Math.random() - 0.5) * 4);
+    });
+  }
+  function pluck(g, t, m, v, pan, bright) {
+    const f = actx.createBiquadFilter(), gn = actx.createGain();
+    f.type = 'lowpass'; f.Q.value = 2;
+    f.frequency.setValueAtTime(1200 + 1800 * bright, t); f.frequency.exponentialRampToValueAtTime(500, t + 0.15);
+    f.connect(gn); gn.connect(panTo(g.duck, pan)); gn.connect(g.delay);
+    env(gn, t, 0.075 * v, 0.004, 0.2);
+    osc('sawtooth', midiHz(m), t, t + 0.25, f, -5); osc('square', midiHz(m), t, t + 0.25, f, 5);
+  }
+  function leadNote(g, t, m, dur, soft) {
+    const f = actx.createBiquadFilter(), gn = actx.createGain(), vib = actx.createOscillator(), vg = actx.createGain();
+    f.type = 'lowpass'; f.Q.value = 1.5;
+    f.frequency.setValueAtTime(soft ? 1600 : 3800, t); f.frequency.exponentialRampToValueAtTime(soft ? 1000 : 2300, t + dur);
+    f.connect(gn); gn.connect(g.lp); gn.connect(g.delay); gn.connect(g.verb);
+    const lv = soft ? 0.06 : 0.1;
+    gn.gain.setValueAtTime(0.0001, t); gn.gain.exponentialRampToValueAtTime(lv, t + 0.012);
+    gn.gain.setValueAtTime(lv * 0.85, t + Math.max(0.02, dur - 0.03)); gn.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.12);
+    vib.frequency.value = 5.5; vg.gain.setValueAtTime(0, t); vg.gain.linearRampToValueAtTime(dur > 0.3 ? 14 : 0, t + Math.min(dur, 0.5));
+    vib.connect(vg); vib.start(t); vib.stop(t + dur + 0.15);
+    const end = t + dur + 0.15;
+    for (const [type, dt, lvl] of [['sawtooth', -8, 1], ['sawtooth', 8, 1], ['square', 0, 0.4]]) {
+      const o = actx.createOscillator(), og = actx.createGain();
+      o.type = type; o.frequency.value = midiHz(type === 'square' ? m - 12 : m); o.detune.value = dt;
+      vg.connect(o.detune); og.gain.value = lvl; o.connect(og); og.connect(f); o.start(t); o.stop(end);
+    }
+  }
+  function riser(g, t, dur) {
+    const s = actx.createBufferSource(), f = actx.createBiquadFilter(), gn = actx.createGain();
+    s.buffer = g.noise; s.loop = true; f.type = 'bandpass'; f.Q.value = 2;
+    f.frequency.setValueAtTime(300, t); f.frequency.exponentialRampToValueAtTime(8000, t + dur);
+    gn.gain.setValueAtTime(0.0001, t); gn.gain.exponentialRampToValueAtTime(0.12, t + dur);
+    gn.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.2);
+    s.connect(f); f.connect(gn); gn.connect(g.lp); gn.connect(g.verb); s.start(t); s.stop(t + dur + 0.25);
+  }
+  // ---- the sequencer: one sixteenth at a time
+  function genStep(g, t) {
+    const sg = g.song, s = g.step;
+    let b = g.bar, sec = FORM[0];
+    for (const f of FORM) { if (b < f.n) { sec = f; break; } b -= f.n; }
+    const ch = sg.chords[g.bar % 4];
+    const bar = 16 * 60 / sg.bpm / 4, secDur = sec.n * bar;
+    if (s === 0) {
+      if (b === 0) {                                   // a section starts: its filter move, crash
+        const lf = g.lp.frequency;
+        lf.cancelScheduledValues(t);
+        if (sec.f === 'in') { lf.setValueAtTime(320, t); lf.exponentialRampToValueAtTime(18000, t + secDur); }
+        else if (sec.f === 'out') { lf.setValueAtTime(18000, t); lf.exponentialRampToValueAtTime(380, t + secDur); }
+        else if (sec.f === 'build') { lf.setValueAtTime(1500, t); lf.exponentialRampToValueAtTime(18000, t + secDur); }
+        else lf.setValueAtTime(18000, t);
+        if (sec.x) { crash(g, t); if (sec.x === 2) impact(g, t); }
+        if (sec.r) riser(g, t + (sec.n > 4 ? (sec.n - 4) * bar : 0), Math.min(4, sec.n) * bar);
+      }
+      if (sec.p) padChord(g, t, ch.v, bar, sg.padCut);
+    }
+    const lastBar = b === sec.n - 1;
+    if (sec.k && s % 4 === 0 && !(sec.kickStop && lastBar)) kick(g, t);
+    if (sec.c && (s === 4 || s === 12) && !(sec.kickStop && lastBar)) clap(g, t, 1);
+    if (sec.kickStop && b >= sec.n - 2 && (s % 2 === 0 || lastBar)) clap(g, t, 0.25 + 0.6 * ((b - sec.n + 2) * 16 + s) / 32);  // the roll
+    if (sec.h && b >= (sec.hFrom || 0)) {
+      if (sec.h === 1 && s % 2 === 0) hat(g, t, s % 4 === 2 ? 1 : 0.55, false);
+      if (sec.h === 2) hat(g, t, s % 4 === 2 ? 1 : (s % 2 ? 0.45 : 0.65), s % 8 === 6);
+    }
+    if (sec.b && sg.bass[s]) bassNote(g, t, ch.bass + (sg.bass[s] === 2 ? 12 : 0), 60 / sg.bpm / 4 * 1.6);
+    if (sec.a && (sec.soft ? s % 2 === 0 : true)) {
+      const ar = [...ch.v, ...ch.v.map((m) => m + 12)], m = ar[sg.arp[s] % ar.length];
+      pluck(g, t, m, s % 4 === 0 ? 1 : 0.7, s % 2 ? -0.35 : 0.35, sec.soft ? 0.2 : Math.min(1, b / 8 + 0.3));
+    }
+    if (sec.l) {
+      const pos = (g.bar % 8) * 16 + s;
+      for (const nt of sg.hook) if (nt.st === pos) leadNote(g, t, nt.m, nt.len * 60 / sg.bpm / 4 * 0.92, sec.soft);
+    }
+  }
+  function musicTick() {
+    const g = MUSIC.gen;
+    if (!g || !actx) return;
+    const now = actx.currentTime;
+    if (g.t < now) g.t = now + 0.05;                    // after a stall (hidden tab): carry on from now
+    while (g.t < now + 0.2) {
+      const sd = 60 / g.song.bpm / 4;
+      genStep(g, g.t + (g.step % 2 ? g.song.swing * sd : 0));
+      g.t += sd;
+      g.step = (g.step + 1) % 16;
+      if (g.step === 0 && ++g.bar >= BARS) {
+        g.song = newSong(g.song); g.bar = 0;
+        g.delayNode.delayTime.setValueAtTime(0.75 * 60 / g.song.bpm, g.t);
+        musicTitle();
+      }
+    }
+  }
+  const KEYS = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
+  function musicTitle() {
+    let t = 'Music';
+    if (app.musicOn) {
+      if (MUSIC.files.length) t = 'Playing ' + MUSIC.files[MUSIC.idx].name;
+      else if (MUSIC.gen) {
+        const sg = MUSIC.gen.song;
+        t = 'Generated: ' + KEYS[sg.tonic] + ' minor, ' + sg.bpm + ' BPM';
+      }
+    }
+    const b = document.getElementById('musicBox');
+    if (b) b.title = t + ' (wheel: level)';
+  }
+  function musicPlay() {
+    if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; } }
+    if (actx.state === 'suspended') actx.resume();
+    musicBus();
+    if (MUSIC.files.length) {
+      genStop();
+      if (!MUSIC.el) {
+        MUSIC.el = new Audio();
+        MUSIC.el.addEventListener('ended', () => musicNext());
+        MUSIC.src = actx.createMediaElementSource(MUSIC.el);
+        MUSIC.src.connect(MUSIC.bus);
+      }
+      MUSIC.el.src = MUSIC.files[MUSIC.idx].url;
+      MUSIC.el.play().catch(() => { /* needs a click first */ });
+    } else {
+      if (MUSIC.el) MUSIC.el.pause();
+      if (!MUSIC.gen) genStart();
+    }
+    musicTitle();
+  }
+  function musicStop() {
+    genStop();
+    if (MUSIC.el) MUSIC.el.pause();
+    musicTitle();
+  }
+  function musicNext() {
+    if (!app.musicOn) return;
+    if (MUSIC.files.length) { MUSIC.idx = (MUSIC.idx + 1) % MUSIC.files.length; musicPlay(); }
+    else if (MUSIC.gen) {
+      const g = MUSIC.gen;
+      g.song = newSong(g.song); g.bar = 0; g.step = 0;
+      g.delayNode.delayTime.setValueAtTime(0.75 * 60 / g.song.bpm, actx.currentTime);
+      musicTitle();
+    }
+  }
+  function musicFiles(list) {
+    MUSIC.files.forEach((f) => URL.revokeObjectURL(f.url));
+    MUSIC.files = Array.from(list).filter((f) => /^audio\//.test(f.type) || /\.(mp3|ogg|wav|m4a|aac|flac|opus)$/i.test(f.name))
+      .map((f) => ({ url: URL.createObjectURL(f), name: f.name.replace(/\.[^.]+$/, '') }));
+    MUSIC.idx = 0;
+    if (app.musicOn) musicPlay();
   }
 
   // ----------------------------------------------------------- engine
@@ -7685,6 +8341,7 @@ const ROBOTO = { r: "d09GMgABAAAAAFV8ABIAAAAAsBgAAFUTAAEAAAAAAAAAAAAAAAAAAAAAAAA
     if (ts - emuT >= 1000) { emuFps = emuN; emuN = 0; emuT = ts; }
     updateStats();
     motorSound(dt);
+    musicTick();
     requestAnimationFrame(loop);
   }
 
@@ -7756,24 +8413,73 @@ const ROBOTO = { r: "d09GMgABAAAAAFV8ABIAAAAAsBgAAFUTAAEAAAAAAAAAAAAAAAAAAAAAAAA
     });
     $('restartBtn').addEventListener('click', boot);
     $('ovBtn').addEventListener('click', boot);
-    // one control: the slider is the switch too (0 = off); moving it is the user gesture
-    // the browser needs before audio may start
+    // the slider is the switch too (0 = off), the speaker mutes and unmutes (back to the last
+    // level), the wheel steps it by 5%; any of them is the user gesture the browser needs before
+    // audio may start
     const vol = $('soundVol');
-    const volLbl = vol.parentElement;
+    const volBox = $('soundBox');
     const volShow = () => {
-      volLbl.classList.toggle('snd-off', !(app.vol > 0));
-      volLbl.title = app.vol > 0 ? 'Sound volume: ' + Math.round(app.vol * 100) + '%' : 'Sound off';
+      const on = app.vol > 0;
+      volBox.classList.toggle('snd-off', !on);
+      $('volOut').textContent = on ? Math.round(app.vol * 100) + '%' : 'Off';
+      $('muteBtn').setAttribute('aria-pressed', String(!on));
+      $('muteBtn').title = on ? 'Mute' : 'Unmute';
     };
-    vol.value = app.vol;
-    volShow();
-    vol.addEventListener('input', () => {
-      app.vol = parseFloat(vol.value) || 0;
+    const applyVol = (v) => {
+      app.vol = Math.round(Math.max(0, Math.min(1, v)) * 20) / 20;
+      vol.value = app.vol;
       store.set('vol', app.vol);
+      if (app.vol > 0) { app.lastVol = app.vol; store.set('lastVol', app.vol); }
       volShow();
       if (app.vol > 0 && !actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { app.vol = 0; vol.value = 0; volShow(); } }
       if (actx && actx.state === 'suspended') actx.resume();
+      if (outGain) outGain.gain.setTargetAtTime(volGain(app.vol), actx.currentTime, 0.03);
       if (app.vol <= 0) { if (motor && actx) bgTone(0, 0, 0); stopSynth(); }
+    };
+    vol.value = app.vol;
+    volShow();
+    vol.addEventListener('input', () => applyVol(parseFloat(vol.value) || 0));
+    $('muteBtn').addEventListener('click', () => applyVol(app.vol > 0 ? 0 : (app.lastVol || 0.8)));
+    volBox.addEventListener('wheel', (e) => { e.preventDefault(); applyVol(app.vol + (e.deltaY < 0 ? 0.05 : -0.05)); }, { passive: false });
+    // music: the note switches it on and off, the slider is its level (apart from Sound), next
+    // skips to a new song, Songs plays your own files instead of the generated music
+    const mBox = $('musicBox'), mVol = $('musicVol');
+    const musicShow = () => {
+      mBox.classList.toggle('snd-off', !app.musicOn);
+      $('musicBtn').setAttribute('aria-pressed', String(app.musicOn));
+      $('musicBtn').title = app.musicOn ? 'Music off' : 'Music on';
+      musicTitle();
+    };
+    const musicOn = (on) => {
+      app.musicOn = on; store.set('musicOn', on);
+      if (on) musicPlay(); else musicStop();
+      musicShow();
+    };
+    const setMusicVol = (v) => {
+      app.musicVol = Math.round(Math.max(0, Math.min(1, v)) * 20) / 20;
+      mVol.value = app.musicVol; store.set('musicVol', app.musicVol);
+      if (MUSIC.bus) MUSIC.bus.gain.setTargetAtTime(0.6 * volGain(app.musicVol), actx.currentTime, 0.03);
+    };
+    mVol.value = app.musicVol;
+    mVol.addEventListener('input', () => { setMusicVol(parseFloat(mVol.value) || 0); if (!app.musicOn && app.musicVol > 0) musicOn(true); });
+    $('musicBtn').addEventListener('click', () => musicOn(!app.musicOn));
+    $('musicNext').addEventListener('click', () => { if (app.musicOn) musicNext(); else musicOn(true); });
+    $('songIn').addEventListener('change', (ev) => {
+      musicFiles(ev.target.files);
+      ev.target.value = '';
+      if (!app.musicOn) musicOn(true); else musicShow();
     });
+    mBox.addEventListener('wheel', (e) => { e.preventDefault(); setMusicVol(app.musicVol + (e.deltaY < 0 ? 0.05 : -0.05)); }, { passive: false });
+    musicShow();
+    // browsers only start audio after a user gesture: with the volume already up (the saved
+    // setting), the first click, tap or key press anywhere turns the sound on
+    const unlock = () => {
+      if ((app.vol > 0 || app.musicOn) && !actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { /* no audio */ } }
+      if (actx && actx.state === 'suspended') actx.resume();
+      if (actx && app.musicOn && !MUSIC.gen && !(MUSIC.el && !MUSIC.el.paused)) musicPlay();
+      if (actx) ['pointerdown', 'keydown'].forEach((t) => window.removeEventListener(t, unlock, true));
+    };
+    ['pointerdown', 'keydown'].forEach((t) => window.addEventListener(t, unlock, true));
     $('fileIn').addEventListener('change', (ev) => {
       const f = ev.target.files[0];
       if (!f) return;
@@ -7820,11 +8526,12 @@ const ROBOTO = { r: "d09GMgABAAAAAFV8ABIAAAAAsBgAAFUTAAEAAAAAAAAAAAAAAAAAAAAAAAA
       b.setAttribute('aria-pressed', String(b.dataset.input === app.input));
       b.addEventListener('click', () => {
         app.input = b.dataset.input;
+        store.set('input', app.input);
         document.querySelectorAll('#inputSeg button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
         $('padBox').hidden = app.input !== 'pad';
       });
     });
-    $('padBox').hidden = true;
+    $('padBox').hidden = app.input !== 'pad';
     $('padSel').addEventListener('change', () => { app.padKey = $('padSel').value; store.set('padKey', app.padKey); });
     for (const fn of ['ail', 'ele', 'thr', 'rud']) {
       const row = document.querySelector('.axis[data-fn="' + fn + '"]');

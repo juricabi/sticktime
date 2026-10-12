@@ -174,10 +174,26 @@ def lite_tracks(cfg: dict):
     print(f"sdcard/SCRIPTS/TOOLS/StickTimeLite/t1-{len(names)}.txt: {len(names)} tracks")
 
 
+def lite_quads():
+    """The quad classes for the Lite: StickTimeLite/q<n>.txt, one line of numbers each, straight from
+    the QP strings of src/sticktime.lua (the Lite reads the one in use, so they cost it no memory)."""
+    src = (ROOT / "src" / "sticktime.lua").read_text(encoding="utf-8")
+    block = src[src.index("local QP = {"):]
+    block = block[:block.index("\n}")]
+    rows = re.findall(r'^\s*"([0-9.\- e]+)",', block, re.M)
+    assert rows, "no QP strings in src/sticktime.lua"
+    for n, row in enumerate(rows, 1):
+        # the Lite reads at most 300 bytes of a class file (io.read(f, 300))
+        assert len(row) < 300, f"Lite class {n}: {len(row)} bytes, the Lite reads at most 299"
+        (OUT / "StickTimeLite" / f"q{n}.txt").write_text(row + "\n", encoding="utf-8")
+    print(f"sdcard/SCRIPTS/TOOLS/StickTimeLite/q1-{len(rows)}.txt: {len(rows)} quad classes")
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "StickTimeLite").mkdir(exist_ok=True)
     lite_tracks(VARIANTS["LITE"])
+    lite_quads()
     for variant, cfg in VARIANTS.items():
         text = build(variant, cfg, strip=cfg.get("strip", False))
         path = OUT / cfg["file"]

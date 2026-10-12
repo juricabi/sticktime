@@ -129,7 +129,8 @@ collectgarbage()
 local memInit = collectgarbage("count")
 
 -- settings and bests migrated from the version 1 file
-if T.S.track ~= 2 or T.S.rates ~= 3 or T.S.tilt ~= 30 or T.S.twr ~= 4 or T.S.laps ~= 5 then
+-- (the old 4:1 is below the racer's Power range: it comes back as Stock)
+if T.S.track ~= 2 or T.S.rates ~= 3 or T.S.tilt ~= 30 or T.S.twr ~= 0 or T.S.laps ~= 5 then
   fail(string.format("v1 settings not migrated: track %s rates %s tilt %s twr %s laps %s", T.S.track, T.S.rates, T.S.tilt, T.S.twr, T.S.laps))
 end
 do
@@ -192,6 +193,8 @@ local function autopilot(target)
   local d = (px - ax) * nx + (py - ay) * ny + (pz - az) * nz
   if target and d > 0 then nx, nz, d = -nx, -nz, -d end      -- gate rush: either direction counts
   local lead = math.min(14, math.max(0, -d * 0.55))
+  -- swung wide past the gate plane: go round and come back square to it, not edge-on
+  if d > 0 and not target then lead = 8 end
   local tx, ty, tz = ax - nx * lead, ay - ny * lead, az - nz * lead
   local hd = math.sqrt((px - ax) ^ 2 + (pz - az) ^ 2)
   if k == 3 then
@@ -219,7 +222,8 @@ local function autopilot(target)
   sticks.ail = math.max(-0.6, math.min(0.6, -vs * 0.15 + herr * 0.25)) * 1024
   local tilt = math.min(0.8, math.abs(sticks.ele / 1024) * 0.9)
   local hover = hoverStick(1 / math.cos(tilt))
-  local t = hover + (ty - py) * 0.08 - vy * 0.1
+  -- height: stiff enough to hold a gate's height when the wind's translational lift shifts the hover
+  local t = hover + (ty - py) * 0.15 - vy * 0.15
   sticks.thr = (math.max(0, math.min(1, t)) * 2 - 1) * 1024
 end
 

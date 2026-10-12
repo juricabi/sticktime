@@ -29,9 +29,10 @@ def main():
     # on color screens the B&W loaders run color.lua, which loads the same core
     lua_bwcolor = read(ROOT / "sdcard/SCRIPTS/TOOLS/StickTimeBW/color.lua")
     lua_litecolor = read(ROOT / "sdcard/SCRIPTS/TOOLS/StickTimeLite/color.lua")
-    # the Lite reads its tracks from the SD card: /SCRIPTS/TOOLS/StickTimeLite/t1.txt ...
+    # the Lite reads its tracks and quad classes from the SD card: StickTimeLite/t1.txt ..., q1.txt ...
     tdir = ROOT / "sdcard/SCRIPTS/TOOLS/StickTimeLite"
-    tracks = {"/SCRIPTS/TOOLS/StickTimeLite/" + p.name: read(p) for p in sorted(tdir.glob("t*.txt"))}
+    tracks = {"/SCRIPTS/TOOLS/StickTimeLite/" + p.name: read(p)
+              for p in sorted(list(tdir.glob("t*.txt")) + list(tdir.glob("q*.txt")))}
     assert tracks, "no StickTime Lite track files (run build.py)"
     lite_tracks = json.dumps(tracks, indent=0)
     for s in (lua_color, lua_bw, lua_lite, lua_bwcolor, lua_litecolor, lite_tracks):

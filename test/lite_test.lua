@@ -41,9 +41,9 @@ local buzz = 0
 function playHaptic() buzz = buzz + 1 end
 -- the SD card: the track files from the repository, then what the script writes
 local SD = {}
-for t = 1, 9 do
-  local fh = io.open("../sdcard/SCRIPTS/TOOLS/StickTimeLite/t" .. t .. ".txt", "r")
-  if fh then SD["/SCRIPTS/TOOLS/StickTimeLite/t" .. t .. ".txt"] = fh:read("*a") fh:close() end
+for _, n in ipairs({ "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9", "q1", "q2", "q3", "q4" }) do
+  local fh = io.open("../sdcard/SCRIPTS/TOOLS/StickTimeLite/" .. n .. ".txt", "r")
+  if fh then SD["/SCRIPTS/TOOLS/StickTimeLite/" .. n .. ".txt"] = fh:read("*a") fh:close() end
 end
 io = {
   open = function(p, m) if m == "r" and not SD[p] then return nil end return { p = p, m = m, d = (m == "r") and SD[p] or "", pos = 1 } end,
@@ -127,6 +127,13 @@ local function idle() sticks.ail, sticks.ele, sticks.rud, sticks.thr = 0, 0, 0, 
 local FLY, CRASHED, READY, PAUSED, DONE, MENU, SETUP, COUNT = 4, 5, 6, 7, 8, 1, 2, 3
 
 -- angle-mode autopilot: steer toward a lead point on the gate axis, hold the gate height
+-- stick (0..1) that gives `load` times the weight in thrust: inverse of the quad's thrust curve
+local function hoverStick(load)
+  local twr, i0, n, dz = T.thrust()
+  local x = math.max(0, (load / twr - i0) / (1 - i0)) ^ (1 / n)
+  return dz + (1 - dz) * x
+end
+
 local function autopilot(target)
   local _, s = state()
   local px, py, pz, vx, vy, vz, fx, fz = s[1], s[2], s[3], s[4], s[5], s[6], s[7], s[9]
@@ -134,6 +141,7 @@ local function autopilot(target)
   local d = (px - cx) * nx + (py - cy) * ny + (pz - cz) * nz
   if target and d > 0 then nx, nz, d = -nx, -nz, -d end
   local lead = math.min(14, math.max(0, -d * 0.55))
+  if d > 0 and not target then lead = 8 end                -- swung wide past the plane: go round, square to it
   local tx, ty, tz = cx - nx * lead, cy - ny * lead, cz - nz * lead
   local hd = math.sqrt((px - cx) ^ 2 + (pz - cz) ^ 2)
   if k == 3 then tx, tz, ty = cx, cz, hd > 1.2 and cy + 3 or cy - 4 end
@@ -151,10 +159,10 @@ local function autopilot(target)
   if k < 6 and k ~= 3 and py - ty > 0.7 then vdes = math.min(vdes, math.max(0.5, 2 * hd / (py - ty))) end
   sticks.ele = math.max(-0.75, math.min(0.75, (vdes - vf) * 0.12)) * 1024
   sticks.ail = math.max(-0.6, math.min(0.6, -vs * 0.15 + herr * 0.25)) * 1024
-  local _, twr = T.info()
   local tilt = math.min(0.8, math.abs(sticks.ele / 1024) * 0.9)
-  local hover = ((1 / twr - 0.015) / 0.985) ^ (1 / 1.6) / math.cos(tilt)
-  sticks.thr = (math.max(0, math.min(1, hover + (ty - py) * 0.08 - vy * 0.1)) * 2 - 1) * 1024
+  local hover = hoverStick(1 / math.cos(tilt))
+  -- height: stiff enough to hold a gate's height when the wind's translational lift shifts the hover
+  sticks.thr = (math.max(0, math.min(1, hover + (ty - py) * 0.15 - vy * 0.15)) * 2 - 1) * 1024
 end
 
 -- 1. menus: walk the main menu, change the track, every setting both ways
@@ -174,7 +182,7 @@ frame(EVT_VIRTUAL_ENTER)
 if state() ~= SETUP then fail("settings did not open") end
 local before = {}
 for k, v in pairs(T.S) do before[k] = v end
-for i = 1, 8 do
+for i = 1, 9 do                                        -- the nine settings rows, then Back
   frame(EVT_VIRTUAL_ENTER)
   frame(EVT_VIRTUAL_INC) frame(0)
   frame(EVT_VIRTUAL_DEC) frame(EVT_VIRTUAL_DEC) frame(0)
@@ -257,6 +265,7 @@ if plap < 3 then fail("practice in wind: only " .. plap .. " laps in 240 s") end
 T.set("wind", 0)
 
 -- freestyle: no countdown; a roll in acro is a trick, the combo is banked 2.5 s later
+idle()                                                  -- centred sticks (the autopilot's are left over)
 T.set("mode", 1)
 T.track(1)
 T.start(3)
@@ -275,7 +284,7 @@ local _, sp = state()
 T.pose(sp[1], sp[2], sp[3], 0, 0, 0)
 T.vel(0, 0, 0)
 sticks.ail = 0
-sticks.thr = -250
+sticks.thr = (hoverStick(1) * 2 - 1) * 1024                 -- hover: the class's own throttle
 steps(70)
 sc, chn = select(10, T.info())
 local _, _, _, bf = T.best(1)
@@ -330,6 +339,7 @@ if rn < 4 or bg ~= rn then fail("gate rush: " .. rn .. " gates, best " .. bg) en
 frame(EVT_VIRTUAL_EXIT)
 
 -- 4. crash into the ground, respawn, fly on with a stick
+idle()                                                  -- centred sticks: any input would relaunch
 T.track(1)
 T.start(2)
 steps(70)
@@ -353,7 +363,7 @@ if state() ~= CRASHED then fail("no crash into the gate frame (state " .. state(
 
 -- ground effect: at the throttle that holds a hover high up, the quad rises near the ground
 do
-  local hover = (((1 / 5 - 0.015) / 0.985) ^ (1 / 1.6) * 2 - 1) * 1024
+  local hover = (hoverStick(1) * 2 - 1) * 1024
   local function vyAfter(y)
     T.track(1) T.start(2) steps(70)
     local _, s0 = state()
@@ -431,7 +441,7 @@ SD["/SCRIPTS/TOOLS/StickTimeLite/data.txt"] = "FPVLITE2 track=99 twr=13 mode=x l
 STICKTIME_TEST = {}
 local s3 = f()
 s3.init()
-if STICKTIME_TEST.S.track ~= 1 or STICKTIME_TEST.S.twr ~= 6 then fail("bad save values were not rejected") end
+if STICKTIME_TEST.S.track ~= 1 or STICKTIME_TEST.S.twr ~= 0 then fail("bad save values were not rejected") end
 s3.run(0)
 -- a save of the first Lite, under its old name FPV Sim Lite (four tracks: the 4th was the Grand
 -- Prix, now the 6th): read, and saved under the new name right away

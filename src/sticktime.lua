@@ -79,20 +79,23 @@ local RKEYS = { rc = 1, rm = 2, re = 3, yc = 4, ym = 5, ye = 6 }
 -- quad profiles (Racer 5", Freestyle 5", 3" toothpick, Whoop 65mm), each fitted to a detailed model
 -- of that class (blade-element props on rpm-governed motors, a Betaflight-style PID loop; see
 -- docs/flight-model.md). twr stock thrust/weight; thrust curve: i0 idle, tn exponent, dz bottom dead
--- zone; vp prop pitch speed climbing (m/s); tl, vt translational lift gain and speed (m/s); ks, kf, ku
+-- zone; vp, vc, vk climbing: prop pitch speed (m/s), throttle exponent and bend of the inflow loss; tl, vt
+-- translational lift gain and speed (m/s), te, ta its fades near full stick and with axial inflow (m/s); ks, kf, ku
 -- side, front, top drag per kg; er, vd extra drag at low speed and the speed it fades by (m/s); lr
 -- frame lift / drag; gg, gl, gw ground effect gain, ray length and fade (m); tm thrust, tr roll/pitch,
--- ty yaw response time (s); pw/wl/wv prop wash Max: wobble, thrust loss, the sink speed where the loss
--- has faded out (m/s); wls/wvs/pws the same at the class's Stock setting; vq, cq descending:
--- pitch speed (m/s) and the most thrust gained.
+-- ty yaw response time (s); pw/wl/wv prop wash Max: shake rms at full wash (deg), thrust loss, the sink
+-- speed where the loss has faded out (m/s); wls/wvs/pws the same at the class's Stock setting; sq, cq,
+-- ce, se, rf descending: the cushion peaks at cq (less by ce near full stick) at a sink of sq*tf^se m/s,
+-- then stalls down to rf; pf the prop wash shake's frequency (Hz); tlo, thi the Power settings that
+-- suit the class (thrust/weight of real quads of its kind; Stock is always there).
 -- One string per class (parsed for the class in use only: tables of numbers cost radio memory):
-local QK = { "twr", "i0", "tn", "dz", "vp", "vk", "tl", "vt", "te", "ks", "kf", "ku", "er", "vd", "lr", "gg", "gl", "gw", "tm", "tr", "ty", "pw", "wl", "wv", "vq", "cq", "wls", "wvs", "pws" }
+local QK = { "twr", "i0", "tn", "dz", "vp", "vk", "tl", "vt", "te", "ks", "kf", "ku", "er", "vd", "lr", "gg", "gl", "gw", "tm", "tr", "ty", "pw", "wl", "wv", "sq", "cq", "wls", "wvs", "pws", "vc", "ta", "ce", "se", "rf", "pf", "tlo", "thi" }
 local QP = {
-  -- twr i0 tn dz vp vk tl vt te ks kf ku er vd lr gg gl gw tm tr ty pw wl wv vq cq wls wvs pws
-  "7.67 .0315 2.16 0 60.4 0 .54 6 .276 .0152 .00819 .0245 .357 15 .229 .24 .25 .113 .006 .009 .02 .5 .326 6.01 26.3 1.32 .119 3.8 .274",     -- Racer 5": 0.49 kg, 2500KV, 5045 tri-blade
-  "7.88 .026 1.52 .08 59.2 0 .48 5.4 .419 .0126 .00728 .0181 .357 15 .257 .27 .25 .113 .006 .007 .02 1 .348 6.54 26.9 1.33 .128 4.25 .548",  -- Freestyle 5": O4 build, 0.58 kg, 2400KV, 5045
-  "5.35 .0221 1.72 .03 49.5 0 .96 9.8 .982 .0176 .0167 .0384 .5 15 .1 .44 .15 .135 .006 .009 .02 1 .291 7.04 15.8 1.61 .103 5.17 .548",      -- 3" toothpick: 0.11 kg, 3S, 5000KV, 76 mm
-  "2.58 .0059 .9 .11 57.3 0 1.02 9.4 .805 .0741 .07 .0858 .286 7 0 .17 .0625 .0344 .006 .02 .02 1 .237 5.61 14.1 1.33 .0243 2.5 .316",       -- Whoop 65mm: ducted 1S, 24 g, 28000KV, 31 mm
+  -- twr i0 tn dz vp vk tl vt te ks kf ku er vd lr gg gl gw tm tr ty pw wl wv sq cq wls wvs pws vc ta ce se rf pf tlo thi
+  "7.67 .0315 2.16 0 77.4 .101 .854 8.6 .402 .0152 .00819 .0287 .357 15 .229 .24 .25 .113 .006 .009 .02 .347 .326 6.01 15.5 1.35 .119 3.8 .19 .584 35.1 .544 .579 .756 26 5 12",  -- Racer 5": 0.49 kg, 2500KV, 5045 tri-blade
+  "6.88 .026 1.52 .08 75.5 -.283 .685 9.14 .514 .011 .00635 .0184 .357 15 .257 .26 .25 .113 .006 .008 .02 .347 .348 7 13.5 1.39 .132 4.56 .19 .524 90.5 .722 .497 .722 24 4 10",  -- Freestyle 5": HD, 0.66 kg, 2400KV, 5045
+  "5.35 .0221 1.72 .03 67.6 -.77 1.01 9.33 0 .0176 .0167 .0417 .5 15 .1 .44 .15 .135 .006 .009 .02 .42 .291 7.04 15.5 1.61 .103 5.17 .23 .681 12.2 .21 .525 .881 35 3 10",        -- 3" toothpick: 0.11 kg, 3S, 5000KV, 76 mm
+  "2.58 .0059 .9 .11 72.9 -1 1.14 9.97 .019 .0741 .07 .0875 .286 7 0 .17 .0625 .0344 .006 .02 .02 .854 .237 5.61 9.08 1.37 .0243 2.5 .27 .891 23.6 .174 .557 .9 45 3 8",          -- Whoop 65mm: ducted 1S, 24 g, 28000KV, 31 mm
 }
 
 -- -------------------------------------------------------------- tracks
@@ -117,7 +120,7 @@ local TRACKS = {
     { -6.225,34,4.025,0.25,0,7,1, 6.225,34,4.025,0.25,0,7,1, 0,34,2.2,0.25,3.6,7,1,
       -6.225,46,4.025,0.25,0,7,1, 6.225,46,4.025,0.25,0,7,1, 0,46,2.2,0.25,3.6,7,1,
       -10,40,0.25,5.75,0,7,1, 10,36.025,0.25,1.775,0,7,1, 10,43.975,0.25,1.775,0,7,1, 10,40,0.25,2.2,3.6,7,1,
-      46,64,2,2,0,24,1, 33.6,10,1.25,3,0,2.6,2, 40.5,10,1.25,3,0,2.6,3, 47.4,10,1.25,3,0,2.6,2,
+      46,64,2,2,0,36,1, 33.6,10,1.25,3,0,2.6,2, 40.5,10,1.25,3,0,2.6,3, 47.4,10,1.25,3,0,2.6,2,
       -30,20,3,1.25,0,5.2,3, -36,50,4,4,0,3,1 } },
   -- laid out like a real race: lanes up and down the field joined by flag hairpins, a high
   -- gate and a dive gate on the start straight, a split-S (through the high gate, back
@@ -418,7 +421,7 @@ end
 local px, py, pz, vx, vy, vz = 0, 0.15, 0, 0, 0, 0                 -- quad position / velocity (m, m/s)
 local rx, ry, rz, ux, uy, uz, fx, fy, fz = 1, 0, 0, 0, 1, 0, 0, 0, 1 -- quad right / up / forward axes
 local sA, sE, sT, sR, speed = 0, 0, 0, 0, 0                           -- sticks, speed
-local aTf, aVu, aE2, aW = 0, 0, 0, 0                                  -- sound state (thrust frac, sink, edge speed, wash)
+local aTf, aVu, aE2, aW, aS, aF = 0, 0, 0, 0, 0, 0  -- sound state (thrust frac, sink, edge speed, wash, shake)
 local DR, NEAR = 0.15, 0.2                                            -- quad radius, camera near plane
 local P = { rc = 100, rm = 600, re = 0.5, yc = 100, ym = 500, ye = 0.4, twr = 6, angle = false, tc = 0.9, ts = 0.42,
             wr = 0, wp = 0, wy = 0 }                                  -- settings in use, body rates (rad/s)
@@ -459,7 +462,9 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
   local grounded = true
   local nearG, nearP, nearB = {}, {}, {}
   local Tm = 0                                   -- motor thrust (lags the throttle)
-  local wob1, wob2, sW, wl = 0, 0, 0, 0         -- prop wash wobble (rad/s), wash build-up (0..1), thrust loss
+  -- prop wash: shake (rad) and its turning part, wash build-up (0..1), shake size and severity,
+  -- thrust loss
+  local wob1, wob2, wob3, wq1, wq2, wq3, sW, sH, sV, wl = 0, 0, 0, 0, 0, 0, 0, 0, 1, 0
   local seed = 7
 
   rnd = function()
@@ -528,7 +533,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     hx, hz = hx / l, hz / l
     fx, fy, fz, rx, ry, rz, ux, uy, uz = hx, 0, hz, hz, 0, -hx, 0, 1, 0
     grounded = y <= DR + 0.01
-    speed, Tm, P.wr, P.wp, P.wy, sW = 0, 0, 0, 0, 0, 0
+    speed, Tm, P.wr, P.wp, P.wy, sW, sH, wob1, wob2, wob3, wq1, wq2, wq3 = 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
     for i = 1, NG do
       gd[i] = (px - gx[i]) * gnx[i] + (py - gy[i]) * gny[i] + (pz - gz[i]) * gnz[i]
     end
@@ -646,8 +651,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     -- prop wash (setting, off by default): sinking into your own downwash. The props build up a
     -- wash over ~0.2 s while they move down their own axis, less the faster they also move edgewise.
     -- It costs thrust (up to wl, from a 0.6 m/s sink until it fades out at wv m/s: the quad sinks
-    -- and feels mushy) and, falling faster with throttle on, shakes it (smoothed noise, so it reads
-    -- as a wobble, not jitter).
+    -- and feels mushy) and shakes it.
     wl = 0
     if S.wash > 0 then
       local vu0 = vx * ux + vy * uy + vz * uz
@@ -662,16 +666,40 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
           wl = P.wl * sW * f
         end
       end
-      if vu0 < -2 and sT > 0.2 then
-        local a = (-vu0 - 2) * 0.2
+      -- the shake: the props chop through their own turbulent wake and the quad rings at its wash
+      -- frequency. Sized from real Betaflight blackbox logs: pw is the jitter's rms in degrees at full
+      -- wash with the throttle chopped (tenths of a degree; about half with throttle on, when the
+      -- motors have the authority to fight it), each wash its own severity. From a 0.5 m/s sink, gone
+      -- in forward flight, no drift (the rates are its steps); the wake keeps buffeting it for ~0.2 s
+      -- after the sink stops
+      local a = 0
+      if vu0 < -0.5 and dt > 0 then
+        a = (-vu0 - 0.5) * 0.5
         if a > 1 then a = 1 end
-        -- scaled by the real wash build-up (faster edgewise flight clears it); Max carries
-        -- the full-strength set, Stock the class's own
-        a = a * sT * P.pw * 2.5 * sW
-        wob1, wob2 = wob1 * 0.6 + (rnd() - 0.5) * a, wob2 * 0.6 + (rnd() - 0.5) * a
-        wr, wp = wr + wob1, wp + wob2
-      else
-        wob1, wob2 = 0, 0
+        local th = sT * 2 - 0.2
+        if th < 0 then th = 0 elseif th > 1 then th = 1 end
+        if sH < 1e-4 then sV = 0.4 + 1.8 * rnd() ^ 2 end   -- a new wash: how bad this one is
+        a = a * sW * (1 - 0.45 * th) * sV * P.pw * 0.0504  -- rad: its rms is 0.346 a
+      end
+      local k = dt * 5
+      if k > 1 then k = 1 end
+      if a < sH then a = sH + (a - sH) * k end
+      sH = a
+      local rh = dt * 9                                -- the same jitter at any frame rate:
+      if rh > 1 then rh = 1 end                        -- 0.55 of it kept per 50 ms frame
+      local g = a * sqrt(rh * (2 - rh)) * 1.2
+      -- each axis is a fading phasor turning at the class's wash frequency (real quads: 20-45 Hz);
+      -- past what the frame rate can show, as fast as the screen can (2.5 rad a frame)
+      local w = dt * P.pf * 6.283
+      if w > 2.5 then w = 2.5 end
+      local c, s = cos(w) * (1 - rh), sin(w) * (1 - rh)
+      local j1, j2, j3 = wob1 * c - wq1 * s + (rnd() - 0.5) * g, wob2 * c - wq2 * s + (rnd() - 0.5) * g,
+        wob3 * c - wq3 * s + (rnd() - 0.5) * g * 0.35
+      if dt > 0 then
+        wr, wp, wy = wr + (j1 - wob1) / dt, wp + (j2 - wob2) / dt, wy + (j3 - wob3) / dt
+        wq1, wq2, wq3 = wob1 * s + wq1 * c + (rnd() - 0.5) * g, wob2 * s + wq2 * c + (rnd() - 0.5) * g,
+          wob3 * s + wq3 * c + (rnd() - 0.5) * g * 0.35
+        wob1, wob2, wob3 = j1, j2, j3
       end
     end
     if grounded and T < G * 1.02 then
@@ -689,9 +717,9 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     local n = floor(dt * 80) + 1
     local h = dt / n
     local km, kr, ky = h / (P.tm + h), h / (P.tr + h), h / (P.ty + h)
-    local VP, VK, KS, KF, KU, sTx = P.vp, P.vk, P.ks, P.kf, P.ku, sqrt(Tmax)
-    local TL, VT2, TE, ER, VD, LR, GG, GL, GW = P.tl, P.vt * P.vt, P.te, P.er, P.vd, P.lr, P.gg, P.gl, P.gw
-    local VQ, CQ = P.vq, P.cq
+    local VP, VK, VC, KS, KF, KU = P.vp, P.vk, P.vc, P.ks, P.kf, P.ku
+    local TL, VT2, TE, TA, ER, VD, LR, GG, GL, GW = P.tl, P.vt * P.vt, P.te, P.ta, P.er, P.vd, P.lr, P.gg, P.gl, P.gw
+    local SQ, CQ, CE, SE, RF = P.sq, P.cq, P.ce, P.se, P.rf
     local x0, x1, z0, z1 = TR.x0 - 160, TR.x1 + 160, TR.z0 - 160, TR.z1 + 160
     local bx0, bx1, by0, by1, bz0, bz1 = BX.x0, BX.x1, BX.y0, BX.y1, BX.z0, BX.z1
     -- broad phase once per frame: only objects within reach get tested per substep
@@ -736,24 +764,37 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
       local vu = ax_ * ux + vy * uy + az_ * uz
       local vr = ax_ * rx + vy * ry + az_ * rz
       local vf = ax_ * fx + vy * fy + az_ * fz
-      -- props lose thrust as the air through them speeds up (climbing) and gain thrust descending:
-      -- up to cq, about 2.5 times as fast as they lose it climbing (a cushion when you sink)
+      -- props lose thrust as the air through them speeds up (climbing) and gain thrust sinking,
+      -- until the blades stall in a fast drop
+      local tf = Tm / Tmax                              -- thrust fraction
       local Ta
       if vu < 0 then
-        Ta = Tm - vu * sqrt(Tm) * sTx / VQ
-        if Ta > Tm * CQ then Ta = Tm * CQ end
+        -- descending: a cushion that rises to cq at a sink of sq*tf^se, then stalls away (to rf)
+        local x = 9
+        if tf > 0.001 then x = -vu / (SQ * tf ^ SE) end
+        local r = 1 + (CQ - 1) * (1 - CE * tf) * (2 * x - x * x)
+        if r < RF then r = RF end
+        Ta = Tm * r
       else
-        Ta = Tm - vu * sqrt(Tm) * sTx / (VP + vu * VK)
+        if Tm > 0 then                                -- the loss grows with thrust as Tm*(Tmax/Tm)^VC
+          local den = VP + vu * VK                    -- and bends with VK as the inflow grows
+          if den < VP * 0.3 then den = VP * 0.3 end
+          Ta = Tm - vu * Tm * (Tmax / Tm) ^ VC / den
+        else
+          Ta = 0
+        end
         if Ta < 0 then Ta = 0 end
       end
       Ta = Ta * (1 - wl)
       -- translational lift: flying edgewise the props reach fresh air, the induced inflow drops
       -- and the same rpm gives more thrust (a 5": +25% at 6 m/s, +50% from 15 m/s)
       local e2 = vr * vr + vf * vf
-      -- the edgewise gain is a hover-throttle effect; it fades as thrust grows (te)
-      local u = Tmax / (Tm * P.twr)
-      if u > 1 then u = 1 end
-      Ta = Ta * (1 + TL * u ^ TE * e2 / (e2 + VT2))
+      -- the gain fades near full stick (te) and as air comes through the props axially (ta, m/s)
+      local t2 = tf * tf
+      local fa = 1 - TE * t2 * t2
+      if fa < 0 then fa = 0 end
+      if vu > 0 then fa = fa / (1 + vu / TA) end
+      Ta = Ta * (1 + TL * fa * e2 / (e2 + VT2))
       -- ground effect: within a twentieth of the prop diameter of the ground or a roof the props
       -- push their inflow against it (measured along body-down): up to
       -- +25% on a 5", +45% on a 3". Less when tilted (the ray is longer), fades with speed.
@@ -847,8 +888,8 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     speed = sqrt(vx * vx + vy * vy + vz * vz)
     if STICKTIME_TEST then
       -- motor sound state for the web emulator: what the synth needs (rpm from the thrust
-      -- fraction, axial and edgewise flow, wash build-up)
-      aTf = Tm / Tmax
+      -- fraction, axial and edgewise flow, wash build-up, the shake's rms (deg) and frequency)
+      aTf, aS, aF = Tm / Tmax, sH * 19.8, P.pf
       aVu = vx * ux + vy * uy + vz * uz
       aE2 = sqrt((vx * rx + vy * ry + vz * rz) ^ 2 + (vx * fx + vy * fy + vz * fz) ^ 2)
       aW = sW
@@ -1111,6 +1152,7 @@ local function applySettings()
     i = i + 1
     P[QK[i]] = tonumber(v)
   end
+  if S.twr > 0 and (S.twr < P.tlo or S.twr > P.thi) then S.twr = 0 end   -- not for this class: Stock
   if S.twr > 0 then P.twr = S.twr end       -- 0: the class's stock power
   if S.wash == 1 then P.wl, P.wv, P.pw = P.wls, P.wvs, P.pws end  -- Stock: the class's own wash
   P.angle = S.mode == 2
@@ -2335,8 +2377,11 @@ optStep = function(o, d)
   end
   local vals = o[3]
   if vals then
-    local j = optIndex(o) + d
-    if j < 1 then j = #vals elseif j > #vals then j = 1 end
+    local j = optIndex(o)
+    repeat                                     -- Power: only what suits the quad
+      j = j + d
+      if j < 1 then j = #vals elseif j > #vals then j = 1 end
+    until key ~= "twr" or vals[j] == 0 or vals[j] >= P.tlo and vals[j] <= P.thi
     S[key] = vals[j]
   else
     -- fine steps, five times bigger after eight quick ones in a row (held key, fast wheel)
@@ -3139,7 +3184,7 @@ local function init()
     TEST.race = function() return lastGate, lapStart, R.n, R.laps, R.total, R.crashes, tStart end
     TEST.info = function() return NT, P.twr, gmode, R.pos, AI.n, R.sc, R.rn, R.rt, R.chn, BX.n, TRACKS[S.track][1] end
     TEST.thrust = function() return P.twr, P.i0, P.tn, P.dz end
-    TEST.audio = function() return sT, S.quad, state, aTf, aVu, aE2, aW, sA, sE, sR end
+    TEST.audio = function() return sT, S.quad, state, aTf, aVu, aE2, aW, sA, sE, sR, aS, aF end
     TEST.ai = function(a) return AI.x[a], AI.y[a], AI.z[a], AI.k[a], AI.d[a], AI.v[a], AI.seg[a] end
     TEST.best = function(t) return BEST.l[t], BEST.r[t], BEST.g[t], BEST.f[t] end
     TEST.box = function(b) return BX.x0[b], BX.x1[b], BX.y0[b], BX.y1[b], BX.z0[b], BX.z1[b] end

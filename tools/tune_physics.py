@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """Steady-state check of the quad classes in src/sticktime.lua (read from its QP strings).
-Usage: tools/tune_physics.py [class number 1-5] [key=value ...]   e.g. tools/tune_physics.py 1 vp=60
+Usage: tools/tune_physics.py [class number 1-4] [key=value ...]   e.g. tools/tune_physics.py 1 vp=60
 
 Model (mass-normalised, body axes r/u/f; the same steps as physics() in src/sticktime.lua):
   T   = Tmax*(i0 + (1-i0)*x^tn),  x = max(0, (thr-dz)/(1-dz))      stick -> thrust, lagged with tm
-  Ta  = max(0, T - vu*sqrt(T*Tmax)/(vp + vu*vk))  climbing (vk: the loss bends, the prop unloads);
-       min(cq*T, T - vu*sqrt(T*Tmax)/vq)  descending
+  Ta  = max(0, T - vu*T*(Tmax/T)^vc/(vp + vu*vk))  climbing (vc: how the loss scales with thrust,
+                                                  vk: the loss bends, the prop unloads);
+       T*max(rf, 1 + (cq-1)*(1-ce*tf)*(2x - x^2)), x = sink/(sq*tf^se)  descending: a cushion that
+                                                  peaks, then the blades stall (tf = T/Tmax)
   Ta *= 1 - wl*wash*fade  (Prop wash on: sinking into your own downwash, see src/sticktime.lua)
-  Ta *= 1 + tl*min(1,(Tmax/(T*twr))^te)*e2/(e2 + vt^2)   translational lift, fading with throttle
+  Ta *= 1 + tl*fade*e2/(e2 + vt^2)   translational lift; fade = (1 - te*(T/Tmax)^4)/(1 + vu/ta) near full
+                                       stick and with axial inflow
   S   = (ks|vr| + ku|vu| + kf|vf|)*(1 + er*(1 - smoothstep(|v|/vd)))     drag along the flow: a = -S*v
   frame lift: s = vu/|v|, q = lr*s*0.813*(2|s|sqrt(1-s^2))^0.6*S*|v|/sqrt(1-s^2)
               a_u -= q*(1-s^2), a_r += q*s*vr/|v|, a_f += q*s*vf/|v|
@@ -47,13 +50,18 @@ def thrust(p, s):
 def accel(p, Tm, vu, vr, vf):
     """body-axis accelerations (u, r, f) from props, drag and frame lift"""
     Tmax = p["twr"] * G
-    if vu < 0:
-        Ta = min(p["cq"] * Tm, Tm - vu * math.sqrt(Tm * Tmax) / p["vq"])
+    tf = Tm / Tmax
+    if vu < 0:                                                 # the cushion rises, then the blades stall
+        x = -vu / (p["sq"] * tf ** p["se"]) if tf > 0.001 else 9.0
+        Ta = Tm * max(p["rf"], 1 + (p["cq"] - 1) * (1 - p["ce"] * tf) * (2 * x - x * x))
     else:
-        Ta = max(0.0, Tm - vu * math.sqrt(Tm * Tmax) / (p["vp"] + vu * p.get("vk", 0.0)))
+        den = max(0.3 * p["vp"], p["vp"] + vu * p["vk"])
+        Ta = max(0.0, Tm - vu * Tm * (Tmax / Tm) ** p["vc"] / den) if Tm > 0 else 0.0
     e2 = vr * vr + vf * vf
-    tl = p["tl"] * min(1.0, (Tmax / (Tm * p["twr"])) ** p.get("te", 0.0))
-    Ta *= 1 + tl * e2 / (e2 + p["vt"] ** 2)
+    fa = max(0.0, 1 - p["te"] * tf ** 4)                       # translational lift fades near full stick
+    if vu > 0:
+        fa /= 1 + vu / p["ta"]                                 # and with axial inflow
+    Ta *= 1 + p["tl"] * fa * e2 / (e2 + p["vt"] ** 2)
     au, ar, af = Ta, 0.0, 0.0
     v2 = vu * vu + e2
     if v2 > 1e-4:

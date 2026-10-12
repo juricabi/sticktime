@@ -25,8 +25,11 @@
     ghost: store.get('ghost', true),
     delay: store.get('delay', true),
     vol: store.get('vol', 0.8),
+    lastVol: store.get('lastVol', 0.8),            // what unmuting goes back to
+    musicOn: store.get('musicOn', false),
+    musicVol: store.get('musicVol', 0.6),
     mode: store.get('mode', 2),
-    input: 'mix',
+    input: store.get('input', 'mix') === 'pad' ? 'pad' : 'mix',
     cpu: null,
     sd: new Map(Object.entries(store.get('sd', {}))),
     pad: store.get('padmap', { ail: [0, false], ele: [1, false], thr: [2, false], rud: [3, false] }),
@@ -48,7 +51,18 @@
   }
 
   // ------------------------------------------------------------- sound
-  let actx = null, toneEnd = 0, live = [], motor = null;
+  let actx = null, toneEnd = 0, live = [], motor = null, outGain = null;
+  // every sound goes through one gain, set from the slider on a loudness curve (ears hear power
+  // logarithmically: half way is about -12 dB) and eased, so beeps and motors follow it alike
+  const volGain = (v) => v * v;
+  function audioOut() {
+    if (!outGain) {
+      outGain = actx.createGain();
+      outGain.gain.value = volGain(app.vol);
+      outGain.connect(actx.destination);
+    }
+    return outGain;
+  }
   // EdgeTX's background channel (the vario's, StickTime's motor sound): one tone that each call
   // retunes and keeps going for its duration; a call with duration 0 silences it
   function bgTone(freq, dur, vol) {
@@ -58,7 +72,7 @@
       o.type = 'triangle';
       o.frequency.value = Math.max(50, freq);
       g.gain.value = 0;
-      o.connect(g).connect(actx.destination);
+      o.connect(g).connect(audioOut());
       o.start();
       motor = { o, g };
     }
@@ -83,7 +97,7 @@
     g.gain.exponentialRampToValueAtTime(0.045, t0 + 0.006);
     g.gain.setValueAtTime(0.045, Math.max(t0 + 0.007, t1 - 0.012));
     g.gain.exponentialRampToValueAtTime(0.0001, t1);
-    o.connect(g).connect(actx.destination);
+    o.connect(g).connect(audioOut());
     o.start(t0); o.stop(t1 + 0.02);
     live.push(o);
     o.onended = () => { live = live.filter((x) => x !== o); };
@@ -95,50 +109,85 @@
     try { if (navigator.vibrate) navigator.vibrate(Math.min(200, ms * 10)); } catch (e) { /* blocked */ }
   }
 
-  // Motor sound v3, synthesized in the browser (the radio itself can't do better than the
-  // plain tone that was removed in 1.6.4). What makes a quad sound like a quad, per motor:
-  //   - the blade-pass buzz: a custom periodic wave (fundamental + 5 harmonics, not a raw saw)
-  //     through a lowpass that opens with rpm - dark at idle, raspy at speed
-  //   - the shaft tone at rotation frequency (the low growl)
+  // Motor sound v4, synthesized in the browser (the radio itself can't do better than the
+  // plain tone that was removed in 1.6.4). Tuned against recordings of real quads, measured the
+  // same way (tone vs noise share, harmonic levels, amplitude wobble, pitch wander). Per motor:
+  //   - the blade-pass tone: nearly a pure tone (2nd harmonic ~15 dB down, the rest far below;
+  //     the whoop's is much buzzier), through a lowpass that opens with rpm
+  //   - the shaft tone at rotation frequency, and the props' imbalance wobbling the level at it
   //   - the electrical whine at 7x shaft speed (12N14P motors; the whoop's scream at 4-6.6 kHz)
-  //   - a narrow noise band: air rush with speed, prop wash when sinking through dirty air
+  //   - air noise, a whoosh up to ~2x blade pass (a tenth to a fifth of the sound; no hiss)
+  //   - a slow pitch wander (~25 cents) and, in prop wash, the rpm chatter of a real quad's
+  //     motors fighting it (a few % at the class's wash frequency, from blackbox logs), plus
+  //     the dark, fluttering rumble of dirty air the recordings have when descending
   // Each motor runs at its own rpm from a Quad-X stick mix (inputs are audible), has its own
-  // timbre and sits left/right (heard from the camera: FL/FR wide, RR/RL narrow), and an
-  // irregular ~2-7 Hz flutter (random-walk gain and detune, like turbulence over the discs)
-  // replaces the steady drone. The master swells on spool-up and dips on chop, into a high
-  // shelf and a compressor. Class rpm/timbre from each class's measured hover/full rpm.
+  // timbre and sits left/right (heard from the camera: FL/FR wide, RR/RL narrow); together they
+  // beat and flutter like four real props. The master swells on spool-up and dips on chop, into
+  // gentle saturation, a high shelf and a compressor. Class rpm from each class's hover/full rpm.
   const ACLASS = [
-    { rpm: 31679, blades: 3, poles: 7, buzz: 1.0, whine: 0.14, shaft: 0.1, noise: 0.45 },  // 5" racer
-    { rpm: 31679, blades: 3, poles: 7, buzz: 0.9, whine: 0.16, shaft: 0.12, noise: 0.55 }, // 5" freestyle
-    { rpm: 36301, blades: 3, poles: 7, buzz: 0.8, whine: 0.18, shaft: 0.1, noise: 0.65 },  // 3" toothpick
-    { rpm: 56381, blades: 3, poles: 7, buzz: 0.4, whine: 0.4, shaft: 0.05, noise: 1.0 },   // 65 mm whoop
+    { rpm: 31679, blades: 3, poles: 7, buzz: 1.0, whine: 0.14, shaft: 0.1, noise: 0.45, wave: 0 },  // 5" racer
+    { rpm: 31679, blades: 3, poles: 7, buzz: 0.9, whine: 0.16, shaft: 0.12, noise: 0.5, wave: 0 },  // 5" freestyle
+    { rpm: 36301, blades: 3, poles: 7, buzz: 0.8, whine: 0.18, shaft: 0.1, noise: 0.5, wave: 0 },   // 3" toothpick
+    { rpm: 56381, blades: 3, poles: 7, buzz: 0.4, whine: 0.4, shaft: 0.05, noise: 0.4, wave: 1 },   // 65 mm whoop
   ];
+  // blade-pass harmonics: a prop's tone, and the whoop's buzz (from the recordings' spectra)
+  const WAVES = [[0, 1, 0.2, 0.08, 0.06, 0.04, 0.02], [0, 1, 0.8, 0.6, 0.35, 0.3, 0.15]];
   const MIX = [[-1, 1, -1], [1, 1, 1], [1, -1, 1], [-1, -1, -1]];   // [roll, pitch, yaw] weight per motor
   const PAN = [-0.55, 0.55, -0.3, 0.3];                              // FL, FR, RR, RL as heard from the camera
   const TIMBRE = [[1, 1], [0.9, 0.85], [1.08, 1.12], [0.94, 0.88]];  // per-motor buzz / whine scale
+  const CENTS = 1731;                                                // cents per unit of rpm fraction
+  // a seamless looping modulator: random sines on an 8 s grid with a smooth band shape, rms 1
+  // (at 8 kHz, made by the two-term sine recurrence: fast to build)
+  function modBuffer(lo, hi, centre) {
+    const sr = 8000, n = sr * 8, buf = actx.createBuffer(1, n, sr), d = buf.getChannelData(0);
+    for (let k = Math.ceil(lo * 8); k <= hi * 8; k++) {
+      const f = k / 8, a = centre ? Math.exp(-0.5 * ((f - centre) / (centre / 6)) ** 2) : 1 / Math.sqrt(f);
+      const ph = Math.random() * 2 * Math.PI, w = 2 * Math.PI * f / sr, c2 = 2 * Math.cos(w);
+      let y1 = a * Math.sin(ph - w), y2 = a * Math.sin(ph - 2 * w);
+      for (let i = 0; i < n; i++) { const y = c2 * y1 - y2; d[i] += y; y2 = y1; y1 = y; }
+    }
+    let s = 0;
+    for (let i = 0; i < n; i++) s += d[i] * d[i];
+    const g = 1 / Math.sqrt(s / n);
+    for (let i = 0; i < n; i++) d[i] *= g;
+    return buf;
+  }
+  function loopSrc(buf, rate, all) {
+    const s = actx.createBufferSource();
+    s.buffer = buf; s.loop = true; s.playbackRate.value = rate; s.start();
+    all.push(s);
+    return s;
+  }
+  const gainNode = (v) => { const g = actx.createGain(); g.gain.value = v; return g; };
   let synth = null;
   function startSynth() {
-    const master = actx.createGain();
-    master.gain.value = 0;
+    const srcs = [], loop = (b, r) => loopSrc(b, r, srcs);         // every source, to stop them all
+    const master = gainNode(0);
     const shelf = actx.createBiquadFilter();
     shelf.type = 'highshelf'; shelf.frequency.value = 3800; shelf.gain.value = -6;
     const comp = actx.createDynamicsCompressor();
     comp.threshold.value = -20; comp.knee.value = 18; comp.ratio.value = 5;
     comp.attack.value = 0.004; comp.release.value = 0.18;
-    master.connect(shelf); shelf.connect(comp); comp.connect(actx.destination);
-    const sum = actx.createGain();                                  // the flutter modulates this node
-    sum.gain.value = 1;
-    const shaper = actx.createWaveShaper();                         // soft saturation: warmth and grit
+    master.connect(shelf); shelf.connect(comp); comp.connect(audioOut());
+    const sum = gainNode(1);                                        // the flutter modulates this node
+    const shaper = actx.createWaveShaper();                         // gentle saturation: warmth
     const curve = new Float32Array(257);
-    for (let i = 0; i < 257; i++) { const x = i / 128 - 1; curve[i] = Math.tanh(2.2 * x) / Math.tanh(2.2); }
+    for (let i = 0; i < 257; i++) { const x = i / 128 - 1; curve[i] = Math.tanh(1.2 * x) / Math.tanh(1.2); }
     shaper.curve = curve; shaper.oversample = '2x';
-    const drive = actx.createGain(); drive.gain.value = 1.6;        // into the shaper, then back off after
-    const trim = actx.createGain(); trim.gain.value = 0.62;
-    sum.connect(drive); drive.connect(shaper); shaper.connect(trim); trim.connect(master);
-    const wave = actx.createPeriodicWave(new Float32Array(7), new Float32Array([0, 1, 0.6, 0.28, 0.14, 0.07, 0.03]));
+    const drive = gainNode(1);
+    sum.connect(drive); drive.connect(shaper); shaper.connect(gainNode(0.62)).connect(master);
+    const waves = WAVES.map((w) => actx.createPeriodicWave(new Float32Array(w.length), new Float32Array(w)));
     const buf = actx.createBuffer(1, actx.sampleRate * 2, actx.sampleRate);
     const ch = buf.getChannelData(0);
     for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
+    // modulators: slow wander/flutter (0.5-6 Hz) and the prop wash chatter (around 30 Hz,
+    // retuned to the class's wash frequency by playback rate), one per roll / pitch axis
+    const slow = modBuffer(0.5, 6), chat = [modBuffer(15, 60, 30), modBuffer(15, 60, 30)];
+    const chatSrc = chat.map((b) => loop(b, 1));
+    const chatAm = chatSrc.map((s) => { const g = gainNode(0); s.connect(g); return g; });  // per axis, x depth
+    const chatFm = chatSrc.map((s) => { const g = gainNode(0); s.connect(g); return g; });
+    const flut = gainNode(0);
+    loop(slow, 1).connect(flut); flut.connect(sum.gain);
     const motors = [];
     for (let m = 0; m < 4; m++) {
       let dest = sum;
@@ -146,40 +195,66 @@
         const p = actx.createStereoPanner();
         p.pan.value = PAN[m]; p.connect(sum); dest = p;
       }
+      const amp = gainNode(1);                                      // level wobble: imbalance, chatter
+      amp.connect(dest);
       const lp = actx.createBiquadFilter();
-      lp.type = 'lowpass'; lp.frequency.value = 1500; lp.Q.value = 0.8; lp.connect(dest);
-      const buzz = actx.createOscillator(), bg = actx.createGain();
-      buzz.setPeriodicWave(wave); buzz.frequency.value = 200; bg.gain.value = 0;
+      lp.type = 'lowpass'; lp.frequency.value = 1500; lp.Q.value = 0.8; lp.connect(amp);
+      const buzz = actx.createOscillator(), bg = gainNode(0);
+      srcs.push(buzz);
+      buzz.setPeriodicWave(waves[0]); buzz.frequency.value = 200;
       buzz.connect(bg); bg.connect(lp); buzz.start();
-      const buzz2 = actx.createOscillator(), b2g = actx.createGain();   // chorus: thickens the buzz
-      buzz2.setPeriodicWave(wave); buzz2.frequency.value = 201.4; b2g.gain.value = 0;
+      const buzz2 = actx.createOscillator(), b2g = gainNode(0);   // chorus: thickens the tone
+      srcs.push(buzz2);
+      buzz2.setPeriodicWave(waves[0]); buzz2.frequency.value = 201.4;
       buzz2.connect(b2g); b2g.connect(lp); buzz2.start();
-      const shaft = actx.createOscillator(), sg = actx.createGain();
-      shaft.type = 'sine'; shaft.frequency.value = 70; sg.gain.value = 0;
+      const shaft = actx.createOscillator(), sg = gainNode(0);
+      srcs.push(shaft);
+      shaft.type = 'sine'; shaft.frequency.value = 70;
       shaft.connect(sg); sg.connect(lp); shaft.start();
-      const whine = actx.createOscillator(), wg = actx.createGain();
-      whine.type = 'sine'; whine.frequency.value = 1400; wg.gain.value = 0;
-      whine.connect(wg); wg.connect(dest); whine.start();
-      const whine2 = actx.createOscillator(), w2g = actx.createGain();  // second, slightly sharp partial
-      whine2.type = 'sine'; whine2.frequency.value = 2830; w2g.gain.value = 0;
-      whine2.connect(w2g); w2g.connect(dest); whine2.start();
-      const ns = actx.createBufferSource();
-      ns.buffer = buf; ns.loop = true; ns.playbackRate.value = 0.9 + 0.05 * m;
-      const bp = actx.createBiquadFilter();
-      bp.type = 'bandpass'; bp.frequency.value = 600; bp.Q.value = 1.4;
-      const ng = actx.createGain(); ng.gain.value = 0;
-      ns.connect(bp); bp.connect(ng); ng.connect(dest); ns.start();
-      motors.push({ buzz, bg, buzz2, b2g, shaft, sg, whine, wg, whine2, w2g, ns, bp, ng, lp });
+      shaft.connect(gainNode(0.12)).connect(amp.gain);             // the imbalance wobble
+      const whine = actx.createOscillator(), wg = gainNode(0);
+      srcs.push(whine);
+      whine.type = 'sine'; whine.frequency.value = 1400;
+      whine.connect(wg); wg.connect(amp); whine.start();
+      const whine2 = actx.createOscillator(), w2g = gainNode(0);  // second, slightly sharp partial
+      srcs.push(whine2);
+      whine2.type = 'sine'; whine2.frequency.value = 2830;
+      whine2.connect(w2g); w2g.connect(amp); whine2.start();
+      const ns = loop(buf, 0.9 + 0.05 * m);                      // broadband air noise
+      const nlp = actx.createBiquadFilter(), nhp = actx.createBiquadFilter();
+      nlp.type = 'lowpass'; nlp.Q.value = 0; nhp.type = 'highpass'; nhp.Q.value = 0;
+      const ng = gainNode(0);
+      ns.connect(nlp); nlp.connect(nhp); nhp.connect(ng); ng.connect(amp);
+      // pitch: this motor's own slow wander, plus the chatter of the axes it sits on
+      const wand = gainNode(0);
+      loop(slow, 0.8 + 0.17 * m).connect(wand);
+      const det = [buzz, buzz2, shaft, whine, whine2].map((o) => o.detune);
+      det.forEach((d) => wand.connect(d));
+      for (let ax = 0; ax < 2; ax++) {
+        const sAm = gainNode(MIX[m][ax] / Math.SQRT2), sFm = gainNode(MIX[m][ax] / Math.SQRT2);
+        chatAm[ax].connect(sAm); sAm.connect(amp.gain);
+        chatFm[ax].connect(sFm); det.forEach((d) => sFm.connect(d));
+      }
+      motors.push({ buzz, bg, buzz2, b2g, shaft, sg, whine, wg, whine2, w2g, ns, nlp, nhp, ng, lp, wand });
     }
+    // dirty air: a dark rumble that flutters, when descending into the wash
+    const dv = loop(buf, 0.71);
+    const dvf = actx.createBiquadFilter();
+    dvf.type = 'lowpass'; dvf.frequency.value = 400; dvf.Q.value = 0;
+    const dvg = gainNode(0), dvam = gainNode(1);
+    dv.connect(dvf); dvf.connect(dvg); dvg.connect(dvam); dvam.connect(drive);
+    const dvFl = gainNode(0.6);
+    loop(slow, 3.3).connect(dvFl); dvFl.connect(dvam.gain);
+    const dvCh = gainNode(0);
+    chatSrc[0].connect(dvCh); dvCh.connect(dvam.gain);
     // airflow: the wind rush over the frame grows with airspeed (its own voice, not the motors')
-    const ws = actx.createBufferSource();
-    ws.buffer = buf; ws.loop = true; ws.playbackRate.value = 0.8;
+    const ws = loop(buf, 0.8);
     const wf = actx.createBiquadFilter();
     wf.type = 'lowpass'; wf.frequency.value = 200; wf.Q.value = 0.5;
-    const wgn = actx.createGain(); wgn.gain.value = 0;
-    ws.connect(wf); wf.connect(wgn); wgn.connect(master); ws.start();
-    synth = { master, sum, motors, buf, ws, wf, wgn, rpmS: [0, 0, 0, 0], prev: 0, state: 0,
-              vol: 0, flT: 0, flG: 1, flD: [1, 1, 1, 1] };
+    const wgn = gainNode(0);
+    ws.connect(wf); wf.connect(wgn); wgn.connect(master);
+    synth = { master, sum, motors, buf, waves, wave: 0, chatSrc, chatAm, chatFm, flut, dvf, dvg, dvCh, wf, wgn,
+              rpmS: [0, 0, 0, 0], prev: 0, state: 0, vol: 0, dirty: 0, stop: srcs };
   }
   function stopSynth() {
     if (!synth) return;
@@ -188,9 +263,8 @@
     try {
       s.master.gain.setTargetAtTime(0, actx.currentTime, 0.04);
       setTimeout(() => {
-        s.motors.forEach((m) => {
-          try { m.buzz.stop(); m.buzz2.stop(); m.shaft.stop(); m.whine.stop(); m.whine2.stop(); m.ns.stop(); s.ws.stop(); } catch (e) { /* gone */ }
-        });
+        s.stop.forEach((o) => { try { o.stop(); } catch (e) { /* gone */ } });
+        try { s.master.disconnect(); } catch (e) { /* gone */ }
       }, 300);
     } catch (e) { /* context closed */ }
   }
@@ -202,21 +276,30 @@
     if (app.engine && !app.engine.error) { try { a = app.engine.callTest('audio'); } catch (e) { /* hook absent */ } }
     const live = a && a.length >= 10;
     const c = live ? ACLASS[Math.max(1, Math.min(4, a[1] | 0)) - 1] : ACLASS[0];
-    let on = 0, frac = 0, load = 0, speed = 0, chop = 0;
+    if (c.wave !== synth.wave) {
+      synth.wave = c.wave;
+      synth.motors.forEach((m) => { m.buzz.setPeriodicWave(synth.waves[c.wave]); m.buzz2.setPeriodicWave(synth.waves[c.wave]); });
+    }
+    let on = 0, frac = 0, speed = 0, chop = 0, dirty = 0, shake = 0, pf = 26;
     if (live) {
       frac = Math.max(0, Math.min(1, a[3]));                  // lagged thrust / Tmax
-      load = 0.35 * (a[4] - a[5]) - a[6] * 6;                 // PropLoad: dirty air is negative
       speed = Math.abs(a[4]) + a[5];                          // airspeed over the discs
       on = (a[2] === 4 && !app.paused) ? 1 : 0;               // motors live only while flying
+      // dirty air: sinking down the prop axis, cleared by edgewise speed; stronger with the prop
+      // wash setting on (its build-up), and the shake's rms (deg) drives the motors' chatter
+      dirty = Math.max(0, Math.min(1, (-a[4] - 0.5) / 3)) * Math.max(0, 1 - a[5] / 6) * (0.5 + 0.5 * a[6]);
+      shake = a.length >= 12 ? Math.max(0, a[10]) : 0;
+      pf = a.length >= 12 && a[11] > 0 ? a[11] : 26;
       for (let i = 0; i < 4; i++) {
         const mix = MIX[i][0] * a[7] * 0.3 + MIX[i][1] * a[8] * 0.3 + MIX[i][2] * a[9] * 0.22;
         const tf = Math.max(0.008, Math.min(1.15, frac * (1 + mix)));
-        const rpm = c.rpm * Math.max(0.1, Math.sqrt(tf)) * (1 - 0.15 * a[6]);  // wash loads the motors
+        const rpm = c.rpm * Math.max(0.1, Math.sqrt(tf)) * (1 - 0.06 * dirty);  // dirty air loads them
         synth.rpmS[i] += 0.12 * (rpm - synth.rpmS[i]);        // rpm smoothing EMA (0.12/frame)
       }
     } else {
       for (let i = 0; i < 4; i++) synth.rpmS[i] *= 0.92;
     }
+    synth.dirty += (dirty - synth.dirty) * Math.min(1, dt / 120);
     // a crash: a short thud, and the motors cut with it
     if (live && synth.state === 4 && a[2] === 5) {
       const t = actx.currentTime;
@@ -238,42 +321,410 @@
     chop = Math.max(0, slope);
     const swell = Math.max(0.6, Math.min(1.4, 1 - slope));    // spool-up swells, chop dips
     synth.vol += (on * swell - synth.vol) * Math.min(1, dt / 90);
-    synth.master.gain.setTargetAtTime(0.5 * app.vol * synth.vol, now, 0.06);
-    // irregular flutter (random walk, new target every ~140 ms): gain +-13%, detune +-0.4%
-    synth.flT -= dt;
-    if (synth.flT <= 0) {
-      synth.flT = 110 + Math.random() * 60;
-      const rough = 0.13 + 0.22 * (1 - Math.min(1, mean / c.rpm));   // lumpy idle
-      synth.flG = 1 + (Math.random() - 0.5) * 2 * rough;
-      for (let i = 0; i < 4; i++) synth.flD[i] = 1 + (Math.random() - 0.5) * 0.008;
-      synth.sum.gain.setTargetAtTime(synth.flG, now, 0.05);
+    synth.master.gain.setTargetAtTime(0.5 * synth.vol, now, 0.06);
+    const dw = synth.dirty;
+    const rough = 1 + 0.8 * (1 - Math.min(1, mean / c.rpm));             // lumpy idle
+    synth.flut.gain.setTargetAtTime(0.09 * rough * (1 + 1.6 * dw), now, 0.1);
+    // the chatter: rpm a few % at the wash frequency (~2.3% rms at 0.19 deg of shake), level 2.5x
+    const rpmCh = Math.min(0.12, 0.12 * shake);
+    for (let ax = 0; ax < 2; ax++) {
+      synth.chatSrc[ax].playbackRate.setTargetAtTime(pf / 30, now, 0.1);
+      synth.chatFm[ax].gain.setTargetAtTime(on * CENTS * rpmCh, now, 0.05);
+      synth.chatAm[ax].gain.setTargetAtTime(on * 2.5 * rpmCh, now, 0.05);
     }
-    const nAmt = c.noise * Math.max(0.08, Math.min(1.3, 0.2 + 0.5 * frac - Math.min(0, load) * 0.05
-      + speed * 0.02 + chop * 0.6));
+    const nAmt = c.noise * Math.max(0.08, Math.min(1.6, 0.2 + 0.3 * frac + 0.1 * dw + speed * 0.004 + chop * 0.6));
     for (let i = 0; i < 4; i++) {
       const m = synth.motors[i];
       const mech = synth.rpmS[i] / 60;
-      const bpf = mech * c.blades * synth.flD[i];
+      const bpf = mech * c.blades;
       const rf = Math.min(1, synth.rpmS[i] / c.rpm);
       m.buzz.frequency.setTargetAtTime(Math.max(30, bpf), now, 0.02);
       m.buzz2.frequency.setTargetAtTime(Math.max(30, bpf * 1.0068), now, 0.02);
       m.shaft.frequency.setTargetAtTime(Math.max(20, mech), now, 0.02);
-      const elec = mech * c.poles * (1 + (synth.flD[i] - 1) * 2);
-      m.whine.frequency.setTargetAtTime(Math.min(11000, elec), now, 0.03);
-      m.whine2.frequency.setTargetAtTime(Math.min(14000, elec * 2.02), now, 0.03);
-      m.lp.frequency.setTargetAtTime(Math.min(9500, 250 + bpf * 2.2), now, 0.05);
-      m.bp.frequency.setTargetAtTime(Math.min(9000, 300 + bpf * 1.5 + speed * 8), now, 0.05);
+      m.whine.frequency.setTargetAtTime(Math.min(11000, mech * c.poles), now, 0.03);
+      m.whine2.frequency.setTargetAtTime(Math.min(14000, mech * c.poles * 2.02), now, 0.03);
+      m.wand.gain.setTargetAtTime(CENTS * 0.002 * (1 + 3 * dw), now, 0.1);    // 3.5 cents, 14 in dirty air
+      m.lp.frequency.setTargetAtTime(Math.min(12000, 250 + bpf * 3), now, 0.05);
+      m.nlp.frequency.setTargetAtTime(Math.min(3000, 300 + bpf * 2.2), now, 0.05);
+      m.nhp.frequency.setTargetAtTime(Math.max(40, bpf * 0.3), now, 0.05);
       m.bg.gain.setTargetAtTime(on * c.buzz * TIMBRE[i][0] * (0.12 + 0.3 * rf), now, 0.04);
       m.b2g.gain.setTargetAtTime(on * c.buzz * TIMBRE[i][0] * 0.55 * (0.12 + 0.3 * rf), now, 0.04);
       m.sg.gain.setTargetAtTime(on * c.shaft * (0.1 + 0.9 * rf), now, 0.04);
-      const loadW = 1 + 0.3 * Math.max(0, Math.min(1, load / 6));      // a loaded motor whines louder
-      m.wg.gain.setTargetAtTime(on * c.whine * TIMBRE[i][1] * (0.2 + 0.8 * rf) * loadW, now, 0.04);
+      m.wg.gain.setTargetAtTime(on * c.whine * TIMBRE[i][1] * (0.2 + 0.8 * rf), now, 0.04);
       m.w2g.gain.setTargetAtTime(on * c.whine * TIMBRE[i][1] * 0.3 * (0.2 + 0.8 * rf), now, 0.04);
-      m.ng.gain.setTargetAtTime(on * 0.1 * nAmt * TIMBRE[i][0], now, 0.07);
+      m.ng.gain.setTargetAtTime(on * 2.5 * nAmt * TIMBRE[i][0], now, 0.07);
     }
-    // the wind rush: quiet to 15 m/s, loud by 30, brighter with speed
-    synth.wgn.gain.setTargetAtTime(on * Math.min(0.3, (speed / 28) * (speed / 28)) * 0.9, now, 0.1);
-    synth.wf.frequency.setTargetAtTime(Math.min(4000, 180 + speed * 36), now, 0.1);
+    // the dirty-air rumble: below the blade pass, louder the dirtier, fluttering with the chatter
+    const dvc = 120 + 0.4 * mean / 60 * c.blades;
+    synth.dvf.frequency.setTargetAtTime(dvc, now, 0.1);
+    const dvn = Math.sqrt(1.11 * dvc / (1.5 * actx.sampleRate));           // that noise's rms
+    synth.dvg.gain.setTargetAtTime(on * 0.1 * dw * (0.5 + frac) / dvn, now, 0.08);
+    synth.dvCh.gain.setTargetAtTime(Math.min(0.8, 2 * shake), now, 0.05);
+    // the wind rush: a dark whoosh under the motors, from ~15 m/s, never hissing
+    synth.wgn.gain.setTargetAtTime(on * Math.min(0.1, 0.1 * (speed / 35) * (speed / 35)), now, 0.1);
+    synth.wf.frequency.setTargetAtTime(Math.min(900, 150 + speed * 15), now, 0.1);
+  }
+
+  // ------------------------------------------------------------- music
+  // Built-in music, generated live (free by construction: nothing to license or download), in
+  // the spirit of FPV edits: melodic electronic tracks. Each song (~2.5 min) picks a minor key, a tempo, a progression of seventh chords voiced with smooth voice leading,
+  // a bass groove, an arpeggio and a hook: a two-bar motif developed over eight bars (A A' B A''),
+  // landing on chord tones. Arranged like a real track: a pad and a muffled kick swell in through
+  // an opening filter, the groove, a build with a riser and snare roll, the drop with the hook,
+  // a breakdown, a second drop, an outro that closes the filter; then the next song. Or the
+  // player's own files (Songs...). Music has its own on/off and level, apart from Sound.
+  const MUSIC = { bus: null, gen: null, el: null, src: null, files: [], idx: 0 };
+  const midiHz = (m) => 440 * Math.pow(2, (m - 69) / 12);
+  const pick = (a) => a[Math.floor(Math.random() * a.length)];
+  const AEOLIAN = [0, 2, 3, 5, 7, 8, 10];
+  // progressions as scale degrees (0 = i, 2 = III, 3 = iv, 4 = v, 5 = VI, 6 = VII)
+  const PROGS = [[0, 5, 2, 6], [0, 6, 5, 6], [5, 6, 0, 0], [0, 3, 5, 4], [0, 5, 3, 4], [5, 3, 0, 6], [3, 5, 0, 6],
+                 [0, 2, 6, 5]];
+  const BASSES = [
+    [1, 0, 1, 0, 1, 0, 2, 0, 1, 0, 1, 0, 1, 0, 2, 0],    // driving eighths, octave jumps
+    [0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1],    // offbeat
+    [1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 2, 0],    // rolling
+  ];
+  const ARPS = [[0, 1, 2, 3, 1, 2, 3, 4, 2, 3, 4, 5, 3, 2, 1, 2], [0, 2, 1, 3, 2, 4, 3, 5, 4, 3, 2, 4, 1, 3, 0, 2],
+                [0, 1, 2, 1, 3, 2, 4, 3, 5, 4, 3, 2, 4, 3, 2, 1]];
+  // two-bar hook rhythms: [step, length] in sixteenths
+  const RHY = [
+    [[0, 3], [3, 3], [6, 2], [8, 4], [12, 2], [14, 2], [16, 3], [19, 3], [22, 2], [24, 8]],
+    [[0, 2], [2, 2], [4, 4], [10, 2], [12, 4], [16, 2], [18, 2], [20, 4], [26, 6]],
+    [[2, 2], [4, 2], [6, 4], [12, 2], [14, 2], [16, 6], [24, 2], [26, 2], [28, 4]],
+    [[0, 6], [6, 6], [12, 4], [16, 3], [19, 3], [22, 2], [24, 8]],
+    [[0, 3], [3, 3], [6, 4], [10, 2], [12, 4], [16, 3], [19, 3], [22, 4], [28, 4]],
+  ];
+  // the arrangement: bars, then what plays (k kick, c clap, h hats 1/2, b bass, p pad, a arp,
+  // l lead, r riser, x crash + impact at the start) and the filter (in, out, build)
+  const FORM = [
+    { n: 8, k: 1, h: 1, p: 1, f: 'in', hFrom: 4 },
+    { n: 8, k: 1, c: 1, h: 1, b: 1, p: 1, a: 1, x: 1 },
+    { n: 8, k: 1, c: 1, h: 2, b: 1, p: 1, a: 1, r: 1, kickStop: 1 },
+    { n: 16, k: 1, c: 1, h: 2, b: 1, p: 1, a: 1, l: 1, x: 2 },
+    { n: 8, p: 1, a: 1, l: 1, f: 'build', r: 1, soft: 1 },
+    { n: 16, k: 1, c: 1, h: 2, b: 1, p: 1, a: 1, l: 1, x: 2 },
+    { n: 8, k: 1, h: 1, b: 1, p: 1, f: 'out' },
+  ];
+  const BARS = FORM.reduce((n, f) => n + f.n, 0);
+  function musicBus() {
+    if (!MUSIC.bus) {
+      MUSIC.bus = actx.createGain();
+      MUSIC.bus.gain.value = 0.6 * volGain(app.musicVol);
+      const comp = actx.createDynamicsCompressor();
+      comp.threshold.value = -16; comp.knee.value = 10; comp.ratio.value = 3; comp.attack.value = 0.01; comp.release.value = 0.2;
+      MUSIC.bus.connect(comp); comp.connect(actx.destination);
+    }
+    return MUSIC.bus;
+  }
+  // ---- the song: harmony, voicings, hook
+  function newSong(prev) {
+    const tonic = prev ? (prev.tonic + pick([5, 7, 3, 9])) % 12 : Math.floor(Math.random() * 12);
+    const scale = AEOLIAN;
+    const prog = pick(PROGS);
+    const deg = (d, i) => { const k = d + i; return scale[((k % 7) + 7) % 7] + 12 * Math.floor(k / 7); };
+    // each chord: its scale degree and the root, 3rd, 5th, 7th, 9th above the tonic (in semitones)
+    const chords = prog.map((d) => ({ d, t: [0, 2, 4, 6, 8].map((i) => deg(d, i)) }));
+    // pads: 4 voices (3rd, 5th, 7th, 9th or root) placed nearest to the previous chord's voices
+    let prevV = [57, 60, 64, 67];
+    chords.forEach((c) => {
+      const pcs = [c.t[1], c.t[2], c.t[3], Math.random() < 0.5 ? c.t[4] : c.t[0]];
+      c.v = pcs.map((pc, i) => {
+        let best = 0, bd = 99;
+        for (let o = 3; o <= 6; o++) {
+          const m = 12 * o + ((tonic + pc) % 12 + 12) % 12;
+          if (m >= 52 && m <= 76 && Math.abs(m - prevV[i]) < bd) { bd = Math.abs(m - prevV[i]); best = m; }
+        }
+        return best;
+      }).sort((a, b) => a - b);
+      prevV = c.v;
+      c.bass = 36 + ((tonic + c.t[0]) % 12 + 12) % 12;       // C2..B2
+    });
+    // the hook, in scale steps around the tonic (index 0 = tonic, D4..C#5)
+    const leadBase = 62 + (((tonic - 62) % 12) + 12) % 12;      // the tonic between D4 and C#5
+    const tones = (c) => [c.d, c.d + 2, c.d + 4];             // chord tones as scale indices
+    const nearest = (x, c, set) => {
+      let best = x, bd = 99;
+      for (const s of set.map((j) => tones(c)[j])) for (let o = -14; o <= 14; o += 7) {
+        const v = s + o;
+        if (v >= -3 && v <= 11 && Math.abs(v - x) < bd) { bd = Math.abs(v - x); best = v; }
+      }
+      return best;
+    };
+    function phrase(rhy, b0, start, endRoot) {
+      let x = start;
+      return rhy.map(([st, len], k) => {
+        const c = chords[(b0 + (st >> 4)) % 4];
+        if (k === rhy.length - 1 && endRoot) x = nearest(x, c, [0]);
+        else if (st % 8 === 0 || len >= 4) x = nearest(x + (Math.random() < 0.5 ? 1 : -1), c, [0, 1, 2]);
+        else x = Math.max(-3, Math.min(11, x + pick([-1, 1, 1, 2, -2, -1])));
+        return { st: st + 16 * b0, len, x };
+      });
+    }
+    const rA = pick(RHY), rB = pick(RHY);
+    const A = phrase(rA, 0, 4, false);
+    const fit = (ph, b0, endRoot) => ph.map((nt, k) => {          // the motif again over other chords
+      const st = nt.st % 32, c = chords[(b0 + (st >> 4)) % 4];
+      const x = (k === ph.length - 1 && endRoot) ? nearest(nt.x, c, [0]) : ((st % 8 === 0 || nt.len >= 4) ? nearest(nt.x, c, [0, 1, 2]) : nt.x);
+      return { st: st + 16 * b0, len: nt.len, x };
+    });
+    const B = phrase(rB, 4, A[A.length - 1].x + 2, false);
+    const hook = [...A, ...fit(A, 2, false), ...B, ...fit(A, 6, true)];
+    const toMidi = (x) => leadBase + scale[((x % 7) + 7) % 7] + 12 * Math.floor(x / 7);
+    hook.forEach((nt) => { nt.m = toMidi(nt.x); });
+    return { tonic, scale, chords, hook, bpm: 120 + Math.floor(Math.random() * 7), bass: pick(BASSES), arp: pick(ARPS),
+             swing: 0.02 + Math.random() * 0.03, padCut: 1300 + Math.random() * 900 };
+  }
+  // ---- the mixer: everything into a filter (the intro/outro sweeps), reverb and a dotted-eighth delay
+  function genStart() {
+    const sr = actx.sampleRate;
+    const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 18000; lp.Q.value = 0.5;
+    const out = actx.createGain(); out.gain.value = 1;
+    lp.connect(out); out.connect(musicBus());
+    const noise = actx.createBuffer(1, sr, sr), nd = noise.getChannelData(0);
+    for (let i = 0; i < sr; i++) nd[i] = Math.random() * 2 - 1;
+    const ir = actx.createBuffer(2, Math.floor(sr * 2.6), sr);
+    for (let c = 0; c < 2; c++) {
+      const d = ir.getChannelData(c);
+      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3.5);
+    }
+    const verb = actx.createConvolver(); verb.buffer = ir;
+    const verbOut = actx.createGain(); verbOut.gain.value = 0.3; verb.connect(verbOut); verbOut.connect(lp);
+    const delay = actx.createDelay(2), fb = actx.createGain(), dlp = actx.createBiquadFilter();
+    fb.gain.value = 0.35; dlp.type = 'lowpass'; dlp.frequency.value = 2400;
+    delay.connect(dlp); dlp.connect(fb); fb.connect(delay); dlp.connect(lp); dlp.connect(verb);
+    const duck = actx.createGain(); duck.connect(lp);           // bass, pad and arp pump with the kick
+    const send = (g) => { const s = actx.createGain(); s.gain.value = g; return s; };
+    const dSend = send(1), vSend = send(1);
+    dSend.connect(delay); vSend.connect(verb);
+    const g = { lp, out, noise, verb: vSend, delay: dSend, duck, song: newSong(null), bar: 0, step: 0, t: actx.currentTime + 0.1 };
+    delay.delayTime.value = 0.75 * 60 / g.song.bpm;
+    g.delayNode = delay;
+    MUSIC.gen = g;
+  }
+  function genStop() {
+    const g = MUSIC.gen;
+    if (!g) return;
+    MUSIC.gen = null;
+    g.out.gain.setTargetAtTime(0, actx.currentTime, 0.05);
+    setTimeout(() => { try { g.out.disconnect(); } catch (e) { /* gone */ } }, 400);
+  }
+  // ---- instruments
+  function panTo(dest, pan) {
+    if (!pan || !actx.createStereoPanner) return dest;
+    const p = actx.createStereoPanner();
+    p.pan.value = pan; p.connect(dest);
+    return p;
+  }
+  function env(gn, t, v, a, d) {                       // attack to v, exponential decay over d
+    gn.gain.setValueAtTime(0.0001, t);
+    gn.gain.exponentialRampToValueAtTime(v, t + a);
+    gn.gain.exponentialRampToValueAtTime(0.0001, t + a + d);
+  }
+  function osc(type, f, t, end, dest, detune) {
+    const o = actx.createOscillator();
+    o.type = type; o.frequency.value = f; if (detune) o.detune.value = detune;
+    o.connect(dest); o.start(t); o.stop(end);
+    return o;
+  }
+  function noiseHit(g, t, dur, type, freq, q, v, dest, pan) {
+    const s = actx.createBufferSource(), f = actx.createBiquadFilter(), gn = actx.createGain();
+    s.buffer = g.noise; f.type = type; f.frequency.value = freq; f.Q.value = q;
+    s.connect(f); f.connect(gn); gn.connect(panTo(dest || g.lp, pan));
+    env(gn, t, v, 0.002, dur);
+    s.start(t, Math.random() * 0.5); s.stop(t + dur + 0.05);
+  }
+  function kick(g, t) {
+    const o = actx.createOscillator(), gn = actx.createGain();
+    o.frequency.setValueAtTime(160, t); o.frequency.exponentialRampToValueAtTime(48, t + 0.1);
+    o.connect(gn); gn.connect(g.lp); env(gn, t, 0.85, 0.003, 0.38); o.start(t); o.stop(t + 0.45);
+    noiseHit(g, t, 0.01, 'highpass', 2500, 0.7, 0.1);
+    const d = g.duck.gain;                             // side-chain pump
+    d.cancelScheduledValues(t); d.setValueAtTime(0.35, t); d.linearRampToValueAtTime(1, t + 0.24);
+  }
+  function clap(g, t, v) {
+    for (let k = 0; k < 3; k++) noiseHit(g, t + k * 0.011, k < 2 ? 0.02 : 0.18, 'bandpass', 1500, 1.1, 0.6 * v);
+    noiseHit(g, t, 0.3, 'bandpass', 1500, 1, 0.2 * v, g.verb);
+  }
+  function hat(g, t, v, open) {
+    noiseHit(g, t + (Math.random() - 0.5) * 0.004, open ? 0.3 : 0.05, 'highpass', 6500, 0.7,
+      (open ? 0.75 : 0.7) * v * (0.9 + Math.random() * 0.2), null, open ? -0.2 : 0.25);
+  }
+  function crash(g, t) {
+    noiseHit(g, t, 1.8, 'highpass', 4500, 0.5, 0.35, null, 0.15);
+    noiseHit(g, t, 2.2, 'highpass', 4500, 0.5, 0.15, g.verb);
+  }
+  function impact(g, t) {                              // the drop: a sub boom under the crash
+    const o = actx.createOscillator(), gn = actx.createGain();
+    o.frequency.setValueAtTime(70, t); o.frequency.exponentialRampToValueAtTime(38, t + 0.9);
+    o.connect(gn); gn.connect(g.lp); env(gn, t, 0.5, 0.005, 1.1); o.start(t); o.stop(t + 1.2);
+  }
+  function bassNote(g, t, m, dur) {
+    const f = actx.createBiquadFilter(), gn = actx.createGain();
+    f.type = 'lowpass'; f.Q.value = 5;
+    f.frequency.setValueAtTime(200, t); f.frequency.exponentialRampToValueAtTime(900, t + 0.012);
+    f.frequency.exponentialRampToValueAtTime(280, t + dur);
+    f.connect(gn); gn.connect(g.duck);
+    gn.gain.setValueAtTime(0.0001, t); gn.gain.exponentialRampToValueAtTime(0.17, t + 0.006);
+    gn.gain.setValueAtTime(0.17, t + dur * 0.8); gn.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.04);
+    osc('sawtooth', midiHz(m), t, t + dur + 0.06, f, -6); osc('sawtooth', midiHz(m), t, t + dur + 0.06, f, 6);
+    const sub = actx.createGain(); sub.gain.value = 0.9; sub.connect(gn);
+    osc('sine', midiHz(m - 12), t, t + dur + 0.06, sub);
+  }
+  function padChord(g, t, notes, dur, cut) {
+    const f = actx.createBiquadFilter(), gn = actx.createGain();
+    f.type = 'lowpass'; f.Q.value = 1;
+    f.frequency.setValueAtTime(cut * 0.6, t); f.frequency.linearRampToValueAtTime(cut, t + dur * 0.6);
+    f.connect(gn); gn.connect(g.duck); gn.connect(g.verb);
+    gn.gain.setValueAtTime(0.0001, t); gn.gain.exponentialRampToValueAtTime(0.045, t + 0.4);
+    gn.gain.setValueAtTime(0.045, t + dur - 0.05); gn.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.9);
+    notes.forEach((m, i) => {
+      const p = panTo(f, i % 2 ? 0.3 : -0.3);
+      for (const dt of [-11, 0, 11]) osc('sawtooth', midiHz(m), t, t + dur + 1, p, dt + (Math.random() - 0.5) * 4);
+    });
+  }
+  function pluck(g, t, m, v, pan, bright) {
+    const f = actx.createBiquadFilter(), gn = actx.createGain();
+    f.type = 'lowpass'; f.Q.value = 2;
+    f.frequency.setValueAtTime(1200 + 1800 * bright, t); f.frequency.exponentialRampToValueAtTime(500, t + 0.15);
+    f.connect(gn); gn.connect(panTo(g.duck, pan)); gn.connect(g.delay);
+    env(gn, t, 0.075 * v, 0.004, 0.2);
+    osc('sawtooth', midiHz(m), t, t + 0.25, f, -5); osc('square', midiHz(m), t, t + 0.25, f, 5);
+  }
+  function leadNote(g, t, m, dur, soft) {
+    const f = actx.createBiquadFilter(), gn = actx.createGain(), vib = actx.createOscillator(), vg = actx.createGain();
+    f.type = 'lowpass'; f.Q.value = 1.5;
+    f.frequency.setValueAtTime(soft ? 1600 : 3800, t); f.frequency.exponentialRampToValueAtTime(soft ? 1000 : 2300, t + dur);
+    f.connect(gn); gn.connect(g.lp); gn.connect(g.delay); gn.connect(g.verb);
+    const lv = soft ? 0.06 : 0.1;
+    gn.gain.setValueAtTime(0.0001, t); gn.gain.exponentialRampToValueAtTime(lv, t + 0.012);
+    gn.gain.setValueAtTime(lv * 0.85, t + Math.max(0.02, dur - 0.03)); gn.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.12);
+    vib.frequency.value = 5.5; vg.gain.setValueAtTime(0, t); vg.gain.linearRampToValueAtTime(dur > 0.3 ? 14 : 0, t + Math.min(dur, 0.5));
+    vib.connect(vg); vib.start(t); vib.stop(t + dur + 0.15);
+    const end = t + dur + 0.15;
+    for (const [type, dt, lvl] of [['sawtooth', -8, 1], ['sawtooth', 8, 1], ['square', 0, 0.4]]) {
+      const o = actx.createOscillator(), og = actx.createGain();
+      o.type = type; o.frequency.value = midiHz(type === 'square' ? m - 12 : m); o.detune.value = dt;
+      vg.connect(o.detune); og.gain.value = lvl; o.connect(og); og.connect(f); o.start(t); o.stop(end);
+    }
+  }
+  function riser(g, t, dur) {
+    const s = actx.createBufferSource(), f = actx.createBiquadFilter(), gn = actx.createGain();
+    s.buffer = g.noise; s.loop = true; f.type = 'bandpass'; f.Q.value = 2;
+    f.frequency.setValueAtTime(300, t); f.frequency.exponentialRampToValueAtTime(8000, t + dur);
+    gn.gain.setValueAtTime(0.0001, t); gn.gain.exponentialRampToValueAtTime(0.12, t + dur);
+    gn.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.2);
+    s.connect(f); f.connect(gn); gn.connect(g.lp); gn.connect(g.verb); s.start(t); s.stop(t + dur + 0.25);
+  }
+  // ---- the sequencer: one sixteenth at a time
+  function genStep(g, t) {
+    const sg = g.song, s = g.step;
+    let b = g.bar, sec = FORM[0];
+    for (const f of FORM) { if (b < f.n) { sec = f; break; } b -= f.n; }
+    const ch = sg.chords[g.bar % 4];
+    const bar = 16 * 60 / sg.bpm / 4, secDur = sec.n * bar;
+    if (s === 0) {
+      if (b === 0) {                                   // a section starts: its filter move, crash
+        const lf = g.lp.frequency;
+        lf.cancelScheduledValues(t);
+        if (sec.f === 'in') { lf.setValueAtTime(320, t); lf.exponentialRampToValueAtTime(18000, t + secDur); }
+        else if (sec.f === 'out') { lf.setValueAtTime(18000, t); lf.exponentialRampToValueAtTime(380, t + secDur); }
+        else if (sec.f === 'build') { lf.setValueAtTime(1500, t); lf.exponentialRampToValueAtTime(18000, t + secDur); }
+        else lf.setValueAtTime(18000, t);
+        if (sec.x) { crash(g, t); if (sec.x === 2) impact(g, t); }
+        if (sec.r) riser(g, t + (sec.n > 4 ? (sec.n - 4) * bar : 0), Math.min(4, sec.n) * bar);
+      }
+      if (sec.p) padChord(g, t, ch.v, bar, sg.padCut);
+    }
+    const lastBar = b === sec.n - 1;
+    if (sec.k && s % 4 === 0 && !(sec.kickStop && lastBar)) kick(g, t);
+    if (sec.c && (s === 4 || s === 12) && !(sec.kickStop && lastBar)) clap(g, t, 1);
+    if (sec.kickStop && b >= sec.n - 2 && (s % 2 === 0 || lastBar)) clap(g, t, 0.25 + 0.6 * ((b - sec.n + 2) * 16 + s) / 32);  // the roll
+    if (sec.h && b >= (sec.hFrom || 0)) {
+      if (sec.h === 1 && s % 2 === 0) hat(g, t, s % 4 === 2 ? 1 : 0.55, false);
+      if (sec.h === 2) hat(g, t, s % 4 === 2 ? 1 : (s % 2 ? 0.45 : 0.65), s % 8 === 6);
+    }
+    if (sec.b && sg.bass[s]) bassNote(g, t, ch.bass + (sg.bass[s] === 2 ? 12 : 0), 60 / sg.bpm / 4 * 1.6);
+    if (sec.a && (sec.soft ? s % 2 === 0 : true)) {
+      const ar = [...ch.v, ...ch.v.map((m) => m + 12)], m = ar[sg.arp[s] % ar.length];
+      pluck(g, t, m, s % 4 === 0 ? 1 : 0.7, s % 2 ? -0.35 : 0.35, sec.soft ? 0.2 : Math.min(1, b / 8 + 0.3));
+    }
+    if (sec.l) {
+      const pos = (g.bar % 8) * 16 + s;
+      for (const nt of sg.hook) if (nt.st === pos) leadNote(g, t, nt.m, nt.len * 60 / sg.bpm / 4 * 0.92, sec.soft);
+    }
+  }
+  function musicTick() {
+    const g = MUSIC.gen;
+    if (!g || !actx) return;
+    const now = actx.currentTime;
+    if (g.t < now) g.t = now + 0.05;                    // after a stall (hidden tab): carry on from now
+    while (g.t < now + 0.2) {
+      const sd = 60 / g.song.bpm / 4;
+      genStep(g, g.t + (g.step % 2 ? g.song.swing * sd : 0));
+      g.t += sd;
+      g.step = (g.step + 1) % 16;
+      if (g.step === 0 && ++g.bar >= BARS) {
+        g.song = newSong(g.song); g.bar = 0;
+        g.delayNode.delayTime.setValueAtTime(0.75 * 60 / g.song.bpm, g.t);
+        musicTitle();
+      }
+    }
+  }
+  const KEYS = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
+  function musicTitle() {
+    let t = 'Music';
+    if (app.musicOn) {
+      if (MUSIC.files.length) t = 'Playing ' + MUSIC.files[MUSIC.idx].name;
+      else if (MUSIC.gen) {
+        const sg = MUSIC.gen.song;
+        t = 'Generated: ' + KEYS[sg.tonic] + ' minor, ' + sg.bpm + ' BPM';
+      }
+    }
+    const b = document.getElementById('musicBox');
+    if (b) b.title = t + ' (wheel: level)';
+  }
+  function musicPlay() {
+    if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; } }
+    if (actx.state === 'suspended') actx.resume();
+    musicBus();
+    if (MUSIC.files.length) {
+      genStop();
+      if (!MUSIC.el) {
+        MUSIC.el = new Audio();
+        MUSIC.el.addEventListener('ended', () => musicNext());
+        MUSIC.src = actx.createMediaElementSource(MUSIC.el);
+        MUSIC.src.connect(MUSIC.bus);
+      }
+      MUSIC.el.src = MUSIC.files[MUSIC.idx].url;
+      MUSIC.el.play().catch(() => { /* needs a click first */ });
+    } else {
+      if (MUSIC.el) MUSIC.el.pause();
+      if (!MUSIC.gen) genStart();
+    }
+    musicTitle();
+  }
+  function musicStop() {
+    genStop();
+    if (MUSIC.el) MUSIC.el.pause();
+    musicTitle();
+  }
+  function musicNext() {
+    if (!app.musicOn) return;
+    if (MUSIC.files.length) { MUSIC.idx = (MUSIC.idx + 1) % MUSIC.files.length; musicPlay(); }
+    else if (MUSIC.gen) {
+      const g = MUSIC.gen;
+      g.song = newSong(g.song); g.bar = 0; g.step = 0;
+      g.delayNode.delayTime.setValueAtTime(0.75 * 60 / g.song.bpm, actx.currentTime);
+      musicTitle();
+    }
+  }
+  function musicFiles(list) {
+    MUSIC.files.forEach((f) => URL.revokeObjectURL(f.url));
+    MUSIC.files = Array.from(list).filter((f) => /^audio\//.test(f.type) || /\.(mp3|ogg|wav|m4a|aac|flac|opus)$/i.test(f.name))
+      .map((f) => ({ url: URL.createObjectURL(f), name: f.name.replace(/\.[^.]+$/, '') }));
+    MUSIC.idx = 0;
+    if (app.musicOn) musicPlay();
   }
 
   // ----------------------------------------------------------- engine
@@ -628,6 +1079,7 @@
     if (ts - emuT >= 1000) { emuFps = emuN; emuN = 0; emuT = ts; }
     updateStats();
     motorSound(dt);
+    musicTick();
     requestAnimationFrame(loop);
   }
 
@@ -699,24 +1151,73 @@
     });
     $('restartBtn').addEventListener('click', boot);
     $('ovBtn').addEventListener('click', boot);
-    // one control: the slider is the switch too (0 = off); moving it is the user gesture
-    // the browser needs before audio may start
+    // the slider is the switch too (0 = off), the speaker mutes and unmutes (back to the last
+    // level), the wheel steps it by 5%; any of them is the user gesture the browser needs before
+    // audio may start
     const vol = $('soundVol');
-    const volLbl = vol.parentElement;
+    const volBox = $('soundBox');
     const volShow = () => {
-      volLbl.classList.toggle('snd-off', !(app.vol > 0));
-      volLbl.title = app.vol > 0 ? 'Sound volume: ' + Math.round(app.vol * 100) + '%' : 'Sound off';
+      const on = app.vol > 0;
+      volBox.classList.toggle('snd-off', !on);
+      $('volOut').textContent = on ? Math.round(app.vol * 100) + '%' : 'Off';
+      $('muteBtn').setAttribute('aria-pressed', String(!on));
+      $('muteBtn').title = on ? 'Mute' : 'Unmute';
     };
-    vol.value = app.vol;
-    volShow();
-    vol.addEventListener('input', () => {
-      app.vol = parseFloat(vol.value) || 0;
+    const applyVol = (v) => {
+      app.vol = Math.round(Math.max(0, Math.min(1, v)) * 20) / 20;
+      vol.value = app.vol;
       store.set('vol', app.vol);
+      if (app.vol > 0) { app.lastVol = app.vol; store.set('lastVol', app.vol); }
       volShow();
       if (app.vol > 0 && !actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { app.vol = 0; vol.value = 0; volShow(); } }
       if (actx && actx.state === 'suspended') actx.resume();
+      if (outGain) outGain.gain.setTargetAtTime(volGain(app.vol), actx.currentTime, 0.03);
       if (app.vol <= 0) { if (motor && actx) bgTone(0, 0, 0); stopSynth(); }
+    };
+    vol.value = app.vol;
+    volShow();
+    vol.addEventListener('input', () => applyVol(parseFloat(vol.value) || 0));
+    $('muteBtn').addEventListener('click', () => applyVol(app.vol > 0 ? 0 : (app.lastVol || 0.8)));
+    volBox.addEventListener('wheel', (e) => { e.preventDefault(); applyVol(app.vol + (e.deltaY < 0 ? 0.05 : -0.05)); }, { passive: false });
+    // music: the note switches it on and off, the slider is its level (apart from Sound), next
+    // skips to a new song, Songs plays your own files instead of the generated music
+    const mBox = $('musicBox'), mVol = $('musicVol');
+    const musicShow = () => {
+      mBox.classList.toggle('snd-off', !app.musicOn);
+      $('musicBtn').setAttribute('aria-pressed', String(app.musicOn));
+      $('musicBtn').title = app.musicOn ? 'Music off' : 'Music on';
+      musicTitle();
+    };
+    const musicOn = (on) => {
+      app.musicOn = on; store.set('musicOn', on);
+      if (on) musicPlay(); else musicStop();
+      musicShow();
+    };
+    const setMusicVol = (v) => {
+      app.musicVol = Math.round(Math.max(0, Math.min(1, v)) * 20) / 20;
+      mVol.value = app.musicVol; store.set('musicVol', app.musicVol);
+      if (MUSIC.bus) MUSIC.bus.gain.setTargetAtTime(0.6 * volGain(app.musicVol), actx.currentTime, 0.03);
+    };
+    mVol.value = app.musicVol;
+    mVol.addEventListener('input', () => { setMusicVol(parseFloat(mVol.value) || 0); if (!app.musicOn && app.musicVol > 0) musicOn(true); });
+    $('musicBtn').addEventListener('click', () => musicOn(!app.musicOn));
+    $('musicNext').addEventListener('click', () => { if (app.musicOn) musicNext(); else musicOn(true); });
+    $('songIn').addEventListener('change', (ev) => {
+      musicFiles(ev.target.files);
+      ev.target.value = '';
+      if (!app.musicOn) musicOn(true); else musicShow();
     });
+    mBox.addEventListener('wheel', (e) => { e.preventDefault(); setMusicVol(app.musicVol + (e.deltaY < 0 ? 0.05 : -0.05)); }, { passive: false });
+    musicShow();
+    // browsers only start audio after a user gesture: with the volume already up (the saved
+    // setting), the first click, tap or key press anywhere turns the sound on
+    const unlock = () => {
+      if ((app.vol > 0 || app.musicOn) && !actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { /* no audio */ } }
+      if (actx && actx.state === 'suspended') actx.resume();
+      if (actx && app.musicOn && !MUSIC.gen && !(MUSIC.el && !MUSIC.el.paused)) musicPlay();
+      if (actx) ['pointerdown', 'keydown'].forEach((t) => window.removeEventListener(t, unlock, true));
+    };
+    ['pointerdown', 'keydown'].forEach((t) => window.addEventListener(t, unlock, true));
     $('fileIn').addEventListener('change', (ev) => {
       const f = ev.target.files[0];
       if (!f) return;
@@ -763,11 +1264,12 @@
       b.setAttribute('aria-pressed', String(b.dataset.input === app.input));
       b.addEventListener('click', () => {
         app.input = b.dataset.input;
+        store.set('input', app.input);
         document.querySelectorAll('#inputSeg button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
         $('padBox').hidden = app.input !== 'pad';
       });
     });
-    $('padBox').hidden = true;
+    $('padBox').hidden = app.input !== 'pad';
     $('padSel').addEventListener('change', () => { app.padKey = $('padSel').value; store.set('padKey', app.padKey); });
     for (const fn of ['ail', 'ele', 'thr', 'rud']) {
       const row = document.querySelector('.axis[data-fn="' + fn + '"]');
