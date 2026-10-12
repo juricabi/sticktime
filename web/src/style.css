@@ -77,6 +77,24 @@ select { max-width: 270px; }
 .btn:hover { border-color: var(--muted); }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: #1c0c00; font-weight: 600; }
 .btn[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
+/* sound: speaker (mute), slider (0 is off), level; off dims it */
+.sound { cursor: default; gap: 4px; padding: 0 8px 0 3px; }
+.sound .mute { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 6px;
+  background: none; color: inherit; cursor: pointer; }
+.sound .mute:hover { background: var(--accent-soft); }
+.sound .mute .cross { display: none; }
+.sound input[type="range"] { width: 90px; accent-color: var(--accent); cursor: pointer; }
+.sound output { min-width: 3.2em; text-align: right; font: 500 12px/1 var(--font-mono); color: var(--muted); }
+.sound.snd-off .wave { display: none; }
+.sound.snd-off .cross { display: inline; }
+.sound.snd-off input[type="range"] { accent-color: var(--muted); opacity: .55; }
+.sound.snd-off output { opacity: .7; }
+.music input[type="range"] { width: 70px; }
+.music.snd-off svg { opacity: .55; }
+.music .songs { position: relative; overflow: hidden; margin-left: 2px; padding: 3px 7px; border-radius: 6px;
+  font: 500 12px/1 var(--font-display); color: var(--muted); cursor: pointer; }
+.music .songs:hover { background: var(--accent-soft); color: inherit; }
+.music .songs input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .file-btn { position: relative; overflow: hidden; }
 .file-btn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 

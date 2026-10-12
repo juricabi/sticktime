@@ -31,7 +31,7 @@ StickTime BW and StickTime Lite also run on color radios, drawn in B&W style at 
 - **Flight model.** Props lose thrust as the air through them speeds up; rotor drag in the prop plane makes the quad carve like a real 5" (a sideways slide halves in about 2 s); quadratic body drag; ground effect near the ground and roofs (up to 12% more thrust); motors that spool up in 20–30 ms and a DShot-style 1.5% idle, so you drop instead of floating. All at 80 Hz. At the default 6:1: about 130 km/h top speed, 115 km/h punch-outs, 65 km/h flat fall.
 - **Your quad.** **Racer** (snappy, the most grip) or **Freestyle** (heavier, carries more momentum). Power from 3:1 to 12:1, Acro or Angle mode.
 - **Rates.** Betaflight Actual rates: Soft, Normal and Fast presets, or Custom center sensitivity (10–500 deg/s), max rate (100–2000 deg/s) and expo (0.00–1.00) for roll/pitch and yaw, in Betaflight's own steps (10 deg/s and 0.01), so your Actual rates go in exactly as they are. Hold a key or spin the wheel quickly for five times bigger steps.
-- **Eight tracks.** Meadow, Figure 8, Dive Tower, Slalom, Hoop Forest, Grand Prix, the **Bando** (an open-roof ruin with doors to fly through, a 24 m tower and stacked containers) and **Pro Track**, laid out like a real race: lanes up and down the field joined by flag hairpins, a high gate and a dive gate on the start straight, and a split-S. Gates, high gates, dive gates, hoops, arches, flags (pass on the marked side, shown by a yellow marker) and gaps in walls. Trees, poles, walls and structures are solid.
+- **Eight tracks.** Meadow, Figure 8, Dive Tower, Slalom, Hoop Forest, Grand Prix, the **Bando** (an open-roof ruin with doors to fly through, a 36 m tower for orbits and dives, and stacked containers) and **Pro Track**, laid out like a real race: lanes up and down the field joined by flag hairpins, a high gate and a dive gate on the start straight, and a split-S. Gates, high gates, dive gates, hoops, arches, flags (pass on the marked side, shown by a yellow marker) and gaps in walls. Trees, poles, walls and structures are solid.
 - **Four ways to play.**
     - **Race** up to three AI pilots (Easy, Medium, Hard) with a live position and a results screen.
     - **Practice**: lap times against your best.
@@ -95,7 +95,16 @@ Play at **[juricabi.github.io/sticktime](https://juricabi.github.io/sticktime/)*
 
 - Any radio screen, color or B&W, or **PC screen** (1280×720 at 60 fps); **Fullscreen** with F.
 - Fly with the keyboard (W/S throttle, A/D yaw, arrows for pitch and roll), the on-screen gimbals, or your radio as a USB joystick (**Radio / gamepad**, then map the axes).
-- **Sound on** plays the beeps.
+- **Sound**: the slider sets the volume of the beeps and the synthesized motor sound (0 is off, the
+  speaker mutes and unmutes, the mouse wheel steps it). Four motors, each with its own rpm (they
+  follow your stick inputs), tuned against recordings of real quads: a nearly pure blade-pass tone
+  over a soft air whoosh (no hiss), the shaft growl and the electrical whine, a steady pitch, panned
+  left/right and beating like four real props; descending into your own wash adds a dark rumble.
+- **Music**: melodic electronic music composed live in the browser (free, nothing downloaded): every
+  song has its own key, tempo, seventh-chord progression and hook, arranged like a real track (a
+  filtered intro, the groove, a build, the drop, a breakdown, a second drop, an outro). Or **Songs**
+  to play your own files. Its own switch, level and next-song button, apart from Sound.
+- Keyboard or **Radio / gamepad** input, the gamepad and its axis mapping are remembered.
 - Real radio refresh (20 Hz) and the color screen's one-frame delay are on by default and can be turned off; B&W LCD ghosting is optional.
 - **Radio load** estimates the frame time on F2, F4 and H7 radios; **Open .lua** runs any other EdgeTX tool script.
 

@@ -252,6 +252,7 @@ end
 local px, py, pz, vx, vy, vz = 0, DR, 0, 0, 0, 0                      -- position, velocity (m, m/s)
 local rx, ry, rz, ux, uy, uz, fx, fy, fz = 1, 0, 0, 0, 1, 0, 0, 0, 1   -- right, up, forward
 local sA, sE, sT, sR, speed = 0, 0, 0, 0, 0
+local aTf, aVu, aE2, aW = 0, 0, 0, 0                                  -- sound state for the web emulator
 local wr0, wp0, wy0, Tm, grounded = 0, 0, 0, 0, true                  -- body rates (rad/s), thrust
 local state, gm, from = MENU, 1, FLY
 local gt, lastT, tState, tStart, fi, pt, smp = 0, 0, 0, 0, 5, 0, 0     -- clocks (10 ms ticks)
@@ -583,6 +584,13 @@ physics = function(dt)
   rx, ry, rz = rx * l, ry * l, rz * l
   ux, uy, uz = fy * rz - fz * ry, fz * rx - fx * rz, fx * ry - fy * rx
   speed = sqrt(vx * vx + vy * vy + vz * vz)
+  if STICKTIME_TEST then
+    -- motor sound state for the web emulator: thrust fraction, axial and edgewise flow, prop wash
+    aTf = Tm / Tmax
+    aVu = vx * ux + vy * uy + vz * uz
+    aE2 = sqrt((vx * rx + vy * ry + vz * rz) ^ 2 + (vx * fx + vy * fy + vz * fz) ^ 2)
+    aW = S.wash
+  end
   if gm == 3 then
     -- freestyle: distance to the nearest surface, for proximity runs
     local m = py + 0.7
@@ -1046,6 +1054,7 @@ local function init()
     T.ntracks = function() return NT end
     T.nmodes = function() return 4 end
     T.S = S
+    T.audio = function() return sT, S.quad, state, aTf, aVu, aE2, aW, sA, sE, sR end
   end
 --#endif
 end

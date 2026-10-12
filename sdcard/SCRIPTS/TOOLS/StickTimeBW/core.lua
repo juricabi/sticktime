@@ -95,7 +95,7 @@ local TRACKS = {
     { -6.225,34,4.025,0.25,0,7,1, 6.225,34,4.025,0.25,0,7,1, 0,34,2.2,0.25,3.6,7,1,
       -6.225,46,4.025,0.25,0,7,1, 6.225,46,4.025,0.25,0,7,1, 0,46,2.2,0.25,3.6,7,1,
       -10,40,0.25,5.75,0,7,1, 10,36.025,0.25,1.775,0,7,1, 10,43.975,0.25,1.775,0,7,1, 10,40,0.25,2.2,3.6,7,1,
-      46,64,2,2,0,24,1, 33.6,10,1.25,3,0,2.6,2, 40.5,10,1.25,3,0,2.6,3, 47.4,10,1.25,3,0,2.6,2,
+      46,64,2,2,0,36,1, 33.6,10,1.25,3,0,2.6,2, 40.5,10,1.25,3,0,2.6,3, 47.4,10,1.25,3,0,2.6,2,
       -30,20,3,1.25,0,5.2,3, -36,50,4,4,0,3,1 } },
   -- laid out like a real race: lanes up and down the field joined by flag hairpins, a high
   -- gate and a dive gate on the start straight, a split-S (through the high gate, back
@@ -376,6 +376,7 @@ end
 local px, py, pz, vx, vy, vz = 0, 0.15, 0, 0, 0, 0                 -- quad position / velocity (m, m/s)
 local rx, ry, rz, ux, uy, uz, fx, fy, fz = 1, 0, 0, 0, 1, 0, 0, 0, 1 -- quad right / up / forward axes
 local sA, sE, sT, sR, speed = 0, 0, 0, 0, 0                           -- sticks, speed
+local aTf, aVu, aE2, aW = 0, 0, 0, 0                                  -- sound state for the web emulator
 local DR, NEAR = 0.15, 0.2                                            -- quad radius, camera near plane
 local P = { rc = 100, rm = 600, re = 0.5, yc = 100, ym = 500, ye = 0.4, twr = 6, angle = false, tc = 0.9, ts = 0.42,
             wr = 0, wp = 0, wy = 0 }                                  -- settings in use, body rates (rad/s)
@@ -745,6 +746,13 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     P.wr, P.wp, P.wy = pwr, pwp, pwy
     orthonormalize()
     speed = sqrt(vx * vx + vy * vy + vz * vz)
+    if STICKTIME_TEST then
+      -- motor sound state for the web emulator: thrust fraction, axial and edgewise flow, prop wash
+      aTf = Tm / Tmax
+      aVu = vx * ux + vy * uy + vz * uz
+      aE2 = sqrt((vx * rx + vy * ry + vz * rz) ^ 2 + (vx * fx + vy * fy + vz * fz) ^ 2)
+      aW = S.wash
+    end
     if gmode == 3 then
       -- distance to the nearest surface, for proximity tricks
       local m = py + 0.7
@@ -1773,6 +1781,7 @@ local function init()
     TEST.best = function(t) return BEST.l[t], BEST.r[t], BEST.g[t], BEST.f[t] end
     TEST.box = function(b) return BX.x0[b], BX.x1[b], BX.y0[b], BX.y1[b], BX.z0[b], BX.z1[b] end
     TEST.S = S
+    TEST.audio = function() return sT, S.quad, state, aTf, aVu, aE2, aW, sA, sE, sR end
     TEST.order = function() return nOrd, ordP, ordI, TEST.bounds, kpx, kpy, kpz end
     TEST.cam = function() return krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz end
   end
