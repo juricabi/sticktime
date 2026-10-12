@@ -1,4 +1,4 @@
-# StickTime
+# <img src="docs/icon.svg" alt="" width="36" height="36" align="absmiddle"> StickTime
 
 A real 3D FPV quad simulator that runs **on your radio** as an EdgeTX Lua tool. Race AI pilots, fly freestyle around a bando or chase gates against the clock, with nothing but your radio. Color screens get filled 3D, black & white radios get wireframe 3D, and older B&W radios with little memory get **StickTime Lite**.
 

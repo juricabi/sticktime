@@ -66,8 +66,7 @@ button, select, input { font: inherit; color: inherit; }
   border-bottom: 1px solid var(--line);
 }
 .brand { display: flex; align-items: center; gap: 10px; margin-right: auto; }
-.brand-mark { width: 30px; height: 26px; border: 4px solid var(--accent); border-radius: 3px; position: relative; flex: none; }
-.brand-mark::after { content: ""; position: absolute; left: -7px; right: -7px; bottom: -8px; height: 3px; background: var(--fg); opacity: .5; border-radius: 2px; }
+.brand-mark { width: 34px; height: 34px; display: block; flex: none; }
 .brand h1 { font: 700 22px/1 var(--font-display); letter-spacing: .02em; margin: 0; text-transform: uppercase; }
 .brand small { display: block; font: 500 11px/1.2 var(--font-mono); color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
 .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -257,7 +256,7 @@ footer.credits a { color: inherit; }
 
 <header class="top">
   <div class="brand">
-    <div class="brand-mark" aria-hidden="true"></div>
+    <img class="brand-mark" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CiAgPGRlZnM+CiAgICA8Y2xpcFBhdGggaWQ9InN0LXRpbGUiPjxyZWN0IHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgcng9IjE0Ii8+PC9jbGlwUGF0aD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ic3Qtc2t5IiB4MT0iMCIgeTE9IjAiIHgyPSIwIiB5Mj0iMSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzRhOGZkZCIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzhjYzJmMiIvPgogICAgPC9saW5lYXJHcmFkaWVudD4KICA8L2RlZnM+CiAgPGcgY2xpcC1wYXRoPSJ1cmwoI3N0LXRpbGUpIj4KICAgIDxyZWN0IHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgZmlsbD0idXJsKCNzdC1za3kpIi8+CiAgICA8cGF0aCBkPSJNLTggNDRMNzIgMjYiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLW9wYWNpdHk9Ii43NSIgc3Ryb2tlLXdpZHRoPSI1Ii8+CiAgICA8cGF0aCBkPSJNLTggNDZMNzIgMjhWNzJILThaIiBmaWxsPSIjM2Y4YTM0Ii8+CiAgICA8cGF0aCBkPSJNMTcgNTBWMTlINDdWNTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmYTcyNiIgc3Ryb2tlLXdpZHRoPSI2IiBzdHJva2UtbGluZWpvaW49InJvdW5kIiB0cmFuc2Zvcm09InJvdGF0ZSgtMTIuNyAzMiAzNSkiLz4KICA8L2c+Cjwvc3ZnPgo=" alt="" width="34" height="34">
     <div><h1>StickTime</h1><small>EdgeTX FPV sim · in the browser</small></div>
   </div>
   <div class="controls">

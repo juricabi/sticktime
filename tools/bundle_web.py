@@ -36,6 +36,9 @@ def main():
               for p in sorted(list(tdir.glob("t*.txt")) + list(tdir.glob("q*.txt")))}
     assert tracks, "no StickTime Lite track files (run build.py)"
     lite_tracks = json.dumps(tracks, indent=0)
+    # the icon (docs/icon.svg; its PNGs from tools/make_icons.py)
+    icon_svg = "data:image/svg+xml;base64," + b64(ROOT / "docs/icon.svg")
+    icon_png = "data:image/png;base64," + b64(ROOT / "docs/icon-32.png")
     for s in (lua_color, lua_bw, lua_lite, lua_bwcolor, lua_litecolor, lite_tracks):
         assert "</script" not in s.lower()
     parts = {
@@ -51,6 +54,7 @@ def main():
         "LITE_TRACKS": lite_tracks,
         "ROBOTO400": b64(W / "vendor/roboto-latin-400-normal.woff2"),
         "ROBOTO700": b64(W / "vendor/roboto-latin-700-normal.woff2"),
+        "ICON": icon_svg,
     }
     tpl = read(SRC / "index.html")
     for k, v in parts.items():
@@ -73,7 +77,11 @@ def main():
             f"<meta property=\"og:description\" content=\"{desc}\">\n"
             f"<meta property=\"og:url\" content=\"{site}\">\n"
             f"<meta property=\"og:image\" content=\"{site}social-preview.png\">\n"
-            "<meta name=\"twitter:card\" content=\"summary_large_image\">\n")
+            "<meta name=\"twitter:card\" content=\"summary_large_image\">\n"
+            f"<link rel=\"icon\" href=\"{icon_png}\" sizes=\"32x32\">\n"
+            f"<link rel=\"icon\" href=\"{icon_svg}\" type=\"image/svg+xml\">\n"
+            # docs/icon-180.png on the site (.github/workflows/pages.yml)
+            "<link rel=\"apple-touch-icon\" href=\"apple-touch-icon.png\">\n")
     # the head has the title: the template's own (artifact.html's) would be a second one
     body = re.sub(r"<title>.*?</title>\n?", "", tpl, count=1)
     full = ("<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n"

@@ -9,6 +9,7 @@ on:
     paths:
       - 'web/simulator.html'
       - 'docs/social-preview.png'
+      - 'docs/icon-180.png'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -37,6 +38,7 @@ jobs:
           mkdir -p _site
           cp web/simulator.html _site/index.html
           cp docs/social-preview.png _site/social-preview.png
+          cp docs/icon-180.png _site/apple-touch-icon.png
 
       - name: Configure Pages
         uses: actions/configure-pages@v6
