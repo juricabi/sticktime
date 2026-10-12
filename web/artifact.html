@@ -431,6 +431,7 @@ const BW_FONTS = {"tin":{"name":"koi5x8","adv":5,"y0":-7,"y1":1,"g":[[5,0,-7,5,8
 const EdgeTX = (() => {
   const RADIOS = [
     { id: 'pc', label: '1280×720  PC screen · 60 fps, no radio limits', w: 1280, h: 720, color: true, fonts: 'pc', cpu: 'H7', pc: true },
+    { id: 'pc1080', label: '1920×1080  PC screen, Full HD · 60 fps, no radio limits', w: 1920, h: 1080, color: true, fonts: 'hd', cpu: 'H7', pc: true },
     { id: 'tx16s', label: '480×272  TX16S · T16 · T18 · X10 · X12S · V16', w: 480, h: 272, color: true, fonts: 'std', cpu: 'F4' },
     { id: 'tx15', label: '480×320  TX15 · T15 · PL18 · ST16 · GX15 · T22', w: 480, h: 320, color: true, fonts: 'std', cpu: 'H7' },
     { id: 'nv14', label: '320×480  NV14 · EL18 · NB4+ (portrait)', w: 320, h: 480, color: true, fonts: 'std', cpu: 'F4' },
@@ -508,13 +509,13 @@ const EdgeTX = (() => {
   // color font sizes (px) per screen class: STD, BOLD, XXS, XS, L, XL, XXL, LXL
   const FONT_PX = {
     std: [16, 16, 9, 13, 24, 32, 64, 48], sml: [13, 13, 8, 10, 19, 25, 48, 36], lrg: [22, 22, 12, 18, 33, 44, 88, 66],
-    pc: [32, 32, 18, 26, 48, 64, 128, 96],
+    pc: [32, 32, 18, 26, 48, 64, 128, 96], hd: [48, 48, 27, 39, 72, 96, 192, 144],
   };
   const FONT_BOLD = [false, true, false, false, false, true, true, true];
   // what lcd.sizeText reports as the height (the fonts' line height) on EdgeTX, same order
   const LINE_H = {
     std: [21, 20, 12, 17, 29, 40, 69, 51], sml: [17, 16, 10, 14, 23, 33, 52, 38], lrg: [27, 28, 17, 23, 42, 55, 95, 70],
-    pc: [42, 40, 24, 34, 58, 80, 138, 102],
+    pc: [42, 40, 24, 34, 58, 80, 138, 102], hd: [63, 60, 36, 51, 87, 120, 207, 153],
   };
 
   // ---------------------------------------------------------- color fonts
@@ -1424,6 +1425,7 @@ AI.pos = function(i, s)
 end
 
 local buildTrack
+local nBuilt = 0                                       -- how many tracks were built
 do
   local GCY = { 1.35, 5.5, 7.0, 2.4, 0, 0, 0, 2.0 }       -- default center height per type
   local seed = 1
@@ -1458,6 +1460,7 @@ do
   end
 
   buildTrack = function(t)
+    nBuilt = nBuilt + 1
     local T = TRACKS[t]
     local d, bd = T[3], T[4]
     NG, NP, BX.n = 0, 0, 0
@@ -2431,135 +2434,206 @@ end
 local ordZ, ordI, ordP, nOrd = {}, {}, {}, 0
 local collectObjects
 do
+  local ordN = {}                                      -- object number (1..) of each ord entry
   -- With structures in view, depth order is not enough (a long wall's center can be far
   -- while its near end hides things). Pairs that overlap on screen and involve a structure
   -- get an exact rule from a separating plane: if the two bounds are apart along x, y or z
   -- and the camera is on one side of the gap, the object on that side is in front. Then a
   -- topological sort (Kahn) draws everything far to near while keeping those rules.
-  local OB = { x0 = {}, x1 = {}, y0 = {}, y1 = {}, z0 = {}, z1 = {}, b = {} }
+  local OB = { x0 = {}, x1 = {}, y0 = {}, y1 = {}, z0 = {}, z1 = {}, b = {} }  -- b: structure?
+  local SB = { x0 = {}, x1 = {}, y0 = {}, y1 = {}, z0 = {}, z1 = {} }        -- bounds, by object
   local sx0, sx1, sy0, sy1 = {}, {}, {}, {}            -- screen rectangle of each object
-  local EA, EB, SU, cnt, st, indeg, done, DO = {}, {}, {}, {}, {}, {}, {}, {}
+  local EA, EB, cnt, indeg, DO = {}, {}, {}, {}, {}
+  local CL, HD, NE, NX = {}, {}, {}, {}               -- rule candidates, rule lists, not drawn
 
   -- Rules only for pairs with a structure in them that overlap on screen. A plane between
   -- their boxes (along x, then z, then y) with the camera on one side puts the other object
   -- behind: rule 1 draws i before j, -1 after, 0 none (they cannot overlap on screen).
   -- Touching faces count as separated (2 cm tolerance: radio Lua uses 32-bit floats).
   -- Boxes that intersect (a tree's box touching a wall): the farther one first.
-  local function sortWithStructures(n)
-    local ne = 0
-    local isB, X0, X1, Y0, Y1, Z0, Z1 = OB.b, OB.x0, OB.x1, OB.y0, OB.y1, OB.z0, OB.z1
-    local cx, cy, cz = kpx, kpy, kpz
-    for i = 1, n do
-      if isB[i] then
-        local p0, p1, q0, q1 = sx0[i], sx1[i], sy0[i], sy1[i]
-        local a0, a1, c0, c1, e0, e1 = X0[i], X1[i], Z0[i], Z1[i], Y0[i], Y1[i]
-        for j = 1, n do
-          if j ~= i and (j > i or not isB[j]) then
-            if p0 < sx1[j] and sx0[j] < p1 and q0 < sy1[j] and sy0[j] < q1 then
-              local v, b0, b1 = 0, X0[j], X1[j]
-              if a1 <= b0 + 0.02 then v = cx >= b0 and 1 or cx <= a1 and -1 or 0
-              elseif b1 <= a0 + 0.02 then v = cx >= a0 and -1 or cx <= b1 and 1 or 0
-              else
-                b0, b1 = Z0[j], Z1[j]
-                if c1 <= b0 + 0.02 then v = cz >= b0 and 1 or cz <= c1 and -1 or 0
-                elseif b1 <= c0 + 0.02 then v = cz >= c0 and -1 or cz <= b1 and 1 or 0
-                else
-                  b0, b1 = Y0[j], Y1[j]
-                  if e1 <= b0 + 0.02 then v = cy >= b0 and 1 or cy <= e1 and -1 or 0
-                  elseif b1 <= e0 + 0.02 then v = cy >= e0 and -1 or cy <= b1 and 1 or 0
-                  else v = ordZ[i] > ordZ[j] and 1 or -1 end
-                end
-              end
-              if v > 0 then
-                ne = ne + 1
-                EA[ne], EB[ne] = i, j
-              elseif v < 0 then
-                ne = ne + 1
-                EA[ne], EB[ne] = j, i
-              end
-            end
-          end
-        end
+  -- depth order (far to near) of the n objects into DO: an insertion sort fed with last frame's
+  -- order (objects keep their places from frame to frame, so it takes about one pass)
+  local LPOS, LST, BUF, stp, lastN = {}, {}, {}, 0, 0
+  local function depthOrder(n)
+    for p = 1, lastN do BUF[p] = 0 end
+    for o = 1, n do
+      local k = ordN[o]
+      if LST[k] == stp then BUF[LPOS[k]] = o end
+    end
+    local m = 0
+    for p = 1, lastN do
+      local o = BUF[p]
+      if o > 0 then
+        m = m + 1
+        DO[m] = o
       end
     end
-    -- depth order first (insertion sort, far to near)
     for o = 1, n do
-      local z, j = ordZ[o], o - 1
+      if LST[ordN[o]] ~= stp then
+        m = m + 1
+        DO[m] = o
+      end
+    end
+    for k = 2, n do
+      local o = DO[k]
+      local z, j = ordZ[o], k - 1
       while j > 0 and ordZ[DO[j]] < z do
         DO[j + 1] = DO[j]
         j = j - 1
       end
       DO[j + 1] = o
     end
-    if ne == 0 then
-      for k = 1, n do ordP[k] = DO[k] end
-      return
-    end
-    -- successor lists (compressed), in-degrees
-    for o = 1, n do cnt[o], indeg[o], done[o] = 0, 0, false end
-    for e = 1, ne do
-      local a, b = EA[e], EB[e]
-      cnt[a], indeg[b] = cnt[a] + 1, indeg[b] + 1
-    end
-    local q = 1
-    for o = 1, n do
-      st[o] = q
-      q = q + cnt[o]
-      cnt[o] = st[o]
-    end
-    for e = 1, ne do
-      local a = EA[e]
-      SU[cnt[a]] = EB[e]
-      cnt[a] = cnt[a] + 1
-    end
-    -- Kahn: always the farthest object whose rules allow it
-    local first = 1
+  end
+  -- this frame's draw order, for the next frame's depthOrder
+  local function keepOrder(n)
+    stp = stp + 1
     for k = 1, n do
-      while done[DO[first]] do first = first + 1 end
-      local p = first
-      while p <= n and (done[DO[p]] or indeg[DO[p]] > 0) do p = p + 1 end
-      -- p > n: a cycle (rare), broken at the farthest object left
-      local best = DO[p > n and first or p]
-      done[best] = true
-      ordP[k] = best
-      for e = st[best], cnt[best] - 1 do
-        local v = SU[e]
-        indeg[v] = indeg[v] - 1
+      local key = ordN[ordP[k]]
+      LPOS[key], LST[key] = k, stp
+    end
+    lastN = n
+  end
+
+  local function sortWithStructures(n)
+    local ne = 0
+    local isB, X0, X1, Y0, Y1, Z0, Z1 = OB.b, SB.x0, SB.x1, SB.y0, SB.y1, SB.z0, SB.z1
+    local cx, cy, cz = kpx, kpy, kpz
+    -- candidates: the other objects, then the structures last to first, so that structure
+    -- number b of nb pairs with CL[1 .. no + nb - b]: every other object and the structures
+    -- after it (each pair of structures once)
+    local no, nb = 0, 0
+    for i = 1, n do
+      if not isB[i] then
+        no = no + 1
+        CL[no] = i
       end
     end
+    for i = n, 1, -1 do
+      if isB[i] then
+        nb = nb + 1
+        CL[no + nb] = i
+      end
+    end
+    for b = 1, nb do
+      local i = CL[no + nb + 1 - b]
+      local p0, p1, q0, q1 = sx0[i], sx1[i], sy0[i], sy1[i]
+      local m = ordN[i]
+      local a0, a1, c0, c1, e0, e1 = X0[m], X1[m], Z0[m], Z1[m], Y0[m], Y1[m]
+      for k = 1, no + nb - b do
+        local j = CL[k]
+        if p0 < sx1[j] and sx0[j] < p1 and q0 < sy1[j] and sy0[j] < q1 then
+          local mj = ordN[j]
+          local v, b0, b1 = 0, X0[mj], X1[mj]
+          if a1 <= b0 + 0.02 then v = cx >= b0 and 1 or cx <= a1 and -1 or 0
+          elseif b1 <= a0 + 0.02 then v = cx >= a0 and -1 or cx <= b1 and 1 or 0
+          else
+            b0, b1 = Z0[mj], Z1[mj]
+            if c1 <= b0 + 0.02 then v = cz >= b0 and 1 or cz <= c1 and -1 or 0
+            elseif b1 <= c0 + 0.02 then v = cz >= c0 and -1 or cz <= b1 and 1 or 0
+            else
+              b0, b1 = Y0[mj], Y1[mj]
+              if e1 <= b0 + 0.02 then v = cy >= b0 and 1 or cy <= e1 and -1 or 0
+              elseif b1 <= e0 + 0.02 then v = cy >= e0 and -1 or cy <= b1 and 1 or 0
+              else v = ordZ[i] > ordZ[j] and 1 or -1 end
+            end
+          end
+          if v > 0 then
+            ne = ne + 1
+            EA[ne], EB[ne] = i, j
+          elseif v < 0 then
+            ne = ne + 1
+            EA[ne], EB[ne] = j, i
+          end
+        end
+      end
+    end
+    depthOrder(n)
+    -- the depth order when no rule says otherwise (Kahn would give the same)
+    for k = 1, n do cnt[DO[k]] = k end
+    local ok = true
+    for e = 1, ne do
+      if cnt[EA[e]] > cnt[EB[e]] then
+        ok = false
+        break
+      end
+    end
+    if ok then
+      for k = 1, n do ordP[k] = DO[k] end
+    else
+      -- successors as lists linked through the rules, in-degrees
+      for o = 1, n do HD[o], indeg[o] = 0, 0 end
+      for e = 1, ne do
+        local a, b = EA[e], EB[e]
+        NE[e], HD[a] = HD[a], e
+        indeg[b] = indeg[b] + 1
+      end
+      -- Kahn: always the farthest object whose rules allow it. The objects not drawn yet are
+      -- linked in depth order (NX), so the search for the next one skips those already drawn.
+      for k = 1, n do NX[k] = k + 1 end
+      local head = 1
+      for k = 1, n do
+        local prev, p = 0, head
+        while p <= n and indeg[DO[p]] > 0 do prev, p = p, NX[p] end
+        -- p > n: a cycle (rare), broken at the farthest object left
+        if p > n then prev, p = 0, head end
+        if prev == 0 then head = NX[p] else NX[prev] = NX[p] end
+        local best = DO[p]
+        ordP[k] = best
+        local e = HD[best]
+        while e > 0 do
+          local v = EB[e]
+          indeg[v] = indeg[v] - 1
+          e = NE[e]
+        end
+      end
+    end
+    keepOrder(n)
+  end
+
+  -- the track's objects for collectObjects, made once per track: center, radius, id and 3D
+  -- bounds by object number (gates, the trees that are drawn, structures; the AI pilots come
+  -- after them, their bounds refreshed when in view)
+  local OCX, OCY, OCZ, ORAD, OID = {}, {}, {}, {}, {}
+  local NS, made = 0, -1
+  local function makeObjects()
+    local n = 0
+    for i = 1, NG do
+      n = n + 1
+      local k = gk[i]
+      OCX[n], OCY[n], OCZ[n], OID[n] = gx[i], gy[i], gz[i], i
+      ORAD[n] = GSH[k] == 3 and 9 or (k == 2 or k == 3) and 7 or 4
+      SB.x0[n], SB.x1[n], SB.y0[n], SB.y1[n], SB.z0[n], SB.z1[n] = GB.x0[i], GB.x1[i], GB.y0[i], GB.y1[i], GB.z0[i], GB.z1[i]
+    end
+    for i = 1, NP do
+      if qk[i] == 1 then
+        n = n + 1
+        local r = qh[i] * 0.25
+        OCX[n], OCY[n], OCZ[n], ORAD[n], OID[n] = qx[i], qh[i] * 0.4, qz[i], qh[i], -i
+        SB.x0[n], SB.x1[n], SB.y0[n], SB.y1[n], SB.z0[n], SB.z1[n] = qx[i] - r, qx[i] + r, 0, qh[i], qz[i] - r, qz[i] + r
+      end
+    end
+    for b = 1, BX.n do
+      n = n + 1
+      local x0, x1, y0, y1, z0, z1 = BX.x0[b], BX.x1[b], BX.y0[b], BX.y1[b], BX.z0[b], BX.z1[b]
+      OCX[n], OCY[n], OCZ[n], OID[n] = (x0 + x1) * 0.5, (y0 + y1) * 0.5, (z0 + z1) * 0.5, 1000 + b
+      ORAD[n] = (x1 - x0 + y1 - y0 + z1 - z0) * 0.5
+      SB.x0[n], SB.x1[n], SB.y0[n], SB.y1[n], SB.z0[n], SB.z1[n] = x0, x1, y0, y1, z0, z1
+    end
+    NS, made = n, nBuilt
   end
 
   collectObjects = function(maxZ)
     nOrd = 0
-    local n1 = NG + NP
-    local n2 = n1 + BX.n
+    if made ~= nBuilt then makeObjects() end
+    local ns = NS
     local boxes = false
-    for n = 1, n2 + (gmode == 1 and AI.n or 0) do
-      local id, X, Y, Z, rad = n, 0, 0, 0, 4
-      if n <= NG then
-        X, Y, Z = gx[n] - kpx, gy[n] - kpy, gz[n] - kpz
-        local k = gk[n]
-        if GSH[k] == 3 then rad = 9 elseif k == 2 or k == 3 then rad = 7 end
-      elseif n <= n1 then
-        local i = n - NG
-        if qk[i] == 1 then
-          X, Y, Z = qx[i] - kpx, qh[i] * 0.4 - kpy, qz[i] - kpz
-          rad = qh[i]
-        else
-          Z = -1e9
-        end
-        id = -i
-      elseif n <= n2 then
-        local b = n - n1
-        local x0, x1, y0, y1, z0, z1 = BX.x0[b], BX.x1[b], BX.y0[b], BX.y1[b], BX.z0[b], BX.z1[b]
-        X, Y, Z = (x0 + x1) * 0.5 - kpx, (y0 + y1) * 0.5 - kpy, (z0 + z1) * 0.5 - kpz
-        rad = (x1 - x0 + y1 - y0 + z1 - z0) * 0.5
-        id = 1000 + b
+    for n = 1, ns + (gmode == 1 and AI.n or 0) do
+      local X, Y, Z, rad
+      if n <= ns then
+        X, Y, Z, rad = OCX[n] - kpx, OCY[n] - kpy, OCZ[n] - kpz, ORAD[n]
       else
-        local a = n - n2
-        X, Y, Z = AI.x[a] - kpx, AI.y[a] - kpy, AI.z[a] - kpz
-        rad = 1
-        id = 2000 + a
+        local a = n - ns
+        X, Y, Z, rad = AI.x[a] - kpx, AI.y[a] - kpy, AI.z[a] - kpz, 1
       end
       local z = X * kfx + Y * kfy + Z * kfz
       if z > -rad and z < maxZ then
@@ -2567,21 +2641,18 @@ do
         if (x < 0 and -x or x) < z * tanH + rad or z < 4 then
           local o = nOrd + 1
           nOrd = o
-          ordZ[o], ordI[o] = z, id
+          local id = n <= ns and OID[n] or 2000 + n - ns
+          ordZ[o], ordI[o], ordN[o] = z, id, n
           -- screen rectangle (in pixels from the center) for the draw-order rules, made
           -- conservative; the whole screen when the object reaches the camera.
           local y = X * kux + Y * kuy + Z * kuz
           local isBox = id >= 1000 and id < 2000
           OB.b[o] = isBox
-          sx0[o], sx1[o], sy0[o], sy1[o] = -1e6, 1e6, -1e6, 1e6
           if isBox then
             -- a box: its extent across, up and along the view, then the nearest and farthest
             -- depth for the outer edges (a wall seen edge-on is a narrow strip, not a circle)
-            local b = id - 1000
-            local x0, x1, y0, y1, z0, z1 = BX.x0[b], BX.x1[b], BX.y0[b], BX.y1[b], BX.z0[b], BX.z1[b]
-            OB.x0[o], OB.x1[o], OB.y0[o], OB.y1[o], OB.z0[o], OB.z1[o] = x0, x1, y0, y1, z0, z1
             boxes = true
-            local hx, hy, hz = (x1 - x0) * 0.5, (y1 - y0) * 0.5, (z1 - z0) * 0.5
+            local hx, hy, hz = (SB.x1[n] - SB.x0[n]) * 0.5, (SB.y1[n] - SB.y0[n]) * 0.5, (SB.z1[n] - SB.z0[n]) * 0.5
             local a, c, e = krx * hx, kry * hy, krz * hz
             local ex = (a < 0 and -a or a) + (c < 0 and -c or c) + (e < 0 and -e or e)
             a, c, e = kux * hx, kuy * hy, kuz * hz
@@ -2594,6 +2665,8 @@ do
               sx0[o], sx1[o] = a * (a < 0 and f0 or f1), c * (c > 0 and f0 or f1)
               a, c = y - ey, y + ey
               sy0[o], sy1[o] = a * (a < 0 and f0 or f1), c * (c > 0 and f0 or f1)
+            else
+              sx0[o], sx1[o], sy0[o], sy1[o] = -1e6, 1e6, -1e6, 1e6
             end
           else
             -- other objects: around their bounding sphere, at its nearest depth and stretched
@@ -2603,16 +2676,12 @@ do
               local r = rad * F / (z - rad) * (1 + (x * x + y * y) / (z * z))
               x, y = x * s, y * s
               sx0[o], sx1[o], sy0[o], sy1[o] = x - r, x + r, y - r, y + r
-            end
-            if id > 0 and id < 1000 then
-              OB.x0[o], OB.x1[o], OB.y0[o], OB.y1[o], OB.z0[o], OB.z1[o] = GB.x0[id], GB.x1[id], GB.y0[id], GB.y1[id], GB.z0[id], GB.z1[id]
-            elseif id < 0 then
-              local i = -id
-              local r = qh[i] * 0.25
-              OB.x0[o], OB.x1[o], OB.y0[o], OB.y1[o], OB.z0[o], OB.z1[o] = qx[i] - r, qx[i] + r, 0, qh[i], qz[i] - r, qz[i] + r
             else
-              local a, r = id - 2000, 0.3
-              OB.x0[o], OB.x1[o], OB.y0[o], OB.y1[o], OB.z0[o], OB.z1[o] = AI.x[a] - r, AI.x[a] + r, AI.y[a] - r, AI.y[a] + r, AI.z[a] - r, AI.z[a] + r
+              sx0[o], sx1[o], sy0[o], sy1[o] = -1e6, 1e6, -1e6, 1e6
+            end
+            if n > ns then
+              local a, r = n - ns, 0.3
+              SB.x0[n], SB.x1[n], SB.y0[n], SB.y1[n], SB.z0[n], SB.z1[n] = AI.x[a] - r, AI.x[a] + r, AI.y[a] - r, AI.y[a] + r, AI.z[a] - r, AI.z[a] + r
             end
           end
         end
@@ -2622,17 +2691,20 @@ do
       sortWithStructures(nOrd)
       return
     end
-    -- no structures in view: plain depth order (insertion sort)
-    for o = 1, nOrd do
-      local z, j = ordZ[o], o - 1
-      while j > 0 and ordZ[ordP[j]] < z do
-        ordP[j + 1] = ordP[j]
-        j = j - 1
+    -- no structures in view: plain depth order
+    depthOrder(nOrd)
+    for k = 1, nOrd do ordP[k] = DO[k] end
+    keepOrder(nOrd)
+  end
+  if STICKTIME_TEST then
+    STICKTIME_TEST.bounds = OB
+    STICKTIME_TEST.fillBounds = function()          -- OB's bounds by ord entry, for the tests
+      for o = 1, nOrd do
+        local m = ordN[o]
+        OB.x0[o], OB.x1[o], OB.y0[o], OB.y1[o], OB.z0[o], OB.z1[o] = SB.x0[m], SB.x1[m], SB.y0[m], SB.y1[m], SB.z0[m], SB.z1[m]
       end
-      ordP[j + 1] = o
     end
   end
-  if STICKTIME_TEST then STICKTIME_TEST.bounds = OB end
 end
 
 local C = {}            -- colors (color radios) / grey levels (B&W)
@@ -2671,6 +2743,9 @@ local render3D, initGfx
     C.white, C.black, C.accent, C.accent2 = RGB(255, 255, 255), RGB(0, 0, 0), RGB(255, 138, 0), RGB(255, 214, 64)
     C.good, C.bad, C.red, C.cyan = RGB(96, 232, 120), RGB(255, 96, 96), RGB(230, 30, 40), RGB(80, 220, 255)
     C.panel, C.panelBG, C.dim = RGB(14, 18, 28), RGB(22, 26, 36), RGB(170, 178, 192)
+    -- the minimap's structures: C.dim as it was blended over the minimap's panel, over the sky
+    -- (landscape) or over the instrument panel (portrait)
+    C.mapBox = PORTRAIT and RGB(99, 105, 117) or RGB(114, 133, 159)
     C.ai = { RGB(255, 72, 72), RGB(64, 150, 255), RGB(200, 96, 255) }
     for k = 0, 7 do hazeS[k + 1] = mixc(HAZE, sky, k / 8) end
     for k = 0, 3 do hazeG[k + 1] = mixc({ 150, 182, 140 }, grass, k / 4) end
@@ -2767,11 +2842,49 @@ local render3D, initGfx
   end
 
   local function fillPoly(n, col)
-    n = clip2(n, fxs, fys, gxs, gys, true, VX - 1, -1)
-    n = clip2(n, gxs, gys, fxs, fys, true, VX + VW, 1)
-    n = clip2(n, fxs, fys, gxs, gys, false, VY - 1, -1)
-    n = clip2(n, gxs, gys, fxs, fys, false, VY + VH, 1)
-    for i = 2, n - 1 do fillTri(fxs[1], fys[1], fxs[i], fys[i], fxs[i + 1], fys[i + 1], col) end
+    -- clip only against the view edges the polygon crosses
+    local x0, x1, y0, y1 = fxs[1], fxs[1], fys[1], fys[1]
+    for i = 2, n do
+      local x, y = fxs[i], fys[i]
+      if x < x0 then x0 = x elseif x > x1 then x1 = x end
+      if y < y0 then y0 = y elseif y > y1 then y1 = y end
+    end
+    local px, py, qx, qy = fxs, fys, gxs, gys
+    if x0 < VX - 1 then
+      n = clip2(n, px, py, qx, qy, true, VX - 1, -1)
+      px, py, qx, qy = qx, qy, px, py
+    end
+    if x1 > VX + VW then
+      n = clip2(n, px, py, qx, qy, true, VX + VW, 1)
+      px, py, qx, qy = qx, qy, px, py
+    end
+    if y0 < VY - 1 then
+      n = clip2(n, px, py, qx, qy, false, VY - 1, -1)
+      px, py, qx, qy = qx, qy, px, py
+    end
+    if y1 > VY + VH then
+      n = clip2(n, px, py, qx, qy, false, VY + VH, 1)
+      px, py = qx, qy
+    end
+    if n < 3 then return end
+    -- a strip from the top corner down both sides: the firmware walks every row of each
+    -- triangle, and a fan from one corner would walk up to n - 2 times the polygon's height
+    local t, ty = 1, py[1]
+    for i = 2, n do
+      if py[i] < ty then t, ty = i, py[i] end
+    end
+    local l, r = t == 1 and n or t - 1, t == n and 1 or t + 1
+    fillTri(px[t], ty, px[l], py[l], px[r], py[r], col)
+    for _ = 4, n do
+      local a, b = l == 1 and n or l - 1, r == n and 1 or r + 1
+      if py[a] < py[b] then
+        fillTri(px[l], py[l], px[r], py[r], px[a], py[a], col)
+        l = a
+      else
+        fillTri(px[l], py[l], px[r], py[r], px[b], py[b], col)
+        r = b
+      end
+    end
   end
 
   -- filled triangle; far off-screen corners go through the clipper (the firmware
@@ -2807,14 +2920,11 @@ local render3D, initGfx
     end
   end
 
-  -- sky/ground split for any attitude: one rectangle + one thin wedge
-  -- triangle (filled triangles cost one call per scanline on the radio)
-  local function drawGround()
-    local a, b, c = kry, kuy, F * kfy      -- ground where c + (x-CX)*a - (y-CY)*b < 0
+  -- one side of the horizon (where c + (x-CX)*a - (y-CY)*b < 0) within the view: one rectangle
+  -- + one thin wedge triangle (filled triangles cost one call per scanline on the radio)
+  local function fillSide(a, b, c, g)
     local x0, y0, x1, y1 = VX, VY, VX + VW, VY + VH
     local A, B = a < 0 and -a or a, b < 0 and -b or b
-    local g = cGround
-    local hx0, hy0, hx1, hy1
     if A <= B then
       if B < 1e-5 then
         if c < 0 then fillRect(x0, y0, VW, VH, g) end
@@ -2841,7 +2951,6 @@ local render3D, initGfx
           if yL > yR then fillTri(x0, yL, x1, yR, x0, yR, g) else fillTri(x0, yL, x1, yR, x1, yL, g) end
         end
       end
-      hx0, hy0, hx1, hy1 = x0, yL, x1, yR
     else
       local xT, xB = CX + ((y0 - CY) * b - c) / a, CX + ((y1 - CY) * b - c) / a
       local lo, hi = xT, xB
@@ -2864,7 +2973,40 @@ local render3D, initGfx
           if xT > xB then fillTri(xT, y0, xB, y1, xT, y1, g) else fillTri(xT, y0, xB, y1, xB, y0, g) end
         end
       end
-      hx0, hy0, hx1, hy1 = xT, y0, xB, y1
+    end
+  end
+
+  -- sky, ground and the mountains between them, every pixel painted about once: lcd.clear()
+  -- paints the larger of sky and ground (and comes first in the frame, so firmware that keeps
+  -- the last frame need not copy it), then only the other side is filled
+  local function drawGround()
+    local a, b, c = kry, kuy, F * kfy      -- ground where c + (x-CX)*a - (y-CY)*b < 0
+    local x0, y0, x1, y1 = VX, VY, VX + VW, VY + VH
+    local A, B = a < 0 and -a or a, b < 0 and -b or b
+    -- share of the view that is ground, from where the horizon crosses its middle
+    local f
+    if B < 1e-5 and A < 1e-5 then f = c < 0 and 1 or 0
+    elseif A <= B then
+      f = (CY + (c + ((x0 + x1) * 0.5 - CX) * a) / b - y0) / VH     -- b > 0: ground below
+      if b > 0 then f = 1 - f end
+    else
+      f = (CX + (((y0 + y1) * 0.5 - CY) * b - c) / a - x0) / VW
+      if a < 0 then f = 1 - f end
+    end
+    if f > 0.5 then
+      lcd.clear(cGround)
+      fillSide(-a, -b, -c, cSky)
+    else
+      lcd.clear(cSky)
+      fillSide(a, b, c, cGround)
+    end
+    drawMountains()
+    local hx0, hy0, hx1, hy1
+    if A <= B then
+      if B < 1e-5 then return end
+      hx0, hy0, hx1, hy1 = x0, CY + (c + (x0 - CX) * a) / b, x1, CY + (c + (x1 - CX) * a) / b
+    else
+      hx0, hy0, hx1, hy1 = CX + ((y0 - CY) * b - c) / a, y0, CX + ((y1 - CY) * b - c) / a, y1
     end
     -- atmospheric haze: soft bands hugging the horizon
     local l = sqrt(a * a + b * b)
@@ -2974,8 +3116,14 @@ local render3D, initGfx
     p, q = bx - ax, by - ay
     if n > 140 or (n >= 3 and (p < 0 and -p or p) >= (q < 0 and -q or q)) then
       if safe and ax >= VX and bx >= VX and cx >= VX and dx >= VX and ay >= VY and by >= VY and cy >= VY and dy >= VY then
-        fillTri(ax, ay, bx, by, dx, dy, fill)
-        fillTri(ax, ay, dx, dy, cx, cy, fill)
+        -- quad a-b-d-c, split along the diagonal between the corners next to the top one
+        if (ay < dy and ay or dy) < (by < cy and by or cy) then
+          fillTri(ax, ay, bx, by, cx, cy, fill)
+          fillTri(bx, by, dx, dy, cx, cy, fill)
+        else
+          fillTri(ax, ay, bx, by, dx, dy, fill)
+          fillTri(ax, ay, dx, dy, cx, cy, fill)
+        end
       else
         fxs[1], fys[1], fxs[2], fys[2], fxs[3], fys[3], fxs[4], fys[4] = ax, ay, bx, by, dx, dy, cx, cy
         fillPoly(4, fill)
@@ -3025,16 +3173,28 @@ local render3D, initGfx
       if x0 < VX or x1 > VX + VW or y0 < VY or y1 > VY + VH then
         fxs[1], fys[1], fxs[2], fys[2], fxs[3], fys[3], fxs[4], fys[4] = a1, b1, a2, b2, a3, b3, a4, b4
         fillPoly(4, col)
+      elseif (b1 < b3 and b1 or b3) < (b2 < b4 and b2 or b4) then
+        -- split along the diagonal between the two corners next to the top one: the two
+        -- triangles then share the fewest rows (the firmware walks each one's every row)
+        fillTri(a1, b1, a2, b2, a4, b4, col)
+        fillTri(a2, b2, a3, b3, a4, b4, col)
       else
         fillTri(a1, b1, a2, b2, a3, b3, col)
         fillTri(a1, b1, a3, b3, a4, b4, col)
       end
       -- outlines only where they show: each line call costs as much as a short line
       if x1 - x0 + y1 - y0 > 16 then
-        ln(a1, b1, a2, b2, ecol)
-        ln(a2, b2, a3, b3, ecol)
-        ln(a3, b3, a4, b4, ecol)
-        ln(a4, b4, a1, b1, ecol)
+        if x1 <= XL and y1 <= YL then              -- no end past the right or bottom edge
+          drawLine(a1, b1, a2, b2, SOLID, ecol)
+          drawLine(a2, b2, a3, b3, SOLID, ecol)
+          drawLine(a3, b3, a4, b4, SOLID, ecol)
+          drawLine(a4, b4, a1, b1, SOLID, ecol)
+        else
+          ln(a1, b1, a2, b2, ecol)
+          ln(a2, b2, a3, b3, ecol)
+          ln(a3, b3, a4, b4, ecol)
+          ln(a4, b4, a1, b1, ecol)
+        end
       end
       return
     end
@@ -3269,8 +3429,6 @@ local render3D, initGfx
   end
 
   render3D = function()
-    fillRect(VX, VY, VW, VH, cSky)
-    drawMountains()
     drawGround()
     drawGrid()
     drawPad()
@@ -3511,8 +3669,10 @@ local render, hitTest, pauseHit, initUI
     local s = (w - 6) / sx
     if (h - 6) / sz < s then s = (h - 6) / sz end
     local ox, oz = x + w / 2 - (TR.x0 + TR.x1) * 0.5 * s, y + h / 2 + (TR.z0 + TR.z1) * 0.5 * s
+    -- structures: solid, in the colour they had blended over the panel (a blended fill is one
+    -- slow call each on the radio)
     for b = 1, BX.n do
-      fillRect(ox + BX.x0[b] * s, oz - BX.z1[b] * s, (BX.x1[b] - BX.x0[b]) * s + 1, (BX.z1[b] - BX.z0[b]) * s + 1, C.dim, 7)
+      fillRect(ox + BX.x0[b] * s, oz - BX.z1[b] * s, (BX.x1[b] - BX.x0[b]) * s + 1, (BX.z1[b] - BX.z0[b]) * s + 1, C.mapBox)
     end
     for i = 1, NG do
       local j = i % NG + 1
@@ -4028,7 +4188,10 @@ local function init()
     TEST.best = function(t) return BEST.l[t], BEST.r[t], BEST.g[t], BEST.f[t] end
     TEST.box = function(b) return BX.x0[b], BX.x1[b], BX.y0[b], BX.y1[b], BX.z0[b], BX.z1[b] end
     TEST.S = S
-    TEST.order = function() return nOrd, ordP, ordI, TEST.bounds, kpx, kpy, kpz end
+    TEST.order = function()
+      if TEST.fillBounds then TEST.fillBounds() end
+      return nOrd, ordP, ordI, TEST.bounds, kpx, kpy, kpz
+    end
     TEST.cam = function() return krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz end
   end
 end
@@ -5267,7 +5430,7 @@ do
         end
       end
     end
-    -- no structures in view: plain depth order (insertion sort)
+    -- plain depth order (insertion sort)
     for o = 1, nOrd do
       local z, j = ordZ[o], o - 1
       while j > 0 and ordZ[ordP[j]] < z do
@@ -5990,7 +6153,10 @@ local function init()
     TEST.best = function(t) return BEST.l[t], BEST.r[t], BEST.g[t], BEST.f[t] end
     TEST.box = function(b) return BX.x0[b], BX.x1[b], BX.y0[b], BX.y1[b], BX.z0[b], BX.z1[b] end
     TEST.S = S
-    TEST.order = function() return nOrd, ordP, ordI, TEST.bounds, kpx, kpy, kpz end
+    TEST.order = function()
+      if TEST.fillBounds then TEST.fillBounds() end
+      return nOrd, ordP, ordI, TEST.bounds, kpx, kpy, kpz
+    end
     TEST.cam = function() return krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz end
   end
 end

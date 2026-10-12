@@ -10,6 +10,7 @@
 const EdgeTX = (() => {
   const RADIOS = [
     { id: 'pc', label: '1280×720  PC screen · 60 fps, no radio limits', w: 1280, h: 720, color: true, fonts: 'pc', cpu: 'H7', pc: true },
+    { id: 'pc1080', label: '1920×1080  PC screen, Full HD · 60 fps, no radio limits', w: 1920, h: 1080, color: true, fonts: 'hd', cpu: 'H7', pc: true },
     { id: 'tx16s', label: '480×272  TX16S · T16 · T18 · X10 · X12S · V16', w: 480, h: 272, color: true, fonts: 'std', cpu: 'F4' },
     { id: 'tx15', label: '480×320  TX15 · T15 · PL18 · ST16 · GX15 · T22', w: 480, h: 320, color: true, fonts: 'std', cpu: 'H7' },
     { id: 'nv14', label: '320×480  NV14 · EL18 · NB4+ (portrait)', w: 320, h: 480, color: true, fonts: 'std', cpu: 'F4' },
@@ -87,13 +88,13 @@ const EdgeTX = (() => {
   // color font sizes (px) per screen class: STD, BOLD, XXS, XS, L, XL, XXL, LXL
   const FONT_PX = {
     std: [16, 16, 9, 13, 24, 32, 64, 48], sml: [13, 13, 8, 10, 19, 25, 48, 36], lrg: [22, 22, 12, 18, 33, 44, 88, 66],
-    pc: [32, 32, 18, 26, 48, 64, 128, 96],
+    pc: [32, 32, 18, 26, 48, 64, 128, 96], hd: [48, 48, 27, 39, 72, 96, 192, 144],
   };
   const FONT_BOLD = [false, true, false, false, false, true, true, true];
   // what lcd.sizeText reports as the height (the fonts' line height) on EdgeTX, same order
   const LINE_H = {
     std: [21, 20, 12, 17, 29, 40, 69, 51], sml: [17, 16, 10, 14, 23, 33, 52, 38], lrg: [27, 28, 17, 23, 42, 55, 95, 70],
-    pc: [42, 40, 24, 34, 58, 80, 138, 102],
+    pc: [42, 40, 24, 34, 58, 80, 138, 102], hd: [63, 60, 36, 51, 87, 120, 207, 153],
   };
 
   // ---------------------------------------------------------- color fonts

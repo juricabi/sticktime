@@ -1192,7 +1192,7 @@ do
         end
       end
     end
-    -- no structures in view: plain depth order (insertion sort)
+    -- plain depth order (insertion sort)
     for o = 1, nOrd do
       local z, j = ordZ[o], o - 1
       while j > 0 and ordZ[ordP[j]] < z do
@@ -1915,7 +1915,10 @@ local function init()
     TEST.best = function(t) return BEST.l[t], BEST.r[t], BEST.g[t], BEST.f[t] end
     TEST.box = function(b) return BX.x0[b], BX.x1[b], BX.y0[b], BX.y1[b], BX.z0[b], BX.z1[b] end
     TEST.S = S
-    TEST.order = function() return nOrd, ordP, ordI, TEST.bounds, kpx, kpy, kpz end
+    TEST.order = function()
+      if TEST.fillBounds then TEST.fillBounds() end
+      return nOrd, ordP, ordI, TEST.bounds, kpx, kpy, kpz
+    end
     TEST.cam = function() return krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz end
   end
 end
