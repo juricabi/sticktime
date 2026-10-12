@@ -7,6 +7,7 @@ web/artifact.html   - same page as body content, fengari from jsDelivr (for host
 import base64
 import json
 import pathlib
+import re
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 W = ROOT / "web"
@@ -73,9 +74,11 @@ def main():
             f"<meta property=\"og:url\" content=\"{site}\">\n"
             f"<meta property=\"og:image\" content=\"{site}social-preview.png\">\n"
             "<meta name=\"twitter:card\" content=\"summary_large_image\">\n")
+    # the head has the title: the template's own (artifact.html's) would be a second one
+    body = re.sub(r"<title>.*?</title>\n?", "", tpl, count=1)
     full = ("<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n"
             "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\">\n"
-            + meta + "</head>\n<body>\n" + tpl.replace("{{FENGARI_TAG}}", inline) + "\n</body>\n</html>\n")
+            + meta + "</head>\n<body>\n" + body.replace("{{FENGARI_TAG}}", inline) + "\n</body>\n</html>\n")
     (W / "simulator.html").write_text(full, encoding="utf-8")
     for f in ("artifact.html", "simulator.html"):
         print(f, (W / f).stat().st_size // 1024, "KB")
