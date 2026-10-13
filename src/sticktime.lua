@@ -729,7 +729,9 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     seed = seed * 171 % 30269
     return seed / 30269
   end
+--#if TEST
   if STICKTIME_TEST then STICKTIME_TEST.seed = function(s) seed = s end end
+--#endif
 
   local function clamp1(v)
     if v > 1 then return 1 elseif v < -1 then return -1 end
@@ -1351,6 +1353,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     P.wr, P.wp, P.wy = pwr, pwp, pwy
     orthonormalize()
     speed = sqrt(vx * vx + vy * vy + vz * vz)
+--#if TEST
     if STICKTIME_TEST then
       -- motor sound state for the web emulator: what the synth needs (rpm from the thrust
       -- fraction, axial and edgewise flow, wash build-up, the shake's rms (deg) and frequency)
@@ -1359,6 +1362,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
       aE2 = sqrt((vx * rx + vy * ry + vz * rz) ^ 2 + (vx * fx + vy * fy + vz * fz) ^ 2)
       aW = sW
     end
+--#endif
     if gmode == 3 then
       -- distance to the nearest surface, for proximity tricks
       local m = py + 0.7
@@ -3975,6 +3979,8 @@ local function init()
   selectTrack(S.track)
   lastT = getTime()
   R.fpsT = lastT
+--#if TEST
+  -- the test hooks (the headless tests, the browser emulator); not in StickTime BW as shipped
   local TEST = STICKTIME_TEST
   if TEST then
     TEST.get = function() return px, py, pz, vx, vy, vz, fx, fy, fz, ux, uy, uz, rx, ry, rz, state, lap, nextGate, NG, gt end
@@ -4023,6 +4029,7 @@ local function init()
     end
     TEST.cam = function() return krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz end
   end
+--#endif
 end
 
 local function run(event, touch)

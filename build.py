@@ -37,6 +37,7 @@ VARIANTS = {
         "DPS": "°/s",
         "LATK": "0.011",
         "REFW": "480",
+        "hooks": True,                      # the test hooks ship (the emulator runs this file)
     },
     "BW": {
         "file": "StickTimeBW/core.lua",
@@ -52,6 +53,7 @@ VARIANTS = {
         "DATAFILE": "StickTimeBW.dat",
         "OLDDATA": "FPVSimBW.dat",
         "DIR": "StickTimeBW",
+        "test": "test/build/sticktime_bw_test.lua",     # with the STICKTIME_TEST hooks (--#if TEST)
         "DEG": "",
         "DPS": "",
         "LATK": "0.003",
@@ -72,21 +74,26 @@ VARIANTS = {
 }
 
 
-def build(variant: str, cfg: dict, strip: bool) -> str:
-    out = []
-    keep = True
+def build(variant: str, cfg: dict, strip: bool, test: bool = False) -> str:
+    """`--#if A B` keeps its lines in any of the named builds (they nest, closed by `--#endif`).
+    TEST marks the STICKTIME_TEST hooks: in the test builds, and in the color game, whose
+    shipped file the browser emulator runs (the B&W radios don't load them: about 7 KB)."""
+    on = {variant} | ({"TEST"} if test or cfg.get("hooks") else set())
+    out, stack = [], []
     src = ROOT / "src" / cfg.get("src", "sticktime.lua")
     for n, line in enumerate(src.read_text(encoding="utf-8").splitlines(), 1):
         s = line.strip()
-        m = re.match(r"^--#if\s+(\w+)$", s)
+        m = re.match(r"^--#if\s+(\w+(?:\s+\w+)*)$", s)
         if m:
-            keep = m.group(1) == variant
+            stack.append(any(k in on for k in m.group(1).split()))
             continue
         if s == "--#endif":
-            keep = True
+            assert stack, f"{src.name}:{n}: --#endif without --#if"
+            stack.pop()
             continue
-        if keep:
+        if all(stack):
             out.append(line)
+    assert not stack, f"{src.name}: --#if without --#endif"
     text = fold(placeholders("\n".join(out) + "\n", cfg))
     left = re.findall(r"@[A-Z]+@", text)
     if left:
@@ -213,7 +220,7 @@ def main():
         if "test" in cfg:
             tp = ROOT / cfg["test"]
             tp.parent.mkdir(parents=True, exist_ok=True)
-            tp.write_text(build("TEST", cfg, strip=True), encoding="utf-8")
+            tp.write_text(build(variant, cfg, strip=cfg.get("strip", False), test=True), encoding="utf-8")
             precompile(tp)
         if "loader" in cfg:
             lt = placeholders((ROOT / "src" / "bwloader.lua").read_text(encoding="utf-8"), cfg)

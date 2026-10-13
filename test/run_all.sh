@@ -12,12 +12,14 @@ check() {
   echo "$line | $res"
   [ "$res" = "ALL OK" ] || fail=1
 }
-for v in "StickTime.lua color 480 272" "StickTime.lua color 480 320" "StickTime.lua color 320 480" "StickTime.lua color 320 240" \
-         "StickTime.lua color 800 480" "StickTimeBW/core.lua bw 128 64" "StickTimeBW/core.lua bw 212 64"; do
+# (StickTime BW: its test build, with the STICKTIME_TEST hooks the shipped core.lua doesn't have)
+for v in "$S/StickTime.lua color 480 272" "$S/StickTime.lua color 480 320" "$S/StickTime.lua color 320 480" \
+         "$S/StickTime.lua color 320 240" "$S/StickTime.lua color 800 480" "build/sticktime_bw_test.lua bw 128 64" \
+         "build/sticktime_bw_test.lua bw 212 64"; do
   set -- $v
-  check "$($LUA53 harness.lua "$S/$1" $2 $3 $4 2>&1)"
+  check "$($LUA53 harness.lua "$1" $2 $3 $4 2>&1)"
   if [ -n "$FULL" ] || [ "$3" = "480" -a "$4" = "272" ] || [ "$3" = "128" ]; then
-    check "$(python3 run52.py "$S/$1" $2 $3 $4 2>&1)"
+    check "$(python3 run52.py "$1" $2 $3 $4 2>&1)"
   fi
 done
 # faster firmware: run() every 20 ms and 16 ms instead of 50 ms

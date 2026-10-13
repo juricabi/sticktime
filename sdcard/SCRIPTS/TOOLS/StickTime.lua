@@ -3439,6 +3439,7 @@ local function init()
   selectTrack(S.track)
   lastT = getTime()
   R.fpsT = lastT
+  -- the test hooks (the headless tests, the browser emulator); not in StickTime BW as shipped
   local TEST = STICKTIME_TEST
   if TEST then
     TEST.get = function() return px, py, pz, vx, vy, vz, fx, fy, fz, ux, uy, uz, rx, ry, rz, state, lap, nextGate, NG, gt end

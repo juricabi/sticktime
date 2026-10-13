@@ -95,7 +95,8 @@ def track_data():
 
 def main():
     lua_color = read(ROOT / "sdcard/SCRIPTS/TOOLS/StickTime.lua")
-    lua_bw = read(ROOT / "sdcard/SCRIPTS/TOOLS/StickTimeBW/core.lua")
+    # StickTime BW with its test hooks (the shipped core.lua has none), so the emulator can be automated
+    lua_bw = read(ROOT / "test/build/sticktime_bw_test.lua")
     # the Lite with its test hooks (inert on a radio), so the emulator can be automated
     lua_lite = read(ROOT / "test/build/sticktime_lite_test.lua")
     # on color screens the B&W loaders run color.lua, which loads the same core

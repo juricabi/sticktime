@@ -110,9 +110,12 @@ STICKTIME_TEST = {}
 -- the B&W game's files, as color.lua loads them (the source: the 32-bit core.luac is for radios).
 -- As on EdgeTX, a third argument (env) leaves the chunk with no globals at all: api_general.cpp
 -- clears the stack before it reads the argument.
+-- StickTime BW's core is its test build (build/, with the STICKTIME_TEST hooks; the shipped one
+-- has none)
 function loadScript(p, mode, ...)
-  if select("#", ...) > 0 then return loadfile("../sdcard" .. p, "t", nil) end
-  return loadfile("../sdcard" .. p, "t")
+  local f = string.find(p, "StickTimeBW/core.lua", 1, true) and "build/sticktime_bw_test.lua" or "../sdcard" .. p
+  if select("#", ...) > 0 then return loadfile(f, "t", nil) end
+  return loadfile(f, "t")
 end
 
 -- ------------------------------------------------------------------- load

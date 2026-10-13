@@ -571,7 +571,6 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     seed = seed * 171 % 30269
     return seed / 30269
   end
-  if STICKTIME_TEST then STICKTIME_TEST.seed = function(s) seed = s end end
 
   local function clamp1(v)
     if v > 1 then return 1 elseif v < -1 then return -1 end
@@ -1185,14 +1184,6 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     P.wr, P.wp, P.wy = pwr, pwp, pwy
     orthonormalize()
     speed = sqrt(vx * vx + vy * vy + vz * vz)
-    if STICKTIME_TEST then
-      -- motor sound state for the web emulator: what the synth needs (rpm from the thrust
-      -- fraction, axial and edgewise flow, wash build-up, the shake's rms (deg) and frequency)
-      aTf, aS, aF = Tm / Tmax, sH * 19.8, P.pf
-      aVu = vx * ux + vy * uy + vz * uz
-      aE2 = sqrt((vx * rx + vy * ry + vz * rz) ^ 2 + (vx * fx + vy * fy + vz * fz) ^ 2)
-      aW = sW
-    end
     if gmode == 3 then
       -- distance to the nearest surface, for proximity tricks
       local m = py + 0.7
@@ -2247,51 +2238,6 @@ local function init()
   selectTrack(S.track)
   lastT = getTime()
   R.fpsT = lastT
-  local TEST = STICKTIME_TEST
-  if TEST then
-    TEST.get = function() return px, py, pz, vx, vy, vz, fx, fy, fz, ux, uy, uz, rx, ry, rz, state, lap, nextGate, NG, gt end
-    TEST.gate = function(i) return gx[i], gy[i], gz[i], gnx[i], gny[i], gnz[i], gk[i], AX[i], AY[i], AZ[i] end
-    TEST.start = function(m) startRace(m) end
-    TEST.state = function(s) state = s end
-    TEST.set = function(k, v)
-      S[k] = v
-      applySettings()
-    end
-    TEST.track = function(t) selectTrack(t) end
-    TEST.pose = function(x, y, z, yaw, pitch, roll)
-      yaw = yaw * 0.0174533
-      placeDrone(x, y, z, sin(yaw), cos(yaw))
-      rotate(0, pitch * 0.0174533, 0)
-      rotate(roll * 0.0174533, 0, 0)
-    end
-    TEST.vel = function(a, b, c) vx, vy, vz = a, b, c end
-    TEST.qp = function(k, v) local o = P[k] if v then P[k] = v end return o end   -- a class number
-    TEST.lapclock = function(t)
-      -- first lap running for t ticks, and no "GO!" banner (for screenshots)
-      lapStart, tStart, R.msgT = gt - t, gt - t, gt - 1000
-      if lap < 1 then lap = 1 end
-    end
-    TEST.next = function(i) nextGate, lastGate = i, (i - 2) % NG + 1 end
-    TEST.race = function() return lastGate, lapStart, R.n, R.laps, R.total, R.crashes, tStart end
-    TEST.info = function()
-      local n = NT
-      while not TRACKS[n] do n = n - 1 end          -- the highest track that exists
-      return n, P.twr, gmode, R.pos, AI.n, R.sc, R.rn, R.rt, R.chn, BX.n, TRACKS[S.track][1] end
-    TEST.thrust = function() return P.twr, P.i0, P.tn, P.dz, P.tk end
-    TEST.audio = function() return sT, S.quad, state, aTf, aVu, aE2, aW, sA, sE, sR, aS, aF, R.crashes, R.hv or 0 end
-    TEST.ai = function(a) return AI.x[a], AI.y[a], AI.z[a], AI.k[a], AI.d[a], AI.v[a], AI.seg[a] end
-    TEST.best = function(t) return BEST.l[t], BEST.r[t], BEST.g[t], BEST.f[t] end
-    TEST.medals = function() return MED[1], MED[2], MED[3], MED.of end
-    TEST.stun = function() return R.st end
-    TEST.bat = function(k, v) if v then BAT[k] = v end return BAT[k], R.why end   -- a battery value; the crash's why
-    TEST.box = function(b) return BX.x0[b], BX.x1[b], BX.y0[b], BX.y1[b], BX.z0[b], BX.z1[b] end
-    TEST.S = S
-    TEST.order = function()
-      if TEST.fillBounds then TEST.fillBounds() end
-      return nOrd, ordP, ordI, TEST.bounds, kpx, kpy, kpz
-    end
-    TEST.cam = function() return krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz end
-  end
 end
 
 local function run(event, touch)

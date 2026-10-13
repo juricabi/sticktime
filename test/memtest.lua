@@ -32,7 +32,7 @@ end
 -- StickTime BW: a custom track as big as the editor makes them (24 gates, 16 structures) in slot 1,
 -- track 9, played like the others
 if string.find(path, "StickTimeBW", 1, true) then
-  radio.setfile("/SCRIPTS/TOOLS/StickTimeTracks/c1.txt", "Big Test" .. string.char(10) .. "1 4321 7 9 0 0 1 0 0  18 2 2 15 0  35 9 4 30 0  49 21 1 45 0  61 35 5 60 0  68 52 6 75 0  70 70 1 90 0  68 88 4 105 0  61 105 2 120 0  49 119 1 135 0  35 131 7 150 0  18 138 4 165 0  0 140 1 180 0  -18 138 2 195 0  -35 131 1 210 0  -49 119 4 225 0  -61 105 6 240 0  -68 88 1 255 0  -70 70 2 270 0  -68 52 4 285 0  -61 35 1 300 0  -49 21 7 315 0  -35 9 1 330 0  -18 2 4 345 0 / 0 -35 3 2 0 4 1  40 -27 3 2 0 5 2  74 -4 3 2 0 6 3  97 30 3 2 0 4 1  105 70 3 2 0 5 2  97 110 3 2 0 6 3  74 144 3 2 0 4 1  40 167 3 2 0 5 2  0 175 3 2 0 6 3  -40 167 3 2 0 4 1  -74 144 3 2 0 5 2  -97 110 3 2 0 6 3  -105 70 3 2 0 4 1  -97 30 3 2 0 5 2  -74 -4 3 2 0 6 3  -40 -27 3 2 0 4 1" .. string.char(10))
+  radio.setfile("/SCRIPTS/TOOLS/StickTimeTracks/c1.txt", "Big Test" .. string.char(10) .. "1 4321 7 30 0 0 1 0 0  18 2 2 15 0  35 9 4 30 0  49 21 1 45 0  61 35 5 60 0  68 52 6 75 0  70 70 1 90 0  68 88 4 105 0  61 105 2 120 0  49 119 1 135 0  35 131 7 150 0  18 138 4 165 0  0 140 1 180 0  -18 138 2 195 0  -35 131 1 210 0  -49 119 4 225 0  -61 105 6 240 0  -68 88 1 255 0  -70 70 2 270 0  -68 52 4 285 0  -61 35 1 300 0  -49 21 7 315 0  -35 9 1 330 0  -18 2 4 345 0 / 0 -35 3 2 0 4 1  40 -27 3 2 0 5 2  74 -4 3 2 0 6 3  97 30 3 2 0 4 1  105 70 3 2 0 5 2  97 110 3 2 0 6 3  74 144 3 2 0 4 1  40 167 3 2 0 5 2  0 175 3 2 0 6 3  -40 167 3 2 0 4 1  -74 144 3 2 0 5 2  -97 110 3 2 0 6 3  -105 70 3 2 0 4 1  -97 30 3 2 0 5 2  -74 -4 3 2 0 6 3  -40 -27 3 2 0 4 1" .. string.char(10))
 end
 local base = radio.mem()
 radio.resetpeak()
@@ -83,13 +83,18 @@ okRun, runErr = pcall(function()
       end
     end
   else
-    -- the Lite as shipped (no hooks), through its menus: 7 tracks x 4 modes, Track is item 5
-    for t = 1, 7 do
+    -- as shipped (no hooks: StickTime BW and the Lite), through the menus: every track (StickTime
+    -- BW: the custom one too) x 4 modes, Track is item 5; the pause menu's way back to the menu is
+    -- the Lite's 3rd item, StickTime BW's 5th
+    local bw = string.find(path, "StickTimeBW", 1, true)
+    for t = 1, bw and 9 or 8 do
       for m = 1, 4 do
         for _ = 2, m do key(NEXT) end
         key(ENTER)                                      -- start mode m
         fly()
-        key(EXIT) key(NEXT) key(NEXT) key(ENTER)        -- pause, "Menu"
+        key(EXIT)                                       -- pause
+        for _ = 1, bw and 4 or 2 do key(NEXT) end
+        key(ENTER)                                      -- "Menu" / "Main menu"
       end
       for _ = 1, 4 do key(NEXT) end
       key(ENTER) key(INC) key(ENTER)                    -- next track
