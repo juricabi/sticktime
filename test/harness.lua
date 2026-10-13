@@ -347,25 +347,25 @@ for _, p in ipairs({ { 0, 5, 0, 0, 90, 0 }, { 0, 5, 0, 0, -90, 0 }, { 0, 5, 0, 4
   frame(0)
 end
 
--- 4. dive gate: drop straight through it from above (track 3, gate 5)
+-- 4. dive gate: drop straight through it from above (track 3, gate 6)
 T.track(3)
 T.start(2)
 steps(70)
 T.state(4)
-T.next(5)
-local gx5, gy5, gz5 = T.gate(5)
+T.next(6)
+local gx5, gy5, gz5 = T.gate(6)
 T.pose(gx5, gy5 + 3, gz5, 0, 0, 0)
 idleSticks()
 steps(30)
 local _, s5 = state()
-if s5[18] ~= 6 then fail("dive gate not registered (next gate " .. s5[18] .. ", state " .. s5[16] .. ")") else print("dive gate: pass registered") end
+if s5[18] ~= 7 then fail("dive gate not registered (next gate " .. s5[18] .. ", state " .. s5[16] .. ")") else print("dive gate: pass registered") end
 T.state(4)
-T.next(5)
+T.next(6)
 T.pose(gx5 + 2.1, gy5 + 3, gz5, 0, 0, 0)
 steps(30)
 do
   local st, s = state()
-  if st ~= 4 or s[18] ~= 5 or s[2] < gy5 then
+  if st ~= 4 or s[18] ~= 6 or s[2] < gy5 then
     fail(string.format("the dive gate frame should stop the quad on top (state %d, next gate %d, %.2f m over it)", st, s[18], s[2] - gy5))
   else print(string.format("dive gate frame: the quad stops on it (%.2f m over the gate)", s[2] - gy5)) end
 end
@@ -566,18 +566,20 @@ if r ~= 1 then fail("EXIT in main menu should quit (got " .. tostring(r) .. ")")
 if stat.rejected > 0 then fail(stat.rejected .. " lines would be rejected by the firmware") end
 
 -- 9. a save from before layout 2 (flag sides swapped on the Slalom and the Grand Prix) loses
--- those tracks' lap and race bests and keeps everything else; a layout 2 save keeps them
-for _, c in ipairs({ { "", 0, 0 }, { "lay=2 ", 5000, 12000 } }) do
-  SD[DATA] = "FPVSIM2 " .. c[1] .. "track=4 l1=4321 r1=9876 l4=5000 r4=12000 g4=9 f4=300 l6=7000 r6=15000\n"
+-- those tracks' lap and race bests and keeps everything else; one from before layout 3 (new
+-- Meadow, Dive Tower, Hoop Forest and Grand Prix) loses theirs; a layout 3 save keeps them all
+for _, c in ipairs({ { "", 0, 0, 0 }, { "lay=2 ", 5000, 12000, 0 }, { "lay=3 ", 5000, 12000, 1 } }) do
+  SD[DATA] = "FPVSIM2 " .. c[1] .. "track=4 l1=4321 r1=9876 l4=5000 r4=12000 g4=9 f4=300 l6=7000 r6=15000 l2=3000 f1=50\n"
   STICKTIME_TEST = {}
   chunk().init()
   local L = STICKTIME_TEST
-  local a1, a2 = L.best(1)
+  local a1, a2, _, a4 = L.best(1)
   local b1, b2, b3, b4 = L.best(4)
   local c1, c2 = L.best(6)
-  if L.S.track ~= 4 or a1 ~= 4321 or a2 ~= 9876 or b1 ~= c[2] or b2 ~= c[3] or b3 ~= 9 or b4 ~= 300
-    or c1 ~= (c[2] > 0 and 7000 or 0) or c2 ~= (c[2] > 0 and 15000 or 0) then
-    fail(string.format("layout %s save: bests %s %s / %s %s %s %s / %s %s", c[1], a1, a2, b1, b2, b3, b4, c1, c2))
+  local k = c[4] == 1
+  if L.S.track ~= 4 or a1 ~= (k and 4321 or 0) or a2 ~= (k and 9876 or 0) or a4 ~= 50 or L.best(2) ~= 3000
+    or b1 ~= c[2] or b2 ~= c[3] or b3 ~= 9 or b4 ~= 300 or c1 ~= (k and 7000 or 0) or c2 ~= (k and 15000 or 0) then
+    fail(string.format("layout %s save: bests %s %s %s / %s %s %s %s / %s %s", c[1], a1, a2, a4, b1, b2, b3, b4, c1, c2))
   end
 end
 

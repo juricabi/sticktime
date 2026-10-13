@@ -166,7 +166,7 @@ local OLD = "/SCRIPTS/TOOLS/FPVLite/data.txt"              -- the save under the
 save = function()
 local f = io.open(FILE, "w")
 if not f then return end
-io.write(f, "FPVLITE2 lay=2")
+io.write(f, "FPVLITE2 lay=3")
 for k, v in pairs(S) do io.write(f, " " .. k .. "=" .. floor(v)) end
 for t = 1, 8 do
 io.write(f, " l" .. t .. "=" .. floor(BL[t]) .. " r" .. t .. "=" .. floor(BR[t]) .. " f" .. t .. "=" .. BF[t] .. " g" .. t .. "=" .. BG[t])
@@ -203,6 +203,7 @@ end
 end
 end
 if lay < 2 then BL[4], BR[4], BL[6], BR[6] = 0, 0, 0, 0 end
+if lay < 3 then BL[1], BR[1], BL[3], BR[3], BL[5], BR[5], BL[6], BR[6] = 0, 0, 0, 0, 0, 0, 0, 0 end
 if old then save() end                            -- under the new name right away
 end
 end

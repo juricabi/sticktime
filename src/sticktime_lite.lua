@@ -207,7 +207,7 @@ save = function()
   -- and this radio's heap has no room for that in the middle of a flight
   local f = io.open(FILE, "w")
   if not f then return end
-  io.write(f, "FPVLITE2 lay=2")
+  io.write(f, "FPVLITE2 lay=3")
   for k, v in pairs(S) do io.write(f, " " .. k .. "=" .. floor(v)) end
   for t = 1, NT do
     io.write(f, " l" .. t .. "=" .. floor(BL[t]) .. " r" .. t .. "=" .. floor(BR[t]) .. " f" .. t .. "=" .. BF[t] .. " g" .. t .. "=" .. BG[t])
@@ -249,6 +249,8 @@ load = function()
   -- layout 2 (1.6.2) swapped the flag sides on the Slalom and the Grand Prix: a straight line
   -- passed them. Lap and race bests flown before cannot be beaten fairly, so they start over.
   if lay < 2 then BL[4], BR[4], BL[6], BR[6] = 0, 0, 0, 0 end
+  -- layout 3 (1.7.0): Meadow, Dive Tower, Hoop Forest and the Grand Prix are new layouts
+  if lay < 3 then BL[1], BR[1], BL[3], BR[3], BL[5], BR[5], BL[6], BR[6] = 0, 0, 0, 0, 0, 0, 0, 0 end
   if old then save() end                            -- under the new name right away
 end
 end

@@ -484,9 +484,9 @@ local T4 = STICKTIME_TEST
 local a1, a2, a3, a4 = T4.best(6)                 -- lap, race, gate rush, combo
 local c1, c2, c3, c4 = T4.best(4)
 local d1, d2, d3 = T4.best(1)
--- (its Grand Prix lap and race bests start over: layout 2 swapped the flag sides there)
+-- (its Grand Prix and Meadow lap and race bests start over: layouts 2 and 3 changed them)
 if T4.S.track ~= 6 or T4.S.twr ~= 8 or T4.S.rates ~= 3 or a1 ~= 0 or a2 ~= 0 or a3 ~= 7 or a4 ~= 0
-  or c1 ~= 0 or c2 ~= 0 or c3 ~= 0 or c4 ~= 0 or d1 ~= 4810 or d2 ~= 10120 or d3 ~= 3 then
+  or c1 ~= 0 or c2 ~= 0 or c3 ~= 0 or c4 ~= 0 or d1 ~= 0 or d2 ~= 0 or d3 ~= 3 then
   fail("a save of the first Lite was not read right")
 end
 local new = SD["/SCRIPTS/TOOLS/StickTimeLite/data.txt"]
@@ -495,18 +495,19 @@ if not new or string.sub(new, 1, 8) ~= "FPVLITE2" or not string.find(new, "g6=7"
 end
 s4.run(0)
 -- a save from before layout 2 (flag sides swapped on the Slalom and the Grand Prix) loses those
--- tracks' lap and race bests and keeps everything else; a layout 2 save keeps them
+-- tracks' lap and race bests and keeps everything else; one from before layout 3 (new Meadow, Dive
+-- Tower, Hoop Forest and Grand Prix) loses theirs; a layout 3 save keeps them all
 SD["/SCRIPTS/TOOLS/FPVLite/data.txt"] = nil
-for _, c in ipairs({ { "", 0 }, { " lay=2", 5000 } }) do
+for _, c in ipairs({ { "", 0 }, { " lay=2", 5000 }, { " lay=3", 5000, true } }) do
   SD["/SCRIPTS/TOOLS/StickTimeLite/data.txt"] = "FPVLITE2" .. c[1] .. " track=4 l1=4810 r1=10120 l4=5000 r4=12000 g4=9 l6=7000 r6=15000"
   STICKTIME_TEST = {}
   f().init()
-  local L, kept = STICKTIME_TEST, c[2] > 0
+  local L, kept, k3 = STICKTIME_TEST, c[2] > 0, c[3]
   local a1, a2 = L.best(1)
   local b1, b2, b3 = L.best(4)
   local e1, e2 = L.best(6)
-  if L.S.track ~= 4 or a1 ~= 4810 or a2 ~= 10120 or b1 ~= c[2] or b2 ~= (kept and 12000 or 0) or b3 ~= 9
-    or e1 ~= (kept and 7000 or 0) or e2 ~= (kept and 15000 or 0) then
+  if L.S.track ~= 4 or a1 ~= (k3 and 4810 or 0) or a2 ~= (k3 and 10120 or 0) or b1 ~= c[2] or b2 ~= (kept and 12000 or 0)
+    or b3 ~= 9 or e1 ~= (k3 and 7000 or 0) or e2 ~= (k3 and 15000 or 0) then
     fail(string.format("layout%s save: bests %s %s / %s %s %s / %s %s", c[1], a1, a2, b1, b2, b3, e1, e2))
   end
 end
