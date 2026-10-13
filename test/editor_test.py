@@ -260,7 +260,9 @@ def main():
 
         # ---- screenshots: desktop (light and dark), phone width
         page.click("#tracksBtn")
+        page.select_option("#edTemplate", label="Bando")
         click_map(page, 0, 34)                                   # a wall of the Bando: its group
+        check(len(page.evaluate("sim.editor.selected()")) == 4, "a click on a gap in a wall selects the wall (4 items)")
         page.mouse.move(0, 0)
         shot_clip(page, OUT / "editor_desktop.png")
         print("wrote test/shots/editor_desktop.png")
