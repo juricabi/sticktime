@@ -38,8 +38,9 @@ StickTime BW and StickTime Lite also run on color radios, drawn in B&W style at 
     - **Freestyle**: flips, rolls, 360s, power loops, dives, hang time, gap shots and proximity runs score points; chain them within 2.5 s for up to a ×4 combo.
     - **Gate Rush**: 30 s on the clock, every gate adds time and lights the next one at random.
 - **Wind** (off, light, strong, with gusts; each track has its own direction, shown by a small arrow on the OSD: up is where your nose points), optional **prop wash** - Off, **Stock** (each class's own strength) or **Max** (sinking into your own downwash costs thrust and shakes the quad, hardest when you catch a dive), **Grip** - Low (the full momentum of the fitted model), **Medium** (the default) or High (rotor drag: props moving edgewise are pushed back, harder the faster they spin, so the quad carves and stops sooner: a racer's slide halves in 4, 3 or 2 s), beeps for the countdown, gates and laps, and a **vibration** on crashes and laps (On, Off).
+- **Battery** - Off (the default), **Real** or **Long** (twice the capacity): each class flies its own pack (a 4S 1300 mAh on the racer, a 4S 1500 on the freestyler, a 3S 550 LiHV on the 3", a 1S and a 2S 300 LiHV on the whoops) that sags under load and runs down: about 2 minutes of hard racing on the racer, nearly 5 cruising. A fresh pack flies as the quad without it (Betaflight's sag compensation), so no lap gets faster; as it drains, the punches fade. Below 3.5 V a cell the voltage blinks with a beep every 2 s (LOW BATTERY), below 3.3 V a double beep (LAND NOW); near empty the quad limps, then the motors stop: EMPTY, and a fresh pack (not counted as a crash). Every start gets a fresh pack, a crash keeps it, pausing stops it. Betaflight-style OSD: pack and cell voltage, current, mAh used, a charge bar and the flight time (B&W: the cell voltage and a small gauge, flight time and mAh on the pause and finish screens).
 - **Saved per track:** best lap, race, combo and Gate Rush score, plus all settings.
-- **Color radios:** filled sky and ground, haze and fog, mountains, shaded structures, an FPV-style OSD, a minimap with the AI pilots, optional stick view and FPS, and touch. **B&W radios:** the same game in wireframe, with greyscale ground on 212×64 screens. **Lite:** the same flight model, quads, prop wash, Grip and tracks, with Time trial, Practice, Freestyle and Gate Rush; no AI pilots or custom rates.
+- **Color radios:** filled sky and ground, haze and fog, mountains, shaded structures, an FPV-style OSD, a minimap with the AI pilots, optional stick view and FPS, and touch. **B&W radios:** the same game in wireframe, with greyscale ground on 212×64 screens. **Lite:** the same flight model, quads, prop wash, Grip and tracks, with Time trial, Practice, Freestyle and Gate Rush; no AI pilots, custom rates or battery.
 
 ## Controls
 
@@ -171,7 +172,8 @@ docs/flight-model.md    the flight model, every class's numbers and what they we
 docs/ideas.md           ideas for later: snaps slowed by the motors, scraping obstacles instead of crashing
 tools/build_firmware.sh EdgeTX main + firmware/edgetx-fast-lua.patch for one radio
 test/harness.lua        headless EdgeTX mock: autopilot races with AI pilots on every track, flags, hoops,
-                        dive gates, freestyle, gate rush, ground effect, vibration, menus, crashes, saves
+                        dive gates, freestyle, gate rush, ground effect, vibration, battery, menus, crashes,
+                        saves
 test/lite_test.lua      the same for the Lite, as a radio with +/- keys and without the libraries B&W lacks
 test/order_check.lua    ray-cast check of the draw order at the Bando
 test/memtest.lua        memory of the B&W versions through their loaders on F2 / F4 radio models

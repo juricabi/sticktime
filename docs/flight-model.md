@@ -139,6 +139,48 @@ stock power, attitude held) and what StickTime gives (`tools/tune_physics.py`):
 | thrust response, 63% (hover to full) | 6 ms | 6 ms | 6 ms | 6 ms | 6 ms |
 | roll rate step, 63% time (half / full stick) | 6 / 12 ms | 6 / 10 ms | 8 / 10 ms | 10 / 30 ms | 10 / 22 ms |
 
+## Battery
+
+The **Battery** setting (Off by default, Real, or Long with twice the capacity) is a model of its
+own, not part of the fit. Once a frame it takes the thrust the stick asks for (before the motors'
+lag), with `c = T/Tmax` and the charge `s` (1 full, 0 empty):
+
+```
+I  = If*(0.05 + 0.95*c^1.5)        current: power ~ thrust^1.5 (momentum theory), plus 5% of full
+                                   at idle for the motors and electronics
+vr = 3.98 + 1.1*(s - 0.8)          s >= 0.8      rest voltage a cell (LiPo; LiHV + 0.15*s)
+     3.66 + 0.47*(s - 0.12)        s >= 0.12
+     3.0 + 5.5*s                   below
+im = (vr - 3.0)/R                  the most current before a cell drops to 3.0 V
+v  = vr - I*R,  k = min(1, (v/3.5)^2)          I <= im
+k  = 0.735*(im/I)^(2/3),  I = im,  v = 3.0     I > im: the quad limps (thrust ~ current^(2/3))
+s -= I*dt/(3.6*mAh);  T *= k       empty when im < 0.05*If: the motors stop
+```
+
+`k` stays 1 down to 3.5 V a cell under load, as Betaflight's sag compensation
+(`vbat_sag_compensation`) holds a fresh pack's thrust: a fresh pack flies as the quad without a
+battery (only the freestyler's full-throttle punch sags it to 3.48 V, 1% less thrust at the very
+top), the battery never makes a lap faster, and the bests stay comparable. The voltage shown and
+warned about is `v` filtered over about 1 s: below 3.5 V a cell a beep every 2 s, below 3.3 V a
+double beep and LAND (Betaflight's default `vbat_warning_cell_voltage` and `vbat_min_cell_voltage`).
+Under a long punch it dips under them mid-pack, as on a real quad. A second after the motors stop
+the flight ends (EMPTY, not counted as a crash) and the quad respawns with a fresh pack; a crash
+keeps the pack, every start gets a fresh one, and the AI pilots fly without one.
+
+| | Racer 5" | Freestyle 5" | 3" toothpick | Whoop 65mm | Whoop 75mm |
+|---|---|---|---|---|---|
+| pack | 4S 1300 mAh | 4S 1500 mAh | 3S 550 mAh LiHV | 1S 300 mAh LiHV | 2S 300 mAh LiHV |
+| resistance a cell `R` (mOhm) | 6 | 6 | 20 | 45 | 35 |
+| current at full throttle `If` (A) | 95 | 120 | 28 | 11 | 14 |
+| full-throttle sag, fresh pack (V a cell) | 4.20 → 3.63 | 4.20 → 3.48 | 4.35 → 3.79 | 4.35 → 3.86 | 4.35 → 3.86 |
+| flight on Real, hard / cruise (min) | 1.9 / 4.7 | 1.7 / 3.8 | 2.2 / 4.5 | 1.9 / 2.6 | 1.7 / 3.0 |
+
+Hard is 0.5 s of full throttle and 1.5 s at three times the weight in thrust, over and over; cruise
+is twice the weight (fast forward flight). Long flies twice as long. Sources: Betaflight's battery
+settings and tuning notes (the warning and minimum cell voltages, sag compensation), published LiPo
+and LiHV discharge curves (rest voltage against charge), and motor and prop bench data (current
+against thrust, each class's full-throttle current).
+
 ## What the per-prop model has that this one leaves out
 
 - Four props, each with its own airflow: rotating the quad changes each prop's inflow, which damps
@@ -146,6 +188,6 @@ stock power, attitude held) and what StickTime gives (`tools/tune_physics.py`):
 - The PID loop itself: rate steps overshoot by 35-70% before they settle (strong feedforward on a
   filtered gyro), saturated motors also slow a full-stick snap at full throttle (StickTime keeps the
   thrust side of it, the airmode mixer above), yaw is limited to 10000 deg/s^2.
-- Battery sag and capacity (rarely on in other sims either), prop deformation at full power,
-  bent props after crashes.
+- Prop deformation at full power, bent props after crashes. (Battery sag and capacity are the
+  Battery setting above, a model of their own.)
 - Spec classes and bigger quads.
