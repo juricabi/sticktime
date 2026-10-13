@@ -856,7 +856,10 @@
   // ---------------------------------------------------------- keyboard
   const held = new Set();
   let exitDown = 0, exitLongSent = false;
-  const isField = (t) => t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA');
+  // form fields keep their keys, and so does the track editor (editor.js): what is typed there
+  // (R to turn a gate, Delete, the arrows) never flies the quad or restarts the game
+  const isField = (t) => t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA'
+    || (t.closest && t.closest('#editor') !== null));
   function key(name) { if (app.engine) app.engine.key(name); }
   window.addEventListener('keydown', (e) => {
     if (isField(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
@@ -1304,14 +1307,19 @@
     window.addEventListener('resize', sizeCanvas);
   }
 
-  // automation hook (used by the test suite)
+  // automation hook (used by the test suite), and the track editor's way in (editor.js)
+  const saveSD = () => store.set('sd', Object.fromEntries(app.sd));
   window.sim = {
     get app() { return app; },
     get engine() { return app.engine; },
     radio(id) { $('radioSel').value = id; $('radioSel').dispatchEvent(new Event('change')); },
     script(id) { $('scriptSel').value = id; $('scriptSel').dispatchEvent(new Event('change')); },
     sticks(a, e, t, r) { stick.ail = a; stick.ele = e; stick.thr = t; stick.rud = r; },
-    key, pause(p) { app.paused = p; },
+    key, pause(p) { app.paused = p; $('pauseChk').checked = p; },
+    // a file on the virtual SD card, kept (localStorage) like the game's own saves; the game
+    // reads it when it next starts (boot)
+    writeSD(path, text) { app.sd.set(path, String(text)); saveSD(); },
+    removeSD(path) { app.sd.delete(path); saveSD(); },
     touch(type, x, y) { app.engine.touch(type, { x, y, startX: x, startY: y, slideX: 0, slideY: 0, tapCount: 1 }); },
     step(n, ms) { for (let i = 0; i < (n || 1); i++) { if (ms) app.rate = ms; frame(); } draw(); showOverlay(); return app.engine.error; },
     test(name, ...args) { return app.engine.callTest(name, ...args); },

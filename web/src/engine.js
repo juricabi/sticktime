@@ -283,7 +283,7 @@ const EdgeTX = (() => {
 
     // call STICKTIME_TEST.<name>(...) inside the script (automation / tests)
     callTest(name, ...args) {
-      const { lua, to_luastring } = this.fe;
+      const { lua, to_luastring, to_jsstring } = this.fe;
       const L = this.L;
       if (!L) return null;
       const top0 = lua.lua_gettop(L);
@@ -299,9 +299,12 @@ const EdgeTX = (() => {
         else lua.lua_pushnumber(L, a);
       }
       if (lua.lua_pcall(L, args.length, lua.LUA_MULTRET, 0) !== lua.LUA_OK) throw new Error(this.popString());
+      // numbers, booleans and strings (a track's name); anything else is null
       const res = [];
       for (let i = top0 + 1; i <= lua.lua_gettop(L); i++) {
-        res.push(lua.lua_isnumber(L, i) ? lua.lua_tonumber(L, i) : lua.lua_isboolean(L, i) ? lua.lua_toboolean(L, i) : null);
+        const t = lua.lua_type(L, i);
+        res.push(t === lua.LUA_TNUMBER ? lua.lua_tonumber(L, i) : t === lua.LUA_TBOOLEAN ? lua.lua_toboolean(L, i)
+          : t === lua.LUA_TSTRING ? to_jsstring(lua.lua_tostring(L, i)) : null);
       }
       lua.lua_settop(L, top0);
       return res;

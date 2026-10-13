@@ -22,6 +22,7 @@
       </select>
     </label>
     <button class="btn" id="restartBtn" type="button" title="Restart the script (R)">Restart</button>
+    <button class="btn" id="tracksBtn" type="button" aria-expanded="false" aria-controls="editor" title="Make your own tracks: the track editor"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 18.5c-1.8-.8-2.5-3-1.3-4.6L8.4 7.6c1.3-1.7 3.9-1.6 5 .2l.9 1.4c.9 1.4 2.8 1.6 4 .5l.6-.6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M14 20h5.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="19.5" cy="7.5" r="2.2" fill="currentColor"/></svg>Tracks</button>
     <div class="btn sound" id="soundBox" title="Sound volume (wheel: 5% steps)">
       <button type="button" id="muteBtn" class="mute" aria-label="Mute" aria-pressed="false"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path class="wave" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path class="cross" d="M16 9l5 6M21 9l-5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
       <input type="range" id="soundVol" min="0" max="1" step="0.05" value="0.8" aria-label="Sound volume">
@@ -38,6 +39,87 @@
     <button class="btn" id="copyBtn" type="button" title="Copy the running script to the clipboard">Copy .lua</button>
   </div>
 </header>
+
+<section class="card editor" id="editor" hidden aria-labelledby="edTitle">
+  <div class="ed-head">
+    <h2 id="edTitle">Track editor <small>your tracks are 9 to 16 in the game</small></h2>
+    <div class="ed-actions">
+      <label class="field"><span>Start from</span><select id="edTemplate" aria-label="Start from a built-in track or a blank one"></select></label>
+      <label class="btn file-btn" title="Open a track file (c1.txt to c8.txt)">Open file<input type="file" id="edOpen" accept=".txt,text/plain"></label>
+      <button class="btn" id="edClose" type="button" title="Close the editor (your work is kept)">Close</button>
+    </div>
+  </div>
+  <div class="ed-grid">
+    <div class="ed-main">
+      <div class="ed-tools" role="toolbar" aria-label="Edit the track">
+        <span class="ed-pair">
+          <select id="edGateType" aria-label="Type of gate to add"></select>
+          <button class="btn" id="edAddGate" type="button" title="Add a gate after the selected one">Add gate</button>
+        </span>
+        <button class="btn" id="edAddBox" type="button" title="Add a structure in the middle of the map">Add structure</button>
+        <button class="btn" id="edAddWall" type="button" title="Add a wall with a gap to fly through: structures around a gap gate">Wall with gap</button>
+        <span class="ed-sep" aria-hidden="true"></span>
+        <button class="btn icon" id="edRotL" type="button" title="Turn left (Shift+R)" aria-label="Turn left"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M5 3.5v4h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <button class="btn icon" id="edRotR" type="button" title="Turn right (R)" aria-label="Turn right"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M19 3.5v4h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <button class="btn" id="edDup" type="button" title="Duplicate (Ctrl+D)">Duplicate</button>
+        <button class="btn" id="edDel" type="button" title="Delete (Del)">Delete</button>
+        <span class="ed-sep" aria-hidden="true"></span>
+        <button class="btn icon" id="edUndo" type="button" title="Undo (Ctrl+Z)" aria-label="Undo"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 14L4 9l5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+        <button class="btn icon" id="edRedo" type="button" title="Redo (Ctrl+Y)" aria-label="Redo"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M15 14l5-5-5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+        <span class="ed-sep" aria-hidden="true"></span>
+        <button class="btn" id="edFit" type="button" title="Show the whole track (F)">Fit</button>
+        <label class="ed-check" title="Show the trees as the game plants them (color screens)"><input type="checkbox" id="edTrees">Trees</label>
+      </div>
+      <div class="ed-map" id="edMapBox">
+        <canvas id="edMap" tabindex="0" aria-label="Track map, seen from above" aria-describedby="edHint"></canvas>
+        <div class="ed-readout" id="edReadout" aria-hidden="true"></div>
+      </div>
+      <p class="note ed-hint" id="edHint">Drag a gate or a structure to move it (it snaps to half metres; hold Alt to place it freely), the round handle to turn a gate, the square handles to size a structure. Drag the ground to pan; wheel or pinch to zoom. On the map: <kbd>R</kbd> turns, <kbd>Del</kbd> deletes, the arrows nudge, <kbd>Shift</kbd>+click selects more, <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes.</p>
+      <div class="ed-fly">
+        <label class="field"><span>Slot</span><select id="edSlot" aria-label="Slot on the SD card"></select></label>
+        <button class="btn primary" id="edFly" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 4.5v15l12-7.5z" fill="currentColor"/></svg>Fly it</button>
+        <button class="btn" id="edSave" type="button">Save file</button>
+        <button class="btn" id="edEmpty" type="button" title="Take this slot's track off the emulator's SD card">Empty slot</button>
+        <span class="ed-size" id="edSize"></span>
+      </div>
+      <p class="note warn ed-lite" id="edLite" hidden></p>
+      <p class="ed-status" id="edStatus" role="status" aria-live="polite"></p>
+    </div>
+    <div class="ed-side">
+      <section class="ed-sec" aria-labelledby="edTrackH">
+        <h3 id="edTrackH">Track</h3>
+        <div class="ed-form">
+          <label class="ed-f wide"><span>Name</span><input type="text" id="edName" maxlength="16" spellcheck="false" autocomplete="off"></label>
+          <label class="ed-f"><span>Tree seed</span><span class="ed-inline"><input type="number" id="edSeed" min="1" max="99" step="1"><button class="btn" id="edShuffle" type="button" title="Another seed: other trees and another wind">Shuffle</button></span></label>
+          <label class="ed-f"><span>Trees</span><input type="number" id="edTreesN" min="0" max="30" step="1"></label>
+        </div>
+        <p class="note">Trees: 9 as on most tracks, 18 for a forest, 0 for none. The seed plants them and sets the wind's direction.</p>
+      </section>
+      <section class="ed-sec" aria-labelledby="edSelH">
+        <h3 id="edSelH">Selected</h3>
+        <div id="edSel"></div>
+      </section>
+      <section class="ed-sec" aria-labelledby="edProbH">
+        <h3 id="edProbH">Check <span class="pill ok" id="edProbPill">OK</span></h3>
+        <ul class="ed-problems" id="edProblems" aria-live="polite"></ul>
+      </section>
+      <section class="ed-sec" aria-labelledby="edOrderH">
+        <h3 id="edOrderH">Race order</h3>
+        <ol class="ed-order" id="edOrder"></ol>
+      </section>
+      <details class="ed-sec ed-howto">
+        <summary>How to use on the radio</summary>
+        <ol>
+          <li><strong>Save file</strong> downloads the track as <code>c1.txt</code> (the slot's number).</li>
+          <li>On the radio's SD card, make the folder <code>/SCRIPTS/TOOLS/StickTimeTracks/</code> and copy the file into it.</li>
+          <li>Up to 8 tracks, <code>c1.txt</code> to <code>c8.txt</code>: they come after the 8 built-in ones, as tracks 9 to 16 in the track menu.</li>
+          <li>StickTime and StickTime BW read them; StickTime Lite doesn't.</li>
+          <li>Best times are kept while the track stays the same: any change to it starts them over.</li>
+        </ol>
+      </details>
+    </div>
+  </div>
+</section>
 
 <div class="layout">
   <section class="stage" id="stage" aria-label="Radio">
@@ -188,4 +270,10 @@ const ROBOTO = { r: "{{ROBOTO400}}", b: "{{ROBOTO700}}" };
 </script>
 <script>
 {{APP}}
+</script>
+<script>
+const TRACK_DATA = {{TRACK_DATA}};
+</script>
+<script>
+{{EDITOR}}
 </script>
