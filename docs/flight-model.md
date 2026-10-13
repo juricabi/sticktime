@@ -84,7 +84,7 @@ Parameters (`QP` in `src/sticktime.lua`, one string per class):
 | stock power `twr`, Power settings offered `tlo`-`thi` | 7.67, 5-12:1 | 6.88, 4-10:1 | 5.35, 3-10:1 | 2.58, 3-8:1 | 3.54, 3-8:1 |
 | idle `i0`, curve `tn`, dead zone `dz`, steep top end `tk` | .031, 1.43, .12, .18 | .026, 1.5, .075, .015 | .022, 1.76, 0, .032 | .0059, .987, .094, -.041 | .02, .916, .09, -.031 |
 | climbing: prop pitch speed `vp` (m/s), throttle exponent `vc`, bend `vk` | 87.5, .61, -.36 | 75.6, .54, -.28 | 69.6, .71, -.79 | 117, .92, -4.8 | 116, .95, -2.8 |
-| descending cushion: peak `cq` at sink `sq`*tf^`se` (m/s), full-stick fade `ce`, stalled `rf` + `rq`*tf | 1.42 at 13.2*tf^.5, .66, .72 + .33*tf | 1.42 at 11.4*tf^.32, .75, .66 + .27*tf | 1.57 at 14.7*tf^.54, .12, .58 + 6.3*tf | 1.34 at 8.42*tf^.52, .079, 5.9e-12 + 12*tf | 1.32 at 8.68*tf^.53, .083, .2 + 5.7*tf |
+| descending cushion: peak `cq` at sink `sq`*tf^`se` (m/s), full-stick fade `ce`, stalled `rf` + `rq`*tf | 1.42 at 13.2*tf^.5, .66, .72 + .33*tf | 1.42 at 11.4*tf^.32, .75, .66 + .27*tf | 1.57 at 14.7*tf^.54, .12, .58 + 6.3*tf | 1.34 at 8.42*tf^.52, .079, 0 + 12*tf | 1.32 at 8.68*tf^.53, .083, .2 + 5.7*tf |
 | translational lift `tl`, `vt` (m/s), growth with throttle `tb`, fades: full stick `te`, axial inflow `ta` (m/s) | .52, 7.88, .87, .57, 65.3 | .5, 7.61, .37, .71, 453 | .89, 9.7, .3, .2, 14.3 | .82, 9.1, .54, .29, 25.6 | .86, 9.01, .21, .042, 24.6 |
 | drag side/front/top `ks kf ku` (1/m) | .0152 .00819 .0287 | .011 .00635 .0184 | .0176 .0167 .0417 | .0741 .07 .0875 | .0962 .0822 .0288 |
 | low-speed drag `er`, `vd` (m/s) | .36, 15 | .36, 15 | .5, 15 | .29, 7 | .56, 15 |

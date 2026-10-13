@@ -183,6 +183,10 @@ def lite_quads(cfg: dict):
     block = block[:block.index("\n}")]
     rows = re.findall(r'^\s*"([0-9.\- e]+)",', block, re.M)
     assert rows, "no QP strings in src/sticktime.lua"
+    # the Lite reads digits, '.' and '-' only (nums() in src/sticktime_lite.lua): an exponent such as
+    # 5.9e-12 would come out as two numbers and shift every value after it
+    for n, row in enumerate(rows, 1):
+        assert "e" not in row, f"Lite class {n}: write plain decimals in QP, not exponents ({row})"
     menu = re.search(r'\{ "Quad", "quad", \{[^}]*\}, \{([^}]*)\} \}', src).group(1)
     names = re.findall(r"'([^']*)'", menu)
     assert len(names) == len(rows), "the Quad menu and the QP strings disagree"
