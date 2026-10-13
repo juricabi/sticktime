@@ -304,20 +304,20 @@ footer.credits a { color: inherit; }
 .ed-map:has(canvas:focus-visible) { box-shadow: inset 0 0 0 1px rgba(0,0,0,.28), 0 0 0 2px var(--accent); }
 .ed-readout { position: absolute; right: 10px; bottom: 8px; font: 500 11px/1 var(--font-mono); color: rgba(238,246,240,.72);
   pointer-events: none; font-variant-numeric: tabular-nums; }
-.ed-hint { margin: 10px 2px 0; line-height: 1.55; }
+.editor .ed-hint { margin: 10px 2px 0; line-height: 1.55; }
 .ed-hint kbd { font-size: 10.5px; }
 .ed-fly { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
 .ed-fly .btn.primary { padding: 0 16px; }
 .ed-size { margin-left: auto; font: 500 12px/1.3 var(--font-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
 .ed-size.bad { color: var(--bad); }
-.ed-lite { margin: 12px 2px 0; }
+.editor .ed-lite { margin: 12px 2px 0; }
 /* the radio's SD card (File System Access: Chrome, Edge, Opera on a computer) */
 .ed-radio { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .ed-rstate { font: 500 12.5px/1.3 var(--font-mono); color: var(--muted); overflow-wrap: anywhere; }
 .ed-rstate.on { color: var(--ok); }
 .ed-rstate.on::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: currentColor; }
 .ed-rnote { margin: 6px 0 0; }
-.ed-rline { margin: 14px 2px 0; line-height: 1.5; }
+.editor .ed-rline { margin: 12px 2px 0; line-height: 1.5; }
 .linkbtn { padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 .linkbtn:hover { color: var(--fg); }
 /* the Install panel: the connection and the game on the left, the tracks on the right */
@@ -346,7 +346,7 @@ footer.credits a { color: inherit; }
 .ed-estate { font: 500 12px/1.3 var(--font-mono); color: var(--muted); }
 .ed-estate.ok { color: var(--ok); }
 #edInstallBar { flex: 1 1 160px; height: 10px; accent-color: var(--accent); }
-.ed-status { margin: 10px 2px 0; font-size: 12.5px; color: var(--muted); }
+.ed-status, .editor .ed-status { margin: 10px 2px 0; font-size: 12.5px; color: var(--muted); }
 .ed-status:empty { display: none; }
 .ed-status.ok { color: var(--ok); }
 .ed-status.bad { color: var(--bad); }
@@ -11469,8 +11469,11 @@ const GAME_FILES = 'sdcard/';
     return GAME ? ' StickTime isn\'t on this card yet: Install puts it there.' : ' StickTime isn\'t on this card yet: copy it to /SCRIPTS/TOOLS/ too.';
   }
 
+  // the card's name to show: a drive's root is called "\" (Windows) or "/", so then "SD card"
+  const cardName = (dir) => (dir && !/^[\\/]*$/.test(dir.name) ? dir.name : 'SD card');
+
   function renderRadio() {
-    const on = radio.state === 'on', ask = radio.state === 'ask', name = radio.dir ? radio.dir.name : '';
+    const on = radio.state === 'on', ask = radio.state === 'ask', name = radio.dir ? cardName(radio.dir) : '';
     // the editor: Send to radio (Connect radio… first), and a line to the Install panel
     const bad = ed.probs.length > 0;
     el.edSend.hidden = el.edRadioLine.hidden = !radio.ok;
@@ -11536,7 +11539,7 @@ const GAME_FILES = 'sdcard/';
     inst.card = null;                                  // another card: looked at afresh
     try { await kv.set('radio', dir); } catch (e) { /* not kept: Connect radio again next time */ }
     const where = at === 'card' ? '' : ' (' + ['SCRIPTS', 'SCRIPTS/TOOLS', 'SCRIPTS/TOOLS/StickTimeTracks'][['scripts', 'tools', 'tracks'].indexOf(at)] + ')';
-    if (said) say('Radio SD: ' + dir.name + where + ' connected.' + await installed(), 'ok');
+    if (said) say('Radio SD: ' + cardName(dir) + where + ' connected.' + await installed(), 'ok');
     if (radio.panel) await refreshRadio();
   }
   // what the panel shows of the card: its tracks, and the game on it
@@ -11592,7 +11595,7 @@ const GAME_FILES = 'sdcard/';
   async function listRadio() {
     radioSlots = await readAll();
     radio.listed = true;
-    el.edRadioPath.textContent = 'On ' + radio.dir.name + (STEPS[radio.at].length ? ' · ' + STEPS[radio.at].join('/') : '');
+    el.edRadioPath.textContent = 'On ' + cardName(radio.dir) + (STEPS[radio.at].length ? ' · ' + STEPS[radio.at].join('/') : '');
     el.edRadioSlots.innerHTML = radioSlots.map((t, i) => '<li><span><b>c' + (i + 1) + '</b> · track ' + (i + 9) + ' · ' +
       (t === null ? '<em>empty</em>' : esc(nameOf(t))) + '</span>' +
       (t === null ? '' : '<button class="btn" type="button" data-ropen="' + (i + 1) + '">Open in editor</button>') + '</li>').join('');
@@ -11870,7 +11873,7 @@ const GAME_FILES = 'sdcard/';
   function renderInstall() {
     const man = inst.man, card = inst.card;
     if (!man || !card) return;
-    el.edInstallHead.textContent = 'StickTime ' + man.version + ' from this site, onto ' + radio.dir.name;
+    el.edInstallHead.textContent = 'StickTime ' + man.version + ' from this site, onto ' + cardName(radio.dir);
     el.edEditions.innerHTML = Object.entries(man.editions).map(([e, info]) => {
       const c = card[e], newer = c.version && cmpVer(c.version, man.version) > 0;
       const st = !c.installed ? 'not installed' : newer ? 'newer on the card (' + c.version + ')' : c.current ? 'up to date'

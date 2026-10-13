@@ -1530,8 +1530,11 @@
     return GAME ? ' StickTime isn\'t on this card yet: Install puts it there.' : ' StickTime isn\'t on this card yet: copy it to /SCRIPTS/TOOLS/ too.';
   }
 
+  // the card's name to show: a drive's root is called "\" (Windows) or "/", so then "SD card"
+  const cardName = (dir) => (dir && !/^[\\/]*$/.test(dir.name) ? dir.name : 'SD card');
+
   function renderRadio() {
-    const on = radio.state === 'on', ask = radio.state === 'ask', name = radio.dir ? radio.dir.name : '';
+    const on = radio.state === 'on', ask = radio.state === 'ask', name = radio.dir ? cardName(radio.dir) : '';
     // the editor: Send to radio (Connect radio… first), and a line to the Install panel
     const bad = ed.probs.length > 0;
     el.edSend.hidden = el.edRadioLine.hidden = !radio.ok;
@@ -1597,7 +1600,7 @@
     inst.card = null;                                  // another card: looked at afresh
     try { await kv.set('radio', dir); } catch (e) { /* not kept: Connect radio again next time */ }
     const where = at === 'card' ? '' : ' (' + ['SCRIPTS', 'SCRIPTS/TOOLS', 'SCRIPTS/TOOLS/StickTimeTracks'][['scripts', 'tools', 'tracks'].indexOf(at)] + ')';
-    if (said) say('Radio SD: ' + dir.name + where + ' connected.' + await installed(), 'ok');
+    if (said) say('Radio SD: ' + cardName(dir) + where + ' connected.' + await installed(), 'ok');
     if (radio.panel) await refreshRadio();
   }
   // what the panel shows of the card: its tracks, and the game on it
@@ -1653,7 +1656,7 @@
   async function listRadio() {
     radioSlots = await readAll();
     radio.listed = true;
-    el.edRadioPath.textContent = 'On ' + radio.dir.name + (STEPS[radio.at].length ? ' · ' + STEPS[radio.at].join('/') : '');
+    el.edRadioPath.textContent = 'On ' + cardName(radio.dir) + (STEPS[radio.at].length ? ' · ' + STEPS[radio.at].join('/') : '');
     el.edRadioSlots.innerHTML = radioSlots.map((t, i) => '<li><span><b>c' + (i + 1) + '</b> · track ' + (i + 9) + ' · ' +
       (t === null ? '<em>empty</em>' : esc(nameOf(t))) + '</span>' +
       (t === null ? '' : '<button class="btn" type="button" data-ropen="' + (i + 1) + '">Open in editor</button>') + '</li>').join('');
@@ -1931,7 +1934,7 @@
   function renderInstall() {
     const man = inst.man, card = inst.card;
     if (!man || !card) return;
-    el.edInstallHead.textContent = 'StickTime ' + man.version + ' from this site, onto ' + radio.dir.name;
+    el.edInstallHead.textContent = 'StickTime ' + man.version + ' from this site, onto ' + cardName(radio.dir);
     el.edEditions.innerHTML = Object.entries(man.editions).map(([e, info]) => {
       const c = card[e], newer = c.version && cmpVer(c.version, man.version) > 0;
       const st = !c.installed ? 'not installed' : newer ? 'newer on the card (' + c.version + ')' : c.current ? 'up to date'
