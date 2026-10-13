@@ -22,6 +22,8 @@ Download `StickTime-<version>-sdcard.zip` from the [latest release](https://gith
 
 On EdgeTX 2.10 and older the B&W versions don't start: they say "Needs EdgeTX 2.11 or newer" on the radio. When updating StickTime BW or Lite, replace the whole `StickTimeBW` / `StickTimeLite` folder.
 
+Your own tracks (made with the [emulator's](#browser-emulator) track editor) go in `/SCRIPTS/TOOLS/StickTimeTracks/` as `c1.txt` to `c8.txt`: they are tracks 9 to 16 in StickTime and StickTime BW (StickTime Lite doesn't read them).
+
 > **Safety:** the radio keeps transmitting your sticks while the sim runs. Unplug the quad's battery or switch the RF module off first.
 
 StickTime BW and StickTime Lite also run on color radios, drawn in B&W style at the screen's full resolution, which is faster on slow radios. StickTime was called FPV Sim up to version 1.2: it takes over FPV Sim's settings and best times on its first start, after which the old `FPVSim…` and `FPVLite…` files can go.
@@ -109,6 +111,7 @@ Play at **[juricabi.github.io/sticktime](https://juricabi.github.io/sticktime/)*
   to play your own files. Its own switch, level and next-song button, apart from Sound.
 - Keyboard or **Radio / gamepad** input, the gamepad and its axis mapping are remembered.
 - Real radio refresh (20 Hz) and the color screen's one-frame delay are on by default and can be turned off; B&W LCD ghosting is optional.
+- **Track editor** (**Tracks**): lay out your own track on a map seen from above (gates in race order, hoops, flags, dive gates, structures, walls with gaps), from any of the eight tracks or a blank one. It checks that the game can take it, then **Fly it** starts it in the emulator, or **Save file** downloads `c1.txt` to `c8.txt` for your radio.
 - **Radio load** estimates the frame time on F2, F4 and H7 radios; **Open .lua** runs any other EdgeTX tool script.
 
 ## Under the hood
@@ -161,8 +164,10 @@ src/bwloader.lua        the B&W loaders (they load only the precompiled game.lua
 src/bwwhy.lua           why the game did not load, on a screen of its own (the loaders run it only then)
 src/bwcolor.lua         StickTimeBW/color.lua and StickTimeLite/color.lua: the B&W core on a color radio
 build.py                -> sdcard/SCRIPTS/TOOLS/ (StickTime.lua, StickTimeBW*, StickTimeLite*)
-web/src/                emulator: engine.js (EdgeTX API + LCD), app.js (UI), style.css, index.html
-tools/bundle_web.py     -> web/simulator.html (offline, single file) and web/artifact.html
+web/src/                emulator: engine.js (EdgeTX API + LCD), app.js (UI), editor.js (track editor),
+                        style.css, index.html
+tools/bundle_web.py     -> web/simulator.html (offline, single file) and web/artifact.html, with the
+                        built-in tracks (src/sticktime.lua's TRACKS) for the track editor
 tools/build_etxlua.sh   Lua 5.3 with EdgeTX's number settings (native and 32-bit) for the tests
 tools/build_etxhost.sh  EdgeTX's own Lua core with a model of the B&W radios' allocator: makes the
                         game.luac files and runs test/memtest.lua (main, or a release: v2.11.4, v2.10.7)
@@ -179,6 +184,7 @@ test/loader_test.lua    the B&W loaders with a mock loadScript: game.luac only, 
 test/msgtest.lua        the loaders' own screen where the game can't start (EdgeTX 2.10, too little memory)
 test/run_all.sh         all of the above, every screen size, Lua 5.3 and 5.2
 test/web_shots.py       Playwright screenshots of every radio and mode in the emulator
+test/editor_test.py     the track editor, offline: tracks flown from their slots, the files it writes
 .github/workflows/      pages.yml publishes the emulator as the project site; release.yml attaches
                         StickTime-X.Y-sdcard.zip to release vX.Y with docs/releases/vX.Y.md as notes
 ```

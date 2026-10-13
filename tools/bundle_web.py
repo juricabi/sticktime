@@ -22,6 +22,77 @@ def b64(p):
     return base64.b64encode(pathlib.Path(p).read_bytes()).decode()
 
 
+def b64_text(p):
+    """A text file (the SVG icon) as in the repo, with LF line ends: the same bundle from any
+    checkout (git on Windows may give the working copy CRLF)"""
+    return base64.b64encode(pathlib.Path(p).read_bytes().replace(b"\r\n", b"\n")).decode()
+
+
+LUA_TOKEN = re.compile(r'\s+|--[^\n]*|"(?:[^"\\]|\\.)*"|-?(?:\d+\.?\d*|\.\d+)|[{},]|nil\b|[A-Za-z_]\w*|.')
+
+
+def lua_table(text):
+    """The first Lua table constructor in text (positional entries of strings, numbers, nil and
+    tables, as the TRACKS table uses) as Python lists"""
+    toks = [t for t in LUA_TOKEN.findall(text) if t.strip() and not t.startswith("--")]
+    pos = 0
+
+    def value():
+        nonlocal pos
+        t = toks[pos]
+        pos += 1
+        if t == "{":
+            out = []
+            while toks[pos] != "}":
+                out.append(value())
+                if toks[pos] == ",":
+                    pos += 1
+            pos += 1
+            return out
+        if t.startswith('"'):
+            return json.loads(t)
+        if t == "nil":
+            return None
+        try:
+            return float(t) if "." in t else int(t)
+        except ValueError:
+            raise SystemExit(f"bundle_web.py: can't read {t!r} in the TRACKS table of src/sticktime.lua")
+
+    assert toks[0] == "{"
+    return value()
+
+
+def track_data():
+    """What the track editor (web/src/editor.js) needs from the game: the built-in tracks
+    (src/sticktime.lua's TRACKS, with their structures' kinds) as templates, and the gate sizes
+    and default heights, so the map draws what the game builds"""
+    src = read(ROOT / "src/sticktime.lua")
+    table = lua_table(src[src.index("local TRACKS = {") + len("local TRACKS = "):])
+    tracks = []
+    for t in table:
+        name, seed, gates = t[0], t[1], t[2]
+        boxes = t[3] if len(t) > 3 and t[3] else []
+        mult = t[4] if len(t) > 4 else 1
+        assert len(gates) % 5 == 0 and len(boxes) % 7 == 0, f"track {name}: gates of 5, structures of 7 numbers"
+        tracks.append({"name": name, "seed": seed, "trees": round(mult * 9),
+                       "gates": [gates[i:i + 5] for i in range(0, len(gates), 5)],
+                       "boxes": [boxes[i:i + 7] for i in range(0, len(boxes), 7)]})
+    assert len(tracks) == 8, "the editor's templates expect the 8 built-in tracks"
+
+    def nums(pattern):
+        m = re.search(pattern, src)
+        assert m, f"src/sticktime.lua: no match for {pattern}"
+        return [float(v) for v in m.group(1).split(",")]
+    gt, flagh = nums(r"local GT, FLAGH = ([\d.]+\s*,\s*[\d.]+)")
+    # trees on a track with trees = 9, color edition (build.py's @TREES@)
+    trees = int(re.search(r'"COLOR": \{.*?"TREES": "(\d+)"', read(ROOT / "build.py"), re.S).group(1))
+    data = {"tracks": tracks, "GT": gt, "FLAGH": flagh, "TREES": trees,
+            "GHW": nums(r"local GHW = \{([^}]*)\}"), "GHH": nums(r"local GHH = \{([^}]*)\}"),
+            "GCY": nums(r"local GCY = \{([^}]*)\}")}
+    assert len(data["GHW"]) == len(data["GHH"]) == len(data["GCY"]) == 8
+    return json.dumps(data, separators=(",", ":"))
+
+
 def main():
     lua_color = read(ROOT / "sdcard/SCRIPTS/TOOLS/StickTime.lua")
     lua_bw = read(ROOT / "sdcard/SCRIPTS/TOOLS/StickTimeBW/core.lua")
@@ -37,15 +108,19 @@ def main():
     assert tracks, "no StickTime Lite track files (run build.py)"
     lite_tracks = json.dumps(tracks, indent=0)
     # the icon (docs/icon.svg; its PNGs from tools/make_icons.py)
-    icon_svg = "data:image/svg+xml;base64," + b64(ROOT / "docs/icon.svg")
+    icon_svg = "data:image/svg+xml;base64," + b64_text(ROOT / "docs/icon.svg")
     icon_png = "data:image/png;base64," + b64(ROOT / "docs/icon-32.png")
-    for s in (lua_color, lua_bw, lua_lite, lua_bwcolor, lua_litecolor, lite_tracks):
+    # the track editor and the built-in tracks it starts from
+    editor, tracks_json = read(SRC / "editor.js"), track_data()
+    for s in (lua_color, lua_bw, lua_lite, lua_bwcolor, lua_litecolor, lite_tracks, editor, tracks_json):
         assert "</script" not in s.lower()
     parts = {
         "STYLE": read(SRC / "style.css"),
         "BWFONTS": read(SRC / "bwfonts.js"),
         "ENGINE": read(SRC / "engine.js"),
         "APP": read(SRC / "app.js"),
+        "TRACK_DATA": tracks_json,
+        "EDITOR": editor,
         "LUA_COLOR": lua_color,
         "LUA_BW": lua_bw,
         "LUA_LITE": lua_lite,
