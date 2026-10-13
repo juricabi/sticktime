@@ -136,7 +136,9 @@ def main():
         tpl = tpl.replace("{{" + k + "}}", v)
     cdn = '<script src="https://cdn.jsdelivr.net/npm/fengari-web@0.1.4/dist/fengari-web.js"></script>'
     inline = "<script>\n/* fengari-web 0.1.4 (MIT) - https://fengari.io */\n" + read(W / "vendor/fengari-web.js") + "\n</script>"
-    art = tpl.replace("{{FENGARI_TAG}}", cdn)
+    # the game's SD card files beside the page (the site has them: .github/workflows/pages.yml,
+    # tools/sd_manifest.py); a hosted artifact.html has not, so it can't install the game
+    art = tpl.replace("{{FENGARI_TAG}}", cdn).replace("{{GAME_FILES}}", "")
     (W / "artifact.html").write_text(art, encoding="utf-8")
     # the offline page is also the GitHub Pages site (.github/workflows/pages.yml): search and
     # link-preview metadata in its head
@@ -161,7 +163,7 @@ def main():
     body = re.sub(r"<title>.*?</title>\n?", "", tpl, count=1)
     full = ("<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n"
             "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\">\n"
-            + meta + "</head>\n<body>\n" + body.replace("{{FENGARI_TAG}}", inline) + "\n</body>\n</html>\n")
+            + meta + "</head>\n<body>\n" + body.replace("{{FENGARI_TAG}}", inline).replace("{{GAME_FILES}}", "sdcard/") + "\n</body>\n</html>\n")
     (W / "simulator.html").write_text(full, encoding="utf-8")
     for f in ("artifact.html", "simulator.html"):
         print(f, (W / f).stat().st_size // 1024, "KB")

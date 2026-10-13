@@ -88,7 +88,18 @@
         <button class="btn" id="edConnect" type="button" title="Pick the radio's SD card (the radio plugged in by USB, in USB Storage mode)">Connect radio…</button>
         <button class="btn" id="edSend" type="button" hidden>Send to radio</button>
         <button class="btn" id="edFromRadio" type="button" aria-expanded="false" aria-controls="edRadioPanel" hidden>From radio…</button>
+        <button class="btn" id="edInstall" type="button" aria-expanded="false" aria-controls="edInstallPanel" hidden>Install / update StickTime…</button>
         <button class="btn" id="edForget" type="button" title="Forget this SD card" hidden>Disconnect</button>
+      </div>
+      <p class="note ed-rnote" id="edInstallNote" hidden>To put the game itself on the card, copy the SCRIPTS folder of the SD card zip from the <a href="https://github.com/juricabi/sticktime/releases/latest" target="_blank" rel="noopener">latest release</a>; the emulator at juricabi.github.io/sticktime can install it for you.</p>
+      <div class="ed-rpanel" id="edInstallPanel" hidden>
+        <p class="ed-rpath" id="edInstallHead"></p>
+        <ul class="ed-rslots ed-editions" id="edEditions"></ul>
+        <p class="note" id="edInstallHint"></p>
+        <div class="ed-row">
+          <button class="btn primary" id="edInstallGo" type="button">Install / update</button>
+          <progress id="edInstallBar" max="1" value="0" hidden></progress>
+        </div>
       </div>
       <p class="note ed-rnote" id="edRadioNote">Plug the radio in by USB and choose USB Storage (SD) on it, then Connect radio and pick its SD card (the drive).</p>
       <div class="ed-rpanel" id="edRadioPanel" hidden>
@@ -290,6 +301,7 @@ const ROBOTO = { r: "{{ROBOTO400}}", b: "{{ROBOTO700}}" };
 </script>
 <script>
 const TRACK_DATA = {{TRACK_DATA}};
+const GAME_FILES = '{{GAME_FILES}}';
 </script>
 <script>
 {{EDITOR}}

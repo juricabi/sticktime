@@ -389,7 +389,9 @@
     'edRotL', 'edRotR', 'edDup', 'edDel', 'edUndo', 'edRedo', 'edFit', 'edTrees', 'edMap', 'edMapBox', 'edReadout',
     'edSlot', 'edFly', 'edSave', 'edEmpty', 'edSize', 'edLite', 'edStatus', 'edName', 'edSeed', 'edShuffle', 'edTreesN',
     'edSel', 'edProblems', 'edProbPill', 'edOrder', 'edRadio', 'edRadioState', 'edConnect', 'edSend', 'edFromRadio',
-    'edForget', 'edRadioNote', 'edRadioPanel', 'edRadioPath', 'edRadioSlots', 'edRadioToEmu', 'edEmuToRadio']) el[k] = $(k);
+    'edForget', 'edRadioNote', 'edRadioPanel', 'edRadioPath', 'edRadioSlots', 'edRadioToEmu', 'edEmuToRadio',
+    'edInstall', 'edInstallNote', 'edInstallPanel', 'edInstallHead', 'edEditions', 'edInstallHint', 'edInstallGo',
+    'edInstallBar']) el[k] = $(k);
   const cv = el.edMap, ctx = cv.getContext('2d');
   const UP = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3.5 10l4.5-4.5 4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const DOWN = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3.5 6l4.5 4.5 4.5-4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -1517,7 +1519,7 @@
     const has = async (f) => !!(tools && await child(tools, f, 'file'));
     if (await has('StickTime.lua') || await has('StickTimeBW.lua')) return '';
     if (await has('StickTimeLite.lua')) return ' Only StickTime Lite is on this card, and the Lite doesn\'t read custom tracks.';
-    return ' StickTime isn\'t on this card yet: copy it to /SCRIPTS/TOOLS/ too.';
+    return GAME ? ' StickTime isn\'t on this card yet: Install / update StickTime puts it there.' : ' StickTime isn\'t on this card yet: copy it to /SCRIPTS/TOOLS/ too.';
   }
 
   function renderRadio() {
@@ -1541,6 +1543,15 @@
     el.edConnect.disabled = el.edFromRadio.disabled = el.edRadioToEmu.disabled = el.edEmuToRadio.disabled = radio.busy;
     el.edRadioPanel.hidden = !(on && radio.open);
     el.edFromRadio.setAttribute('aria-expanded', String(on && radio.open));
+    // the game itself: from the site's sdcard/ (not offline, not in a hosted artifact)
+    const noTools = radio.at === 'tracks';
+    el.edInstall.hidden = !(on && GAME);
+    el.edInstall.disabled = radio.busy || noTools;
+    el.edInstall.title = noTools ? 'Connect the card\'s drive (or its SCRIPTS/TOOLS folder) to install the game' : 'Put StickTime on the radio, or bring it up to date';
+    el.edInstallNote.hidden = !(on && !GAME);
+    el.edInstallPanel.hidden = !(on && GAME && inst.open && !noTools);
+    el.edInstall.setAttribute('aria-expanded', String(!el.edInstallPanel.hidden));
+    el.edInstallGo.disabled = radio.busy || !inst.card || !Object.values(inst.pick).some(Boolean);
   }
   // a radio job: one at a time; a card that went away (unplugged) or lost its permission says so
   async function job(fn) {
@@ -1553,7 +1564,7 @@
         radio.state = 'ask';
         radio.open = false;
         status('The radio\'s SD card isn\'t there any more: plug the radio in (USB Storage) and Reconnect, or Connect radio to pick it again.', 'bad');
-      } else status('The radio\'s SD card: ' + (e && e.message || e), 'bad');
+      } else status(e && e.site ? e.message : 'The radio\'s SD card: ' + (e && e.message || e), 'bad');
     } finally {
       radio.busy = false;
       renderRadio();
@@ -1572,6 +1583,8 @@
     const where = at === 'card' ? '' : ' (' + ['SCRIPTS', 'SCRIPTS/TOOLS', 'SCRIPTS/TOOLS/StickTimeTracks'][['scripts', 'tools', 'tracks'].indexOf(at)] + ')';
     if (said) status('Radio SD: ' + dir.name + where + ' connected.' + await installed(), 'ok');
     if (radio.open) await listRadio();
+    inst.card = null;                                  // another card: looked at afresh
+    if (inst.open && GAME && at !== 'tracks') await loadInstall();
   }
   // Connect radio… (or Reconnect): the picker and the permission both need this click
   function connect() {
@@ -1679,7 +1692,8 @@
   el.edForget.addEventListener('click', () => {
     radio.state = 'off';
     radio.dir = null;
-    radio.open = false;
+    radio.open = inst.open = false;
+    inst.card = null;
     kv.del('radio').catch(() => { /* nothing kept */ });
     renderRadio();
     status('The radio\'s SD card is forgotten: Connect radio to pick it again.');
@@ -1706,6 +1720,216 @@
     } else radio.state = p === 'denied' ? 'off' : 'ask';
     renderRadio();
   }
+
+  // ---------------------------------------------------------------- the game on the radio
+  // The hosted site has the game's SD card files beside the page (sdcard/manifest.json and
+  // sdcard/SCRIPTS/TOOLS/..., made by tools/sd_manifest.py). Install / update writes the editions
+  // picked and makes their folders match the release, as replacing the whole folder would (an old
+  // core.luac left in StickTimeBW/ has EdgeTX compile core.lua on the radio, which runs it out of
+  // memory). The player's own files are never touched: the saves (*.dat, StickTimeLite/data.txt),
+  // the tracks and the ghosts.
+  const GAME = typeof GAME_FILES === 'string' && GAME_FILES && /^https?:$/.test(location.protocol) ? GAME_FILES : '';
+  const inst = { open: false, man: null, card: null, pick: {}, hint: '' };
+  // EdgeTX's board in RADIO/radio.yml, only as a hint (when unsure, nothing is picked)
+  const BOARDS = {
+    color: /^(tx16s|tx16smk3|tx15|t15|t15pro|t16|t18|x10|x10express|x12s|nv14|el18|pl18|pl18ev|pl18u|nb4p|v12|v16|pa01|f16|gx15|st16|t22)$/,
+    lite: /^(x7|x9d|x9dp|x9lite|xlite|t12|t8|tlite|tpro|lr3pro|tx12)$/,
+    bw: /^(x9dp2019|x9e|x7access|x9lites|xlites|tx12mk2|zorro|boxer|pocket|mt12|gx12|t14|t20|tprov2|tpros|t12max|bumblebee|commando8)$/,
+  };
+  const KIND = { color: 'a color radio', bw: 'a B&W radio with an STM32F4', lite: 'an older B&W radio (STM32F2)' };
+  function cmpVer(a, b) {
+    const x = a.split('.').map(Number), y = b.split('.').map(Number);
+    for (let i = 0; i < Math.max(x.length, y.length); i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0);
+    return 0;
+  }
+  async function sha256(buf) {
+    return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', buf)), (b) => b.toString(16).padStart(2, '0')).join('');
+  }
+  // the player's own: kept even inside an edition folder
+  const keepFile = (path) => inst.man.keep.some((k) => k.toLowerCase() === path.toLowerCase()) || /\.dat$/i.test(path) || /(^|\/)c\d+\.txt$/i.test(path);
+  const toolsDir = (create) => walk(STEPS[radio.at].slice(0, -1), create);
+  async function fileAt(dir, path, create) {
+    const p = path.split('/');
+    for (const s of p.slice(0, -1)) if (!(dir = await child(dir, s, 'directory', create))) return null;
+    return child(dir, p[p.length - 1], 'file', create);
+  }
+  const sameAs = async (h, f) => {
+    const file = h && await h.getFile();
+    return !!file && file.size === f.size && await sha256(await file.arrayBuffer()) === f.sha256;
+  };
+  const siteError = (msg) => Object.assign(new Error(msg), { site: true });
+  // a file of the release from the site, checked against the manifest (bytes as they are)
+  async function siteFile(f) {
+    let buf = null;
+    try {
+      const r = await fetch(new URL(GAME + inst.man.base + '/' + f.path, location.href), { cache: 'no-cache' });
+      if (r.ok) buf = await r.arrayBuffer();
+    } catch (e) { buf = null; }
+    if (!buf) throw siteError('Couldn\'t get ' + f.path + ' from the site: check the connection and try again.');
+    if (buf.byteLength !== f.size || await sha256(buf) !== f.sha256) throw siteError('The site\'s ' + f.path + ' didn\'t arrive whole: try again.');
+    return buf;
+  }
+  async function writeBytes(h, buf) {
+    const w = await h.createWritable();
+    await w.write(buf);
+    await w.close();
+  }
+  // a whole new file first, then moved in place where the browser can (else written in place)
+  async function putFile(tools, path, buf) {
+    const p = path.split('/'), name = p.pop();
+    let dir = tools;
+    for (const s of p) dir = await child(dir, s, 'directory', true);
+    const old = await child(dir, name, 'file');
+    if (typeof FileSystemFileHandle === 'function' && typeof FileSystemFileHandle.prototype.move === 'function') {
+      const tmp = await dir.getFileHandle(name + '.new', { create: true });
+      await writeBytes(tmp, buf);
+      try { await tmp.move(old ? old.name : name); return; } catch (e) { /* not over a file: out of the way first */ }
+      try {
+        if (old) await dir.removeEntry(old.name);
+        await tmp.move(name);
+        return;
+      } catch (e) {
+        try { await dir.removeEntry(name + '.new'); } catch (e2) { /* gone */ }
+      }
+    }
+    await writeBytes(await child(dir, name, 'file', true), buf);
+  }
+  // what is on the card, edition by edition: installed, its version, the same as the release, and
+  // the files in its folder the release doesn't have
+  async function survey() {
+    const man = inst.man, tools = await toolsDir(false), card = {};
+    const release = new Set(man.files.map((f) => f.path.toLowerCase()));
+    for (const [e, info] of Object.entries(man.editions)) {
+      const files = man.files.filter((f) => f.edition === e);
+      const loader = tools && await fileAt(tools, info.loader);
+      let version = null, same = 0;
+      const stale = [];
+      if (loader) {
+        const m = /StickTime(?: BW| Lite)? v(\d+(?:\.\d+)+)/.exec(await (await loader.getFile()).slice(0, 600).text());
+        version = m ? m[1] : null;
+        for (const f of files) if (await sameAs(await fileAt(tools, f.path), f)) same++;
+        stale.push(...await staleIn(tools, info.folder, release));
+      }
+      card[e] = { installed: !!loader, version, current: !!loader && same === files.length && !stale.length, stale };
+    }
+    return card;
+  }
+  async function staleIn(tools, folder, release) {
+    const dir = folder && await child(tools, folder, 'directory'), out = [];
+    if (dir) {
+      for await (const h of dir.values()) {
+        const p = folder + '/' + h.name;
+        if (h.kind === 'file' && !release.has(p.toLowerCase()) && !keepFile(p)) out.push(h.name);
+      }
+    }
+    return out;
+  }
+  async function boardHint() {
+    const f = radio.at === 'card' && await fileAt(radio.dir, 'RADIO/radio.yml');
+    const m = f && /^board:\s*["']?([\w+-]+)/m.exec(await (await f.getFile()).slice(0, 4096).text());
+    if (!m) return null;
+    const b = m[1].toLowerCase();
+    return { board: m[1], e: ['color', 'lite', 'bw'].find((e) => BOARDS[e].test(b)) || null };
+  }
+  async function loadInstall() {
+    if (!inst.man) {
+      let man = null;
+      try {
+        const r = await fetch(new URL(GAME + 'manifest.json', location.href), { cache: 'no-cache' });
+        if (r.ok) man = await r.json();
+      } catch (e) { man = null; }
+      if (!man || !Array.isArray(man.files)) {
+        inst.open = false;
+        status('Couldn\'t get the game\'s files from the site: check the connection and try again.', 'bad');
+        return;
+      }
+      inst.man = man;
+    }
+    const first = !inst.card;
+    inst.card = await survey();
+    if (first) {
+      // what is on the card already; else what RADIO/radio.yml says the radio is; else the player picks
+      inst.pick = {};
+      inst.hint = '';
+      const have = Object.keys(inst.card).filter((e) => inst.card[e].installed);
+      have.forEach((e) => { inst.pick[e] = true; });
+      if (!have.length) {
+        const h = await boardHint();
+        if (h && h.e) { inst.pick[h.e] = true; inst.hint = 'RADIO/radio.yml says ' + h.board + ': ' + KIND[h.e] + '. '; }
+        else inst.hint = (h ? 'RADIO/radio.yml says ' + h.board + ', which this page doesn\'t know. ' : '') + 'Pick the edition for your radio. ';
+      }
+    }
+    renderInstall();
+  }
+  function renderInstall() {
+    const man = inst.man, card = inst.card;
+    if (!man || !card) return;
+    el.edInstallHead.textContent = 'StickTime ' + man.version + ' from this site, onto ' + radio.dir.name;
+    el.edEditions.innerHTML = Object.entries(man.editions).map(([e, info]) => {
+      const c = card[e], newer = c.version && cmpVer(c.version, man.version) > 0;
+      const st = !c.installed ? 'not installed' : newer ? 'newer on the card (' + c.version + ')' : c.current ? 'up to date'
+        : 'will be updated' + (c.version ? ' (' + c.version + ' on the card)' : '') + (c.stale.length ? ', ' + c.stale.length + ' old file' + (c.stale.length > 1 ? 's' : '') + ' removed' : '');
+      return '<li><label><input type="checkbox" data-ed="' + e + '"' + (inst.pick[e] ? ' checked' : '') + '><b>' + esc(info.label) + '</b> ' +
+        esc(info.loader) + (info.folder ? ' + ' + esc(info.folder) + '/' : '') + '</label><span class="ed-estate' + (c.installed && c.current ? ' ok' : '') + '">' + st + '</span></li>';
+    }).join('');
+    el.edInstallHint.textContent = inst.hint + 'Color: color screens. B&W: B&W radios with an STM32F4 (TX12 MkII, Zorro, Boxer, X9D+ 2019...). ' +
+      'Lite: older B&W radios with an STM32F2 (X7, X9D, X9D+, T12...). Your tracks, ghosts and saves stay as they are.';
+    renderRadio();
+  }
+  function installGame() {
+    job(async () => {
+      const man = inst.man, eds = Object.keys(man.editions).filter((e) => inst.pick[e]);
+      if (!eds.length) return;
+      const card = inst.card = await survey();
+      const newer = eds.filter((e) => card[e].version && cmpVer(card[e].version, man.version) > 0);
+      if (newer.length && !window.confirm('The radio has a newer StickTime (' + newer.map((e) => man.editions[e].label + ' ' + card[e].version).join(', ') +
+        ') than this site\'s ' + man.version + '. Replace it with ' + man.version + '?')) {
+        status('Nothing changed on the radio.');
+        return;
+      }
+      const files = man.files.filter((f) => f.edition === 'shared' || eds.includes(f.edition));
+      const tools = await toolsDir(true), bar = el.edInstallBar;
+      bar.hidden = false;
+      bar.max = files.length;
+      let n = 0, changed = 0;
+      try {
+        for (const f of files) {
+          bar.value = n++;
+          status('Writing ' + f.path + ' (' + n + ' of ' + files.length + ')…');
+          if (await sameAs(await fileAt(tools, f.path), f)) continue;
+          await putFile(tools, f.path, await siteFile(f));
+          changed++;
+        }
+        // the edition folders as in the release: the files it doesn't have go (not the player's own)
+        const release = new Set(man.files.map((f) => f.path.toLowerCase()));
+        for (const e of eds) {
+          const folder = man.editions[e].folder;
+          for (const name of await staleIn(tools, folder, release)) {
+            await (await child(tools, folder, 'directory')).removeEntry(name);
+            changed++;
+          }
+        }
+      } finally {
+        bar.value = files.length;
+        bar.hidden = true;
+      }
+      const labels = eds.map((e) => man.editions[e].label);
+      const list = labels.length > 1 ? labels.slice(0, -1).join(', ') + ' and ' + labels[labels.length - 1] : labels[0];
+      status(changed ? 'StickTime ' + man.version + ' is on the radio: ' + list + '. Eject the drive before unplugging it.'
+        : 'StickTime ' + man.version + ' was already on the radio: ' + list + '. Nothing to write.', 'ok');
+      inst.card = await survey();
+      renderInstall();
+    });
+  }
+  el.edInstall.addEventListener('click', () => {
+    inst.open = !inst.open;
+    if (inst.open) job(loadInstall); else renderRadio();
+  });
+  el.edEditions.addEventListener('change', (e) => {
+    const b = e.target.closest('[data-ed]');
+    if (b) { inst.pick[b.dataset.ed] = b.checked; renderRadio(); }
+  });
+  el.edInstallGo.addEventListener('click', installGame);
 
   const reduced = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   function openEditor() {
@@ -1764,7 +1988,7 @@
       file: () => ed.file.text,
       problems: () => ed.probs.map((p) => p.msg),
       selected: () => [...ed.sel],
-      radio: () => ({ ok: radio.ok, state: radio.state, at: radio.at, name: radio.dir && radio.dir.name, busy: radio.busy }),
+      radio: () => ({ ok: radio.ok, state: radio.state, at: radio.at, name: radio.dir && radio.dir.name, busy: radio.busy, game: GAME }),
       at(x, z) { const r = cv.getBoundingClientRect(); return [r.left + sx(x), r.top + sy(z)]; },   // a map point on the page
     };
   }
