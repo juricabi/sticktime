@@ -9,6 +9,8 @@ import json
 import pathlib
 import re
 
+import gallery
+
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 W = ROOT / "web"
 SRC = W / "src"
@@ -113,7 +115,12 @@ def main():
     icon_png = "data:image/png;base64," + b64(ROOT / "docs/icon-32.png")
     # the track editor and the built-in tracks it starts from
     editor, tracks_json = read(SRC / "editor.js"), track_data()
-    for s in (lua_color, lua_bw, lua_lite, lua_bwcolor, lua_litecolor, lite_tracks, editor, tracks_json):
+    # the gallery's tracks (tracks/, tools/gallery.py); the site has them beside the page too
+    shared, probs = gallery.gallery()
+    assert not probs, "tracks/: " + "; ".join(probs)
+    # (in a script element: no "<" for the HTML parser, no "{{" for the placeholders here)
+    shared_json = json.dumps({"tracks": shared}, separators=(",", ":")).replace("<", "\\u003c").replace("{{", "{\\u007b")
+    for s in (lua_color, lua_bw, lua_lite, lua_bwcolor, lua_litecolor, lite_tracks, editor, tracks_json, shared_json):
         assert "</script" not in s.lower()
     parts = {
         "STYLE": read(SRC / "style.css"),
@@ -121,6 +128,7 @@ def main():
         "ENGINE": read(SRC / "engine.js"),
         "APP": read(SRC / "app.js"),
         "TRACK_DATA": tracks_json,
+        "GALLERY": shared_json,
         "EDITOR": editor,
         "LUA_COLOR": lua_color,
         "LUA_BW": lua_bw,
@@ -138,8 +146,9 @@ def main():
     cdn = '<script src="https://cdn.jsdelivr.net/npm/fengari-web@0.1.4/dist/fengari-web.js"></script>'
     inline = "<script>\n/* fengari-web 0.1.4 (MIT) - https://fengari.io */\n" + read(W / "vendor/fengari-web.js") + "\n</script>"
     # the game's SD card files beside the page (the site has them: .github/workflows/pages.yml,
-    # tools/sd_manifest.py); a hosted artifact.html has not, so it can't install the game
-    art = tpl.replace("{{FENGARI_TAG}}", cdn).replace("{{GAME_FILES}}", "")
+    # tools/sd_manifest.py); a hosted artifact.html has not, so it can't install the game (and its
+    # gallery is the one built in, without tracks/index.json)
+    art = tpl.replace("{{FENGARI_TAG}}", cdn).replace("{{GAME_FILES}}", "").replace("{{GALLERY_FILES}}", "")
     (W / "artifact.html").write_text(art, encoding="utf-8")
     # the offline page is also the GitHub Pages site (.github/workflows/pages.yml): search and
     # link-preview metadata in its head
@@ -164,7 +173,8 @@ def main():
     body = re.sub(r"<title>.*?</title>\n?", "", tpl, count=1)
     full = ("<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n"
             "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\">\n"
-            + meta + "</head>\n<body>\n" + body.replace("{{FENGARI_TAG}}", inline).replace("{{GAME_FILES}}", "sdcard/") + "\n</body>\n</html>\n")
+            + meta + "</head>\n<body>\n" + body.replace("{{FENGARI_TAG}}", inline).replace("{{GAME_FILES}}", "sdcard/")
+            .replace("{{GALLERY_FILES}}", "tracks/") + "\n</body>\n</html>\n")
     (W / "simulator.html").write_text(full, encoding="utf-8")
     for f in ("artifact.html", "simulator.html"):
         print(f, (W / f).stat().st_size // 1024, "KB")

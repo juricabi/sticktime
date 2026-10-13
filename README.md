@@ -21,7 +21,7 @@ Download `StickTime-<version>-sdcard.zip` from the [latest release](https://gith
 | Older B&W, STM32F2 (TX12 MkI, X7, X9D, X9D+, X9 Lite, X-Lite, T12, T8, ...) | `StickTimeLite.lua`, `StickTimeLite/` | 2.11 (their last) |
 
 - **Updating:** replace the `StickTimeBW` folder whole; replace `StickTimeLite` but keep its `data.txt` (your Lite saves). Install does both for you.
-- **Your own tracks** go in `StickTimeTracks/` as `c1.txt` to `c8.txt` (tracks 9-16, color and BW). Restart the game after adding one.
+- **Your own tracks** go in `StickTimeTracks/` as `c1.txt` to `c8.txt` (tracks 9-16, color and BW). Restart the game after adding one. The [track gallery](tracks/) has more to fly, the MultiGP qualifier tracks of 2017 to 2026 among them.
 - The B&W versions need EdgeTX 2.11 ("Needs EdgeTX 2.11 or newer" on older). They also run on color radios, in B&W style.
 
 > **Safety:** the radio keeps transmitting your sticks while the sim runs. Unplug the quad's battery or switch the RF module off first.
@@ -30,7 +30,7 @@ Download `StickTime-<version>-sdcard.zip` from the [latest release](https://gith
 
 - **Flight model:** each quad class fitted to a detailed per-prop model (within 0.2-0.5 m/s in steady flight): Betaflight-style throttle curves, thrust loss climbing, translational lift, a cushion when you drop, ground effect, frame downforce, the airmode mixer in flips, 6 ms motors, 80 Hz physics. Details in [docs/flight-model.md](docs/flight-model.md).
 - **Quads:** Racer 5", Freestyle 5", 3" toothpick, Whoop 65mm, Whoop 75mm; Power Stock or the range quads of their kind have; Acro or Angle. **Rates:** Betaflight Actual (Soft, Normal, Fast or Custom, in Betaflight's own steps).
-- **Tracks:** Meadow, Figure 8, Dive Tower, Slalom, Hoop Forest, Grand Prix, the Bando (an open-roof ruin with a 36 m tower) and Pro Track, with gates, high gates, dive gates, hoops, arches, flags and gaps in walls; plus 8 of your own from the emulator's track editor.
+- **Tracks:** Meadow, Figure 8, Dive Tower, Slalom, Hoop Forest, Grand Prix, the Bando (an open-roof ruin with a 36 m tower) and Pro Track, with gates, high gates, dive gates, hoops, arches, flags and gaps in walls; plus 8 of your own from the emulator's track editor or the [track gallery](tracks/).
 - **Modes:** **Race** up to 3 AI pilots (Easy, Medium, Hard) · **Practice** against your best, with a **ghost** of your fastest lap (color edition) · **Freestyle** tricks and combos · **Gate Rush** against the clock.
 - **Medals:** Gold, Silver and Bronze are the Hard, Medium and Easy AI's lap at the Power you fly; shown in the menu, the Practice OSD and the results.
 - **Hits:** the quad stops against what it hits and flies on. A hard hit edge-on is a prop strike: half a second of tumbling to fly out of. Upside down on the ground: **turtle mode**, roll or pitch to flip back. **Pause → Respawn** puts you at the last gate.
@@ -102,7 +102,7 @@ Play at **[juricabi.github.io/sticktime](https://juricabi.github.io/sticktime/)*
 
 - Any radio screen or a **PC screen** (1280×720, 1920×1080 at 60 fps); keyboard, on-screen gimbals or your radio as a USB joystick.
 - Synthesized motor sound tuned against real quads, and live-composed music (or your own songs).
-- **Tracks:** the track editor. Lay out gates, hoops, flags, dive gates, structures and walls on a map, from any track or a blank one; **Fly it**, **Save file**, or **Send to radio** (Chrome/Edge, radio in USB Storage mode).
+- **Tracks:** the track editor. Lay out gates, hoops, flags, dive gates, structures and walls on a map, from any track or a blank one; **Fly it**, **Save file**, or **Send to radio** (Chrome/Edge, radio in USB Storage mode). Its **Gallery** has the tracks of [tracks/](tracks/): fly one, or open it to send it to your radio. Made a good one? [Add it](tracks/README.md#add-your-track) with a pull request.
 - **Install:** connect the radio's SD card to install or update StickTime and manage the tracks on it (hosted site only).
 - **Radio load** estimates the frame time on F2, F4 and H7 radios; **Open .lua** runs any EdgeTX tool script.
 
@@ -164,6 +164,8 @@ tools/bundle_web.py     -> web/simulator.html (offline, single file) and web/art
                         built-in tracks (src/sticktime.lua's TRACKS) for the track editor
 tools/sd_manifest.py    -> the site's sdcard/ (the game's files and manifest.json) that the emulator
                         installs on a radio from (the Pages workflow runs it)
+tracks/                 the track gallery: <name>.txt (the editor's file) and <name>.json (by, about, source)
+tools/gallery.py        checks tracks/ and writes the site's tracks/index.json (the Pages workflow runs it)
 tools/build_etxlua.sh   Lua 5.3 with EdgeTX's number settings (native and 32-bit) for the tests
 tools/build_etxhost.sh  EdgeTX's own Lua core with a model of the B&W radios' allocator: makes the
                         game.luac files and runs test/memtest.lua (main, or a release: v2.11.4, v2.10.7)
@@ -184,8 +186,10 @@ test/run_all.sh         all of the above, every screen size, Lua 5.3 and 5.2
 test/web_shots.py       Playwright screenshots of every radio and mode in the emulator
 test/editor_test.py     the track editor, the radio's SD card and the installer, offline (a stand-in card
                         in the browser's private file system)
+test/gallery_test.py    the gallery: every track of tracks/ opened and flown in the emulator, the site's list
 .github/workflows/      pages.yml publishes the emulator as the project site; release.yml attaches
-                        StickTime-X.Y.Z-sdcard.zip to release vX.Y.Z with docs/releases/vX.Y.Z.md as notes
+                        StickTime-X.Y.Z-sdcard.zip to release vX.Y.Z with docs/releases/vX.Y.Z.md as notes;
+                        tracks.yml checks a pull request's tracks (test/gallery_test.py --tracks)
 ```
 
 ```

@@ -323,8 +323,10 @@ def radio_tests(br, errors):
           "radio: ... and connects")
 
     # SCRIPTS/TOOLS or StickTimeTracks picked instead of the drive
-    page.select_option("#edTemplate", label="Slalom")
-    for path, slot in (("RADIO-SD/SCRIPTS/TOOLS", "2"), ("RADIO-SD/SCRIPTS/TOOLS/StickTimeTracks", "4")):
+    # (another track each time: the radio has the first one in c2 already, and Send to radio makes no second copy)
+    for path, slot, track in (("RADIO-SD/SCRIPTS/TOOLS", "2", "Slalom"), ("RADIO-SD/SCRIPTS/TOOLS/StickTimeTracks", "4", "Hoop Forest")):
+        editor(page)
+        page.select_option("#edTemplate", label=track)
         page.evaluate(PICK, path)
         radio_panel(page)
         if page.is_visible("#edForget"):

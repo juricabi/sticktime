@@ -1,0 +1,45 @@
+name: Track gallery
+# A pull request with a track for the gallery (tracks/<name>.txt and .json, tracks/README.md):
+# the files are checked as the editor and the game read them (tools/gallery.py), then the game
+# builds every track in the web emulator, in headless Chromium (test/gallery_test.py --tracks).
+on:
+  pull_request:
+    paths:
+      - 'tracks/**'
+      - 'tools/gallery.py'
+      - 'test/gallery_test.py'
+      - '.github/workflows/tracks.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'tracks/**'
+      - 'tools/gallery.py'
+      - 'test/gallery_test.py'
+      - '.github/workflows/tracks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Check the tracks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Check the files
+        run: python tools/gallery.py
+
+      - name: Fly them in the emulator
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+          python test/gallery_test.py --tracks

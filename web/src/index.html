@@ -53,12 +53,20 @@
   <div class="ed-head">
     <h2 id="edTitle">Track editor <small>your tracks are 9 to 16 in the game</small></h2>
     <div class="ed-actions">
+      <button class="btn" id="edGalBtn" type="button" aria-expanded="false" aria-controls="edGallery" title="Tracks others made: fly one, open it or put it on your radio"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>Gallery</button>
       <label class="field"><span>Start from</span><select id="edTemplate" aria-label="Start from a built-in track or a blank one"></select></label>
       <label class="btn file-btn" title="Open a track file (c1.txt to c8.txt)">Open file<input type="file" id="edOpen" accept=".txt,text/plain"></label>
       <button class="btn" id="edClose" type="button" title="Close the editor (your work is kept)">Close</button>
     </div>
   </div>
-  <div class="ed-grid">
+  <section class="ed-gallery" id="edGallery" hidden aria-labelledby="edGalH">
+    <h3 id="edGalH">Gallery <small>tracks to fly, open in the editor or send to your radio</small></h3>
+    <p class="ed-gsync" id="edGalSync" hidden><span id="edGalSyncText"></span> <button class="btn" id="edGalSyncAll" type="button">Update them</button></p>
+    <p class="ed-status" id="edGalStatus" role="status" aria-live="polite"></p>
+    <ul class="ed-cards" id="edCards"></ul>
+    <p class="note ed-galnote">Made a track others should fly? Add it to the gallery with a pull request: <a href="https://github.com/juricabi/sticktime/tree/main/tracks#readme" target="_blank" rel="noopener">tracks/ on GitHub</a> says how.</p>
+  </section>
+  <div class="ed-grid" id="edGrid">
     <div class="ed-main">
       <div class="ed-tools" role="group" aria-label="Edit the track">
         <span class="ed-pair">
@@ -335,6 +343,8 @@ const ROBOTO = { r: "{{ROBOTO400}}", b: "{{ROBOTO700}}" };
 <script>
 const TRACK_DATA = {{TRACK_DATA}};
 const GAME_FILES = '{{GAME_FILES}}';
+const GALLERY = {{GALLERY}};
+const GALLERY_FILES = '{{GALLERY_FILES}}';
 </script>
 <script>
 {{EDITOR}}

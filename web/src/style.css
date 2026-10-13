@@ -288,6 +288,31 @@ footer.credits a { color: inherit; }
 .ed-size { margin-left: auto; font: 500 12px/1.3 var(--font-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
 .ed-size.bad { color: var(--bad); }
 .editor .ed-lite { margin: 12px 2px 0; }
+/* the gallery: tracks from tracks/ in the repo, in place of the map while it's shown */
+.ed-gallery h3 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 0 0 12px;
+  font: 700 12px/1.2 var(--font-display); letter-spacing: .1em; text-transform: uppercase; }
+.ed-gallery h3 small { font: 400 13px/1.3 var(--font-body); letter-spacing: 0; text-transform: none; color: var(--muted); }
+.ed-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+.ed-card { display: flex; flex-direction: column; min-width: 0; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; background: var(--surface); }
+.ed-thumb { display: block; width: 100%; height: 170px; background: var(--mat); }
+.ed-cinfo { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px 0; flex: 1; min-width: 0; }
+.ed-cinfo strong { font: 600 15px/1.25 var(--font-display); letter-spacing: .02em; }
+.ed-by { font-size: 12.5px; color: var(--muted); }
+.ed-cinfo p { margin: 4px 0 0; font-size: 13px; line-height: 1.45; }
+.ed-meta { margin-top: auto; padding-top: 6px; font: 500 12px/1.3 var(--font-mono); color: var(--muted); }
+.ed-meta a { color: inherit; text-underline-offset: 3px; }
+.ed-meta a:hover { color: var(--fg); }
+.ed-cbtns { display: flex; gap: 6px; padding: 10px 12px 12px; }
+.ed-cbtns .btn { height: 30px; padding: 0 12px; font-size: 12.5px; }
+.ed-cbtns .btn svg { margin-right: 2px; }
+.ed-cnone { color: var(--muted); }
+.ed-in { font-size: 12.5px; color: var(--ok); }
+.ed-old { font-size: 12.5px; color: var(--warn); }
+.ed-gsync { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0 0 12px; padding: 8px 12px; border: 1px solid var(--warn);
+  border-radius: 8px; font-size: 13px; }
+.ed-gsync .btn { height: 30px; padding: 0 12px; font-size: 12.5px; }
+.ed-gallery > .ed-status { margin: 0 2px 12px; }
+.editor .ed-galnote { margin: 14px 2px 0; line-height: 1.55; }
 /* the radio's SD card (File System Access: Chrome, Edge, Opera on a computer) */
 .ed-radio { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .ed-rstate { font: 500 12.5px/1.3 var(--font-mono); color: var(--muted); overflow-wrap: anywhere; }

@@ -4,6 +4,8 @@ name: Emulator on GitHub Pages
 # https://juricabi.github.io/sticktime/
 # Next to it, sdcard/ (the game's SD card files and manifest.json, tools/sd_manifest.py): the
 # emulator's track editor installs or updates the game on a radio's SD card from there.
+# And tracks/index.json, the track gallery (tracks/, tools/gallery.py): the emulator lists the
+# tracks merged since its page was built from there.
 on:
   push:
     branches:
@@ -12,6 +14,8 @@ on:
       - 'web/simulator.html'
       - 'sdcard/**'
       - 'tools/sd_manifest.py'
+      - 'tracks/**'
+      - 'tools/gallery.py'
       - 'docs/social-preview.png'
       - 'docs/icon-180.png'
       - '.github/workflows/pages.yml'
@@ -44,6 +48,7 @@ jobs:
           cp docs/social-preview.png _site/social-preview.png
           cp docs/icon-180.png _site/apple-touch-icon.png
           python3 tools/sd_manifest.py _site/sdcard
+          python3 tools/gallery.py _site/tracks
 
       - name: Configure Pages
         uses: actions/configure-pages@v6
