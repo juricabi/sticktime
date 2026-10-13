@@ -82,6 +82,23 @@
         <button class="btn" id="edEmpty" type="button" title="Take this slot's track off the emulator's SD card">Empty slot</button>
         <span class="ed-size" id="edSize"></span>
       </div>
+      <div class="ed-radio" id="edRadio">
+        <span class="ed-rlabel">Radio SD</span>
+        <span class="ed-rstate" id="edRadioState">not connected</span>
+        <button class="btn" id="edConnect" type="button" title="Pick the radio's SD card (the radio plugged in by USB, in USB Storage mode)">Connect radio…</button>
+        <button class="btn" id="edSend" type="button" hidden>Send to radio</button>
+        <button class="btn" id="edFromRadio" type="button" aria-expanded="false" aria-controls="edRadioPanel" hidden>From radio…</button>
+        <button class="btn" id="edForget" type="button" title="Forget this SD card" hidden>Disconnect</button>
+      </div>
+      <p class="note ed-rnote" id="edRadioNote">Plug the radio in by USB and choose USB Storage (SD) on it, then Connect radio and pick its SD card (the drive).</p>
+      <div class="ed-rpanel" id="edRadioPanel" hidden>
+        <p class="ed-rpath" id="edRadioPath"></p>
+        <ul class="ed-rslots" id="edRadioSlots"></ul>
+        <div class="ed-row">
+          <button class="btn" id="edRadioToEmu" type="button" title="The radio's tracks into the same slots of the emulator">Copy the radio's tracks here</button>
+          <button class="btn" id="edEmuToRadio" type="button" title="The emulator's tracks into the same slots of the radio">Send all of mine to the radio</button>
+        </div>
+      </div>
       <p class="note warn ed-lite" id="edLite" hidden></p>
       <p class="ed-status" id="edStatus" role="status" aria-live="polite"></p>
     </div>
@@ -111,7 +128,7 @@
         <summary>How to use on the radio</summary>
         <ol>
           <li><strong>Save file</strong> downloads the track as <code>c1.txt</code> (the slot's number).</li>
-          <li>On the radio's SD card, make the folder <code>/SCRIPTS/TOOLS/StickTimeTracks/</code> and copy the file into it.</li>
+          <li>On the radio's SD card, make the folder <code>/SCRIPTS/TOOLS/StickTimeTracks/</code> and copy the file into it. In Chrome or Edge on a computer, <strong>Connect radio</strong> and <strong>Send to radio</strong> do both: the radio plugged in by USB, in USB Storage mode.</li>
           <li>Up to 8 tracks, <code>c1.txt</code> to <code>c8.txt</code>: they come after the 8 built-in ones, as tracks 9 to 16 in the track menu.</li>
           <li>StickTime and StickTime BW read them; StickTime Lite doesn't.</li>
           <li>Best times are kept while the track stays the same: any change to it starts them over.</li>
