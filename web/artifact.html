@@ -322,6 +322,7 @@ footer.credits a { color: inherit; }
 .ed-rslots b { font: 600 12px var(--font-mono); }
 .ed-rslots em { font-style: normal; color: var(--muted); }
 .ed-rslots .btn { height: 28px; padding: 0 10px; font-size: 12.5px; }
+.ed-rbtns { display: flex; gap: 6px; flex: none; }
 .ed-editions li { flex-wrap: wrap; padding: 4px 0; }
 .ed-editions label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .ed-editions input { width: 16px; height: 16px; margin: 0 2px 0 0; accent-color: var(--accent); }
@@ -11657,6 +11658,7 @@ const GAME_FILES = '';
     el.edRefresh.hidden = !on;
     el.edForget.hidden = !(on || ask);
     el.edConnect.disabled = el.edRefresh.disabled = el.edForget.disabled = el.edRadioToEmu.disabled = el.edEmuToRadio.disabled = radio.busy;
+    el.edRadioSlots.querySelectorAll('button').forEach((b) => { b.disabled = radio.busy; });
     const noTools = radio.at === 'tracks', shown = !!(on && GAME && !noTools && inst.card);
     el.edInstallPanel.hidden = !shown;
     el.rpInstWait.hidden = !GAME || shown;
@@ -11776,7 +11778,29 @@ const GAME_FILES = '';
     el.edRadioPath.textContent = 'On ' + cardName(radio.dir) + (STEPS[radio.at].length ? ' · ' + STEPS[radio.at].join('/') : '');
     el.edRadioSlots.innerHTML = radioSlots.map((e, i) => '<li><span><b>c' + (i + 1) + '</b> · track ' + (i + 9) + ' · ' +
       (e === null ? '<em>empty</em>' : e.bad ? '<em class="bad">' + BAD[e.bad] + '</em>' : esc(nameOf(e.text))) + '</span>' +
-      (e === null || e.bad ? '' : '<button class="btn" type="button" data-ropen="' + (i + 1) + '">Open in editor</button>') + '</li>').join('');
+      (e === null ? '' : '<span class="ed-rbtns">' + (e.bad ? '' : '<button class="btn" type="button" data-ropen="' + (i + 1) + '">Open in editor</button>') +
+        '<button class="btn" type="button" data-rdel="' + (i + 1) + '" title="Remove c' + (i + 1) + '.txt from the radio\'s SD card">Remove</button></span>') +
+      '</li>').join('');
+    renderRadio();
+  }
+  // Remove: a slot's file off the card, asked first; only c<n>.txt (n 1-8) in the StickTimeTracks
+  // folder found, and only while it is the file the list showed
+  function removeFromRadio(n) {
+    const e = radioSlots[n - 1], gen = radio.gen;
+    if (!Number.isInteger(n) || n < 1 || n > SLOTS || !e || radio.busy || radio.state !== 'on') return;
+    const name = 'c' + n + '.txt';
+    if (!window.confirm(e.bad ? 'Remove ' + name + ' (track ' + (8 + n) + ', ' + what(e) + ') from the radio?'
+      : 'Remove "' + nameOf(e.text) + '" (track ' + (8 + n) + ') from the radio? Its best times stay in the radio\'s save until a different track is put in that slot.')) return;
+    job(async () => {
+      if (gen !== radio.gen) return;                   // (another card since)
+      const dir = await tracksDir(false), now = dir && await readSlot(dir, n);
+      if (!now || now.text !== e.text || now.bad !== e.bad) {
+        rstatus(name + ' on the radio isn\'t the file listed any more: nothing removed. Look at the list again.', 'bad');
+      } else if (await removeFile(dir, (await child(dir, name, 'file')).name)) {
+        rstatus('Removed ' + name + ' from the radio. Restart StickTime on the radio.', 'ok');
+      } else rstatus(name + ' was gone from the radio already.');
+      await listRadio();
+    }, rstatus, true);
   }
   // a track file into the editor (Open file, a radio slot), checked as the game reads it
   function openText(text, what, slot) {
@@ -11857,6 +11881,8 @@ const GAME_FILES = '';
   });
   // a radio slot into the track editor, on that slot
   el.edRadioSlots.addEventListener('click', (e) => {
+    const del = e.target.closest('[data-rdel]');
+    if (del) { removeFromRadio(+del.dataset.rdel); return; }
     const b = e.target.closest('[data-ropen]');
     const n = b ? +b.dataset.ropen : 0, t = radioSlots[n - 1];
     if (!t || t.bad) return;

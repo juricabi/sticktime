@@ -803,7 +803,8 @@ def slot_tests(br, errors, tmp):
 
 def bad_slot_tests(br, errors):
     """the radio's slots: a file too big to be a track isn't read, one the editor can't read is
-    marked; neither is copied either way (and they are named); a full storage is said"""
+    marked; neither is copied either way (and they are named); Remove takes one slot's file off the
+    card; a full storage is said"""
     ctx = br.new_context(viewport={"width": 1400, "height": 1000})
     served(ctx)
     page = ctx.new_page()
@@ -813,7 +814,8 @@ def bad_slot_tests(br, errors):
     good, good2 = track_text("Radio GP", GP), track_text("Mine GP", GP)
     big = "Huge\n1 1 7 9" + " 0" * 20000 + "\n"
     connect_card(page, "CARD", {"SCRIPTS/TOOLS/StickTime.lua": "-- the game\n", "SCRIPTS/TOOLS/StickTimeTracks/c1.txt": good,
-                                "SCRIPTS/TOOLS/StickTimeTracks/c2.txt": big, "SCRIPTS/TOOLS/StickTimeTracks/c4.txt": JUNK})
+                                "SCRIPTS/TOOLS/StickTimeTracks/c2.txt": big, "SCRIPTS/TOOLS/StickTimeTracks/c4.txt": JUNK,
+                                "SCRIPTS/TOOLS/StickTimeTracks/README.txt": "notes\n", "SCRIPTS/TOOLS/StickTimeGhosts/c3.txt": "ghost 1 2 3\n"})
     rows = page.inner_text("#edRadioSlots")
     check("c2 · track 10 · too big to be a track" in rows and "c4 · track 12 · can't be read" in rows and "c1 · track 9 · Radio GP" in rows
           and page.locator("[data-ropen]").count() == 1, f"radio slots: too big and unreadable files marked, only c1 to open: {rows!r}")
@@ -829,6 +831,31 @@ def bad_slot_tests(br, errors):
     st = page.inner_text("#rpStatus")
     check(page.evaluate(CARD_FILE, "CARD/SCRIPTS/TOOLS/StickTimeTracks/c3.txt") == good2 and page.evaluate(CARD_FILE, "CARD/SCRIPTS/TOOLS/StickTimeTracks/c6.txt") is None
           and "c6 (can't be read)" in st and st.startswith("Sent c3 to the radio."), f"radio slots: the emulator's unreadable c6 not sent, named: {st!r}")
+    # Remove: one slot's file off the card, asked first (No keeps it); the rest of the card untouched
+    dlg = Dialogs(page)
+    tt = "CARD/SCRIPTS/TOOLS/"
+    kept = {p: page.evaluate(CARD_HASH, tt + p) for p in ("StickTime.lua", "StickTimeTracks/c1.txt", "StickTimeTracks/c2.txt", "StickTimeTracks/c4.txt",
+                                                         "StickTimeTracks/README.txt", "StickTimeGhosts/c3.txt")}
+    check(page.locator("[data-rdel]").count() == 4, "radio slots: Remove on each filled slot (the unreadable and too big ones too)")
+    page.click('[data-rdel="3"]')
+    q = dlg.take()
+    check(q == ['Remove "Mine GP" (track 11) from the radio? Its best times stay in the radio\'s save until a different track is put in that slot.']
+          and page.evaluate(CARD_FILE, tt + "StickTimeTracks/c3.txt") == good2, f"radio slots: Remove asks first, naming the track; No keeps it: {q}")
+    dlg.answer = True
+    page.click('[data-rdel="3"]')
+    radio_done(page)
+    st, rows = page.inner_text("#rpStatus"), page.inner_text("#edRadioSlots")
+    check(len(dlg.take()) == 1 and page.evaluate(CARD_LS, tt + "StickTimeTracks") == ["README.txt", "c1.txt", "c2.txt", "c4.txt"]
+          and all(page.evaluate(CARD_HASH, tt + p) == h for p, h in kept.items()) and st == "Removed c3.txt from the radio. Restart StickTime on the radio."
+          and "c3 · track 11 · empty" in rows, f"radio slots: Yes removes c3.txt only (the ghost c3 and the rest stay), the list read again: {st!r}")
+    del kept["StickTimeTracks/c2.txt"]
+    page.click('[data-rdel="2"]')
+    radio_done(page)
+    q = dlg.take()
+    check(q == ["Remove c2.txt (track 10, a file too big to be a track) from the radio?"]
+          and page.evaluate(CARD_LS, tt + "StickTimeTracks") == ["README.txt", "c1.txt", "c4.txt"]
+          and all(page.evaluate(CARD_HASH, tt + p) == h for p, h in kept.items()), f"radio slots: a file too big to be a track can be removed too: {q}")
+    dlg.answer = False
     # the browser's storage full: the copy says it lasts this visit
     page.evaluate(f"sim.removeSD('{SLOT}1.txt')")
     page.evaluate(FULL)
