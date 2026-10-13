@@ -139,6 +139,35 @@ stock power, attitude held) and what StickTime gives (`tools/tune_physics.py`):
 | thrust response, 63% (hover to full) | 6 ms | 6 ms | 6 ms | 6 ms | 6 ms |
 | roll rate step, 63% time (half / full stick) | 6 / 12 ms | 6 / 10 ms | 8 / 10 ms | 10 / 30 ms | 10 / 22 ms |
 
+## Contacts
+
+Nothing is a crash any more: gate frames and hoop rims, gate legs, poles and trees (cylinders),
+walls, towers and containers (boxes) and the ground all stop the quad the same way, as the per-prop
+model's contacts do (no restitution, friction, nothing breaks), and only leaving the world respawns
+it. A box is left through the face the quad came in by (the last one it crossed this substep), a
+cylinder straight out from its middle, a gate frame on the side the quad came from; roofs hold the
+quad like the ground does, so it can land on them.
+
+```
+vn  = -(v . n)                           n: the surface's outward normal; nothing if vn <= 0
+v   = v + vn*n                           the part into the surface goes: no bounce
+v   = v*(1 - min(1, mu*vn/|v|))          friction on the slide: mu 0.3 (0.6 on the ground and roofs)
+j   = vn*n - friction                    the impulse per kg
+from vn >= 1.5 m/s, a prop strike:
+  c   = (n.u)*u - n                      toward the rim point nearest the surface (|c| = sqrt(1 - (n.u)^2))
+  w  += 3 * c x j                        body rates, at most 20 rad/s: 1.5 rad/s per m/s at 45 deg,
+                                         none flat on (the whole disk touches) or edge-on
+  t   = min(0.5, 0.04*vn) s              for t: thrust x0.3, and the rates are no longer the
+                                         stick's: they drift on (fading 1.5/s), so the quad tumbles
+```
+
+After a strike the flight controller takes over again from wherever the quad has tumbled to. A
+5 m/s scrape along a wall at 15 deg keeps about 4.5 m/s; a 20 m/s hit head-on, pitched 40 deg as a
+quad is at that speed, stops it dead and tumbles it about a full turn over half a second. On the ground at under 2 m/s with the throttle
+under hover the quad settles level, as before. Upside down or on its side on the ground (up vector
+below 0.4) it can't take off: **turtle mode**, a roll or pitch stick turns it over at 3.5 rad/s. In
+Freestyle a strike ends the combo in progress and its tumble counts as no trick.
+
 ## What the per-prop model has that this one leaves out
 
 - Four props, each with its own airflow: rotating the quad changes each prop's inflow, which damps
@@ -147,5 +176,5 @@ stock power, attitude held) and what StickTime gives (`tools/tune_physics.py`):
   filtered gyro), saturated motors also slow a full-stick snap at full throttle (StickTime keeps the
   thrust side of it, the airmode mixer above), yaw is limited to 10000 deg/s^2.
 - Battery sag and capacity (rarely on in other sims either), prop deformation at full power,
-  bent props after crashes.
+  bent props that stay bent after a crash (here a prop strike lasts half a second at most).
 - Spec classes and bigger quads.
