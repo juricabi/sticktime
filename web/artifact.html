@@ -1392,7 +1392,22 @@ local TRACKS = {
                        32,22,1,0,0, 32,46,2,0,0, 32,46,1,180,0, 46,26,4,160,3, 48,4,1,180,0, 46,-14,7,225,0,
                        24,-22,1,270,0 } },
 }
-local NT = #TRACKS
+-- custom tracks: StickTimeTracks/c1.txt .. c8.txt on the SD card (the browser emulator's track
+-- editor makes them; every edition reads the same files). A name line, then the numbers: format 1,
+-- an id (bests start over when it changes), tree seed, trees (9: as many as most tracks), the gates
+-- (x z type yaw height), "/", the structures (x z half-x half-z bottom top kind). They are tracks
+-- 9-16 whether or not the slots before them are filled; only the name and id are read here
+local NB0, NT = #TRACKS, #TRACKS + 8
+local CUSTOM = "/SCRIPTS/TOOLS/StickTimeTracks/c"
+for i = 1, 8 do
+  local f = io.open(CUSTOM .. i .. ".txt", "r")
+  if f then
+    local s = io.read(f, 60)
+    io.close(f)
+    local name, ver, id = string.match(s or "", "^%s*([^\r\n]+)[\r\n]+%s*(%d+)%s+(%d+)")
+    if name and ver == "1" then TRACKS[NB0 + i] = { string.sub(name, 1, 16), file = i, id = tonumber(id) } end
+  end
+end
 local GT, FLAGH = 0.28, 3.4                            -- frame thickness, flag pole height (m)
 local GHW = { 1.5, 1.5, 2.0, 1.25, 2.4, 6, 6, 2.2 }     -- inner half width, ring radius, flag zone
 local GHH = { 1.0, 1.0, 2.0, 1.25, 2.4, 30, 30, 1.8 }   -- inner half height
@@ -1463,6 +1478,23 @@ do
   buildTrack = function(t)
     nBuilt = nBuilt + 1
     local T = TRACKS[t]
+    if T.file then
+      -- a custom track: read its numbers now (and let them go once it is built)
+      local f = io.open(CUSTOM .. T.file .. ".txt", "r")
+      local s = f and io.read(f, 1000) or ""
+      if f then io.close(f) end
+      local g, b = string.match(string.match(s, "[\r\n](.*)") or "", "([^/]*)/?(.*)")
+      local n, d = 0, {}
+      for v in string.gmatch(g or "", "%S+") do
+        n = n + 1
+        if n == 3 then T[2] = tonumber(v) or 1
+        elseif n == 4 then T[5] = (tonumber(v) or 9) / 9
+        elseif n > 4 then d[n - 4] = tonumber(v) or 0 end
+      end
+      T[3], T[4] = d, {}
+      for v in string.gmatch(b or "", "%S+") do T[4][#T[4] + 1] = tonumber(v) or 0 end
+      if #d < 10 then T[3] = { 0, 0, 1, 0, 0, 0, 30, 1, 0, 0 } end   -- unreadable: two gates in a line
+    end
     local d, bd = T[3], T[4]
     NG, NP, BX.n = 0, 0, 0
     if bd then
@@ -1588,12 +1620,13 @@ do
       if k2 < k1 then k1 = k2 end
       AI.sf[i] = 0.55 + 0.225 * (k1 + 1)
     end
+    if T.file then T[3], T[4] = nil, nil end
   end
 end
 
 -- --------------------------------------------------------- persistence
-local BEST = { l = {}, r = {}, g = {}, f = {} }   -- per track: best lap, race, gate rush gates, freestyle combo
-for t = 1, NT do BEST.l[t], BEST.r[t], BEST.g[t], BEST.f[t] = 0, 0, 0, 0 end
+local BEST = { l = {}, r = {}, g = {}, f = {}, i = {} }   -- per track: best lap, race, gate rush gates,
+for t = 1, NT do BEST.l[t], BEST.r[t], BEST.g[t], BEST.f[t], BEST.i[t] = 0, 0, 0, 0, 0 end   -- combo, track id
 local loadData, saveData
 do
 local DATA = "/SCRIPTS/TOOLS/StickTime.dat"
@@ -1617,14 +1650,19 @@ local function validate()
     end
     if not ok then S[o[2]] = DEF[o[2]] end
   end
-  if type(S.track) ~= "number" or S.track < 1 or S.track > NT then S.track = 1 end
+  if type(S.track) ~= "number" or not TRACKS[S.track] then S.track = 1 end
+  -- a custom track that is not the one these bests were flown on: they start over
+  for t = NB0 + 1, NT do
+    local T = TRACKS[t]
+    if T and BEST.i[t] ~= T.id then BEST.l[t], BEST.r[t], BEST.g[t], BEST.f[t], BEST.i[t] = 0, 0, 0, 0, T.id end
+  end
 end
 
 loadData = function()
   local f, old = io.open(DATA, "r"), false
   if not f then f, old = io.open(OLD, "r"), true end
-  if not f then return end
-  local s = io.read(f, 1024)
+  if not f then validate() return end
+  local s = io.read(f, 2048)
   io.close(f)
   if type(s) ~= "string" then return end
   if string.sub(s, 1, 7) == "FPVSIM2" then
@@ -4104,8 +4142,11 @@ local handleEvent
   end
 
   local function stepTrack(d)
-    local t = S.track + d
-    if t < 1 then t = NT elseif t > NT then t = 1 end
+    local t = S.track
+    repeat                                          -- (custom slots without a file are skipped)
+      t = t + d
+      if t < 1 then t = NT elseif t > NT then t = 1 end
+    until TRACKS[t]
     selectTrack(t)
     saveData()
   end
@@ -4239,7 +4280,10 @@ local function init()
     end
     TEST.next = function(i) nextGate, lastGate = i, (i - 2) % NG + 1 end
     TEST.race = function() return lastGate, lapStart, R.n, R.laps, R.total, R.crashes, tStart end
-    TEST.info = function() return NT, P.twr, gmode, R.pos, AI.n, R.sc, R.rn, R.rt, R.chn, BX.n, TRACKS[S.track][1] end
+    TEST.info = function()
+      local n = NT
+      while not TRACKS[n] do n = n - 1 end          -- the highest track that exists
+      return n, P.twr, gmode, R.pos, AI.n, R.sc, R.rn, R.rt, R.chn, BX.n, TRACKS[S.track][1] end
     TEST.thrust = function() return P.twr, P.i0, P.tn, P.dz, P.tk end
     TEST.audio = function() return sT, S.quad, state, aTf, aVu, aE2, aW, sA, sE, sR, aS, aF end
     TEST.ai = function(a) return AI.x[a], AI.y[a], AI.z[a], AI.k[a], AI.d[a], AI.v[a], AI.seg[a] end
@@ -4422,7 +4466,22 @@ local TRACKS = {
                        32,22,1,0,0, 32,46,2,0,0, 32,46,1,180,0, 46,26,4,160,3, 48,4,1,180,0, 46,-14,7,225,0,
                        24,-22,1,270,0 } },
 }
-local NT = #TRACKS
+-- custom tracks: StickTimeTracks/c1.txt .. c8.txt on the SD card (the browser emulator's track
+-- editor makes them; every edition reads the same files). A name line, then the numbers: format 1,
+-- an id (bests start over when it changes), tree seed, trees (9: as many as most tracks), the gates
+-- (x z type yaw height), "/", the structures (x z half-x half-z bottom top kind). They are tracks
+-- 9-16 whether or not the slots before them are filled; only the name and id are read here
+local NB0, NT = #TRACKS, #TRACKS + 8
+local CUSTOM = "/SCRIPTS/TOOLS/StickTimeTracks/c"
+for i = 1, 8 do
+  local f = io.open(CUSTOM .. i .. ".txt", "r")
+  if f then
+    local s = io.read(f, 60)
+    io.close(f)
+    local name, ver, id = string.match(s or "", "^%s*([^\r\n]+)[\r\n]+%s*(%d+)%s+(%d+)")
+    if name and ver == "1" then TRACKS[NB0 + i] = { string.sub(name, 1, 16), file = i, id = tonumber(id) } end
+  end
+end
 local GT, FLAGH = 0.28, 3.4                            -- frame thickness, flag pole height (m)
 local GHW = { 1.5, 1.5, 2.0, 1.25, 2.4, 6, 6, 2.2 }     -- inner half width, ring radius, flag zone
 local GHH = { 1.0, 1.0, 2.0, 1.25, 2.4, 30, 30, 1.8 }   -- inner half height
@@ -4490,6 +4549,23 @@ do
 
   buildTrack = function(t)
     local T = TRACKS[t]
+    if T.file then
+      -- a custom track: read its numbers now (and let them go once it is built)
+      local f = io.open(CUSTOM .. T.file .. ".txt", "r")
+      local s = f and io.read(f, 1000) or ""
+      if f then io.close(f) end
+      local g, b = string.match(string.match(s, "[\r\n](.*)") or "", "([^/]*)/?(.*)")
+      local n, d = 0, {}
+      for v in string.gmatch(g or "", "%S+") do
+        n = n + 1
+        if n == 3 then T[2] = tonumber(v) or 1
+        elseif n == 4 then T[5] = (tonumber(v) or 9) / 9
+        elseif n > 4 then d[n - 4] = tonumber(v) or 0 end
+      end
+      T[3], T[4] = d, {}
+      for v in string.gmatch(b or "", "%S+") do T[4][#T[4] + 1] = tonumber(v) or 0 end
+      if #d < 10 then T[3] = { 0, 0, 1, 0, 0, 0, 30, 1, 0, 0 } end   -- unreadable: two gates in a line
+    end
     local d, bd = T[3], T[4]
     NG, NP, BX.n = 0, 0, 0
     if bd then
@@ -4600,12 +4676,13 @@ do
       if k2 < k1 then k1 = k2 end
       AI.sf[i] = 0.55 + 0.225 * (k1 + 1)
     end
+    if T.file then T[3], T[4] = nil, nil end
   end
 end
 
 -- --------------------------------------------------------- persistence
-local BEST = { l = {}, r = {}, g = {}, f = {} }   -- per track: best lap, race, gate rush gates, freestyle combo
-for t = 1, NT do BEST.l[t], BEST.r[t], BEST.g[t], BEST.f[t] = 0, 0, 0, 0 end
+local BEST = { l = {}, r = {}, g = {}, f = {}, i = {} }   -- per track: best lap, race, gate rush gates,
+for t = 1, NT do BEST.l[t], BEST.r[t], BEST.g[t], BEST.f[t], BEST.i[t] = 0, 0, 0, 0, 0 end   -- combo, track id
 local loadData, saveData
 do
 local DATA = "/SCRIPTS/TOOLS/StickTimeBW.dat"
@@ -4629,14 +4706,19 @@ local function validate()
     end
     if not ok then S[o[2]] = DEF[o[2]] end
   end
-  if type(S.track) ~= "number" or S.track < 1 or S.track > NT then S.track = 1 end
+  if type(S.track) ~= "number" or not TRACKS[S.track] then S.track = 1 end
+  -- a custom track that is not the one these bests were flown on: they start over
+  for t = NB0 + 1, NT do
+    local T = TRACKS[t]
+    if T and BEST.i[t] ~= T.id then BEST.l[t], BEST.r[t], BEST.g[t], BEST.f[t], BEST.i[t] = 0, 0, 0, 0, T.id end
+  end
 end
 
 loadData = function()
   local f, old = io.open(DATA, "r"), false
   if not f then f, old = io.open(OLD, "r"), true end
-  if not f then return end
-  local s = io.read(f, 1024)
+  if not f then validate() return end
+  local s = io.read(f, 2048)
   io.close(f)
   if type(s) ~= "string" then return end
   if string.sub(s, 1, 7) == "FPVSIM2" then
@@ -6109,8 +6191,11 @@ local handleEvent
   end
 
   local function stepTrack(d)
-    local t = S.track + d
-    if t < 1 then t = NT elseif t > NT then t = 1 end
+    local t = S.track
+    repeat                                          -- (custom slots without a file are skipped)
+      t = t + d
+      if t < 1 then t = NT elseif t > NT then t = 1 end
+    until TRACKS[t]
     selectTrack(t)
     saveData()
   end
@@ -6244,7 +6329,10 @@ local function init()
     end
     TEST.next = function(i) nextGate, lastGate = i, (i - 2) % NG + 1 end
     TEST.race = function() return lastGate, lapStart, R.n, R.laps, R.total, R.crashes, tStart end
-    TEST.info = function() return NT, P.twr, gmode, R.pos, AI.n, R.sc, R.rn, R.rt, R.chn, BX.n, TRACKS[S.track][1] end
+    TEST.info = function()
+      local n = NT
+      while not TRACKS[n] do n = n - 1 end          -- the highest track that exists
+      return n, P.twr, gmode, R.pos, AI.n, R.sc, R.rn, R.rt, R.chn, BX.n, TRACKS[S.track][1] end
     TEST.thrust = function() return P.twr, P.i0, P.tn, P.dz, P.tk end
     TEST.audio = function() return sT, S.quad, state, aTf, aVu, aE2, aW, sA, sE, sR, aS, aF end
     TEST.ai = function(a) return AI.x[a], AI.y[a], AI.z[a], AI.k[a], AI.d[a], AI.v[a], AI.seg[a] end

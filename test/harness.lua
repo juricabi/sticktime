@@ -572,6 +572,52 @@ for _, c in ipairs({ { "", 0, 0 }, { "lay=2 ", 5000, 12000 } }) do
   end
 end
 
+
+-- 10. custom tracks: StickTimeTracks/c1-c8.txt are tracks 9-16 (empty slots skipped); a slot's
+-- bests start over when a different track (another id) is put in it; a broken file is left out
+do
+  local CT = "/SCRIPTS/TOOLS/StickTimeTracks/c"
+  SD[CT .. "1.txt"] = "Test Loop\n1 4242 7 9  0 0 1 0 0  0 40 1 0 0  30 60 4 90 3  40 20 1 180 0 / 20 30 3 3 0 4 2\n"
+  SD[CT .. "3.txt"] = "Hoops\r\n1 77 3 18  0 0 4 0 2.5  20 30 4 45 2  0 60 4 180 3\r\n"
+  SD[CT .. "5.txt"] = "Broken\n2 1 1 9 0 0 1 0 0\n"                       -- a format this version can't read
+  local inst
+  for _, c in ipairs({ { 4242, 3000 }, { 999, 0 } }) do
+    SD[DATA] = "FPVSIM2 lay=2 track=10 l9=3000 i9=" .. c[1] .. " l11=2500\n"
+    STICKTIME_TEST = {}
+    inst = chunk()
+    inst.init()
+    local L = STICKTIME_TEST
+    local nt = L.info()
+    if nt ~= 11 then fail("custom tracks: the last track should be 11 (c3), is " .. tostring(nt)) end
+    if L.S.track ~= 1 then fail("custom tracks: a save pointing at an empty slot should fall back to track 1") end
+    if L.best(9) ~= c[2] then fail(string.format("custom tracks: track 9's best lap should be %d (saved id %d), is %s", c[2], c[1], tostring(L.best(9)))) end
+    if L.best(11) ~= 0 then fail("custom tracks: track 11's best was saved without its id, it should start over") end
+  end
+  local L = STICKTIME_TEST
+  L.track(9)
+  local name, nb = select(11, L.info()), select(10, L.info())
+  local x, y, z, _, _, _, k = L.gate(3)
+  if name ~= "Test Loop" or nb ~= 1 or x ~= 30 or z ~= 60 or k ~= 4 then
+    fail(string.format("custom tracks: track 9 built wrong (%s, %s structures, gate 3 at %s %s type %s)", tostring(name), tostring(nb), tostring(x), tostring(z), tostring(k)))
+  end
+  L.track(11)
+  local name11 = select(11, L.info())
+  if name11 ~= "Hoops" then fail("custom tracks: track 11 (CRLF file) should be 'Hoops', is " .. tostring(name11)) end
+  -- fly it: a race with AI pilots on the custom track
+  L.track(9) L.set("ai", 2) L.start(1)
+  sticks.thr = 300
+  for _ = 1, 200 do
+    clock = clock + 50
+    local ok, e = pcall(inst.run, 0)
+    if not ok then fail("custom tracks: run error " .. tostring(e)) break end
+  end
+  local st = select(16, L.get())
+  if st ~= 4 and st ~= 5 and st ~= 6 then fail("custom tracks: the race on track 9 isn't flying (state " .. tostring(st) .. ")") end
+  idleSticks()
+  print(string.format("custom tracks: 9 '%s' and 11 '%s' listed (c5 left out), bests kept for the same id, race running", name, name11))
+  for i = 1, 8 do SD[CT .. i .. ".txt"] = nil end
+end
+
 collectgarbage()
 print(string.format("%s %s %dx%d  frames %d  instr/frame (incl. mock lcd) avg %d max %d  tri rows avg %d max %d  rejected lines %d",
   _VERSION, kind, W, H, frames, math.floor(sumInstr / frames), maxInstr, math.floor(sumRows / frames), maxRows, stat.rejected))
