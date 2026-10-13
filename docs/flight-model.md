@@ -10,17 +10,19 @@ measurements.
 
 ```
 x   = max(0, (thr - dz)/(1 - dz))
-T   = Tmax*(i0 + (1 - i0)*x^tn)               Tmax = power * g; lagged with tm
+T   = Tmax*(i0 + (1 - i0)*((1-tk)*x^tn + tk*x^8))   Tmax = power * g; lagged with tm; tk: a steep
+                                               top end, as the reference's throttle chain has
 tf  = T/Tmax
 Ta  = max(0, T - vu*T*(Tmax/T)^vc/(vp + vu*vk))  climbing loses thrust: how the loss scales with
                                                thrust (vc) and bends as the inflow grows (vk)
-Ta  = T*max(rf, 1 + (cq-1)*(1-ce*tf)*(2x - x^2)) descending, x = sink/(sq*tf^se): a cushion that
-                                               peaks at cq, then the blades stall in a fast drop
+Ta  = T*max(min(1, rf + rq*tf), 1 + (cq-1)*(1-ce*tf)*(2x - x^2))   descending, x = sink/(sq*tf^se):
+                                               a cushion that peaks at cq, then the blades stall in
+                                               a fast drop at idle (rf); with power they hold (rq)
 Ta *= 1 - wl*w*min(1, (wv - sink)/(wv - 2))      Prop wash on, sinking faster than 0.6 m/s: w builds
                                                toward 1/(1 + edgewise speed) with a 0.2 s lag
-Ta *= 1 + tl*fade*e2/(e2 + vt^2)                translational lift, e2 = vr^2 + vf^2; it fades near
-                                               full stick and with axial inflow:
-                                               fade = (1 - te*tf^4)/(1 + max(0, vu)/ta)
+Ta *= 1 + tl*fade*e2/(e2 + vt^2)                translational lift, e2 = vr^2 + vf^2; it grows with
+                                               throttle, fades near full stick and with axial inflow:
+                                               fade = (1 + tb*tf)*(1 - te*tf^4)/(1 + max(0, vu)/ta)
 Ta *= 1 + gg*min(1, (gl - d)/gw)/(1 + e2/80)   ground effect when d < gl; d = height above the
                                                surface along body-down (+3 cm, the frame's skids)
 S   = (ks|vr| + ku|vu| + kf|vf|) * (1 + er*(1 - smoothstep(|v|/vd)))
@@ -58,11 +60,15 @@ Both levels are the same physics; Stock is each class's own dose of it.
 
 There is no rotor drag (in-plane H-force): the per-prop model has none, so quads keep their
 momentum (a 5" slide halves in ~4 s). Drag is the measured coefficient of each face, untrimmed.
-The thrust shape (`vp vk vc tl vt te ta`) is fitted jointly to the per-prop model's thrust map
+The thrust shape (`vp vk vc tl vt tb te ta`) is fitted jointly to the per-prop model's thrust map
 over each class's own flight envelope (axial inflow up to its climb rate, edgewise flow up to its
-top speed) and to its steady flight at 0-65 deg pitch and half to full stick; the descent cushion
-(`sq cq ce se rf`) to its thrust map while sinking at idle to full stick. Over those steady flight
-states StickTime is within 0.4-0.9 m/s of the per-prop model on average, with no vertical bias.
+top speed), to its steady flight at 0-65 deg pitch and half to full stick, and to the translational
+lift gain itself in level flight from idle to full stick (so the gain levels off by ~15 m/s as in the
+per-prop model, instead of trading a static-thrust mismatch for too much lift at speed); the descent
+cushion (`sq cq ce se rf rq`) to its thrust map while sinking at idle to full stick (by force, so idle,
+where the props make little thrust, weighs little) and to its flat fall at idle. The throttle curve
+(`dz tn tk`) is fitted to the per-prop model's by relative error from 15% stick up. Over those steady
+flight states StickTime is within 0.2-0.5 m/s of the per-prop model on average.
 The **Grip** setting adds it: props moving edgewise are pushed back, harder the faster they spin,
 so `a = -kh * sqrt(Tm/5g + 0.02) * v` in the prop plane (the 1.6.4 form). Low leaves it out, as
 the reference does (pilots rate that momentum as the closest to a real racer); High is set per
@@ -76,10 +82,10 @@ Parameters (`QP` in `src/sticktime.lua`, one string per class):
 | | Racer 5" | Freestyle 5" | 3" toothpick | Whoop 65mm | Whoop 75mm |
 |---|---|---|---|---|---|
 | stock power `twr`, Power settings offered `tlo`-`thi` | 7.67, 5-12:1 | 6.88, 4-10:1 | 5.35, 3-10:1 | 2.58, 3-8:1 | 3.54, 3-8:1 |
-| idle `i0`, curve `tn`, dead zone `dz` | .031, 2.16, 0 | .026, 1.52, .08 | .022, 1.72, .03 | .0059, .9, .11 | .02, .84, .11 |
-| climbing: prop pitch speed `vp` (m/s), throttle exponent `vc`, bend `vk` | 77.4, .58, .1 | 75.5, .52, -.28 | 67.6, .68, -.77 | 72.9, .89, -1 | 74.5, .83, -1 |
-| descending cushion: peak `cq` at sink `sq`*tf^`se` (m/s), full-stick fade `ce`, stalled `rf` | 1.35 at 15.5*tf^.58, .54, .76 | 1.39 at 13.5*tf^.5, .72, .72 | 1.61 at 15.5*tf^.52, .21, .88 | 1.37 at 9.08*tf^.56, .17, .9 | 1.12 at 14.1*tf^.47, -1, .45 |
-| translational lift `tl`, `vt` (m/s), fades: full stick `te`, axial inflow `ta` (m/s) | .85, 8.6, .4, 35.1 | .69, 9.14, .51, 90.5 | 1, 9.33, 0, 12.2 | 1.1, 9.97, .019, 23.6 | 1.1, 9.17, 0, 29 |
+| idle `i0`, curve `tn`, dead zone `dz`, steep top end `tk` | .031, 1.43, .12, .18 | .026, 1.5, .075, .015 | .022, 1.76, 0, .032 | .0059, .987, .094, -.041 | .02, .916, .09, -.031 |
+| climbing: prop pitch speed `vp` (m/s), throttle exponent `vc`, bend `vk` | 87.5, .61, -.36 | 75.6, .54, -.28 | 69.6, .71, -.79 | 117, .92, -4.8 | 116, .95, -2.8 |
+| descending cushion: peak `cq` at sink `sq`*tf^`se` (m/s), full-stick fade `ce`, stalled `rf` + `rq`*tf | 1.42 at 13.2*tf^.5, .66, .72 + .33*tf | 1.42 at 11.4*tf^.32, .75, .66 + .27*tf | 1.57 at 14.7*tf^.54, .12, .58 + 6.3*tf | 1.34 at 8.42*tf^.52, .079, 5.9e-12 + 12*tf | 1.32 at 8.68*tf^.53, .083, .2 + 5.7*tf |
+| translational lift `tl`, `vt` (m/s), growth with throttle `tb`, fades: full stick `te`, axial inflow `ta` (m/s) | .52, 7.88, .87, .57, 65.3 | .5, 7.61, .37, .71, 453 | .89, 9.7, .3, .2, 14.3 | .82, 9.1, .54, .29, 25.6 | .86, 9.01, .21, .042, 24.6 |
 | drag side/front/top `ks kf ku` (1/m) | .0152 .00819 .0287 | .011 .00635 .0184 | .0176 .0167 .0417 | .0741 .07 .0875 | .0962 .0822 .0288 |
 | low-speed drag `er`, `vd` (m/s) | .36, 15 | .36, 15 | .5, 15 | .29, 7 | .56, 15 |
 | frame lift `lr` | .229 | .257 | .1 | 0 | .4 |
@@ -97,10 +103,10 @@ stock power, attitude held) and what StickTime gives (`tools/tune_physics.py`):
 | | Racer 5" | Freestyle 5" | 3" toothpick | Whoop 65mm | Whoop 75mm |
 |---|---|---|---|---|---|
 | mass (kg) | 0.487 | 0.661 | 0.108 | 0.024 | 0.0468 |
-| hover stick, target / StickTime | 0.33 / 0.35 | 0.30 / 0.31 | 0.38 / 0.37 | 0.43 / 0.42 | 0.30 / 0.30 |
-| full-throttle climb (m/s) | 34.2 / 35.3 | 35.0 / 35.5 | 22.9 / 22.5 | 11.6 / 11.6 | 21.6 / 20.9 |
-| idle fall (m/s) | 17.5 / 17.5 | 22.8 / 22.6 | 15.5 / 15.2 | 11.1 / 11.0 | 19.3 / 19.0 |
-| top speed (m/s) at pitch (deg) | 38.9 @ 67.5 / 40.3 @ 70 | 41.4 @ 62.5 / 41.5 @ 62.5 | 26.5 @ 67.5 / 26.4 @ 67.5 | 14.4 @ 65 / 14.7 @ 65 | 21.4 @ 57.5 / 21.4 @ 57.5 |
+| hover stick, target / StickTime | 0.33 / 0.33 | 0.30 / 0.31 | 0.38 / 0.37 | 0.43 / 0.42 | 0.30 / 0.30 |
+| full-throttle climb (m/s) | 34.2 / 34.4 | 35.0 / 35.5 | 22.9 / 22.7 | 11.6 / 11.6 | 21.6 / 21.3 |
+| idle fall (m/s) | 17.5 / 17.6 | 22.8 / 22.7 | 15.5 / 15.4 | 11.1 / 11.1 | 19.3 / 19.1 |
+| top speed (m/s) at pitch (deg) | 38.9 @ 67.5 / 39.5 @ 70 | 41.4 @ 62.5 / 41.2 @ 62.5 | 26.5 @ 67.5 / 26.6 @ 67.5 | 14.4 @ 65 / 14.5 @ 65 | 21.4 @ 57.5 / 21.5 @ 57.5 |
 | sideways slide half-life from 15 m/s (s) | 4.03 / 4.03 | 5.57 / 5.57 | 3.39 / 3.38 | 0.90 / 0.90 | 0.61 / 0.61 |
 | edgewise thrust gain at 6 / 15 m/s | +27% / +48% | +26% / +43% | +26% / +68% | +29% / +73% | +30% / +67% |
 | thrust at 2 / 6 m/s sink, wash off / on | 1.21 / 1.31, 0.82 / 1.27 | 1.20 / 1.34, 0.79 / 1.17 | 1.29 / 1.61, 0.93 / 1.43 | 1.23 / 1.33, 0.95 / 1.32 | 1.24 / 1.29, 0.90 / 1.30 |

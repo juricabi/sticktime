@@ -3,13 +3,14 @@
 Usage: tools/tune_physics.py [class number 1-5] [key=value ...]   e.g. tools/tune_physics.py 1 vp=60 grip=2
 
 Model (mass-normalised, body axes r/u/f; the same steps as physics() in src/sticktime.lua):
-  T   = Tmax*(i0 + (1-i0)*x^tn),  x = max(0, (thr-dz)/(1-dz))      stick -> thrust, lagged with tm
+  T   = Tmax*(i0 + (1-i0)*((1-tk)*x^tn + tk*x^8)),  x = max(0, (thr-dz)/(1-dz))   stick -> thrust, lagged with tm
   Ta  = max(0, T - vu*T*(Tmax/T)^vc/(vp + vu*vk))  climbing (vc: how the loss scales with thrust,
                                                   vk: the loss bends, the prop unloads);
        T*max(rf, 1 + (cq-1)*(1-ce*tf)*(2x - x^2)), x = sink/(sq*tf^se)  descending: a cushion that
                                                   peaks, then the blades stall (tf = T/Tmax)
   Ta *= 1 - wl*wash*fade  (Prop wash on: sinking into your own downwash, see src/sticktime.lua)
-  Ta *= 1 + tl*fade*e2/(e2 + vt^2)   translational lift; fade = (1 - te*(T/Tmax)^4)/(1 + vu/ta) near full
+  Ta *= 1 + tl*fade*e2/(e2 + vt^2)   translational lift; fade = (1 + tb*T/Tmax)*(1 - te*(T/Tmax)^4)/(1 + vu/ta):
+                                       it grows with throttle (tb), fades near full
                                        stick and with axial inflow
   S   = (ks|vr| + ku|vu| + kf|vf|)*(1 + er*(1 - smoothstep(|v|/vd)))     drag along the flow: a = -S*v
   frame lift: s = vu/|v|, q = lr*s*0.813*(2|s|sqrt(1-s^2))^0.6*S*|v|/sqrt(1-s^2)
@@ -42,9 +43,24 @@ def classes():
     return out
 
 
+def curve(p, x):
+    tk = p.get("tk", 0.0)
+    return (1 - tk) * x ** p["tn"] + tk * x ** 8
+
+
 def thrust(p, s):
     x = max(0.0, (s - p["dz"]) / (1 - p["dz"]))
-    return p["twr"] * G * (p["i0"] + (1 - p["i0"]) * x ** p["tn"])
+    return p["twr"] * G * (p["i0"] + (1 - p["i0"]) * curve(p, x))
+
+
+def hover_stick(p, load=1.0):
+    r = (load / p["twr"] - p["i0"]) / (1 - p["i0"])
+    lo, hi = 0.0, 1.0
+    for _ in range(50):
+        m = (lo + hi) / 2
+        if curve(p, m) < r: lo = m
+        else: hi = m
+    return p["dz"] + (1 - p["dz"]) * hi
 
 
 def accel(p, Tm, vu, vr, vf):
@@ -53,12 +69,13 @@ def accel(p, Tm, vu, vr, vf):
     tf = Tm / Tmax
     if vu < 0:                                                 # the cushion rises, then the blades stall
         x = -vu / (p["sq"] * tf ** p["se"]) if tf > 0.001 else 9.0
-        Ta = Tm * max(p["rf"], 1 + (p["cq"] - 1) * (1 - p["ce"] * tf) * (2 * x - x * x))
+        fl = min(1.0, p["rf"] + p.get("rq", 0.0) * tf)          # stalled floor: lower at idle
+        Ta = Tm * max(fl, 1 + (p["cq"] - 1) * (1 - p["ce"] * tf) * (2 * x - x * x))
     else:
         den = max(0.3 * p["vp"], p["vp"] + vu * p["vk"])
         Ta = max(0.0, Tm - vu * Tm * (Tmax / Tm) ** p["vc"] / den) if Tm > 0 else 0.0
     e2 = vr * vr + vf * vf
-    fa = max(0.0, 1 - p["te"] * tf ** 4)                       # translational lift fades near full stick
+    fa = max(0.0, 1 - p["te"] * tf ** 4) * (1 + p.get("tb", 0.0) * tf)   # translational lift: grows with throttle, fades near full stick
     if vu > 0:
         fa /= 1 + vu / p["ta"]                                 # and with axial inflow
     Ta *= 1 + p["tl"] * fa * e2 / (e2 + p["vt"] ** 2)
@@ -107,8 +124,7 @@ def fly(p, thr, pitch_deg, v0=(0.0, 0.0), secs=14.0, h=0.0125, hold_alt=False, u
 
 
 def report(p):
-    r = (1 / p["twr"] - p["i0"]) / (1 - p["i0"])
-    hover = p["dz"] + (1 - p["dz"]) * max(0.0, r) ** (1 / p["tn"])
+    hover = hover_stick(p)
     _, climb, _ = fly(p, 1.0, 0.0, secs=8)
     _, fall, _ = fly(p, 0.0, 0.0, secs=10)
     best = None

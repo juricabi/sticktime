@@ -179,9 +179,13 @@ local function steps(n) for i = 1, math.max(1, math.floor(n * 50 / FRAME_MS + 0.
 -- ------------------------------------------------------------ autopilot
 -- stick (0..1) that gives `load` times the weight in thrust: inverse of the quad's thrust curve
 function hoverStick(load)
-  local twr, i0, n, dz = T.thrust()
-  local x = math.max(0, (load / twr - i0) / (1 - i0)) ^ (1 / n)
-  return dz + (1 - dz) * x
+  local twr, i0, n, dz, tk = T.thrust()
+  local r, lo, hi = math.max(0, (load / twr - i0) / (1 - i0)), 0, 1
+  for _ = 1, 40 do                      -- (1 - tk) x^n + tk x^8 rises with x: bisect
+    local x = (lo + hi) / 2
+    if (1 - tk) * x ^ n + tk * x ^ 8 < r then lo = x else hi = x end
+  end
+  return dz + (1 - dz) * hi
 end
 
 -- angle mode: steer toward a lead point on the gate axis, hold the aim height

@@ -1,6 +1,6 @@
 local toolName = "TNS|@TOOLNAME@|TNE"
 --[[ ======================================================================
-  @TITLE@ v1.6.6  -  a real 3D FPV quad simulator that runs on your radio
+  @TITLE@ v1.6.7  -  a real 3D FPV quad simulator that runs on your radio
   @VARIANT@
 
   Install : @INSTALL@
@@ -80,25 +80,26 @@ local RKEYS = { rc = 1, rm = 2, re = 3, yc = 4, ym = 5, ye = 6 }
 -- quad profiles (Racer 5", Freestyle 5", 3" toothpick, Whoop 65mm, Whoop 75mm), each fitted to a detailed model
 -- of that class (blade-element props on rpm-governed motors, a Betaflight-style PID loop; see
 -- docs/flight-model.md). twr stock thrust/weight; thrust curve: i0 idle, tn exponent, dz bottom dead
--- zone; vp, vc, vk climbing: prop pitch speed (m/s), throttle exponent and bend of the inflow loss; tl, vt
--- translational lift gain and speed (m/s), te, ta its fades near full stick and with axial inflow (m/s); ks, kf, ku
--- side, front, top drag per kg; er, vd extra drag at low speed and the speed it fades by (m/s); lr
+-- zone, tk the share of a steep top end (x^8); vp, vc, vk climbing: prop pitch speed (m/s), throttle
+-- exponent and bend of the inflow loss; tl, vt translational lift gain and speed (m/s), tb its growth
+-- with throttle, te, ta its fades near full stick and with axial inflow (m/s); ks, kf, ku side, front,
+-- top drag per kg; er, vd extra drag at low speed and the speed it fades by (m/s); lr
 -- frame lift / drag; gg, gl, gw ground effect gain, ray length and fade (m); tm thrust, tr roll/pitch,
 -- ty yaw response time (s); pw/wl/wv prop wash Max: shake rms at full wash (deg), thrust loss, the sink
 -- speed where the loss has faded out (m/s); wls/wvs/pws the same at the class's Stock setting; sq, cq,
 -- ce, se, rf descending: the cushion peaks at cq (less by ce near full stick) at a sink of sq*tf^se m/s,
--- then stalls down to rf; pf the prop wash shake's frequency (Hz); tlo, thi the Power settings that
+-- then stalls down to rf + rq*tf (at most 1: at idle the blades stall, with power they hold); pf the prop wash shake's frequency (Hz); tlo, thi the Power settings that
 -- suit the class (thrust/weight of real quads of its kind; Stock is always there); kh rotor drag at
 -- Grip High (1/s, times sqrt(Tm/5g + 0.02); Medium, the default, 0.4 of it; Low none, as in the reference).
 -- One string per class (parsed for the class in use only: tables of numbers cost radio memory):
-local QK = { "twr", "i0", "tn", "dz", "vp", "vk", "tl", "vt", "te", "ks", "kf", "ku", "er", "vd", "lr", "gg", "gl", "gw", "tm", "tr", "ty", "pw", "wl", "wv", "sq", "cq", "wls", "wvs", "pws", "vc", "ta", "ce", "se", "rf", "pf", "tlo", "thi", "kh" }
+local QK = { "twr", "i0", "tn", "dz", "vp", "vk", "tl", "vt", "te", "ks", "kf", "ku", "er", "vd", "lr", "gg", "gl", "gw", "tm", "tr", "ty", "pw", "wl", "wv", "sq", "cq", "wls", "wvs", "pws", "vc", "ta", "ce", "se", "rf", "pf", "tlo", "thi", "kh", "tk", "tb", "rq" }
 local QP = {
-  -- twr i0 tn dz vp vk tl vt te ks kf ku er vd lr gg gl gw tm tr ty pw wl wv sq cq wls wvs pws vc ta ce se rf pf tlo thi kh
-  "7.67 .0315 2.16 0 77.4 .101 .854 8.6 .402 .0152 .00819 .0287 .357 15 .229 .24 .25 .113 .006 .009 .02 .347 .326 6.01 15.5 1.35 .119 3.8 .19 .584 35.1 .544 .579 .756 26 5 12 .363",  -- Racer 5": 0.49 kg, 2500KV, 5045 tri-blade
-  "6.88 .026 1.52 .08 75.5 -.283 .685 9.14 .514 .011 .00635 .0184 .357 15 .257 .26 .25 .113 .006 .008 .02 .347 .348 7 13.5 1.39 .132 4.56 .19 .524 90.5 .722 .497 .722 24 4 10 .263",  -- Freestyle 5": HD, 0.66 kg, 2400KV, 5045
-  "5.35 .0221 1.72 .03 67.6 -.77 1.01 9.33 0 .0176 .0167 .0417 .5 15 .1 .44 .15 .135 .006 .009 .02 .42 .291 7.04 15.5 1.61 .103 5.17 .23 .681 12.2 .21 .525 .881 35 3 10 .433",        -- 3" toothpick: 0.11 kg, 3S, 5000KV, 76 mm
-  "2.58 .0059 .9 .11 72.9 -1 1.14 9.97 .019 .0741 .07 .0875 .286 7 0 .17 .0625 .0344 .006 .02 .02 .854 .237 5.61 9.08 1.37 .0243 2.5 .27 .891 23.6 .174 .557 .9 45 3 8 1.59",          -- Whoop 65mm: ducted 1S, 24 g, 28000KV, 31 mm
-  "3.54 .0198 .84 .11 74.5 -1 1.11 9.17 0 .0962 .0822 .0288 .556 15 .4 .19 .08 .036 .006 .016 .02 .456 .285 5.61 14.1 1.12 .0949 3.63 .25 .826 29 -1 .474 .454 40 3 8 2.38",           -- Whoop 75mm: ducted 2S, 47 g, 12000KV, 4-blade 40 mm
+  -- twr i0 tn dz vp vk tl vt te ks kf ku er vd lr gg gl gw tm tr ty pw wl wv sq cq wls wvs pws vc ta ce se rf pf tlo thi kh tk tb rq
+  "7.67 .0315 1.43 .123 87.5 -.362 .517 7.88 .566 .0152 .00819 .0287 .357 15 .229 .24 .25 .113 .006 .009 .02 .347 .326 6.01 13.2 1.42 .119 3.8 .19 .61 65.3 .655 .496 .72 26 5 12 .363 .184 .874 .334",  -- Racer 5": 0.49 kg, 2500KV, 5045 tri-blade
+  "6.88 .026 1.5 .075 75.6 -.278 .502 7.61 .712 .011 .00635 .0184 .357 15 .257 .26 .25 .113 .006 .008 .02 .347 .348 7 11.4 1.42 .132 4.56 .19 .539 453 .75 .317 .661 24 4 10 .263 .015 .367 .272",       -- Freestyle 5": HD, 0.66 kg, 2400KV, 5045
+  "5.35 .0221 1.76 0 69.6 -.786 .891 9.7 .204 .0176 .0167 .0417 .5 15 .1 .44 .15 .135 .006 .009 .02 .42 .291 7.04 14.7 1.57 .103 5.17 .23 .713 14.3 .121 .537 .577 35 3 10 .433 .032 .297 6.34",         -- 3" toothpick: 0.11 kg, 3S, 5000KV, 76 mm
+  "2.58 .0059 .987 .094 117 -4.79 .824 9.1 .287 .0741 .07 .0875 .286 7 0 .17 .0625 .0344 .006 .02 .02 .854 .237 5.61 8.42 1.34 .0243 2.5 .27 .919 25.6 .0789 .517 5.9e-12 45 3 8 1.59 -.041 .536 11.9",  -- Whoop 65mm: ducted 1S, 24 g, 28000KV, 31 mm
+  "3.54 .0198 .916 .09 116 -2.78 .864 9.01 .042 .0962 .0822 .0288 .556 15 .4 .19 .08 .036 .006 .016 .02 .456 .285 5.61 8.68 1.32 .0949 3.63 .25 .952 24.6 .0829 .526 .203 40 3 8 2.38 -.031 .212 5.67",  -- Whoop 75mm: ducted 2S, 47 g, 12000KV, 4-blade 40 mm
 }
 
 -- -------------------------------------------------------------- tracks
@@ -656,7 +657,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     -- stick -> thrust: idle (min_throttle), the bottom dead zone, then the class curve (rpm ~ stick, thrust ~ rpm^2)
     local tx = (sT - P.dz) / (1 - P.dz)
     if tx < 0 then tx = 0 end
-    local T = Tmax * (P.i0 + (1 - P.i0) * tx ^ P.tn)
+    local T = Tmax * (P.i0 + (1 - P.i0) * ((1 - P.tk) * tx ^ P.tn + P.tk * tx ^ 8))
     -- prop wash (setting, off by default): sinking into your own downwash. The props build up a
     -- wash over ~0.2 s while they move down their own axis, less the faster they also move edgewise.
     -- It costs thrust (up to wl, from a 0.6 m/s sink until it fades out at wv m/s: the quad sinks
@@ -728,7 +729,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     local km, kr, ky = h / (P.tm + h), h / (P.tr + h), h / (P.ty + h)
     local VP, VK, VC, KS, KF, KU = P.vp, P.vk, P.vc, P.ks, P.kf, P.ku
     local TL, VT2, TE, TA, ER, VD, LR, GG, GL, GW = P.tl, P.vt * P.vt, P.te, P.ta, P.er, P.vd, P.lr, P.gg, P.gl, P.gw
-    local SQ, CQ, CE, SE, RF = P.sq, P.cq, P.ce, P.se, P.rf
+    local SQ, CQ, CE, SE, RF, RQ, TB = P.sq, P.cq, P.ce, P.se, P.rf, P.rq, P.tb
     local KH = (P.kh or 0) * (S.grip == 2 and 1 or S.grip == 1 and 0.4 or 0)
     local x0, x1, z0, z1 = TR.x0 - 160, TR.x1 + 160, TR.z0 - 160, TR.z1 + 160
     local bx0, bx1, by0, by1, bz0, bz1 = BX.x0, BX.x1, BX.y0, BX.y1, BX.z0, BX.z1
@@ -779,11 +780,14 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
       local tf = Tm / Tmax                              -- thrust fraction
       local Ta
       if vu < 0 then
-        -- descending: a cushion that rises to cq at a sink of sq*tf^se, then stalls away (to rf)
+        -- descending: a cushion that rises to cq at a sink of sq*tf^se, then stalls away (to rf + rq*tf:
+        -- with power the blades hold their thrust, at idle they stall)
         local x = 9
         if tf > 0.001 then x = -vu / (SQ * tf ^ SE) end
         local r = 1 + (CQ - 1) * (1 - CE * tf) * (2 * x - x * x)
-        if r < RF then r = RF end
+        local fl = RF + RQ * tf
+        if fl > 1 then fl = 1 end
+        if r < fl then r = fl end
         Ta = Tm * r
       else
         if Tm > 0 then                                -- the loss grows with thrust as Tm*(Tmax/Tm)^VC
@@ -797,12 +801,14 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
       end
       Ta = Ta * (1 - wl)
       -- translational lift: flying edgewise the props reach fresh air, the induced inflow drops
-      -- and the same rpm gives more thrust (a 5": +25% at 6 m/s, +50% from 15 m/s)
+      -- and the same rpm gives more thrust (a 5" at hover throttle: about +20% at 6 m/s, levelling off near +50%)
       local e2 = vr * vr + vf * vf
-      -- the gain fades near full stick (te) and as air comes through the props axially (ta, m/s)
+      -- the gain grows with throttle (tb), fades near full stick (te) and as air comes through the
+      -- props axially (ta, m/s)
       local t2 = tf * tf
       local fa = 1 - TE * t2 * t2
       if fa < 0 then fa = 0 end
+      fa = fa * (1 + TB * tf)
       if vu > 0 then fa = fa / (1 + vu / TA) end
       Ta = Ta * (1 + TL * fa * e2 / (e2 + VT2))
       -- ground effect: within a twentieth of the prop diameter of the ground or a roof the props
@@ -3427,7 +3433,7 @@ local function init()
     TEST.next = function(i) nextGate, lastGate = i, (i - 2) % NG + 1 end
     TEST.race = function() return lastGate, lapStart, R.n, R.laps, R.total, R.crashes, tStart end
     TEST.info = function() return NT, P.twr, gmode, R.pos, AI.n, R.sc, R.rn, R.rt, R.chn, BX.n, TRACKS[S.track][1] end
-    TEST.thrust = function() return P.twr, P.i0, P.tn, P.dz end
+    TEST.thrust = function() return P.twr, P.i0, P.tn, P.dz, P.tk end
     TEST.audio = function() return sT, S.quad, state, aTf, aVu, aE2, aW, sA, sE, sR, aS, aF end
     TEST.ai = function(a) return AI.x[a], AI.y[a], AI.z[a], AI.k[a], AI.d[a], AI.v[a], AI.seg[a] end
     TEST.best = function(t) return BEST.l[t], BEST.r[t], BEST.g[t], BEST.f[t] end

@@ -216,6 +216,9 @@ def main():
             lp = OUT / cfg["loader"]
             lp.write_text(lt, encoding="utf-8")
             print(f"{lp.relative_to(ROOT)}: {len(lt.encode())} bytes (loader)")
+            # why the game did not load (the loader runs it only then)
+            wt = placeholders((ROOT / "src" / "bwwhy.lua").read_text(encoding="utf-8"), cfg)
+            (OUT / cfg["DIR"] / "why.lua").write_text(wt, encoding="utf-8")
             # what the loader shows on a color radio instead of the game
             ct = placeholders((ROOT / "src" / "bwcolor.lua").read_text(encoding="utf-8"), cfg)
             (OUT / cfg["DIR"] / "color.lua").write_text(ct, encoding="utf-8")

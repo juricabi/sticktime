@@ -1,6 +1,6 @@
 local toolName = "TNS|StickTime Lite|TNE"
 --[[ ======================================================================
-  StickTime Lite v1.6.6  -  the small edition of StickTime for B&W radios.
+  StickTime Lite v1.6.7  -  the small edition of StickTime for B&W radios.
   Made for radios with little memory (STM32F2: X7, X9D, X9D+, X9 Lite,
   X-Lite, TX12 MkI, T12, T8, T-Lite, T-Pro, LR3 Pro). Runs on every
   black & white EdgeTX radio with EdgeTX 2.11 or newer.
@@ -67,7 +67,7 @@ local OPTS = {
 local RATES = nums("70 400 35 70 350 30 100 600 50 100 500 40 150 850 45 130 700 40")
 -- the quad classes: one line of numbers each in StickTimeLite/q<class>.txt (made by build.py from
 -- the color game's QP), read when the class is picked. Order: twr i0 tn dz vp vk tl vt te ks kf
--- ku er vd lr gg gl gw tm tr ty pw wl wv sq cq wls wvs pws vc ta ce se rf pf tlo thi kh (P[7]..P[44]), then
+-- ku er vd lr gg gl gw tm tr ty pw wl wv sq cq wls wvs pws vc ta ce se rf pf tlo thi kh tk tb rq (P[7]..P[47]), then
 -- the class's name on the next line
 
 -- tracks: the names; each track's gates and structures are in StickTimeLite/t<number>.txt (made
@@ -203,16 +203,16 @@ local FILE = "/SCRIPTS/TOOLS/StickTimeLite/data.txt"
 local OLD = "/SCRIPTS/TOOLS/FPVLite/data.txt"              -- the save under the old name, FPV Sim Lite
 
 save = function()
-  local s = "FPVLITE2 lay=2"
-  for k, v in pairs(S) do s = s .. " " .. k .. "=" .. floor(v) end
-  for t = 1, NT do
-    s = s .. " l" .. t .. "=" .. floor(BL[t]) .. " r" .. t .. "=" .. floor(BR[t]) .. " f" .. t .. "=" .. BF[t] .. " g" .. t .. "=" .. BG[t]
-  end
+  -- piece by piece: a line grown by concatenation leaves a trail of ever longer strings behind,
+  -- and this radio's heap has no room for that in the middle of a flight
   local f = io.open(FILE, "w")
-  if f then
-    io.write(f, s)
-    io.close(f)
+  if not f then return end
+  io.write(f, "FPVLITE2 lay=2")
+  for k, v in pairs(S) do io.write(f, " " .. k .. "=" .. floor(v)) end
+  for t = 1, NT do
+    io.write(f, " l" .. t .. "=" .. floor(BL[t]) .. " r" .. t .. "=" .. floor(BR[t]) .. " f" .. t .. "=" .. BF[t] .. " g" .. t .. "=" .. BG[t])
   end
+  io.close(f)
 end
 
 load = function()
@@ -491,7 +491,7 @@ physics = function(dt)
   local wy = rate(sR, P[4], P[5], P[6])
   local x = (sT - P[10]) / (1 - P[10])                         -- the class curve: bottom dead zone,
   if x < 0 then x = 0 end                                       -- idle, then thrust ~ rpm^2
-  local T = Tmax * (P[8] + (1 - P[8]) * x ^ P[9])
+  local T = Tmax * (P[8] + (1 - P[8]) * ((1 - P[45]) * x ^ P[9] + P[45] * x ^ 8))   -- tk: a steep top end
   -- prop wash (setting): sinking into your own downwash costs thrust (Stock: the class's own
   -- dose, Max: full). No shake here: at its real size (tenths of a degree) it is under a pixel on
   -- these screens, and this radio has no memory to spare
@@ -565,11 +565,13 @@ physics = function(dt)
     local tf = Tm / Tmax                              -- thrust fraction
     local Ta
     if vu < 0 then
-      -- descending: a cushion that rises to cq at a sink of sq*tf^se, then stalls away (to rf)
+      -- descending: a cushion that rises to cq at a sink of sq*tf^se, then stalls away (to rf + rq*tf)
       local x = 9
       if tf > 0.001 then x = -vu / (SQ * tf ^ SE) end
       local r = 1 + (CQ - 1) * (1 - CE * tf) * (2 * x - x * x)
-      if r < RF then r = RF end
+      x = RF + P[47] * tf                           -- (x reused: the stall floor, rf + rq*tf)
+      if x > 1 then x = 1 end
+      if r < x then r = x end
       Ta = Tm * r
     else
       if Tm > 0 then                                -- the loss grows with thrust as Tm*(Tmax/Tm)^VC
@@ -582,12 +584,13 @@ physics = function(dt)
       if Ta < 0 then Ta = 0 end
     end
     Ta = Ta * (1 - wl)
-    -- translational lift: edgewise the props reach fresh air; it fades near full stick (te) and
-    -- with axial inflow (ta)
+    -- translational lift: edgewise the props reach fresh air; it grows with throttle (tb), fades
+    -- near full stick (te) and with axial inflow (ta)
     local e2 = vr * vr + vf * vf
     local t2 = tf * tf
     local fa = 1 - TE * t2 * t2
     if fa < 0 then fa = 0 end
+    fa = fa * (1 + P[46] * tf)
     if vu > 0 then fa = fa / (1 + vu / TA) end
     Ta = Ta * (1 + TL * fa * e2 / (e2 + VT2))
     -- ground effect: within a twentieth of the prop diameter of the ground or a roof
@@ -725,7 +728,8 @@ end
 
 local function selectTrack(t)
   S.track = t
-  buildTrack(t)
+  collectgarbage()                                  -- the flight's leftovers first: free space in one piece
+  buildTrack(t)                                     -- for the bigger tracks' tables
   collectgarbage()                                  -- what building left behind, before flying
   place(spx, DR, spz, shx, shz)
 end
@@ -1152,7 +1156,7 @@ local function init()
     T.next = function(i) nextGate, lastGate = i, (i - 2) % NG + 1 end
     T.lapclock = function(t) lapStart, tStart, msgT = gt - t, gt - t, gt - 1000 if lap < 1 then lap = 1 end end
     T.info = function() return NT, P[7], gm, lap, total, rn, rt, TRACKS[S.track], NP, sc, chn, NB end
-    T.thrust = function() return P[7], P[8], P[9], P[10] end
+    T.thrust = function() return P[7], P[8], P[9], P[10], P[45] end
     T.audio = function() return sT, S.quad, state, aTf, aVu, aE2, aW, sA, sE, sR end
     T.best = function(t) return BL[t], BR[t], BG[t], BF[t] end
     T.ntracks = function() return NT end

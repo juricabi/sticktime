@@ -1,6 +1,6 @@
 local toolName = "TNS|StickTime Lite|TNE"
 --[[ ======================================================================
-StickTime Lite v1.6.6  -  the small edition of StickTime for B&W radios.
+StickTime Lite v1.6.7  -  the small edition of StickTime for B&W radios.
 Made for radios with little memory (STM32F2: X7, X9D, X9D+, X9 Lite,
 X-Lite, TX12 MkI, T12, T8, T-Lite, T-Pro, LR3 Pro). Runs on every
 black & white EdgeTX radio with EdgeTX 2.11 or newer.
@@ -164,16 +164,14 @@ do
 local FILE = "/SCRIPTS/TOOLS/StickTimeLite/data.txt"
 local OLD = "/SCRIPTS/TOOLS/FPVLite/data.txt"              -- the save under the old name, FPV Sim Lite
 save = function()
-local s = "FPVLITE2 lay=2"
-for k, v in pairs(S) do s = s .. " " .. k .. "=" .. floor(v) end
-for t = 1, 8 do
-s = s .. " l" .. t .. "=" .. floor(BL[t]) .. " r" .. t .. "=" .. floor(BR[t]) .. " f" .. t .. "=" .. BF[t] .. " g" .. t .. "=" .. BG[t]
-end
 local f = io.open(FILE, "w")
-if f then
-io.write(f, s)
-io.close(f)
+if not f then return end
+io.write(f, "FPVLITE2 lay=2")
+for k, v in pairs(S) do io.write(f, " " .. k .. "=" .. floor(v)) end
+for t = 1, 8 do
+io.write(f, " l" .. t .. "=" .. floor(BL[t]) .. " r" .. t .. "=" .. floor(BR[t]) .. " f" .. t .. "=" .. BF[t] .. " g" .. t .. "=" .. BG[t])
 end
+io.close(f)
 end
 load = function()
 local f, old = io.open(FILE, "r"), false
@@ -418,7 +416,7 @@ end
 local wy = rate(sR, P[4], P[5], P[6])
 local x = (sT - P[10]) / (1 - P[10])                         -- the class curve: bottom dead zone,
 if x < 0 then x = 0 end                                       -- idle, then thrust ~ rpm^2
-local T = Tmax * (P[8] + (1 - P[8]) * x ^ P[9])
+local T = Tmax * (P[8] + (1 - P[8]) * ((1 - P[45]) * x ^ P[9] + P[45] * x ^ 8))   -- tk: a steep top end
 local wl = 0
 if S.wash > 0 then
 local vu0 = vx * ux + vy * uy + vz * uz
@@ -485,7 +483,9 @@ if vu < 0 then
 local x = 9
 if tf > 0.001 then x = -vu / (SQ * tf ^ SE) end
 local r = 1 + (CQ - 1) * (1 - CE * tf) * (2 * x - x * x)
-if r < RF then r = RF end
+x = RF + P[47] * tf                           -- (x reused: the stall floor, rf + rq*tf)
+if x > 1 then x = 1 end
+if r < x then r = x end
 Ta = Tm * r
 else
 if Tm > 0 then                                -- the loss grows with thrust as Tm*(Tmax/Tm)^VC
@@ -502,6 +502,7 @@ local e2 = vr * vr + vf * vf
 local t2 = tf * tf
 local fa = 1 - TE * t2 * t2
 if fa < 0 then fa = 0 end
+fa = fa * (1 + P[46] * tf)
 if vu > 0 then fa = fa / (1 + vu / TA) end
 Ta = Ta * (1 + TL * fa * e2 / (e2 + VT2))
 if uy > 0.3 then
@@ -618,7 +619,8 @@ state, tState = m == 3 and 6 or 3, gt
 end
 local function selectTrack(t)
 S.track = t
-buildTrack(t)
+collectgarbage()                                  -- the flight's leftovers first: free space in one piece
+buildTrack(t)                                     -- for the bigger tracks' tables
 collectgarbage()                                  -- what building left behind, before flying
 place(spx, 0.15, spz, shx, shz)
 end

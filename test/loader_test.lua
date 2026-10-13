@@ -27,9 +27,10 @@ local function check(loader, case)
     mode = mode or "bt"
     local rel = path:match("TOOLS/(.*)%.lua$")
     calls[#calls + 1] = rel:match("[^/]*$") .. ":" .. mode
-    if case == "oom" then return nil, "not enough memory" end
-    if case == "old" then return nil, "/SCRIPTS/TOOLS/" .. rel .. ".luac: version mismatch in precompiled chunk" end
-    local f = case == "game" and io.open(ROOT .. rel .. ".luac", "rb")
+    local game = rel:match("[^/]*$") == "game"
+    if game and case == "oom" then return nil, "not enough memory" end
+    if game and case == "old" then return nil, "/SCRIPTS/TOOLS/" .. rel .. ".luac: version mismatch in precompiled chunk" end
+    local f = game and case == "game" and io.open(ROOT .. rel .. ".luac", "rb")
     if f then
       local s = f:read("a")
       f:close()
@@ -40,7 +41,7 @@ local function check(loader, case)
   end
   local good, m = pcall(dofile, ROOT .. loader)
   local seq = table.concat(calls, " ")
-  local want, screen = "game:b", ""
+  local want, screen = case == "game" and "game:b" or "game:b why:bt", ""   -- why.lua only when the game failed
   if case == "game" then
     good = good and type(m) == "table" and type(m.init) == "function" and type(m.run) == "function" and seq == want
   else
