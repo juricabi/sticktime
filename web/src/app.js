@@ -743,13 +743,19 @@
     return { text: LUA[kind], name: kind === 'color' ? 'StickTime.lua' : dir + 'core.lua' };
   }
 
+  // the game's saves go to the browser's storage just after the frame that wrote them, not in it
+  // (with ghosts on the virtual card the write takes a few ms), and at the latest as the page goes
+  let sdLater = 0;
+  const flushSD = () => { sdLater = 0; store.set('sd', Object.fromEntries(app.sd)); };
+  window.addEventListener('pagehide', () => { if (sdLater) flushSD(); });
+
   function boot() {
     const r = app.radio;
     const eng = new Engine(fengari, r, {
       colorFonts, bwFonts: BW_FONTS, sd: app.sd,
       files: Object.assign({ '/SCRIPTS/TOOLS/StickTimeBW/core.lua': LUA.bw, '/SCRIPTS/TOOLS/StickTimeLite/core.lua': LUA.lite }, LITE_TRACKS),
       onTone: tone, onHaptic: haptic,
-      onSave: () => store.set('sd', Object.fromEntries(app.sd)),
+      onSave: () => { if (!sdLater) sdLater = setTimeout(flushSD, 0); },
     });
     eng.stickMode = app.mode - 1;
     // PC mode: big screen, 60 fps, frames shown at once (no radio display delay)

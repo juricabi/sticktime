@@ -2194,7 +2194,7 @@ do
   ghost.lap = function(lt)                     -- a practice lap ends: is it the new ghost?
     if RC.t0 ~= lapStart or RC.n < 2 or (GH.n > 0 and lt >= GH.lap) then return end
     if #RC.q > 0 then RC.c[#RC.c + 1] = RC.q end
-    GH = { n = RC.n, iv = RC.iv, lap = lt, c = RC.c, t = S.track, dirty = true }   -- (saved at a break: R.flush)
+    GH = { n = RC.n, iv = RC.iv, lap = lt, c = RC.c, t = S.track, dirty = true }   -- (saved by R.flush)
   end
 
   -- its file. The id: a custom track's, else the layout of the built-in tracks (3)
@@ -2251,8 +2251,8 @@ do
   ghost.max, ghost.file = GMAX, GFILE
 end
 
--- the saves wait for a break in the flying (pause, restart, the menu, a crash, the end of a run):
--- writing the SD card in flight stalls a frame
+-- the saves: a new best and a new ghost are written at once (the radio may be switched off any
+-- time); the breaks (pause, restart, the menu, a crash, the end of a run) write anything left
 R.flush = function()
   if R.dirty then
     R.dirty = false
@@ -2472,11 +2472,12 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
           BEST.l[S.track], R.newLap = lt, true
           local m = MED.of(lt)
           showMsg("LAP " .. lap .. "  " .. timeStr(lt) .. "  " .. (m > MED.of(b) and MED.n[m] or "BEST") .. "!", true)
-          R.dirty = true                             -- (saved at a break: R.flush)
+          R.dirty = true
         else
           showMsg("LAP " .. lap .. "  " .. timeStr(lt) .. "  +" .. timeStr(lt - b), false)
         end
         if gmode == 2 and S.ghost == 1 then ghost.lap(lt) end
+        R.flush()                                    -- (now: the radio may be switched off any time)
         lap = lap + 1
         beep(2200, 160)
         if playHaptic and S.vib == 1 then playHaptic(25, 0) end
@@ -2961,6 +2962,7 @@ end)()
       BEST.f[S.track], R.newBest, R.dirty = v, true, true
       showMsg("COMBO " .. v .. "  BEST!", true)
       beep(2400, 200)
+      R.flush()
     elseif R.chn > 1 then
       showMsg("COMBO " .. v, true)
     end
@@ -5650,8 +5652,8 @@ local function showMsg(s, good)
 end
 
 
--- the saves wait for a break in the flying (pause, restart, the menu, a crash, the end of a run):
--- writing the SD card in flight stalls a frame
+-- the saves: a new best and a new ghost are written at once (the radio may be switched off any
+-- time); the breaks (pause, restart, the menu, a crash, the end of a run) write anything left
 R.flush = function()
   if R.dirty then
     R.dirty = false
@@ -5867,10 +5869,11 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
           BEST.l[S.track], R.newLap = lt, true
           local m = MED.of(lt)
           showMsg("LAP " .. lap .. "  " .. timeStr(lt) .. "  " .. (m > MED.of(b) and MED.n[m] or "BEST") .. "!", true)
-          R.dirty = true                             -- (saved at a break: R.flush)
+          R.dirty = true
         else
           showMsg("LAP " .. lap .. "  " .. timeStr(lt) .. "  +" .. timeStr(lt - b), false)
         end
+        R.flush()                                    -- (now: the radio may be switched off any time)
         lap = lap + 1
         beep(2200, 160)
         if playHaptic and S.vib == 1 then playHaptic(25, 0) end
@@ -6355,6 +6358,7 @@ end)()
       BEST.f[S.track], R.newBest, R.dirty = v, true, true
       showMsg("COMBO " .. v .. "  BEST!", true)
       beep(2400, 200)
+      R.flush()
     elseif R.chn > 1 then
       showMsg("COMBO " .. v, true)
     end
@@ -9441,13 +9445,19 @@ const ROBOTO = { r: "d09GMgABAAAAAFV8ABIAAAAAsBgAAFUTAAEAAAAAAAAAAAAAAAAAAAAAAAA
     return { text: LUA[kind], name: kind === 'color' ? 'StickTime.lua' : dir + 'core.lua' };
   }
 
+  // the game's saves go to the browser's storage just after the frame that wrote them, not in it
+  // (with ghosts on the virtual card the write takes a few ms), and at the latest as the page goes
+  let sdLater = 0;
+  const flushSD = () => { sdLater = 0; store.set('sd', Object.fromEntries(app.sd)); };
+  window.addEventListener('pagehide', () => { if (sdLater) flushSD(); });
+
   function boot() {
     const r = app.radio;
     const eng = new Engine(fengari, r, {
       colorFonts, bwFonts: BW_FONTS, sd: app.sd,
       files: Object.assign({ '/SCRIPTS/TOOLS/StickTimeBW/core.lua': LUA.bw, '/SCRIPTS/TOOLS/StickTimeLite/core.lua': LUA.lite }, LITE_TRACKS),
       onTone: tone, onHaptic: haptic,
-      onSave: () => store.set('sd', Object.fromEntries(app.sd)),
+      onSave: () => { if (!sdLater) sdLater = setTimeout(flushSD, 0); },
     });
     eng.stickMode = app.mode - 1;
     // PC mode: big screen, 60 fps, frames shown at once (no radio display delay)

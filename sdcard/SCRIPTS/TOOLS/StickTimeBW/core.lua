@@ -542,8 +542,8 @@ local function showMsg(s, good)
 end
 
 
--- the saves wait for a break in the flying (pause, restart, the menu, a crash, the end of a run):
--- writing the SD card in flight stalls a frame
+-- the saves: a new best and a new ghost are written at once (the radio may be switched off any
+-- time); the breaks (pause, restart, the menu, a crash, the end of a run) write anything left
 R.flush = function()
   if R.dirty then
     R.dirty = false
@@ -759,10 +759,11 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
           BEST.l[S.track], R.newLap = lt, true
           local m = MED.of(lt)
           showMsg("LAP " .. lap .. "  " .. timeStr(lt) .. "  " .. (m > MED.of(b) and MED.n[m] or "BEST") .. "!", true)
-          R.dirty = true                             -- (saved at a break: R.flush)
+          R.dirty = true
         else
           showMsg("LAP " .. lap .. "  " .. timeStr(lt) .. "  +" .. timeStr(lt - b), false)
         end
+        R.flush()                                    -- (now: the radio may be switched off any time)
         lap = lap + 1
         beep(2200, 160)
         if playHaptic and S.vib == 1 then playHaptic(25, 0) end
@@ -1247,6 +1248,7 @@ end)()
       BEST.f[S.track], R.newBest, R.dirty = v, true, true
       showMsg("COMBO " .. v .. "  BEST!", true)
       beep(2400, 200)
+      R.flush()
     elseif R.chn > 1 then
       showMsg("COMBO " .. v, true)
     end

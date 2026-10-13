@@ -636,7 +636,7 @@ do
   ghost.lap = function(lt)                     -- a practice lap ends: is it the new ghost?
     if RC.t0 ~= lapStart or RC.n < 2 or (GH.n > 0 and lt >= GH.lap) then return end
     if #RC.q > 0 then RC.c[#RC.c + 1] = RC.q end
-    GH = { n = RC.n, iv = RC.iv, lap = lt, c = RC.c, t = S.track, dirty = true }   -- (saved at a break: R.flush)
+    GH = { n = RC.n, iv = RC.iv, lap = lt, c = RC.c, t = S.track, dirty = true }   -- (saved by R.flush)
   end
 
   -- its file. The id: a custom track's, else the layout of the built-in tracks (3)
@@ -694,8 +694,8 @@ do
 end
 --#endif
 
--- the saves wait for a break in the flying (pause, restart, the menu, a crash, the end of a run):
--- writing the SD card in flight stalls a frame
+-- the saves: a new best and a new ghost are written at once (the radio may be switched off any
+-- time); the breaks (pause, restart, the menu, a crash, the end of a run) write anything left
 R.flush = function()
   if R.dirty then
     R.dirty = false
@@ -917,13 +917,14 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
           BEST.l[S.track], R.newLap = lt, true
           local m = MED.of(lt)
           showMsg("LAP " .. lap .. "  " .. timeStr(lt) .. "  " .. (m > MED.of(b) and MED.n[m] or "BEST") .. "!", true)
-          R.dirty = true                             -- (saved at a break: R.flush)
+          R.dirty = true
         else
           showMsg("LAP " .. lap .. "  " .. timeStr(lt) .. "  +" .. timeStr(lt - b), false)
         end
 --#if COLOR
         if gmode == 2 and S.ghost == 1 then ghost.lap(lt) end
 --#endif
+        R.flush()                                    -- (now: the radio may be switched off any time)
         lap = lap + 1
         beep(2200, 160)
         if playHaptic and S.vib == 1 then playHaptic(25, 0) end
@@ -1413,6 +1414,7 @@ end)()
       BEST.f[S.track], R.newBest, R.dirty = v, true, true
       showMsg("COMBO " .. v .. "  BEST!", true)
       beep(2400, 200)
+      R.flush()
     elseif R.chn > 1 then
       showMsg("COMBO " .. v, true)
     end
