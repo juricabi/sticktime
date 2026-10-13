@@ -5,7 +5,14 @@ format src/sticktime.lua reads, plain decimals, at most 999 bytes, the id from i
 file read back (CR LF too) and a broken one refused, the checks that stop a track the game can't
 take, keys typed in the editor that must never reach the game (and keys outside it that must),
 StickTime Lite, a wall with a gap, artifact.html (fengari from its CDN address, served here from
-web/vendor), and screenshots at desktop and phone width: test/shots/editor_*.png."""
+web/vendor), and screenshots at desktop and phone width: test/shots/editor_*.png.
+
+The radio's SD card (File System Access): the page is served at https://sticktime.test/ (a
+file:// page has no private file system), a folder there stands for the card and replaces the
+folder picker, so the editor's own reads and writes run: Send to radio, the overwrite question,
+From radio (list, open, copy both ways), the card remembered across a reload, a picked SCRIPTS/
+TOOLS or StickTimeTracks folder, a folder that isn't a card, and the line shown where the browser
+can't do it (no picker, a SecurityError, the page in another site's frame)."""
 import pathlib
 import re
 import sys
@@ -98,6 +105,203 @@ def offline(ctx, cdn=False):
         else:
             r.abort()
     ctx.route("http*://**", route)
+
+
+SITE = "https://sticktime.test/"
+PARENT = "https://another.test/"
+NO_RADIO = ("This browser can't write to the radio's SD card: use Save file and copy it to "
+            "/SCRIPTS/TOOLS/StickTimeTracks/ on the radio.")
+NOT_CARD = "This doesn't look like the radio's SD card: no SCRIPTS folder. Pick the drive the radio shows up as."
+# the card: RADIO-SD/SCRIPTS/TOOLS with StickTime.lua in it, a Documents folder beside it, and
+# the folder picker answering with window.__pick
+CARD = """async () => {
+  const root = await navigator.storage.getDirectory();
+  for (const n of ['RADIO-SD', 'Documents']) { try { await root.removeEntry(n, { recursive: true }); } catch (e) { } }
+  const card = await root.getDirectoryHandle('RADIO-SD', { create: true });
+  const tools = await (await card.getDirectoryHandle('SCRIPTS', { create: true })).getDirectoryHandle('TOOLS', { create: true });
+  const w = await (await tools.getFileHandle('StickTime.lua', { create: true })).createWritable();
+  await w.write('-- the game\\n'); await w.close();
+  await root.getDirectoryHandle('Documents', { create: true });
+  window.__pick = card;
+  window.showDirectoryPicker = async (opts) => { window.__opts = opts; return window.__pick; };
+}"""
+PICK = """async (path) => { let d = await navigator.storage.getDirectory();
+  for (const p of path.split('/')) d = await d.getDirectoryHandle(p); window.__pick = d; }"""
+# a file on the card, or null
+CARD_FILE = """async (path) => { try { let d = await navigator.storage.getDirectory(); const p = path.split('/');
+  for (const s of p.slice(0, -1)) d = await d.getDirectoryHandle(s);
+  return await (await (await d.getFileHandle(p[p.length - 1])).getFile()).text(); } catch (e) { return null; } }"""
+CARD_WRITE = """async ([path, text]) => { let d = await navigator.storage.getDirectory(); const p = path.split('/');
+  for (const s of p.slice(0, -1)) d = await d.getDirectoryHandle(s, { create: true });
+  const w = await (await d.getFileHandle(p[p.length - 1], { create: true })).createWritable(); await w.write(text); await w.close(); }"""
+TRACKS = "RADIO-SD/SCRIPTS/TOOLS/StickTimeTracks/c"
+
+
+def served(ctx):
+    """simulator.html and artifact.html at https://sticktime.test/, a page at https://another.test/
+    that frames artifact.html, fengari at its CDN address; nothing else answers"""
+    pages = {SITE + "simulator.html": (ROOT / "web" / "simulator.html").read_bytes(),
+             SITE + "artifact.html": (ROOT / "web" / "artifact.html").read_bytes(),
+             PARENT: (f'<!doctype html><iframe src="{SITE}artifact.html" width="1300" height="900"></iframe>').encode()}
+
+    def route(r):
+        u = r.request.url
+        if u in pages:
+            r.fulfill(body=pages[u], content_type="text/html; charset=utf-8")
+        elif "fengari-web" in u:
+            r.fulfill(body=FENGARI, content_type="application/javascript")
+        else:
+            r.abort()
+    ctx.route("**/*", route)
+
+
+def radio_done(page):
+    page.wait_for_function("!sim.editor.radio().busy", timeout=10000)
+    return page.evaluate("sim.editor.radio()")
+
+
+def radio_tests(br, errors):
+    ctx = br.new_context(viewport={"width": 1400, "height": 1000}, accept_downloads=True)
+    served(ctx)
+    page = ctx.new_page()
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    page.goto(SITE + "simulator.html")
+    wait_sim(page)
+    page.evaluate(CARD)
+    page.click("#tracksBtn")
+    check(page.is_visible("#edConnect") and page.is_hidden("#edSend") and "USB Storage" in page.inner_text("#edRadioNote"),
+          "radio: Connect radio… and what to do on the radio")
+
+    # a folder that isn't the card
+    page.evaluate(PICK, "Documents")
+    page.click("#edConnect")
+    r = radio_done(page)
+    check(page.inner_text("#edStatus") == NOT_CARD and r["state"] == "off", "radio: a folder without SCRIPTS is refused, plainly")
+    # the card
+    page.evaluate(PICK, "RADIO-SD")
+    page.click("#edConnect")
+    r = radio_done(page)
+    check(r["state"] == "on" and r["at"] == "card" and page.inner_text("#edRadioState") == "RADIO-SD connected",
+          f"radio: the card connected: {page.inner_text('#edRadioState')!r}")
+    check(page.evaluate("window.__opts") == {"mode": "readwrite", "id": "sticktime-radio"}, "radio: the picker asked for read and write")
+
+    # Send to radio: the same text as Save file, the folder made
+    page.select_option("#edTemplate", label="Grand Prix")
+    page.select_option("#edSlot", "1")
+    with page.expect_download() as d:
+        page.click("#edSave")
+    saved = pathlib.Path(d.value.path()).read_bytes().decode("ascii")
+    check(page.evaluate(CARD_FILE, TRACKS + "1.txt") is None, "radio: no StickTimeTracks folder yet")
+    page.click("#edSend")
+    radio_done(page)
+    check(page.evaluate(CARD_FILE, TRACKS + "1.txt") == saved, "radio: c1.txt on the card is Save file's text (StickTimeTracks made)")
+    check(page.inner_text("#edStatus") == "Sent to the radio as track 9 (c1.txt). On the radio: restart StickTime, the track is in the Track list.",
+          "radio: it says where the track went")
+
+    # another track for slot 1: asked first, with the names
+    page.select_option("#edTemplate", label="Bando")
+    asked = []
+    page.once("dialog", lambda dl: (asked.append(dl.message), dl.dismiss()))
+    page.click("#edSend")
+    radio_done(page)
+    check(asked and '"My Grand Prix"' in asked[0] and '"My Bando"' in asked[0], f"radio: overwriting another track asks: {asked}")
+    check(page.evaluate(CARD_FILE, TRACKS + "1.txt") == saved, "radio: No leaves the card's c1.txt alone")
+    page.once("dialog", lambda dl: dl.accept())
+    page.click("#edSend")
+    radio_done(page)
+    bando = page.evaluate("sim.editor.file()")
+    check(page.evaluate(CARD_FILE, TRACKS + "1.txt") == bando, "radio: Yes replaces it")
+
+    # From radio: the slots by name, one opened (CR LF on the card)
+    page.evaluate(CARD_WRITE, [TRACKS + "3.txt", saved.replace("\n", "\r\n")])
+    page.click("#edFromRadio")
+    radio_done(page)
+    rows = page.inner_text("#edRadioSlots")
+    check("c1 · track 9 · My Bando" in rows and "c3 · track 11 · My Grand Prix" in rows and rows.count("empty") == 6,
+          "radio: From radio lists the card's slots by name")
+    page.click('[data-ropen="3"]')
+    check(page.input_value("#edName") == "My Grand Prix" and page.input_value("#edSlot") == "3"
+          and page.evaluate("sim.editor.file()") == saved, "radio: a slot opens into the editor (slot 3)")
+    # both ways
+    page.click("#edRadioToEmu")
+    radio_done(page)
+    check(page.evaluate(f"sim.app.sd.get('{SLOT}1.txt')") == bando and page.evaluate(f"sim.app.sd.get('{SLOT}3.txt')") == saved.replace("\n", "\r\n"),
+          "radio: the radio's tracks copied into the emulator's slots")
+    check(page.inner_text("#edStatus").startswith("Copied c1 and c3 from the radio"), f"radio: {page.inner_text('#edStatus')!r}")
+    page.select_option("#edTemplate", label="Meadow")
+    meadow = page.evaluate("sim.editor.file()")
+    page.evaluate("(t) => sim.writeSD('/SCRIPTS/TOOLS/StickTimeTracks/c5.txt', t)", meadow)
+    page.click("#edEmuToRadio")
+    radio_done(page)
+    check(page.evaluate(CARD_FILE, TRACKS + "5.txt") == meadow and page.evaluate(CARD_FILE, TRACKS + "1.txt") == bando,
+          "radio: the emulator's tracks sent to the card")
+    check(page.inner_text("#edStatus").startswith("Sent c5 to the radio."), f"radio: only what changed is written: {page.inner_text('#edStatus')!r}")
+    page.mouse.move(0, 0)
+    shot_clip(page, OUT / "editor_radio.png")
+    print("wrote test/shots/editor_radio.png")
+
+    # the card remembered on the next visit; Disconnect forgets it
+    page.reload()
+    wait_sim(page)
+    page.wait_for_function("sim.editor.radio().state === 'on'", timeout=10000)
+    page.click("#tracksBtn")
+    check(page.inner_text("#edRadioState") == "RADIO-SD connected", "radio: a later visit is connected again (IndexedDB)")
+    page.click("#edForget")
+    page.reload()
+    wait_sim(page)
+    page.wait_for_timeout(500)
+    check(page.evaluate("sim.editor.radio().state") == "off", "radio: Disconnect forgets the card")
+
+    # SCRIPTS/TOOLS or StickTimeTracks picked instead of the drive
+    page.evaluate("() => { window.showDirectoryPicker = async () => window.__pick; }")
+    page.click("#tracksBtn")
+    page.select_option("#edTemplate", label="Slalom")
+    for path, slot in (("RADIO-SD/SCRIPTS/TOOLS", "2"), ("RADIO-SD/SCRIPTS/TOOLS/StickTimeTracks", "4")):
+        page.evaluate(PICK, path)
+        if page.is_visible("#edForget"):
+            page.click("#edForget")
+        page.click("#edConnect")
+        radio_done(page)
+        page.select_option("#edSlot", slot)
+        page.click("#edSend")
+        radio_done(page)
+        check(page.evaluate(CARD_FILE, TRACKS + slot + ".txt") == page.evaluate("sim.editor.file()"),
+              f"radio: {path.split('/')[-1]} picked: c{slot}.txt still lands in StickTimeTracks")
+
+    # a picker that may not open here (another site's frame: SecurityError)
+    page.click("#edForget")
+    page.evaluate("() => { window.showDirectoryPicker = async () => { throw new DOMException('no pickers in this frame', 'SecurityError'); }; }")
+    page.click("#edConnect")
+    radio_done(page)
+    check(page.is_hidden("#edRadio") and page.inner_text("#edRadioNote") == NO_RADIO, "radio: a SecurityError gives the Save file line")
+    ctx.close()
+
+    # no picker at all (Firefox, Safari, phones): the line, and the rest still works
+    ctx = br.new_context(viewport={"width": 1400, "height": 1000})
+    served(ctx)
+    ctx.add_init_script("delete window.showDirectoryPicker")
+    page = ctx.new_page()
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    page.goto(SITE + "simulator.html")
+    wait_sim(page)
+    page.click("#tracksBtn")
+    check(page.is_hidden("#edRadio") and page.is_visible("#edRadioNote") and page.inner_text("#edRadioNote") == NO_RADIO,
+          "radio: without the picker, one line: use Save file")
+    page.select_option("#edTemplate", label="Grand Prix")
+    page.click("#edFly")
+    check(page.evaluate("sim.test('info')")[10] == "My Grand Prix", "radio: ... and Fly it still works")
+    # artifact.html in another site's frame
+    page.goto(PARENT)
+    frame = None
+    for _ in range(100):
+        frame = next((f for f in page.frames if f.url.startswith(SITE)), None)
+        if frame:
+            break
+        page.wait_for_timeout(100)
+    frame.wait_for_function("window.sim && window.sim.editor", timeout=30000)
+    check(frame.evaluate("sim.editor.radio().ok") is False and frame.evaluate("document.getElementById('edRadioNote').textContent") == NO_RADIO,
+          "radio: artifact.html in another site's frame gives the Save file line")
+    ctx.close()
 
 
 def main():
@@ -303,6 +507,9 @@ def main():
         info = page.evaluate("sim.test('info')")
         check(info[0] == 16 and info[10] == "My Pro Track", "artifact.html: Pro Track flown as track 16")
         ctx.close()
+
+        # ---- the radio's SD card
+        radio_tests(br, errors)
         br.close()
     for e in errors:
         print("page error:", e)
