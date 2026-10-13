@@ -9,7 +9,8 @@ local toolName = "TNS|@TOOLNAME@|TNE"
             handles stick mode 1-4. EXIT = pause/back, ENTER = select,
             rotary / +- / up-down = move. Touch screens: tap.
   Modes   : Race against AI pilots, Practice, Freestyle (tricks and
-            combos) and Gate Rush (beat the clock), on eight tracks.
+            combos) and Gate Rush (beat the clock), on eight tracks and
+            eight of your own (StickTimeTracks/c1.txt .. c8.txt).
   Safety  : the radio keeps transmitting while the sim runs - keep the
             real quad unplugged or the RF module off.
   Credits : inspired by lua-fpv-sim by Alexey Stankevich (@AlexeyStn);
@@ -142,7 +143,7 @@ local TRACKS = {
                        24,-22,1,270,0 } },
 }
 -- custom tracks: StickTimeTracks/c1.txt .. c8.txt on the SD card (the browser emulator's track
--- editor makes them; every edition reads the same files). A name line, then the numbers: format 1,
+-- editor makes them; StickTime and StickTime BW read the same files, the Lite doesn't). A name line, then the numbers: format 1,
 -- an id (bests start over when it changes), tree seed, trees (9: as many as most tracks), the gates
 -- (x z type yaw height), "/", the structures (x z half-x half-z bottom top kind). They are tracks
 -- 9-16 whether or not the slots before them are filled; only the name and id are read here
@@ -510,8 +511,8 @@ local R = { laps = {}, n = 0, total = 0, newLap = false, newRace = false, newBes
             fi = 5, pt = 0, st = 0 }          -- frame interval, sim time (10 ms ticks), prop strike left (s)
 -- the battery (setting). One pack per class (Racer 5", Freestyle 5", 3" toothpick, Whoop 65mm, Whoop
 -- 75mm): cells, capacity (mAh), resistance (milliohm a cell), current at full throttle (A), and the
--- volts a cell has over 4.2 when full (LiHV). In use (applySettings): cells n, capacity mah (twice
--- for Long), resistance r (ohm), current f, h. The pack's state: charge s (1 full .. 0 empty), cell
+-- volts a cell has over 4.2 when full (LiHV). In use (applySettings): cells n, capacity mah (1.5 or 2
+-- times for 1.5x, 2x), resistance r (ohm), current f (more with more Power), h. The pack's state: charge s (1 full .. 0 empty), cell
 -- voltage under load v (filtered over about 1 s), current i (A), flight time t and time since it ran
 -- empty e (s), warning w (1 below 3.5 V a cell, 2 below 3.3 V)
 local BAT = { "4 1300 6 95 0", "4 1500 6 120 0", "3 550 20 28 .15", "1 300 45 11 .15", "2 300 35 14 .15",

@@ -153,20 +153,25 @@ vn  = -(v . n)                           n: the surface's outward normal; nothin
 v   = v + vn*n                           the part into the surface goes: no bounce
 v   = v*(1 - min(1, mu*vn/|v|))          friction on the slide: mu 0.3 (0.6 on the ground and roofs)
 j   = vn*n - friction                    the impulse per kg
-from vn >= 1.5 m/s, a prop strike:
+vs  = vn*sqrt(1 - (n.u)^2)                how hard the props and arms strike: flat on (a level
+                                         landing) the skids take it all
+from vs >= 1.5 m/s, a prop strike:
   c   = (n.u)*u - n                      toward the rim point nearest the surface (|c| = sqrt(1 - (n.u)^2))
   w  += 3 * c x j                        body rates, at most 20 rad/s: 1.5 rad/s per m/s at 45 deg,
                                          none flat on (the whole disk touches) or edge-on
-  t   = min(0.5, 0.04*vn) s              for t: thrust x0.3, and the rates are no longer the
+  t   = min(0.5, 0.04*vs) s              for t: thrust x0.3, and the rates are no longer the
                                          stick's: they drift on (fading 1.5/s), so the quad tumbles
 ```
 
 After a strike the flight controller takes over again from wherever the quad has tumbled to. A
 5 m/s scrape along a wall at 15 deg keeps about 4.5 m/s; a 20 m/s hit head-on, pitched 40 deg as a
 quad is at that speed, stops it dead and tumbles it about a full turn over half a second. On the
-ground at under 2 m/s with the throttle under hover the quad settles level, as before. Upside down or on its side on the ground (up vector
-below 0.4) it can't take off: **turtle mode**, a roll or pitch stick turns it over at 3.5 rad/s. In
-Freestyle a strike ends the combo in progress and its tumble counts as no trick.
+ground at under 2 m/s with the throttle under hover the quad settles level, as before. Upside
+down or on its side on the ground or a roof (up vector below 0.4, tipped past about 66 deg) it can't
+take off: **turtle mode**, a roll or pitch stick of at least a quarter turns it over at 3.5 rad/s
+(the throttle does nothing). In Freestyle a strike ends the combo in progress and its tumble counts
+as no trick. The pause menu's Respawn puts the quad at the last gate (Freestyle: where it was a
+second or two before) with a fresh battery pack and ends a combo.
 
 ## Battery
 
@@ -176,14 +181,16 @@ lag), with `c = T/Tmax` and the charge `s` (1 full, 0 empty):
 
 ```
 I  = If*(0.05 + 0.95*c^1.5)        current: power ~ thrust^1.5 (momentum theory), plus 5% of full
-                                   at idle for the motors and electronics
+                                   at idle for the motors and electronics; If is the class's at its
+                                   stock power, times (Power/stock)^1.5 (the same hover current)
 vr = 3.98 + 1.1*(s - 0.8)          s >= 0.8      rest voltage a cell (LiPo; LiHV + 0.15*s)
      3.66 + 0.47*(s - 0.12)        s >= 0.12
      3.0 + 5.5*s                   below
 im = (vr - 3.0)/R                  the most current before a cell drops to 3.0 V
 v  = vr - I*R,  k = min(1, (v/3.5)^2)          I <= im
 k  = 0.735*(im/I)^(2/3),  I = im,  v = 3.0     I > im: the quad limps (thrust ~ current^(2/3))
-s -= I*dt/(3.6*mAh);  T *= k       empty when im < 0.05*If: the motors stop
+s -= I*dt/(3.6*mAh);  T *= k       empty once full throttle would lift no more than 1.25 times
+                                   the weight (0.735*(im/If)^(2/3)*Power < 1.25): the motors stop
 ```
 
 `k` stays 1 down to 3.5 V a cell under load, as Betaflight's sag compensation
@@ -191,10 +198,13 @@ s -= I*dt/(3.6*mAh);  T *= k       empty when im < 0.05*If: the motors stop
 battery (only the freestyler's full-throttle punch sags it to 3.48 V, 1% less thrust at the very
 top), the battery never makes a lap faster, and the bests stay comparable. The voltage shown and
 warned about is `v` filtered over about 1 s: below 3.5 V a cell a beep every 2 s, below 3.3 V a
-double beep and LAND (Betaflight's default `vbat_warning_cell_voltage` and `vbat_min_cell_voltage`).
+double beep (Betaflight's default `vbat_warning_cell_voltage` and `vbat_min_cell_voltage`); the
+color OSD turns the battery yellow and then red and blinking, B&W inverts and blinks its gauge and
+shows LAND below 3.3 V.
 Under a long punch it dips under them mid-pack, as on a real quad. A second after the motors stop
-the flight ends (EMPTY, not counted as a crash) and the quad respawns with a fresh pack; a hit
-keeps the pack, every start and the pause menu's Respawn get a fresh one, and the AI pilots fly without one.
+the flight ends (EMPTY, shown instead of CRASH) and the quad respawns with a fresh pack; a hit
+keeps the pack, every start and the pause menu's Respawn get a fresh one, and the AI pilots fly
+without one.
 
 | | Racer 5" | Freestyle 5" | 3" toothpick | Whoop 65mm | Whoop 75mm |
 |---|---|---|---|---|---|
@@ -202,7 +212,7 @@ keeps the pack, every start and the pause menu's Respawn get a fresh one, and th
 | resistance a cell `R` (mOhm) | 6 | 6 | 20 | 45 | 35 |
 | current at full throttle `If` (A) | 95 | 120 | 28 | 11 | 14 |
 | full-throttle sag, fresh pack (V a cell) | 4.20 → 3.63 | 4.20 → 3.48 | 4.35 → 3.79 | 4.35 → 3.86 | 4.35 → 3.86 |
-| flight on Real, hard / cruise (min) | 1.9 / 4.7 | 1.7 / 3.8 | 2.2 / 4.5 | 1.9 / 2.6 | 1.7 / 3.0 |
+| flight on Real, hard / cruise (min) | 1.9 / 4.6 | 1.6 / 3.7 | 2.1 / 4.3 | 1.6 / 2.2 | 1.5 / 2.8 |
 
 Hard is 0.5 s of full throttle and 1.5 s at three times the weight in thrust, over and over; cruise
 is twice the weight (fast forward flight). 1.5x and 2x fly one and a half and twice as long. Sources: Betaflight's battery
