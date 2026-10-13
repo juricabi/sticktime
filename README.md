@@ -20,7 +20,7 @@ Download `StickTime-<version>-sdcard.zip` from the [latest release](https://gith
 | B&W with an STM32F4: TX12 MkII, Zorro, Boxer, Pocket, MT12, GX12, X9D+ 2019, X9E, X7 ACCESS, T14, T20, T-Pro V2 / S, T12 Max, Bumblebee, Commando 8 | `StickTimeBW.lua` and the `StickTimeBW` folder | 2.11+ |
 | Older B&W (STM32F2): TX12 MkI, X7, X9D, X9D+, X9 Lite, X-Lite, T12, T8, T-Lite, T-Pro, LR3 Pro | `StickTimeLite.lua` and the `StickTimeLite` folder | 2.11 (their last EdgeTX) |
 
-On EdgeTX 2.10 and older the B&W versions don't start: they say "Needs EdgeTX 2.11 or newer" on the radio.
+On EdgeTX 2.10 and older the B&W versions don't start: they say "Needs EdgeTX 2.11 or newer" on the radio. When updating StickTime BW or Lite, replace the whole `StickTimeBW` / `StickTimeLite` folder.
 
 > **Safety:** the radio keeps transmitting your sticks while the sim runs. Unplug the quad's battery or switch the RF module off first.
 
@@ -28,7 +28,7 @@ StickTime BW and StickTime Lite also run on color radios, drawn in B&W style at 
 
 ## Features
 
-- **Flight model.** Fitted class by class to a detailed per-prop model (see [docs/flight-model.md](docs/flight-model.md)): props lose thrust as the air through them speeds up and gain some descending; translational lift (flying edgewise, the same throttle gives up to 50% more thrust); ground effect within a twentieth of a prop diameter of the ground or a roof (up to 25% more thrust on a 5", 45% on a 3"); body drag along the flow with no rotor drag, so the quad keeps its momentum (a 5" racer's sideways slide halves in about 4 s); downforce from the frame when it flies nose-down at speed; a Betaflight-style idle and throttle curve; motors that spool up in about 5 ms; 1.1 g gravity for a planted feel. All at 80 Hz. The stock Racer 5": about 140 km/h top speed, 125 km/h punch-outs, 63 km/h flat fall.
+- **Flight model.** Fitted class by class to a detailed per-prop model and within 0.2-0.5 m/s of it in steady flight at any pitch and throttle (see [docs/flight-model.md](docs/flight-model.md)): each class's own Betaflight-style idle and throttle curve, with its bottom dead zone and steeper top end; props lose thrust as the air through them speeds up; translational lift (flying edgewise the same throttle gives up to about 50% more thrust, levelling off by about 15 m/s, more with more throttle); a cushion when you drop, while at idle the blades stall in a fast drop; ground effect within a twentieth of a prop diameter of the ground or a roof (up to 25% more thrust on a 5", 45% on a 3"); body drag along the flow, a little more at low speed; downforce from the frame when it flies nose-down at speed; rotor drag set by **Grip**; motors that spool up in about 6 ms; 1.1 g gravity for a planted feel. All at 80 Hz. The stock Racer 5": hovers at a third of the stick, about 140 km/h top speed, 125 km/h punch-outs, 63 km/h flat fall.
 - **Your quad.** **Racer 5"** (0.49 kg, 7.7:1, snappy), **Freestyle 5"** (a 0.66 kg HD freestyler, 6.9:1, heavier and floatier than the racer), **3" toothpick** (0.11 kg 3S, 5.3:1, light and draggy) **Whoop 65mm** (a 24 g ducted 1S whoop, 2.6:1, slow and grippy) or **Whoop 75mm** (a 47 g ducted 2S whoop, 3.5:1). Power **Stock** (the class's own) or the range quads of its kind have: 5:1 to 12:1 on the racer, 4:1 to 10:1 on the freestyler and the 3", 3:1 to 8:1 on the whoops. Acro or Angle mode.
 - **Rates.** Betaflight Actual rates: Soft, Normal and Fast presets, or Custom center sensitivity (10–500 deg/s), max rate (100–2000 deg/s) and expo (0.00–1.00) for roll/pitch and yaw, in Betaflight's own steps (10 deg/s and 0.01), so your Actual rates go in exactly as they are. Hold a key or spin the wheel quickly for five times bigger steps.
 - **Eight tracks.** Meadow, Figure 8, Dive Tower, Slalom, Hoop Forest, Grand Prix, the **Bando** (an open-roof ruin with doors to fly through, a 36 m tower for orbits and dives, and stacked containers) and **Pro Track**, laid out like a real race: lanes up and down the field joined by flag hairpins, a high gate and a dive gate on the start straight, and a split-S. Gates, high gates, dive gates, hoops, arches, flags (pass on the marked side, shown by a yellow marker) and gaps in walls. Trees, poles, walls and structures are solid.
@@ -67,7 +67,7 @@ The layout follows `LCD_W` / `LCD_H` and the radio's real font sizes, so new scr
 
 ## Faster firmware (optional)
 
-Stock EdgeTX runs a tool at most every 50 ms (20 fps) and shows each frame one cycle late. The [`fast-lua-20ms` prerelease](https://github.com/juricabi/edgetx/releases/tag/fast-lua-20ms) has firmware for every color radio (EdgeTX `main` plus [`firmware/edgetx-fast-lua.patch`](firmware/edgetx-fast-lua.patch)): Lua tools run every 20 ms, frames show at once, and drawing is much faster. On every STM32H750 radio (RadioMaster TX16S MK3, TX15 and GX15, Jumper T15 Pro, HelloRadioSky V12 and V15, and more) it also runs the Lua interpreter from ITCM. On the HelloRadioSky V12 and the Flysky PA01, whose screens hang on an SPI bus, it also sends frames to the screen in the background. On the V12 that makes 38 fps even in the Bando, and stick-to-screen latency drops from about 90 ms to about 40 ms. With **Show FPS** on, StickTime shows how long each frame took to run and to reach the screen. These are test builds: back up your SD card first.
+Stock EdgeTX runs a tool at most every 50 ms (20 fps) and shows each frame one cycle late. The [`fast-lua-20ms` prerelease](https://github.com/juricabi/edgetx/releases/tag/fast-lua-20ms) has firmware for every color radio (EdgeTX `main` plus [`firmware/edgetx-fast-lua.patch`](firmware/edgetx-fast-lua.patch)): Lua tools run every 20 ms, each frame goes straight to the display, and drawing is much faster. On every STM32H750 radio (RadioMaster TX16S MK3, TX15 and GX15, Jumper T15 Pro, HelloRadioSky V12 and V15, and more) it also runs the Lua interpreter from ITCM. On the HelloRadioSky V12 and the Flysky PA01, whose screens hang on an SPI bus, it also sends frames to the screen in the background. On the V12 that makes up to 50 fps, and stick-to-screen latency drops from about 90 ms to about 40 ms. With **Show FPS** on, StickTime shows how long each frame took to run and to reach the screen. These are test builds: back up your SD card first.
 
 <details>
 <summary>What the patch changes</summary>
@@ -75,14 +75,15 @@ Stock EdgeTX runs a tool at most every 50 ms (20 fps) and shows each frame one c
 While a Lua tool is open:
 
 - the UI loop runs every 20 ms instead of 50 ms, and goes back to 50 ms when the tool closes;
-- each frame goes to the screen as soon as the script has drawn it (`lv_refr_now`), not at the next cycle;
-- solid lines, rectangles and filled triangles go straight into the tool's canvas, instead of through an LVGL canvas call per shape (per row of a filled triangle), which is what made the Bando slow;
-- H7 radios no longer flush the whole data cache on every `lcd.drawLine`;
+- the tool draws into frames of its own and each finished frame goes straight to the display (a frame buffer swap at the vertical blank, or the SPI transfer), instead of LVGL drawing the tool's canvas into its own frame buffers every frame. Where the radio has the memory for it (at least 1 MB of heap left free) there are three: one on the display, one on its way there, one being drawn, so the tool doesn't wait for the display either. Radios whose panel is mounted upside down (TX16S, T16, X10, X10 Express, H17, older F16) show the tool's frame with a callback of their own, turned around into the back buffer: one full-screen pass per frame instead of three. Elsewhere each frame goes to the screen as soon as the script has drawn it (`lv_refr_now`), not at the next cycle;
+- LVGL takes the display back whenever anything shows over the tool (a dialog, a message bubble, the power-off screen) and draws the whole screen again;
+- solid lines, rectangles and filled triangles go straight into the tool's frame, instead of through an LVGL canvas call per shape (per row of a filled triangle), which is what made the Bando slow; large fills use the DMA2D;
+- H7 radios no longer flush the whole data cache on every `lcd.drawLine`, only when the DMA2D has written memory since;
 - the tool gets `TOOL_RUN_US` and `TOOL_SHOW_US`: how long its last `run()` and putting that frame on the screen took.
 
 On the STM32H750 radios (every target linked with `stm32h750_sdram`: tx16smk3, tx15, gx15, t15pro, t15h7, t22, pa01, st16, c14, h17, v12, v15), whose firmware runs from SDRAM through a 16 KB instruction cache, the Lua interpreter and the drawing code behind the `lcd` functions run from the H750's 64 KB ITCM, which stock EdgeTX leaves empty, compiled for speed (about 49 KB of it). The STM32F429 radios have no ITCM, and need it less: their firmware runs from internal flash.
 
-On the HelloRadioSky V12 and the Flysky PA01 (320×240 SPI screens) frames also go out in the background: the screen's vertical blank (FMARK) starts the SPI transfer (13 ms on the V12, 25 ms on the PA01) and its interrupt finishes it, while the CPU already runs the next frame. The PA01 has not been tried on a real radio yet.
+On the HelloRadioSky V12 and the Flysky PA01 (320×240 SPI screens) frames also go out in the background: the screen's vertical blank (FMARK) starts the SPI transfer and its interrupt finishes it, while the CPU already runs the next frame. On the V12 the DMA reads two pixels at a time from SDRAM, so a frame takes 13 ms on the SPI, inside one refresh of its 74 Hz panel (one pixel at a time took 14.5 ms, so every frame took two refreshes); the PA01's 50 MHz SPI takes about 25 ms. The PA01 has not been tried on a real radio yet.
 
 The mixer task (sticks, mixes, RF, telemetry) keeps its higher priority and is not touched. `tools/build_firmware.sh v12` clones EdgeTX `main`, applies the patch and builds one radio's firmware (any target from EdgeTX's `tools/build-common.sh`, ARM GCC 14.2 on the `PATH`). The same changes are on the `fast-lua-20ms` branch of [juricabi/edgetx](https://github.com/juricabi/edgetx/tree/fast-lua-20ms), whose CI publishes the prerelease.
 
@@ -121,10 +122,10 @@ Measured on EdgeTX 2.11's own Lua core (the tests also run main's, which packs v
 
 | | Heap for Lua (EdgeTX 2.11.3) | Lua memory while playing | Peak heap use |
 |---|---|---|---|
-| StickTime BW on STM32F4 | 114–121 KB + 34 KB CCM | about 90 KB | 84 KB + 34 KB CCM |
-| StickTime Lite on STM32F2 | 63–73 KB + 10 KB pools | about 49 KB | 58 KB + 10 KB pools |
+| StickTime BW on STM32F4 | 114–121 KB + 34 KB CCM | about 97 KB | 87 KB + 34 KB CCM |
+| StickTime Lite on STM32F2 | 63–73 KB + 10 KB pools | about 52 KB | 59 KB + 10 KB pools |
 
-The Lite still runs with a 58 KB heap, so about 5 KB of an X9D+ stays free. It reads each track from its file (`StickTimeLite/t1.txt` to `t8.txt`) only when you pick it, parses numbers without making a string for each, and collects garbage before the flight starts.
+The Lite runs on a heap down to 60.5 KB, so about 3 KB of an X9D+ stays free (the memory test passes on every heap from there up, with no emergency garbage collection). Its quads and tracks are files in its folder (`StickTimeLite/q1.txt` to `q5.txt`, `t1.txt` to `t8.txt`), read only when you pick one; it parses numbers without making a string for each, collects garbage before it builds a track and before the flight starts, and writes its save file piece by piece. The loaders collect what compiling them left behind before they load the game, and keep their error screen in `why.lua`, so the game loads into a clean heap.
 </details>
 
 <details>
@@ -166,12 +167,14 @@ tools/build_etxlua.sh   Lua 5.3 with EdgeTX's number settings (native and 32-bit
 tools/build_etxhost.sh  EdgeTX's own Lua core with a model of the B&W radios' allocator: makes the
                         game.luac files and runs test/memtest.lua (main, or a release: v2.11.4, v2.10.7)
 tools/tune_physics.py   steady-state check of every quad class (hover, top speed, punch-out, fall, slide)
+docs/flight-model.md    the flight model, every class's numbers and what they were fitted to
 tools/build_firmware.sh EdgeTX main + firmware/edgetx-fast-lua.patch for one radio
 test/harness.lua        headless EdgeTX mock: autopilot races with AI pilots on every track, flags, hoops,
                         dive gates, freestyle, gate rush, ground effect, vibration, menus, crashes, saves
 test/lite_test.lua      the same for the Lite, as a radio with +/- keys and without the libraries B&W lacks
 test/order_check.lua    ray-cast check of the draw order at the Bando
 test/memtest.lua        memory of the B&W versions through their loaders on F2 / F4 radio models
+test/loader_test.lua    the B&W loaders with a mock loadScript: game.luac only, why.lua when it fails
 test/msgtest.lua        the loaders' own screen where the game can't start (EdgeTX 2.10, too little memory)
 test/run_all.sh         all of the above, every screen size, Lua 5.3 and 5.2
 test/web_shots.py       Playwright screenshots of every radio and mode in the emulator
