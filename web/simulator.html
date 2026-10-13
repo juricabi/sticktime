@@ -2156,7 +2156,6 @@ do
   end
 
   ghost.load = function()
-    ghost.flush()
     GH, RC = { n = 0, iv = 10, lap = 0, c = {}, t = S.track }, { n = 0, iv = 10, c = {}, q = "" }
     local f = io.open(GFILE .. S.track .. ".txt", "r")
     if not f then return end
@@ -2176,29 +2175,11 @@ do
     if RC.t0 ~= lapStart or RC.n < 2 or (GH.n > 0 and lt >= GH.lap) then return end
     if #RC.q > 0 then RC.c[#RC.c + 1] = RC.q end
     GH = { n = RC.n, iv = RC.iv, lap = lt, c = RC.c, t = S.track }
-    ghost.flush()
-    -- the header now, the samples over the next frames (ghost.step), so the lap's last frame doesn't
-    -- stall on a 5 KB write to the SD card
     local f = io.open(GFILE .. S.track .. ".txt", "w")
     if f then
       io.write(f, string.format("STG1 %3d %6d %6d %5d %4d %7d\n", NG, floor(AX[1] * 10 + 0.5), floor(AZ[1] * 10 + 0.5), GH.iv, GH.n, lt))
-      GH.f, GH.w = f, 0
-    end
-  end
-
-  -- the ghost's file: the samples not written yet (n at most, all if none given)
-  ghost.flush = function(n)
-    local f = GH.f
-    if not f then return end
-    for _ = 1, n or 99 do
-      local q = GH.c[GH.w + 1]
-      if not q then
-        io.close(f)
-        GH.f = nil
-        return
-      end
-      io.write(f, q)
-      GH.w = GH.w + 1
+      for i = 1, #GH.c do io.write(f, GH.c[i]) end
+      io.close(f)
     end
   end
 
@@ -2210,7 +2191,6 @@ do
   -- every frame of a practice lap: record it, and put the ghost where it was at this time of its lap
   -- (as AI pilot 4; GH.on while it flies)
   ghost.step = function()
-    ghost.flush(4)
     local t0 = RC.t0
     if t0 then
       local t = gt - t0
@@ -4201,7 +4181,6 @@ local function startRace(m)
     if GH.t ~= S.track then ghost.load() end
     RC.t0, GH.on = nil, false
   else
-    ghost.flush()
     GH, RC = { n = 0, iv = 10, lap = 0, c = {}, t = 0 }, { n = 0, iv = 10, c = {}, q = "" }   -- (memory)
   end
   if m == 3 then state, R.ready = READY, gt else state, tState = COUNT, gt end
