@@ -76,6 +76,18 @@ def check_file(text, gates, boxes, what):
     return name, nums
 
 
+
+def send_fly(page):
+    """Send to emulator, then Fly (Send to emulator asks before another track goes: then Fly only
+    when it was sent)"""
+    before = page.evaluate("sim.app.sd.get('/SCRIPTS/TOOLS/StickTimeTracks/c' + document.getElementById('edSlot').value + '.txt') ?? null")
+    page.click("#edSendEmu")
+    now = page.evaluate("sim.app.sd.get('/SCRIPTS/TOOLS/StickTimeTracks/c' + document.getElementById('edSlot').value + '.txt') ?? null")
+    if now == page.evaluate("sim.editor.file()") and page.is_enabled("#edFly"):
+        page.click("#edFly")
+    return before
+
+
 def wait_sim(page):
     page.wait_for_function("window.sim && window.sim.engine && window.sim.engine.frames > 2 && window.sim.editor", timeout=30000)
 
@@ -417,7 +429,7 @@ def radio_tests(br, errors):
     editor(page)
     check(page.is_hidden("#edSend") and page.is_hidden("#edRadioLine"), "radio: ... the editor without Send to radio")
     start_from(page, "Grand Prix")
-    page.click("#edFly")
+    send_fly(page)
     check(page.evaluate("sim.test('info')")[10] == "My Grand Prix", "radio: ... and Fly it still works")
     # artifact.html in another site's frame
     page.goto(PARENT)
@@ -772,23 +784,23 @@ def slot_tests(br, errors, tmp):
     page.click("#tracksBtn")
     start_from(page, "Grand Prix")
     page.select_option("#edSlot", "1")
-    page.click("#edFly")
+    send_fly(page)
     gp = emu(page, 1)
     check(not dlg.take() and gp and gp.startswith("My Grand Prix\n"), "slots: an empty slot: Fly it without a question")
     page.click("#tracksBtn")
     start_from(page, "Bando")
     check(not dlg.take() and page.input_value("#edSlot") == "2", "slots: a new track over a track that is in a slot: no question, an empty slot (c2)")
     page.select_option("#edSlot", "1")
-    page.click("#edFly")
+    send_fly(page)
     q = dlg.take()
     check(len(q) == 1 and '"My Grand Prix"' in q[0] and '"My Bando"' in q[0] and emu(page, 1) == gp and page.is_visible("#editor")
           and 'keeps "My Grand Prix"' in page.text_content("#edStatus"), f"slots: Fly it over another track asks; No keeps it: {q}")
     dlg.answer = True
-    page.click("#edFly")
+    send_fly(page)
     bando = page.evaluate("sim.editor.file()")
     check(len(dlg.take()) == 1 and emu(page, 1) == bando and page.evaluate("sim.test('info')")[10] == "My Bando", "slots: ... Yes flies the Bando from c1")
     page.click("#tracksBtn")
-    page.click("#edFly")
+    send_fly(page)
     check(not dlg.take(), "slots: the same track into its slot again: no question")
 
     # Remove (My tracks, the emulator's c1) asks first
@@ -838,17 +850,19 @@ def slot_tests(br, errors, tmp):
     check("c6 · track 14 · can't be read" in page.inner_text("#edSlot"), "slots: a slot's file the editor can't read is marked in the slot list")
     page.select_option("#edSlot", "6")
     dlg.answer = False
-    page.click("#edFly")
+    send_fly(page)
     q = dlg.take()
     check(len(q) == 1 and "a file that can't be read" in q[0] and emu(page, 6) == JUNK, f"slots: ... and Fly it over it asks: {q}")
 
-    # the browser's storage full: Fly it says the slot lasts this visit
+    # the browser's storage full: Send to emulator says the slot lasts this visit; Fly flies it
     page.evaluate(FULL)
     page.select_option("#edSlot", "2")
-    page.click("#edFly")
+    page.click("#edSendEmu")
     st = page.text_content("#edStatus")
     check("storage is full" in st and "bad" in page.get_attribute("#edStatus", "class") and emu(page, 2) == page.evaluate("sim.editor.file()"),
-          f"slots: storage full: flown, and Fly it says so: {st!r}")
+          f"slots: storage full: sent, and Send to emulator says so: {st!r}")
+    page.click("#edFly")
+    check(page.text_content("#edStatus").startswith("Flying "), "slots: ... and Fly flies it")
     page.evaluate(ROOMY)
     ctx.close()
 
@@ -961,8 +975,8 @@ def main():
         start_from(page, "Grand Prix")
         gp = page.evaluate("sim.editor.track()")
         check(page.input_value("#edName") == "My Grand Prix" and len(gp["gates"]) == NGP, f"the Grand Prix template: {NGP} gates")
-        check(page.evaluate("sim.editor.problems()") == [] and page.is_enabled("#edFly") and page.is_enabled("#edSave"),
-              "nothing in the way: Fly it and Save file on")
+        check(page.evaluate("sim.editor.problems()") == [] and page.is_enabled("#edSendEmu") and page.is_enabled("#edSave") and page.is_disabled("#edFly"),
+              "nothing in the way: Send to emulator and Save file on; Fly off while c1 is empty")
         page.select_option("#edSlot", "1")
         with page.expect_download() as d:
             page.click("#edSave")
@@ -973,7 +987,7 @@ def main():
         check(page.evaluate("sim.editor.file()") == text, "the download is the editor's file")
 
         # ---- Fly it: slot 1 is track 9, in Practice
-        page.click("#edFly")
+        send_fly(page)
         check(page.is_hidden("#editor"), "Fly it closes the editor")
         info = page.evaluate("sim.test('info')")
         check(info[0] == 9 and info[10] == "My Grand Prix", f"the game lists track 9 as {info[10]!r}")
@@ -1020,10 +1034,10 @@ def main():
         page.press('#edSel [data-f="z"]', "Tab")
         probs = page.evaluate("sim.editor.problems()")
         check("Structures 15 and 16 overlap." in probs, f"an overlap is found: {probs}")
-        check(page.is_disabled("#edFly") and page.is_disabled("#edSave"), "Fly it and Save file off while it is wrong")
+        check(page.is_disabled("#edSendEmu") and page.is_disabled("#edSave"), "Send to emulator and Save file off while it is wrong")
         page.click("#edUndo")
         page.click("#edUndo")
-        check(page.evaluate("sim.editor.problems()") == [] and page.is_enabled("#edFly"), "Undo puts it right")
+        check(page.evaluate("sim.editor.problems()") == [] and page.is_enabled("#edSendEmu"), "Undo puts it right")
         click_map(page, 0, 0)                                    # gate 1
         page.select_option('#edSel [data-f="t"]', "3")
         check(any("dive gate" in m for m in page.evaluate("sim.editor.problems()")), "gate 1 can't be a dive gate")
@@ -1078,7 +1092,7 @@ def main():
         check([(b["hx"], b["hz"]) for b in t2["boxes"]] == [(b["hz"], b["hx"]) for b in t["boxes"]] and page.evaluate("sim.editor.problems()") == [],
               "it turns 90° as a whole")
         page.select_option("#edSlot", "3")
-        page.click("#edFly")
+        send_fly(page)
         info = page.evaluate("sim.test('info')")
         check(info[10] == "My Meadow" and info[9] == 3 and page.evaluate("sim.test('get')")[18] == len(TEMPLATES["Meadow"]["gates"]) + 1,
               "track 11: Meadow, its wall and its gap")
@@ -1089,7 +1103,7 @@ def main():
         check(page.is_visible("#edLite") and "Lite" in page.inner_text("#edLite"), "the editor says the Lite doesn't read them")
         start_from(page, "Bando")
         page.select_option("#edSlot", "2")
-        page.click("#edFly")
+        send_fly(page)
         info = page.evaluate("sim.test('info')")
         check(page.evaluate("sim.app.script") == "auto" and info[10] == "My Bando" and info[9] == 16,
               "Fly it switches the Lite to Auto: track 10, the Bando's 16 structures")
@@ -1099,7 +1113,7 @@ def main():
         page.click("#tracksBtn")
         start_from(page, "Hoop Forest")
         page.select_option("#edSlot", "4")
-        page.click("#edFly")
+        send_fly(page)
         info = page.evaluate("sim.test('info')")
         check(page.evaluate("sim.app.radio.color") is False and info[0] == 12 and info[10] == "My Hoop Forest"
               and page.evaluate("sim.test('get')")[18] == len(TEMPLATES["Hoop Forest"]["gates"]), "StickTime BW on a TX12: Hoop Forest flown as track 12")
@@ -1143,7 +1157,7 @@ def main():
         page.click("#tracksBtn")
         start_from(page, "Pro Track")
         page.select_option("#edSlot", "8")
-        page.click("#edFly")
+        send_fly(page)
         info = page.evaluate("sim.test('info')")
         check(info[0] == 16 and info[10] == "My Pro Track", "artifact.html: Pro Track flown as track 16")
         ctx.close()

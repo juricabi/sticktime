@@ -73,6 +73,18 @@ def checker_tests():
             check(what in text, f"checker: {what}...")
 
 
+
+def send_fly(page):
+    """Send to emulator, then Fly (Send to emulator asks before another track goes: then Fly only
+    when it was sent)"""
+    before = page.evaluate("sim.app.sd.get('/SCRIPTS/TOOLS/StickTimeTracks/c' + document.getElementById('edSlot').value + '.txt') ?? null")
+    page.click("#edSendEmu")
+    now = page.evaluate("sim.app.sd.get('/SCRIPTS/TOOLS/StickTimeTracks/c' + document.getElementById('edSlot').value + '.txt') ?? null")
+    if now == page.evaluate("sim.editor.file()") and page.is_enabled("#edFly"):
+        page.click("#edFly")
+    return before
+
+
 def wait_sim(page):
     page.wait_for_function("window.sim && window.sim.engine && window.sim.engine.frames > 2 && window.sim.editor", timeout=30000)
 
@@ -149,7 +161,7 @@ def tracks_tests(br, errors, tracks):
         check(r["file"] == t["text"] and r["name"] == t["name"] and not r["probs"] and page.is_hidden("#edGallery") and page.is_visible("#edMap"),
               f"{t['file']}: opens as it is, Check OK {r['probs'] if r['probs'] else ''}")
         n = len(asked)
-        page.click("#edFly")
+        send_fly(page)
         slot = int(page.input_value("#edSlot"))
         info = page.evaluate("sim.test('info')")
         want = i + 1 if i < 8 else slot
@@ -166,7 +178,7 @@ def tracks_tests(br, errors, tracks):
     n = len(asked)
     open_gallery(page)
     page.click("[data-gopen='2']")
-    page.click("#edFly")
+    send_fly(page)
     check(int(page.input_value("#edSlot")) == 3 and len(asked) == n and page.evaluate("sim.test('info')")[10] == tracks[2]["name"],
           "site: opened again: on the slot that has it, flown with nothing asked")
 
@@ -242,7 +254,7 @@ def radio_tests(br, errors, tracks):
     page.click("[data-gopen='1']")
     check(int(page.input_value("#edSlot")) == 6 and "it is in c6 (track 14) on the radio." in page.inner_text("#edStatus"),
           f"radio: a gallery track the radio has in c6 opens on c6: {page.inner_text('#edStatus')!r}")
-    page.click("#edFly")
+    send_fly(page)
     page.click("#tracksBtn")
     opts = page.eval_on_selector_all("#edSlot option", "els => els.map(e => e.textContent)")
     check(opts[5] == f"c6 · track 14 · {tracks[1]['name']} (emulator and radio)" and page.inner_text("#edEmuHas") == "c6: this track"
@@ -348,6 +360,19 @@ def page_tests(br, errors, tracks):
     page.click("button[aria-label='Open a copy of Slalom']")
     check(page.is_hidden("#edGallery") and page.input_value("#edName") == "My Slalom" and page.inner_text("#edEditing") == "Editing a local copy of My Slalom (kept in this browser as you edit): in no slot yet",
           f"page: Start from Slalom: a copy in the editor, in no slot yet ({page.inner_text('#edEditing')!r})")
+    # Send to emulator, then a change: the Emulator row says c1 hasn't it, and Fly asks before flying c1 as it is
+    page.click("#edSendEmu")
+    check(page.inner_text("#edEmuHas") == "c1: this track" and page.is_enabled("#edFly") and page.inner_text("#edFly") == "Fly c1"
+          and page.inner_text("#edStatus").startswith("Sent to c1 in the emulator"), f"page: Send to emulator: c1 has it, Fly c1 on ({page.inner_text('#edStatus')!r})")
+    page.locator("#edTreesN").fill("5")
+    page.locator("#edTreesN").press("Tab")
+    asked = []
+    page.once("dialog", lambda dl: (asked.append(dl.message), dl.dismiss()))
+    page.click("#edFly")
+    check('c1: "My Slalom", not the version you are editing' == page.inner_text("#edEmuHas") and "warn" in page.get_attribute("#edEmuHas", "class")
+          and asked and "not the version you are editing" in asked[0] and page.inner_text("#edStatus").startswith("Not flown")
+          and "changed, not sent yet" in page.inner_text("#edEditing"), f"page: a change not sent: the row says so, Fly asks first: {asked}")
+    page.click("#edSendEmu")
     page.click("#edGalBtn")
     page.click("[data-gopen='1']")
     check(page.evaluate("sim.editor.file()") == built[1]["text"] and page.input_value("#edName") == bundled[1],

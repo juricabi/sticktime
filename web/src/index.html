@@ -129,7 +129,8 @@
             <span class="ed-where">Emulator</span>
             <span class="ed-has" id="edEmuHas"></span>
             <span class="ed-acts">
-              <button class="btn" id="edFly" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 4.5v15l12-7.5z" fill="currentColor"/></svg><span>Send to emulator &amp; fly</span></button>
+              <button class="btn" id="edSendEmu" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 21h8M12 8v5M9.5 10.5l2.5 2.5 2.5-2.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Send to emulator</span></button>
+              <button class="btn primary" id="edFly" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 4.5v15l12-7.5z" fill="currentColor"/></svg><span id="edFlyText">Fly c1</span></button>
               
             </span>
           </div>
@@ -177,7 +178,7 @@
       <details class="ed-sec ed-howto">
         <summary>How to use on the radio</summary>
         <ol>
-          <li>Each slot, <code>c1</code> to <code>c8</code>, is the same track number on the emulator and on the radio. <strong>Send to emulator &amp; fly</strong> puts the track in the emulator's slot and flies it here; <strong>Send to radio</strong> puts it in the radio's; <strong>Save file</strong> downloads it as <code>c1.txt</code> (the slot's number).</li>
+          <li>Each slot, <code>c1</code> to <code>c8</code>, is the same track number on the emulator and on the radio. <strong>Send to emulator</strong> puts the track in the emulator's slot and <strong>Fly</strong> flies that slot here; <strong>Send to radio</strong> puts it in the radio's; <strong>Save file</strong> downloads it as <code>c1.txt</code> (the slot's number).</li>
           <li>Copy the file to <code>/SCRIPTS/TOOLS/StickTimeTracks/</code> on the radio's SD card (the folder is in the release zip; make it if it's missing). In Chrome or Edge on a computer, <strong>Send to radio</strong> does it for you: the radio plugged in by USB, in USB Storage mode. On the hosted site, <strong>Install</strong> (next to Tracks) also installs or updates the game. Eject the drive before you unplug the radio, and restart StickTime on it to see a new track.</li>
           <li>Up to 8 tracks, <code>c1.txt</code> to <code>c8.txt</code>: they come after the 8 built-in ones in the track menu, by name (tracks 9 to 16).</li>
           <li>StickTime and StickTime BW read them; StickTime Lite doesn't.</li>

@@ -294,7 +294,9 @@ footer.credits a { color: inherit; }
 .ed-has { min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
 .ed-acts { display: flex; gap: 6px; justify-content: flex-end; }
 .ed-acts .btn { height: 32px; padding: 0 12px; }
-.ed-acts .btn:first-child { min-width: 200px; justify-content: center; }
+.ed-acts .btn:first-child { min-width: 180px; justify-content: center; }
+.ed-acts #edFly { min-width: 92px; justify-content: center; }
+.ed-has.warn { color: var(--warn); }
 .ed-rsync { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 12px 0 0; padding: 8px 12px; border: 1px solid var(--warn);
   border-radius: 8px; font-size: 13px; }
 .ed-rsync .btn { height: 30px; padding: 0 12px; font-size: 12.5px; }

@@ -102,7 +102,7 @@ Play at **[juricabi.github.io/sticktime](https://juricabi.github.io/sticktime/)*
 
 - Any radio screen or a **PC screen** (1280×720, 1920×1080 at 60 fps); keyboard, on-screen gimbals or your radio as a USB joystick.
 - Synthesized motor sound tuned against real quads, and live-composed music (or your own songs).
-- **Tracks:** the track editor. Lay out gates, hoops, flags, dive gates, structures and walls on a map. **Open** picks a track to edit: one of yours, a new one, a file or one from the gallery of [tracks/](tracks/). The editor works on a copy, and **Send to emulator & fly**, **Send to radio** (Chrome/Edge, radio in USB Storage mode) or **Save file** puts it in a slot. **My tracks** shows the emulator's and the radio's slots side by side: remove a track, or copy it from one to the other. Made a good one? [Add it](tracks/README.md#add-your-track) with a pull request.
+- **Tracks:** the track editor. Lay out gates, hoops, flags, dive gates, structures and walls on a map. **Open** picks a track to edit: one of yours, a new one, a file or one from the gallery of [tracks/](tracks/). The editor works on a copy, and **Send to emulator**, **Send to radio** (Chrome/Edge, radio in USB Storage mode) or **Save file** puts it in a slot, and **Fly** flies the emulator's slot. **My tracks** shows the emulator's and the radio's slots side by side: remove a track, or copy it from one to the other. Made a good one? [Add it](tracks/README.md#add-your-track) with a pull request.
 - **Install:** connect the radio's SD card to install or update StickTime and manage the tracks on it (hosted site only).
 - **Radio load** estimates the frame time on F2, F4 and H7 radios; **Open .lua** runs any EdgeTX tool script.
 

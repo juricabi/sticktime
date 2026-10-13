@@ -440,7 +440,7 @@
   for (const k of ['tracksBtn', 'edClose', 'radioBtn', 'rpClose',
     'edOpen', 'edGalBtn', 'edMineBtn', 'edMine', 'edMineStatus', 'edMineNote', 'edOpenList', 'edUpdList', 'edSyncMine', 'edNewCards', 'edSlotList', 'edEditing', 'edGallery', 'edCards', 'edGrid', 'edGalStatus', 'edGalSync', 'edGalSyncText', 'edGalSyncAll', 'edGateType', 'edAddGate', 'edAddBox', 'edAddWall',
     'edRotL', 'edRotR', 'edDup', 'edDel', 'edUndo', 'edRedo', 'edFit', 'edTrees', 'edMap', 'edMapBox', 'edReadout',
-    'edSlot', 'edFly', 'edSave', 'edSize', 'edLite', 'edStatus', 'edEmuHas', 'edFileHas',
+    'edSlot', 'edFly', 'edFlyText', 'edSendEmu', 'edSave', 'edSize', 'edLite', 'edStatus', 'edEmuHas', 'edFileHas',
     'edSyncLine', 'edSyncText', 'edSendText', 'edName', 'edSeed', 'edShuffle', 'edTreesN',
     'edSel', 'edProblems', 'edProbPill', 'edOrder', 'edSend', 'edRadioLine', 'edRadioLineText',
     // the Install panel
@@ -617,23 +617,28 @@
   }
 
   function renderFly() {
-    const bad = ed.probs.length > 0;
-    el.edFly.disabled = bad;
+    const bad = ed.probs.length > 0, inSlot = asEntry(emuSlot(ed.slot));
+    el.edSendEmu.disabled = bad;
     el.edSave.disabled = bad;
-    el.edFly.title = bad ? 'Fix the problems listed under Check first' : 'Put it in slot c' + ed.slot + ' of the emulator\'s SD card and fly it (track ' + (8 + ed.slot) + ')';
+    el.edSendEmu.title = bad ? 'Fix the problems listed under Check first' : 'Put it in slot c' + ed.slot + ' of the emulator\'s SD card (track ' + (8 + ed.slot) + ')';
+    el.edFlyText.textContent = 'Fly c' + ed.slot;
+    el.edFly.disabled = !inSlot || !!inSlot.bad;
+    el.edFly.title = !inSlot ? 'c' + ed.slot + ' of the emulator is empty: Send to emulator first' : inSlot.bad ? 'c' + ed.slot + ' of the emulator can\'t be read'
+      : 'Fly c' + ed.slot + ' of the emulator in Practice (track ' + (8 + ed.slot) + '), as it is there';
     el.edSave.title = bad ? 'Fix the problems listed under Check first' : 'Download c' + ed.slot + '.txt for the radio\'s SD card';
     el.edSize.textContent = 'c' + ed.slot + '.txt · ' + ed.file.bytes + ' of ' + MAX_BYTES + ' bytes · id ' + ed.file.id;
     renderEditing();
     el.edSize.classList.toggle('bad', ed.file.bytes > MAX_BYTES);
     const c = 'c' + ed.slot;
-    el.edEmuHas.textContent = c + ': ' + holds(asEntry(emuSlot(ed.slot)));
+    el.edEmuHas.textContent = c + ': ' + holds(inSlot);
+    el.edEmuHas.classList.toggle('warn', stale(inSlot));
     el.edFileHas.textContent = c + '.txt, to copy to ' + DIR + ' on the radio\'s SD card yourself';
     const s = sim(), a = s && s.app;
     const lite = !!(a && !a.custom && a.script === 'lite');
     el.edLite.hidden = !(lite || (a && a.custom));
     el.edLite.textContent = lite
-      ? 'StickTime Lite doesn\'t read custom tracks (its radios have no memory to spare): Send to emulator & fly switches the script to Auto.'
-      : a && a.custom ? a.custom.name + ' is running: Send to emulator & fly switches back to StickTime.' : '';
+      ? 'StickTime Lite doesn\'t read custom tracks (its radios have no memory to spare): Fly switches the script to Auto.'
+      : a && a.custom ? a.custom.name + ' is running: Fly switches back to StickTime.' : '';
     renderRadio();
   }
   // The editor works on its own copy of a track; the slots are what the game plays. The head says
@@ -665,9 +670,10 @@
     if (!e) return 'empty';
     if (e.bad) return BAD[e.bad];
     if (norm(e.text) === ed.file.text) return 'this track';
-    const n = nameOf(e.text);
-    return '"' + n + '"' + (n === ed.T.name.trim().slice(0, 16) ? ', another version' : '');
+    return '"' + nameOf(e.text) + '"' + (stale(e) ? ', not the version you are editing' : '');
   }
+  // a slot with the edited track's name, other numbers: not what is in the editor (changes not sent)
+  const stale = (e) => !!(e && !e.bad && norm(e.text) !== ed.file.text && nameOf(e.text).toLowerCase() === ed.T.name.trim().slice(0, 16).toLowerCase());
   // the slot list: what each slot holds, in the emulator and (connected, its slots read) on the radio
   let slotsHtml = '';
   function renderSlots() {
@@ -1823,24 +1829,41 @@
     saveSoon();
   });
 
-  // Send to emulator & fly: the file into the slot on the emulator's SD card, the game started again (it reads
+  // Send to emulator: the file into the slot on the emulator's SD card, asked first when it holds another track;
   // the slots when it starts), then the track picked and Practice begun
-  function fly() {
-    if (ed.probs.length) return;
+  function sendEmu() {
+    if (ed.probs.length) return false;
     const s = sim();
-    if (!s || !s.engine) { status('The emulator is still starting: try again in a moment.', 'bad'); return; }
-    const slot = ed.slot, t = 8 + slot, old = asEntry(emuSlot(slot));
-    if (old && old.text !== ed.file.text && !window.confirm('Slot c' + slot + ' of the emulator holds ' + what(old) + '. Replace it with "' +
-      ed.T.name.trim() + '"?')) {
-      status('Not flown: c' + slot + ' keeps ' + what(old) + '. Pick another slot.');
-      return;
+    if (!s) return false;
+    const slot = ed.slot, old = asEntry(emuSlot(slot));
+    if (old && (old.bad || norm(old.text) !== ed.file.text) && !stale(old) && !window.confirm('Slot c' + slot + ' of the emulator holds ' + what(old) +
+      '. Replace it with "' + ed.T.name.trim() + '"?')) {
+      status('Not sent: c' + slot + ' keeps ' + what(old) + '. Pick another slot.');
+      return false;
     }
     const kept = s.writeSD(slotPath(slot), ed.file.text) !== false;
     ed.saved.add(ed.file.text);
+    renderSlots();
+    freshGame();                                       // (in its menus the game lists it at once)
+    status('Sent to c' + slot + ' in the emulator (track ' + (8 + slot) + '): Fly c' + slot + ' flies it.' + (kept ? ''
+      : ' The browser\'s storage is full: c' + slot + ' lasts only this visit (Save file keeps the track).'), kept ? 'ok' : 'bad');
+    return true;
+  }
+  // Fly: the game started again (it reads the slots when it starts) on the slot as the emulator has
+  // it, in Practice; a slot without the edited version (changes not sent) is asked about first
+  function fly() {
+    const s = sim();
+    if (!s || !s.engine) { status('The emulator is still starting: try again in a moment.', 'bad'); return; }
+    const slot = ed.slot, t = 8 + slot, cur = asEntry(emuSlot(slot));
+    if (!cur || cur.bad) { status('c' + slot + ' of the emulator ' + (cur ? 'can\'t be read' : 'is empty') + ': Send to emulator first.', 'bad'); return; }
+    if (stale(cur) && !window.confirm('c' + slot + ' in the emulator has "' + nameOf(cur.text) + '", but not the version you are editing: your changes aren\'t sent. ' +
+      'Fly c' + slot + ' as it is?\n\n(Send to emulator first to fly your changes.)')) {
+      status('Not flown: Send to emulator puts your changes in c' + slot + ', then Fly c' + slot + '.');
+      return;
+    }
     // StickTime Lite (and any other script) doesn't read custom tracks: back to the screen's own
     if (s.app.custom || s.app.script === 'lite') s.script('auto'); else s.boot();
     s.pause(false);
-    renderSlots();
     const eng = s.engine;
     if (!eng || eng.error) { status('The game did not start: ' + (eng && eng.error ? eng.error.msg.split('\n')[0] : 'no engine'), 'bad'); return; }
     let name = null;
@@ -1853,8 +1876,7 @@
       status('The game could not build the track: ' + String(err && err.message || err).split('\n')[0], 'bad');
       return;
     }
-    status('Flying ' + (name || ed.T.name.trim()) + ' (track ' + t + ', c' + slot + '.txt) in Practice.' + (kept ? ''
-      : ' The browser\'s storage is full: c' + slot + ' lasts only this visit (Save file keeps the track).'), kept ? 'ok' : 'bad');
+    status('Flying ' + (name || nameOf(cur.text)) + ' (track ' + t + ', c' + slot + '.txt) in Practice.', 'ok');
     closeEditor(false);
     const radio = $('radio');
     if (radio) radio.scrollIntoView({ block: 'center', behavior: reduced() ? 'auto' : 'smooth' });
@@ -1875,6 +1897,7 @@
     status('Saved c' + ed.slot + '.txt: copy it to ' + DIR + ' on the radio\'s SD card.', 'ok');
   }
   el.edFly.addEventListener('click', fly);
+  el.edSendEmu.addEventListener('click', sendEmu);
   el.edSave.addEventListener('click', saveFile);
   function removeEmu(slot, say) {
     const s = sim(), t = emuSlot(slot);
@@ -2021,6 +2044,7 @@
     el.edSend.disabled = radio.busy || (on && bad);
     el.edSend.title = !on ? 'Connect the radio\'s SD card first (the radio plugged in by USB, in USB Storage mode)'
       : bad ? 'Fix the problems listed under Check first' : 'Write c' + ed.slot + '.txt to the radio\'s SD card (track ' + (8 + ed.slot) + ')';
+    el.edRadioLineText.classList.toggle('warn', listed && stale(re));
     el.edRadioLineText.textContent = listed ? 'c' + ed.slot + ': ' + holds(re) + ' · ' + name
       : on ? name + ' connected' + (radio.busy ? ', reading…' : '') : ask ? name + ': allow again' : 'not connected';
     const diff = [];
@@ -2215,7 +2239,7 @@
     const h = homes(text), c = 'c' + ed.slot + ' (track ' + (8 + ed.slot) + ')';
     const here = h.here.includes(ed.slot), there = h.there.includes(ed.slot);
     return here && there ? 'it is in ' + c + ' in the emulator and on the radio.' : here ? 'it is in ' + c + ' in the emulator' + (radioRead() ? ', not on the radio.' : '.')
-      : there ? 'it is in ' + c + ' on the radio.' : 'Send to emulator & fly, Send to radio or Save file puts it in ' + c + '.';
+      : there ? 'it is in ' + c + ' on the radio.' : 'Send to emulator, Send to radio or Save file puts it in ' + c + '.';
   }
   // a track file into the editor (Open file, a radio slot), checked as the game reads it
   function openText(text, what, slot) {
@@ -2273,7 +2297,7 @@
     say = say || rstatus;
     job(async () => {
       const emu = emuEntries();
-      if (!emu.some(Boolean)) { say('No tracks in the emulator\'s slots: Send to emulator & fly in the track editor puts one there.'); return; }
+      if (!emu.some(Boolean)) { say('No tracks in the emulator\'s slots: Send to emulator in the track editor puts one there.'); return; }
       const dir = await tracksDir(true), rad = [];
       for (let i = 1; i <= SLOTS; i++) rad.push(await readSlot(dir, i));
       const p = plan(emu, rad);
