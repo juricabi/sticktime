@@ -12,7 +12,8 @@
   const store = {
     // (the key prefix is from StickTime's old name, FPV Sim: kept so saved settings stay)
     get(k, d) { try { const v = localStorage.getItem('fpvsim.' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
-    set(k, v) { try { localStorage.setItem('fpvsim.' + k, JSON.stringify(v)); } catch (e) { /* storage blocked */ } },
+    // true when it was kept (false: storage blocked or full)
+    set(k, v) { try { localStorage.setItem('fpvsim.' + k, JSON.stringify(v)); return true; } catch (e) { return false; } },
   };
 
   const app = {
@@ -861,7 +862,8 @@
   const held = new Set();
   let exitDown = 0, exitLongSent = false;
   // form fields keep their keys, and so do the Tracks and Install panels (editor.js): what is typed
-  // there (R to turn a gate, Delete, Enter on a button) never flies the quad
+  // there (R to turn a gate, Delete, Enter on a button) never flies the quad. The panels take the
+  // focus themselves (tabindex -1) when their plain text is clicked, so it doesn't fall to the page.
   const isField = (t) => t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA'
     || (t.closest && t.closest('#editor, #radioPanel') !== null));
   function key(name) { if (app.engine) app.engine.key(name); }
@@ -1323,8 +1325,9 @@
     key, pause(p) { app.paused = p; $('pauseChk').checked = p; },
     // a file on the virtual SD card, kept (localStorage) like the game's own saves; the game
     // reads it when it next starts (boot)
-    writeSD(path, text) { app.sd.set(path, String(text)); saveSD(); },
-    removeSD(path) { app.sd.delete(path); saveSD(); },
+    // (true when kept; false: the browser's storage is full or blocked, the file lasts this visit)
+    writeSD(path, text) { app.sd.set(path, String(text)); return saveSD(); },
+    removeSD(path) { app.sd.delete(path); return saveSD(); },
     touch(type, x, y) { app.engine.touch(type, { x, y, startX: x, startY: y, slideX: 0, slideY: 0, tapCount: 1 }); },
     step(n, ms) { for (let i = 0; i < (n || 1); i++) { if (ms) app.rate = ms; frame(); } draw(); showOverlay(); return app.engine.error; },
     test(name, ...args) { return app.engine.callTest(name, ...args); },

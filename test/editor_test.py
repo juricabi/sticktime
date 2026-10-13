@@ -12,7 +12,13 @@ file:// page has no private file system), a folder there stands for the card and
 folder picker, so the editor's own reads and writes run: Send to radio, the overwrite question,
 From radio (list, open, copy both ways), the card remembered across a reload, a picked SCRIPTS/
 TOOLS or StickTimeTracks folder, a folder that isn't a card, and the line shown where the browser
-can't do it (no picker, a SecurityError, the page in another site's frame)."""
+can't do it (no picker, a SecurityError, the page in another site's frame).
+
+The slots: Fly it, Empty slot, Start from and Open file ask before a track goes; a file the editor
+can't read (or too big to be a track) is marked and never copied; the browser's storage full is
+said. The installer: the manifest asked for afresh, refused when it would write a player's file or
+outside the game's folders (tools/sd_manifest.py refuses to publish one too), the files it removes
+named, a newer version's other files kept, Disconnect waiting for a job, Read again after a failure."""
 import hashlib
 import json
 import pathlib
@@ -196,6 +202,7 @@ def served(ctx):
         else:
             r.abort()
     ctx.route("**/*", route)
+    return pages
 
 
 def radio_done(page):
@@ -353,8 +360,11 @@ def radio_tests(br, errors):
     page.goto(SITE + "simulator.html")
     wait_sim(page)
     radio_panel(page)
+    note = page.text_content("#edInstallNote")
     check(page.is_hidden("#edRadio") and page.is_visible("#edRadioNote") and page.inner_text("#edRadioNote") == NO_RADIO
-          and page.is_hidden("#rpInstSec") and page.is_hidden("#rpTracksSec"), "radio: without the picker, one line: use Save file")
+          and page.is_hidden("#rpTracksSec") and page.is_hidden("#rpInstWait") and page.is_hidden("#edInstallPanel"), "radio: without the picker, one line: use Save file")
+    check(page.is_visible("#edInstallNote") and "latest release" in note and "Chrome or Edge on a computer, this page can install it" in note,
+          f"radio: ... and the game from the release zip: {note!r}")
     editor(page)
     check(page.is_hidden("#edSend") and page.is_hidden("#edRadioLine"), "radio: ... the editor without Send to radio")
     page.select_option("#edTemplate", label="Grand Prix")
@@ -371,6 +381,8 @@ def radio_tests(br, errors):
     frame.wait_for_function("window.sim && window.sim.editor", timeout=30000)
     check(frame.evaluate("sim.editor.radio().ok") is False and frame.evaluate("document.getElementById('edRadioNote').textContent") == NO_RADIO,
           "radio: artifact.html in another site's frame gives the Save file line")
+    check(frame.evaluate("!document.getElementById('edInstallNote').hidden && document.getElementById('edInstallNote').textContent")
+          .endswith("the emulator at juricabi.github.io/sticktime can install it for you."), "radio: ... and the release zip for the game")
     ctx.close()
 
 
@@ -412,7 +424,7 @@ def connect_card(page, name, files):
 
 def install_tests(br, errors):
     ctx = br.new_context(viewport={"width": 1400, "height": 1000})
-    served(ctx)
+    pages = served(ctx)
     page = ctx.new_page()
     page.on("pageerror", lambda e: errors.append(str(e)))
     page.goto(SITE + "simulator.html")
@@ -448,20 +460,70 @@ def install_tests(br, errors):
     radio_done(page)
     check(page.inner_text("#rpStatus").startswith(f"StickTime {version} was already on the radio"), "install: again: nothing to write")
 
+    # a job under way (the card read again, the site slow to answer): Disconnect waits for it
+    page.evaluate("""() => { const f = window.fetch; window.__gate = new Promise((r) => { window.__open = r; });
+      window.fetch = async (...a) => { await window.__gate; return f(...a); }; }""")
+    page.click("#edRefresh")
+    page.wait_for_function("sim.editor.radio().busy")
+    check(page.is_disabled("#edForget") and page.is_disabled("#edRefresh") and page.is_disabled("#edInstallGo"),
+          "install: while the card is read, Disconnect, Read again and Install wait")
+    page.evaluate("document.getElementById('edForget').click()")
+    page.evaluate("window.__open()")
+    r = radio_done(page)
+    check(r["state"] == "on" and page.is_visible("#edEditions") and page.is_enabled("#edForget"), "install: ... the job ends, the card still connected")
+
+    # a new release on the site since the panel read it: Install asks for the manifest again
+    new_why = GAME_FILES["StickTimeBW/why.lua"] + b"-- a new release\n"
+    m2 = json.loads(json.dumps(MANIFEST))
+    for f in m2["files"]:
+        if f["path"] == "StickTimeBW/why.lua":
+            f.update(size=len(new_why), sha256=sha(new_why))
+    pages[SITE + "sdcard/manifest.json"], pages[SITE + "sdcard/SCRIPTS/TOOLS/StickTimeBW/why.lua"] = json.dumps(m2).encode(), new_why
+    page.click("#edInstallGo")
+    radio_done(page)
+    st = page.inner_text("#rpStatus")
+    check(st.startswith(f"StickTime {version} is on the radio") and page.evaluate(CARD_HASH, T + "StickTimeBW/why.lua") == sha(new_why),
+          f"install: a release published after the panel read the site installs whole (the manifest asked for again): {st!r}")
+    pages[SITE + "sdcard/manifest.json"], pages[SITE + "sdcard/SCRIPTS/TOOLS/StickTimeBW/why.lua"] = json.dumps(MANIFEST).encode(), GAME_FILES["StickTimeBW/why.lua"]
+
+    # a manifest that would write a player's file, or outside the game's folders: refused, nothing written
+    lite_save = "lite save 1 2 3\n"
+    for extra, why in (({"path": "StickTimeLite/data.txt", "size": 5, "sha256": sha("evil\n"), "edition": "lite"}, "StickTimeLite/data.txt is the player's own"),
+                       ({"path": "StickTimeLite/../../../RADIO/radio.yml", "size": 5, "sha256": sha("evil\n"), "edition": "lite"}, "isn't one of the game's files"),
+                       ({"path": "/RADIO/radio.yml", "size": 5, "sha256": sha("evil\n"), "edition": "shared"}, "isn't one of the game's files")):
+        m3 = json.loads(json.dumps(MANIFEST))
+        m3["files"].append(extra)
+        pages[SITE + "sdcard/manifest.json"] = json.dumps(m3).encode()
+        connect_card(page, "CARD", {"SCRIPTS/TOOLS/StickTimeLite/data.txt": lite_save, "RADIO/radio.yml": "board: x7\n"})
+        wait = page.inner_text("#rpInstWait")
+        check(page.is_hidden("#edInstallPanel") and why in wait and "nothing is written" in wait
+              and page.evaluate(CARD_FILE, "CARD/SCRIPTS/TOOLS/StickTimeLite/data.txt") == lite_save, f"install: a manifest with {extra['path']} refused: {wait!r}")
+    # the site not answering: said (not "Reading the card…" for ever), and Read again tries again
+    del pages[SITE + "sdcard/manifest.json"]
+    page.click("#edRefresh")
+    radio_done(page)
+    check("Couldn't get the game's files from the site" in page.inner_text("#rpInstWait") and page.is_enabled("#edRefresh"),
+          "install: the site not answering: said, not stuck on Reading the card")
+    pages[SITE + "sdcard/manifest.json"] = json.dumps(MANIFEST).encode()
+    page.click("#edRefresh")
+    radio_done(page)
+    check(page.is_visible("#edEditions") and page.is_hidden("#rpInstWait") and page.evaluate(PICKED) == ["lite"], "install: ... Read again reads it")
+
     # an update over an old version: stale files go, the player's files stay byte for byte
     old_luac = [27, 76, 117, 97, 83, 0, 25, 147, 13, 10, 26, 10, 4, 4, 4, 0, 1, 2, 3]
     mine = {"SCRIPTS/TOOLS/StickTimeBW.dat": "FPVSIM2 lay=2 track=9 l9=4321\n", "SCRIPTS/TOOLS/StickTimeLite/data.txt": "lite save 1 2 3\n",
             "SCRIPTS/TOOLS/StickTimeTracks/c1.txt": "My Loop\n1 4242 7 9 0 0 1 0 0 0 40 1 0 0\n",
-            "SCRIPTS/TOOLS/StickTimeGhosts/c3.txt": "ghost 1 2 3\n", "SCRIPTS/TOOLS/FPVSimBW.dat": "old\n"}
+            "SCRIPTS/TOOLS/StickTimeGhosts/c3.txt": "ghost 1 2 3\n", "SCRIPTS/TOOLS/FPVSimBW.dat": "old\n",
+            "SCRIPTS/TOOLS/StickTimeTracks/README.txt": "my notes on my tracks\n", "SCRIPTS/TOOLS/notes.new": "mine\n"}
     old = dict(mine, **{"SCRIPTS/TOOLS/StickTimeBW.lua": "local toolName = \"TNS|StickTime BW|TNE\"\n--[[\n  StickTime BW v1.6.5  -  loader\n]]\n",
                         "SCRIPTS/TOOLS/StickTimeBW/core.lua": "-- old core\n", "SCRIPTS/TOOLS/StickTimeBW/core.luac": old_luac,
                         "SCRIPTS/TOOLS/StickTimeBW/game.luac": old_luac,
                         "SCRIPTS/TOOLS/StickTimeLite.lua": "--[[\n  StickTime Lite v1.6.5  -  loader\n]]\n",
-                        "SCRIPTS/TOOLS/StickTimeLite/t9.txt": "1 9 0 0 1 0 0\n"})
+                        "SCRIPTS/TOOLS/StickTimeLite/t9.txt": "1 9 0 0 1 0 0\n", "SCRIPTS/TOOLS/StickTimeBW.lua.new": "half a loader\n"})
     connect_card(page, "CARD", old)
     states = page.inner_text("#edEditions")
-    check(page.evaluate(PICKED) == ["bw", "lite"] and "will be updated (1.6.5 on the card), 1 old file removed" in states,
-          f"install: B&W and Lite found and picked, older: {states!r}")
+    check(page.evaluate(PICKED) == ["bw", "lite"] and "will be updated (1.6.5 on the card), removes core.luac" in states
+          and "will be updated (1.6.5 on the card), removes t9.txt" in states, f"install: B&W and Lite found and picked, older, what goes named: {states!r}")
     check("c1 · track 9 · My Loop" in page.inner_text("#edRadioSlots"), "install: the panel lists the card's tracks beside it")
     page.mouse.move(0, 0)
     shot_clip(page, OUT / "radio_panel_light.png", "radioPanel")
@@ -472,9 +534,12 @@ def install_tests(br, errors):
     radio_done(page)
     bw, lite = page.evaluate(CARD_LS, T + "StickTimeBW"), page.evaluate(CARD_LS, T + "StickTimeLite")
     check("core.luac" not in bw and "t9.txt" not in lite, "install: the stale core.luac and t9.txt removed")
+    st = page.inner_text("#rpStatus")
+    check("Removed StickTimeBW.lua.new, StickTimeBW/core.luac and StickTimeLite/t9.txt." in st and page.evaluate(CARD_FILE, T + "StickTimeBW.lua.new") is None,
+          f"install: what it removed named (an older page's StickTimeBW.lua.new too; notes.new isn't the game's): {st!r}")
     check(bw == sorted(k.split("/")[1] for k in GAME_FILES if k.startswith("StickTimeBW/")), f"install: StickTimeBW/ is the release's: {bw}")
     check(all(page.evaluate(CARD_HASH, "CARD/" + k) == sha(v) for k, v in mine.items()),
-          "install: saves, StickTimeLite/data.txt, tracks and ghosts kept byte for byte")
+          "install: saves, StickTimeLite/data.txt, tracks, ghosts and the tracks' README kept byte for byte")
     check(page.evaluate(CARD_HASH, T + "StickTimeBW/game.luac") == sha(GAME_FILES["StickTimeBW/game.luac"]), "install: the new game.luac")
     check(page.evaluate(CARD_HASH, T + "StickTime.lua") is None and page.inner_text("#edEditions").count("up to date") == 2,
           "install: Color not picked, not put on the card; B&W and Lite up to date")
@@ -489,6 +554,24 @@ def install_tests(br, errors):
     check(asked and "9.9.9" in asked[0] and page.inner_text("#rpStatus") == "Nothing changed on the radio."
           and page.evaluate(CARD_HASH, T + "StickTime.lua") == sha("--[[\n  StickTime v9.9.9  -  from the future\n]]\n"),
           f"install: asked before replacing a newer one, and No changes nothing: {asked}")
+    connect_card(page, "CARD", {"SCRIPTS/TOOLS/StickTimeBW.lua": "--[[\n  StickTime BW v9.9.9  -  from the future\n]]\n",
+                                "SCRIPTS/TOOLS/StickTimeBW/next.lua": "-- the newer one's\n"})
+    check("newer on the card (9.9.9)" in page.inner_text("#edEditions") and page.evaluate(PICKED) == ["bw"], "install: a newer B&W on the card")
+    asked = []
+    page.once("dialog", lambda dl: (asked.append(dl.message), dl.accept()))
+    page.click("#edInstallGo")
+    radio_done(page)
+    st = page.inner_text("#rpStatus")
+    check(asked and page.evaluate(CARD_HASH, T + "StickTimeBW.lua") == sha(GAME_FILES["StickTimeBW.lua"])
+          and page.evaluate(CARD_FILE, T + "StickTimeBW/next.lua") == "-- the newer one's\n" and "Removed" not in st,
+          f"install: back to {version} on Yes, the newer one's other files left alone: {st!r}")
+    connect_card(page, "CARD", {"SCRIPTS/TOOLS/StickTimeBW/core.luac": old_luac, "RADIO/radio.yml": "board: tx12mk2\n"})
+    states = page.inner_text("#edEditions")
+    check("not installed (installing removes core.luac from StickTimeBW/)" in states, f"install: leftovers in a folder without its loader shown: {states!r}")
+    page.click("#edInstallGo")
+    radio_done(page)
+    check("core.luac" not in page.evaluate(CARD_LS, T + "StickTimeBW") and "Removed StickTimeBW/core.luac" in page.inner_text("#rpStatus"),
+          "install: ... and removed")
     ctx.close()
 
     # no install where the site's files aren't beside the page: artifact.html, file:// pages
@@ -571,7 +654,209 @@ def panel_tests(br, errors):
     page.click("#tracksBtn")
     page.click("#tracksBtn")
     check(page.is_hidden("#editor") and expanded() == ("false", "false"), "panels: a second click on Tracks closes it")
+    # plain text clicked in a panel: the panel has the keys, not the game; Escape closes it
+    page.click("#tracksBtn")
+    page.evaluate("sim.engine.__mark = 1")
+    page.click("#edHint")
+    page.keyboard.press("r")
+    check(page.evaluate("sim.engine.__mark") == 1 and page.evaluate("document.activeElement.id") == "editor",
+          "panels: R after a click on the editor's text doesn't restart the game")
+    page.keyboard.press("Escape")
+    check(page.is_hidden("#editor") and page.evaluate("document.activeElement.id") == "tracksBtn", "panels: Escape closes the editor")
+    page.click("#radioBtn")
+    page.click("#edRadioNote")
+    page.keyboard.press("r")
+    check(page.evaluate("sim.engine.__mark") == 1 and page.evaluate("document.activeElement.id") == "radioPanel",
+          "panels: ... nor after a click on Install's text")
+    page.keyboard.press("Escape")
+    check(page.is_hidden("#radioPanel") and page.evaluate("document.activeElement.id") == "radioBtn" and page.evaluate("sim.engine.__mark") == 1,
+          "panels: Escape closes Install, and doesn't reach the game")
     ctx.close()
+
+
+class Dialogs:
+    """the page's questions (confirm), each answered with .answer (Yes: True) and kept to be checked"""
+    def __init__(self, page):
+        self.seen, self.answer = [], False
+        page.on("dialog", self.on)
+
+    def on(self, dl):
+        self.seen.append(dl.message)
+        if self.answer:
+            dl.accept()
+        else:
+            dl.dismiss()
+
+    def take(self):
+        s, self.seen = self.seen, []
+        return s
+
+
+def emu(page, n):
+    """the emulator's slot n, or None"""
+    return page.evaluate(f"sim.app.sd.get('{SLOT}{n}.txt') ?? null")
+
+
+def track_text(name, t):
+    """a built-in track (no structures) as a track file"""
+    nums = numbers_of(t)
+    return f"{name}\n1 {fnv1a(nums) % 999999 + 1} {nums}\n"
+
+
+JUNK = "Junk\nnot numbers\n"                        # a file the editor (and the game) can't read
+FULL = """() => { window.__setItem = Storage.prototype.setItem;
+  Storage.prototype.setItem = function () { throw new DOMException('full', 'QuotaExceededError'); }; }"""
+ROOMY = "() => { Storage.prototype.setItem = window.__setItem; }"
+
+
+def slot_tests(br, errors, tmp):
+    """the emulator's slots: Fly it and Empty slot ask before a different track goes, the work in
+    progress isn't replaced unasked, a file the editor can't read is marked, a full storage is said"""
+    ctx = br.new_context(viewport={"width": 1400, "height": 1000})
+    offline(ctx)
+    page = ctx.new_page()
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    page.goto(SIM)
+    wait_sim(page)
+    dlg = Dialogs(page)
+    page.click("#tracksBtn")
+    page.select_option("#edTemplate", label="Grand Prix")
+    page.select_option("#edSlot", "1")
+    page.click("#edFly")
+    gp = emu(page, 1)
+    check(not dlg.take() and gp and gp.startswith("My Grand Prix\n"), "slots: an empty slot: Fly it without a question")
+    page.click("#tracksBtn")
+    page.select_option("#edTemplate", label="Bando")
+    check(not dlg.take(), "slots: Start from over a track that is in a slot: no question")
+    page.click("#edFly")
+    q = dlg.take()
+    check(len(q) == 1 and '"My Grand Prix"' in q[0] and '"My Bando"' in q[0] and emu(page, 1) == gp and page.is_visible("#editor")
+          and 'keeps "My Grand Prix"' in page.text_content("#edStatus"), f"slots: Fly it over another track asks; No keeps it: {q}")
+    dlg.answer = True
+    page.click("#edFly")
+    bando = page.evaluate("sim.editor.file()")
+    check(len(dlg.take()) == 1 and emu(page, 1) == bando and page.evaluate("sim.test('info')")[10] == "My Bando", "slots: ... Yes flies the Bando from c1")
+    page.click("#tracksBtn")
+    page.click("#edFly")
+    check(not dlg.take(), "slots: the same track into its slot again: no question")
+
+    # Empty slot asks first
+    page.click("#tracksBtn")
+    dlg.answer = False
+    page.click("#edEmpty")
+    q = dlg.take()
+    check(len(q) == 1 and "Empty slot c1" in q[0] and '"My Bando"' in q[0] and emu(page, 1) == bando, f"slots: Empty slot asks first: {q}")
+    dlg.answer = True
+    page.click("#edEmpty")
+    check(len(dlg.take()) == 1 and emu(page, 1) is None and "c1 · track 9 · empty" in page.inner_text("#edSlot"), "slots: ... Yes empties it")
+
+    # the work in progress, in no slot and no file: Start from and Open file ask first
+    click_map(page, 0, 0)                                      # gate 1
+    page.keyboard.press("r")
+    dlg.answer = False
+    page.select_option("#edTemplate", label="Meadow")
+    q = dlg.take()
+    check(len(q) == 1 and '"My Bando"' in q[0] and page.evaluate("sim.editor.track()")["name"] == "My Bando"
+          and page.text_content("#edStatus") == "Kept your track.", f"slots: Start from over unsaved work asks; No keeps it: {q}")
+    f = tmp / "c5.txt"
+    f.write_text(gp, encoding="ascii", newline="")
+    status = open_file(page, f)
+    check(len(dlg.take()) == 1 and status == "Kept your track: c5.txt not opened." and page.evaluate("sim.editor.track()")["name"] == "My Bando",
+          f"slots: Open file over unsaved work asks too: {status!r}")
+    dlg.answer = True
+    status = open_file(page, f)
+    check(len(dlg.take()) == 1 and status.startswith("Opened c5.txt") and page.evaluate("sim.editor.file()") == gp, "slots: ... Yes opens it")
+    # a file the editor writes otherwise: said
+    odd = tmp / "odd.txt"
+    odd.write_text("Odd\n1 5 150 9 0 0 1 0 0 40 0 1 0 0\n", encoding="ascii", newline="")
+    status = open_file(page, odd)
+    check("Some values were adjusted" in status and "new id" in status and page.evaluate("sim.editor.track()")["seed"] == 99,
+          f"slots: a file with values out of range opens kept in range, and says so: {status!r}")
+    # positions stay in range whatever the edits
+    click_map(page, 40, 0)                                     # gate 2
+    page.fill('#edSel [data-f="x"]', "5000")
+    page.press('#edSel [data-f="x"]', "Tab")
+    check(page.evaluate("sim.editor.track()")["gates"][1]["x"] == 999, "slots: a gate's x typed as 5000 is kept at 999")
+    page.click("#edUndo")
+
+    # a slot's file the editor can't read: marked in the list
+    page.evaluate(f"sim.writeSD('{SLOT}6.txt', {JUNK!r})")
+    page.click("#edClose")
+    page.click("#tracksBtn")
+    check("c6 · track 14 · can't be read" in page.inner_text("#edSlot"), "slots: a slot's file the editor can't read is marked in the slot list")
+    page.select_option("#edSlot", "6")
+    dlg.answer = False
+    page.click("#edFly")
+    q = dlg.take()
+    check(len(q) == 1 and "a file that can't be read" in q[0] and emu(page, 6) == JUNK, f"slots: ... and Fly it over it asks: {q}")
+
+    # the browser's storage full: Fly it says the slot lasts this visit
+    page.evaluate(FULL)
+    page.select_option("#edSlot", "2")
+    page.click("#edFly")
+    st = page.text_content("#edStatus")
+    check("storage is full" in st and "bad" in page.get_attribute("#edStatus", "class") and emu(page, 2) == page.evaluate("sim.editor.file()"),
+          f"slots: storage full: flown, and Fly it says so: {st!r}")
+    page.evaluate(ROOMY)
+    ctx.close()
+
+
+def bad_slot_tests(br, errors):
+    """the radio's slots: a file too big to be a track isn't read, one the editor can't read is
+    marked; neither is copied either way (and they are named); a full storage is said"""
+    ctx = br.new_context(viewport={"width": 1400, "height": 1000})
+    served(ctx)
+    page = ctx.new_page()
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    page.goto(SITE + "simulator.html")
+    wait_sim(page)
+    good, good2 = track_text("Radio GP", GP), track_text("Mine GP", GP)
+    big = "Huge\n1 1 7 9" + " 0" * 20000 + "\n"
+    connect_card(page, "CARD", {"SCRIPTS/TOOLS/StickTime.lua": "-- the game\n", "SCRIPTS/TOOLS/StickTimeTracks/c1.txt": good,
+                                "SCRIPTS/TOOLS/StickTimeTracks/c2.txt": big, "SCRIPTS/TOOLS/StickTimeTracks/c4.txt": JUNK})
+    rows = page.inner_text("#edRadioSlots")
+    check("c2 · track 10 · too big to be a track" in rows and "c4 · track 12 · can't be read" in rows and "c1 · track 9 · Radio GP" in rows
+          and page.locator("[data-ropen]").count() == 1, f"radio slots: too big and unreadable files marked, only c1 to open: {rows!r}")
+    page.click("#edRadioToEmu")
+    radio_done(page)
+    st = page.inner_text("#rpStatus")
+    check(emu(page, 1) == good and emu(page, 2) is None and emu(page, 4) is None and "c2 (too big to be a track)" in st and "c4 (can't be read)" in st,
+          f"radio slots: only c1 copied into the emulator, the others named: {st!r}")
+    page.evaluate(f"sim.writeSD('{SLOT}3.txt', {good2!r})")
+    page.evaluate(f"sim.writeSD('{SLOT}6.txt', {JUNK!r})")
+    page.click("#edEmuToRadio")
+    radio_done(page)
+    st = page.inner_text("#rpStatus")
+    check(page.evaluate(CARD_FILE, "CARD/SCRIPTS/TOOLS/StickTimeTracks/c3.txt") == good2 and page.evaluate(CARD_FILE, "CARD/SCRIPTS/TOOLS/StickTimeTracks/c6.txt") is None
+          and "c6 (can't be read)" in st and st.startswith("Sent c3 to the radio."), f"radio slots: the emulator's unreadable c6 not sent, named: {st!r}")
+    # the browser's storage full: the copy says it lasts this visit
+    page.evaluate(f"sim.removeSD('{SLOT}1.txt')")
+    page.evaluate(FULL)
+    page.click("#edRadioToEmu")
+    radio_done(page)
+    st = page.inner_text("#rpStatus")
+    check("storage is full" in st and "bad" in page.get_attribute("#rpStatus", "class") and emu(page, 1) == good, f"radio slots: storage full is said: {st!r}")
+    page.evaluate(ROOMY)
+    ctx.close()
+
+
+def manifest_checks():
+    """tools/sd_manifest.py refuses to publish what the page mustn't write"""
+    def refused(fs):
+        try:
+            sd_manifest.check(fs)
+        except ValueError as e:
+            return str(e)
+        return None
+    v = MANIFEST["version"]
+    check(sd_manifest.check(GAME_FILES) == v, f"sd_manifest: the release passes its checks ({v})")
+    check(refused(dict(GAME_FILES, **{"StickTimeLite/data.txt": b"x"})) is not None, "sd_manifest: a player's file name (StickTimeLite/data.txt) refused")
+    check(refused(dict(GAME_FILES, **{"StickTimeBW/x.dat": b"x"})) is not None and refused(dict(GAME_FILES, **{"StickTimeTracks/c1.txt": b"x"})) is not None,
+          "sd_manifest: *.dat and c1.txt refused")
+    check(refused(dict(GAME_FILES, **{"StickTimeBW/sub/x.lua": b"x"})) is not None and refused(dict(GAME_FILES, **{"Other/x.lua": b"x"})) is not None,
+          "sd_manifest: files outside the game's folders refused")
+    bw = dict(GAME_FILES, **{"StickTimeBW.lua": GAME_FILES["StickTimeBW.lua"].replace(f"BW v{v}".encode(), b"BW v0.0.1")})
+    check("versions differ" in (refused(bw) or ""), "sd_manifest: a B&W loader of another version refused")
 
 
 def main():
@@ -692,9 +977,13 @@ def main():
         page.keyboard.press("r")
         check(page.evaluate("sim.engine.__mark") is None, "R outside the editor restarts the game, as before")
 
-        # ---- a wall with a gap, flown from slot 3
+        # ---- a wall with a gap, flown from slot 3 (the Bando turned above is in no slot: asked first)
         page.click("#tracksBtn")
+        asked = []
+        page.once("dialog", lambda dl: (asked.append(dl.message), dl.accept()))
         page.select_option("#edTemplate", label="Meadow")
+        check(len(asked) == 1 and asked[0].startswith('Replace "My Bando') and "isn't in a slot" in asked[0],
+              f"Start from over the turned Bando asks first: {asked}")
         page.click("#edAddWall")
         sel = page.evaluate("sim.editor.selected()")
         t = page.evaluate("sim.editor.track()")
@@ -780,6 +1069,9 @@ def main():
         install_tests(br, errors)
         toolbar_shots(br, errors)
         panel_tests(br, errors)
+        slot_tests(br, errors, tmp)
+        bad_slot_tests(br, errors)
+        manifest_checks()
         br.close()
     for e in errors:
         print("page error:", e)

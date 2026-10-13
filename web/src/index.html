@@ -49,7 +49,7 @@
   </div>
 </header>
 
-<section class="card editor" id="editor" hidden aria-labelledby="edTitle">
+<section class="card editor" id="editor" hidden aria-labelledby="edTitle" tabindex="-1">
   <div class="ed-head">
     <h2 id="edTitle">Track editor <small>your tracks are 9 to 16 in the game</small></h2>
     <div class="ed-actions">
@@ -60,7 +60,7 @@
   </div>
   <div class="ed-grid">
     <div class="ed-main">
-      <div class="ed-tools" role="toolbar" aria-label="Edit the track">
+      <div class="ed-tools" role="group" aria-label="Edit the track">
         <span class="ed-pair">
           <select id="edGateType" aria-label="Type of gate to add"></select>
           <button class="btn" id="edAddGate" type="button" title="Add a gate after the selected one">Add gate</button>
@@ -132,7 +132,7 @@
   </div>
 </section>
 
-<section class="card editor rpanel" id="radioPanel" hidden aria-labelledby="rpTitle">
+<section class="card editor rpanel" id="radioPanel" hidden aria-labelledby="rpTitle" tabindex="-1">
   <div class="ed-head">
     <h2 id="rpTitle">Radio &amp; install <small>the radio's SD card over USB: StickTime and your tracks on it</small></h2>
     <div class="ed-actions">
@@ -146,13 +146,14 @@
         <div class="ed-radio" id="edRadio">
           <span class="ed-rstate" id="edRadioState">not connected</span>
           <button class="btn primary" id="edConnect" type="button" title="Pick the radio's SD card (the radio plugged in by USB, in USB Storage mode)">Connect radio…</button>
+          <button class="btn" id="edRefresh" type="button" title="Read the card again (its tracks, the game on it)" hidden>Read again</button>
           <button class="btn" id="edForget" type="button" title="Forget this SD card" hidden>Disconnect</button>
         </div>
         <p class="note ed-rnote" id="edRadioNote"></p>
       </section>
       <section class="ed-sec" id="rpInstSec" aria-labelledby="rpInstH">
         <h3 id="rpInstH">Install / update StickTime</h3>
-        <p class="note" id="edInstallNote" hidden>To put the game itself on the card, copy the SCRIPTS folder of the SD card zip from the <a href="https://github.com/juricabi/sticktime/releases/latest" target="_blank" rel="noopener">latest release</a>; the emulator at juricabi.github.io/sticktime can install it for you.</p>
+        <p class="note" id="edInstallNote" hidden>To put the game itself on the card, copy the SCRIPTS folder of the SD card zip from the <a href="https://github.com/juricabi/sticktime/releases/latest" target="_blank" rel="noopener">latest release</a><span id="edInstallMore">; the emulator at juricabi.github.io/sticktime can install it for you</span>.</p>
         <p class="note" id="rpInstWait" hidden></p>
         <div id="edInstallPanel" hidden>
           <p class="ed-rpath" id="edInstallHead"></p>
@@ -160,7 +161,7 @@
           <p class="note" id="edInstallHint"></p>
           <div class="ed-row">
             <button class="btn primary" id="edInstallGo" type="button">Install / update</button>
-            <progress id="edInstallBar" max="1" value="0" hidden></progress>
+            <progress id="edInstallBar" max="1" value="0" hidden aria-label="Install progress"></progress>
           </div>
         </div>
       </section>
