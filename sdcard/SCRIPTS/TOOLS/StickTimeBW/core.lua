@@ -42,8 +42,8 @@ local focus, scroll, editing = 1, 0, false     -- menus: focused row, list scrol
 
 -- ------------------------------------------------------------ settings
 local S = { track = 1, quad = 1, twr = 0, mode = 1, rates = 2, rc = 100, rm = 600, re = 50, yc = 100, ym = 500, ye = 40,
-            tilt = 20, fov = 100, laps = 3, ai = 2, skill = 2, ghost = 1, wind = 0, wash = 0, grip = 1, vib = 1, map = 1,
-            sticks = 0, fps = 0 }
+            tilt = 20, fov = 100, laps = 3, ai = 2, skill = 2, ghost = 1, wind = 0, wash = 0, grip = 1, batt = 0, vib = 1,
+            map = 1, sticks = 0, fps = 0 }
 -- rows: label, key, then either a value list (+ names, suffix) or nil, nil, suffix, min, max, step
 local OPTS = {
   { "Quad", "quad", { 1, 2, 3, 4, 5 }, { 'Racer 5"', 'Freestyle 5"', '3" toothpick', 'Whoop 65mm', 'Whoop 75mm' } },
@@ -64,6 +64,7 @@ local OPTS = {
   { "Wind", "wind", { 0, 1, 2 }, { "Off", "Light", "Strong" } },
   { "Prop wash", "wash", { 0, 1, 2 }, { "Off", "Stock", "Max" } },
   { "Grip", "grip", { 0, 1, 2 }, { "Low", "Medium", "High" } },
+  { "Battery", "batt", { 0, 1, 2 }, { "Off", "Real", "Long" } },
   { "Vibration", "vib", { 0, 1 }, { "Off", "On" } },
   { "Show FPS", "fps", { 0, 1 }, { "Off", "On" } },
 }
@@ -448,6 +449,17 @@ local R = { laps = {}, n = 0, total = 0, newLap = false, newRace = false, newBes
             ready = 0, crashes = 0, cd = -1, fps = 0, fpsN = 0, fpsT = 0, fpsX = "", runS = 0, showS = 0,
             pk = 0, pos = 1, sc = 0, ch = 0, chn = 0, cht = 0, prox = 9, rn = 0, rt = 0, smp = 0,
             fi = 5, pt = 0, st = 0 }          -- frame interval, sim time (10 ms ticks), prop strike left (s)
+-- the battery (setting). One pack per class (Racer 5", Freestyle 5", 3" toothpick, Whoop 65mm, Whoop
+-- 75mm): cells, capacity (mAh), resistance (milliohm a cell), current at full throttle (A), and the
+-- volts a cell has over 4.2 when full (LiHV). In use (applySettings): cells n, capacity mah (twice
+-- for Long), resistance r (ohm), current f, h. The pack's state: charge s (1 full .. 0 empty), cell
+-- voltage under load v (filtered over about 1 s), current i (A), flight time t and time since it ran
+-- empty e (s), warning w (1 below 3.5 V a cell, 2 below 3.3 V), when LOW BATTERY last showed m (ticks)
+local BAT = { "4 1300 6 95 0", "4 1500 6 120 0", "3 550 20 28 .15", "1 300 45 11 .15", "2 300 35 14 .15",
+              s = 1, v = 4.2, i = 0, t = 0, e = 0, w = 0, m = 0 }
+BAT.new = function()                                   -- a fresh pack
+  BAT.s, BAT.v, BAT.i, BAT.t, BAT.e, BAT.w, BAT.m = 1, 4.2 + BAT.h, 0, 0, 0, 0, 0
+end
 
 local function timeStr(cs)
   cs = floor(cs)
@@ -499,8 +511,8 @@ MED.goal = function()
   return MED.n[m + 1] .. " " .. timeStr(MED[m + 1]), m + 1
 end
 
-local function beep(f, d, flags)
-  if playTone then playTone(f, d, 0, flags or 0) end
+local function beep(f, d, flags, p)                   -- p: a pause after the tone (ms)
+  if playTone then playTone(f, d, p or 0, flags or 0) end
 end
 
 local function showMsg(s, good)
@@ -598,6 +610,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
   end
 
   respawn = function()
+    if BAT.s <= 0 then BAT.new() end                   -- the pack ran empty: a fresh one
     if gmode == 3 then
       if R.ax then placeDrone(R.ax, R.ay + 0.5, R.az, R.ahx, R.ahz) else placeDrone(TR.px, DR, TR.pz, TR.hx, TR.hz) end
     elseif lastGate > 0 then
@@ -610,9 +623,11 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     end
   end
 
-  local function crash()
+  -- why: nil for a crash, "EMPTY" when the battery ran out (shown instead of CRASH, not counted)
+  local function crash(why)
     if state == DONE then respawn() return end
-    state, tState, R.crashes = CRASHED, gt, R.crashes + 1
+    state, tState, R.why = CRASHED, gt, why
+    if not why then R.crashes = R.crashes + 1 end
     if gmode == 3 then
       R.ch, R.chn = 0, 0
       tricks(-1)
@@ -746,6 +761,43 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     local tx = (sT - P.dz) / (1 - P.dz)
     if tx < 0 then tx = 0 end
     local T = Tmax * (P.i0 + (1 - P.i0) * ((1 - P.tk) * tx ^ P.tn + P.tk * tx ^ 8))
+    -- the battery (setting, off by default): the current grows with thrust^1.5 (momentum theory; 5%
+    -- of full at idle for the motors and electronics) and the cells sag by current x resistance from
+    -- their rest voltage. Down to 3.5 V a cell under load the quad flies as without it (Betaflight's
+    -- sag compensation: a fresh pack flies as before, a lap never gets faster), below that the thrust
+    -- falls with the voltage squared. Near empty the cells give no more current than takes them to
+    -- 3.0 V: the quad limps (thrust ~ current^(2/3)). Empty when that is less than the motors need at
+    -- idle: they stop
+    if S.batt > 0 then
+      local s, c, r, f = BAT.s, T / Tmax, BAT.r, BAT.f
+      local I = f * (0.05 + 0.95 * c * sqrt(c))
+      local v = (s >= 0.8 and 3.98 + 1.1 * (s - 0.8) or s >= 0.12 and 3.66 + 0.47 * (s - 0.12) or 3 + 5.5 * s) + BAT.h * s
+      local im, k, t = (v - 3) / r, 1, BAT.t + dt
+      if I <= im then
+        v = v - I * r
+        if v < 3.5 then k = v * v / 12.25 end
+      else
+        k, I, v = 0.735 * (im / I) ^ 0.67, im, 3
+      end
+      s = s - I * dt / (3.6 * BAT.mah)
+      if im < 0.05 * f then
+        s, k, I = 0, 0, 0
+        BAT.e = BAT.e + dt                             -- empty: the quad drops, a second later EMPTY
+        if BAT.e > 1 then crash("EMPTY") return end
+      end
+      v = BAT.v + (v - BAT.v) * (dt < 1 and dt or 1)
+      -- warnings: below 3.5 V a cell a beep every 2 s of flight, below 3.3 V a double beep (and LAND)
+      local w = v < 3.3 and 2 or v < 3.5 and 1 or 0
+      if w > 0 and floor(t * 0.5) > floor(BAT.t * 0.5) then
+        beep(660, 150, 0, 100)
+        if w > 1 then
+          beep(660, 150)
+          showMsg("LAND")
+        end
+      end
+      BAT.s, BAT.i, BAT.v, BAT.t, BAT.w = s, I, v, t, w
+      T = T * k
+    end
     -- prop wash (setting, off by default): sinking into your own downwash. The props build up a
     -- wash over ~0.2 s while they move down their own axis, less the faster they also move edgewise.
     -- It costs thrust (up to wl, from a 0.6 m/s sink until it fades out at wv m/s: the quad sinks
@@ -1358,6 +1410,8 @@ local function applySettings()
     i = i + 1
     P[QK[i]] = tonumber(v)
   end
+  local n, c, o, f, h = string.match(BAT[S.quad] or BAT[1], "(%S+) (%S+) (%S+) (%S+) (%S+)")   -- the class's pack
+  BAT.n, BAT.mah, BAT.r, BAT.f, BAT.h = tonumber(n), tonumber(c) * (S.batt == 2 and 2 or 1), tonumber(o) * 0.001, tonumber(f), tonumber(h)
   if S.twr > 0 and (S.twr < P.tlo or S.twr > P.thi) then S.twr = 0 end   -- not for this class: Stock
   if S.twr > 0 then P.twr = S.twr end       -- 0: the class's stock power
   if S.wash == 1 then P.wl, P.wv, P.pw = P.wls, P.wvs, P.pws end  -- Stock: the class's own wash
@@ -1686,8 +1740,9 @@ local function startRace(m)
   gmode = m
   lap, nextGate, lastGate, lapStart = 0, 1, 0, nil
   R.n, R.total, R.newLap, R.newRace, R.newBest, R.crashes, R.msg, R.cd = 0, 0, false, false, false, 0, nil, -1
-  R.pk, R.pos, R.sc, R.ch, R.chn, R.rn, R.rt, R.ax, R.bx, R.smp = 0, 1, 0, 0, 0, 0, 30, nil, nil, gt
+  R.pk, R.pos, R.sc, R.ch, R.chn, R.rn, R.rt, R.ax, R.bx, R.smp, R.why = 0, 1, 0, 0, 0, 0, 30, nil, nil, gt, nil
   placeDrone(TR.px, DR, TR.pz, TR.hx, TR.hz)
+  BAT.new()
   AI.start()
   tricks(-1)
   if m == 3 then state, R.ready = READY, gt else state, tState = COUNT, gt end
@@ -1727,7 +1782,7 @@ local function update(dt)
   elseif state == CRASHED then
     if gt - tState > 120 then
       respawn()
-      state, R.ready = READY, gt
+      state, R.ready, R.why = READY, gt, nil
     end
   elseif state == READY then
     local e = gt - R.ready
@@ -1868,6 +1923,15 @@ local render, hitTest, pauseHit, initUI
     end
     local th = floor(sT * 30 * U)
     if th > 0 then fillRect(0, YM - th, 2 * U, th, BLK) end
+    if S.batt > 0 and state < PAUSED then
+      -- the battery right of the throttle bar (not under the pause and finish boxes): a fuel gauge
+      -- and the cell voltage, inverted and blinking below 3.5 V a cell
+      local y = YM - 4 * U
+      fillRect(4 * U, y, 9 * U, 4 * U, ERASE)
+      lcd.drawRectangle(4 * U, y, 9 * U, 4 * U, BLK)
+      fillRect(5 * U, y + U, floor(7 * U * BAT.s + 0.5), 2 * U, BLK)
+      drawNumber(15 * U, YM + 2 - 8 * U, floor(BAT.v * 100 + 0.5), PREC2 + SMLSIZE + ((BAT.w > 0 and gt % 50 < 30) and INVERS or 0))
+    end
     drawLine(CX - 4 * U, CY, CX - 2 * U, CY, SOLID, BLK)
     drawLine(CX + 2 * U, CY, CX + 4 * U, CY, SOLID, BLK)
     if S.fps == 1 then drawNumber(XM, YM + 2 - 8 * U, R.fps, SMLSIZE + RIGHT) end
@@ -1883,6 +1947,14 @@ local render, hitTest, pauseHit, initUI
       drawLine(cx - ex, cy - ey, tx, ty, SOLID, BLK)
       drawLine(tx, ty, tx - ex * 0.6 - ey * 0.5, ty - ey * 0.6 + ex * 0.5, SOLID, BLK)
       drawLine(tx, ty, tx - ex * 0.6 + ey * 0.5, ty - ey * 0.6 - ex * 0.5, SOLID, BLK)
+    end
+  end
+
+  -- the pack's flight time and mAh used (Battery on), right-aligned at x on rows y1 and y2
+  local function packInfo(x, y1, y2)
+    if S.batt > 0 then
+      drawText(x, y1, fmt("%d:%02d", floor(BAT.t / 60), floor(BAT.t) % 60), SMLSIZE + RIGHT)
+      drawText(x, y2, floor((1 - BAT.s) * BAT.mah + 0.5) .. "mAh", SMLSIZE + RIGHT)
     end
   end
 
@@ -1941,7 +2013,7 @@ local render, hitTest, pauseHit, initUI
     if state == COUNT then
       drawText(CX, CY - 16 * U, tostring(3 - floor((gt - tState) / 100)), DBLSIZE + CENTER)
     elseif state == CRASHED then
-      drawText(CX, CY - 8 * U, "CRASH", DBLSIZE + INVERS + CENTER)
+      drawText(CX, CY - 8 * U, R.why or "CRASH", DBLSIZE + INVERS + CENTER)
     elseif state == READY then
       drawText(CX, CY - 14 * U, "READY", SMLSIZE + INVERS + CENTER)
     elseif state == PAUSED then
@@ -1950,6 +2022,7 @@ local render, hitTest, pauseHit, initUI
       for i = 1, #PAUSE_ITEMS do
         drawText(22 * U, (8 + (i - 1) * 9) * U, PAUSE_ITEMS[i], i == focus and INVERS or 0)
       end
+      packInfo(W - 17 * U, 32 * U, 43 * U)
     elseif state == DONE then
       fillRect(8 * U, 4 * U, W - 16 * U, H - 8 * U, ERASE)
       lcd.drawRectangle(8 * U, 4 * U, W - 16 * U, H - 8 * U, BLK)
@@ -1971,6 +2044,7 @@ local render, hitTest, pauseHit, initUI
       end
       drawText(x, H - 16 * U, "Again", SMLSIZE + (focus ~= 2 and INVERS or 0))
       drawText(x + 36 * U, H - 16 * U, "Menu", SMLSIZE + (focus == 2 and INVERS or 0))
+      packInfo(W - 12 * U, 35 * U, H - 16 * U)
     end
     if R.msg and state == FLY then
       if gt - R.msgT < 200 then
@@ -2157,6 +2231,7 @@ local function init()
     TEST.best = function(t) return BEST.l[t], BEST.r[t], BEST.g[t], BEST.f[t] end
     TEST.medals = function() return MED[1], MED[2], MED[3], MED.of end
     TEST.stun = function() return R.st end
+    TEST.bat = function(k, v) if v then BAT[k] = v end return BAT[k], R.why end   -- a battery value; the crash's why
     TEST.box = function(b) return BX.x0[b], BX.x1[b], BX.y0[b], BX.y1[b], BX.z0[b], BX.z1[b] end
     TEST.S = S
     TEST.order = function()

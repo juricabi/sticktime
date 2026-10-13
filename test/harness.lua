@@ -235,7 +235,7 @@ local function idleSticks() sticks.ail, sticks.ele, sticks.rud, sticks.thr = 0, 
 
 -- ------------------------------------------------------------ scenarios
 -- 1. menus: walk every item, open settings, change every option both ways
-local OPTN = GAME_COLOR and 23 or 20
+local OPTN = GAME_COLOR and 24 or 21
 steps(20)
 for i = 1, 9 do frame(EVT_VIRTUAL_NEXT) frame(0) end
 for i = 1, 9 do frame(EVT_VIRTUAL_PREV) frame(0) end
@@ -624,14 +624,14 @@ do
   print("medals (AI lap/medal, easy medium hard): " .. table.concat(out, ", "))
 end
 
--- 12. contacts: nothing forces a respawn. A wall scraped at a shallow angle slows the quad a little,
--- one hit head-on stops it dead and knocks it about (a prop strike); upside down on the ground it
--- can't take off, a roll stick flips it back over (turtle mode); the pause menu respawns it
-do
-  local mode = T.S.mode
-  T.set("mode", 2)
-  local hover = (hoverStick(1) * 2 - 1) * 1024
-  T.track(7) T.start(2) steps(70)
+-- 12. contacts: nothing forces a respawn. A wall scraped at a shallow angle slows the quad a little,
+-- one hit head-on stops it dead and knocks it about (a prop strike); upside down on the ground it
+-- can't take off, a roll stick flips it back over (turtle mode); the pause menu respawns it
+do
+  local mode = T.S.mode
+  T.set("mode", 2)
+  local hover = (hoverStick(1) * 2 - 1) * 1024
+  T.track(7) T.start(2) steps(70)
   local x0, x1, y0, y1, z0, z1 = T.box(1)                       -- a wall 8 m long along x, 0.5 m thick
   local ym = math.min(y1 - 0.8, 2.5)
   -- scrape: 5 m/s along its south face, 1.2 m/s into it
@@ -654,41 +654,41 @@ do
     fail(string.format("a head-on hit at 20 m/s: state %d, %.2f m into the wall, %.1f m/s on, hits %d, stun %.2f",
       st, s[3] - z0 + 0.15, s[6], select(6, T.race()) - c0, st2))
   end
-  steps(40)
-  st, s = state()
-  if st ~= 4 and st ~= 6 then fail("after a head-on hit the quad should still be flying (state " .. st .. ")") end
-  print(string.format("head-on hit at 20 m/s: stopped at the wall, still flying 2 s later (%.1f m up)", s[2]))
-  -- turtle: upside down on the ground, full throttle doesn't lift it, a roll stick flips it over
-  T.track(1) T.start(2) steps(70)
-  local _, s0 = state()
-  T.state(4) T.pose(s0[1] + 3, 0.15, s0[3], 0, 0, 180)
-  sticks.ail, sticks.ele, sticks.rud, sticks.thr = 0, 0, 0, 1024
-  steps(10)
-  st, s = state()
-  if st ~= 4 or s[2] > 0.3 or s[11] > 0 then fail(string.format("upside down on the ground it should stay there (state %d, %.2f m up, up %.2f)", st, s[2], s[11])) end
-  sticks.thr, sticks.ail = -1024, 1024
-  steps(24)
-  sticks.ail = 0
-  steps(2)
-  st, s = state()
-  if s[11] < 0.99 then fail(string.format("turtle: a roll stick should flip it back over (up %.2f)", s[11])) end
-  sticks.thr = 1024
-  steps(10)
-  st, s = state()
-  if st ~= 4 or s[2] < 1.5 then fail(string.format("after the turtle it should take off (%.2f m up)", s[2])) end
-  print("turtle: flipped back over with the roll stick and took off")
-  -- the pause menu's Respawn: back at the last gate, ready to go
-  T.next(3)
-  frame(EVT_VIRTUAL_EXIT) frame(EVT_VIRTUAL_NEXT) frame(EVT_VIRTUAL_ENTER)
-  st, s = state()
-  local _, _, _, _, _, _, _, ax, ay, az = T.gate(2)
-  local dd = math.sqrt((s[1] - ax) ^ 2 + (s[3] - az) ^ 2)
-  if st ~= 6 or dd > 3 then fail(string.format("pause, Respawn: should be ready at gate 2 (state %d, %.1f m away)", st, dd)) end
-  print("pause menu: Respawn puts the quad back at the last gate")
-  idleSticks()
-  T.set("mode", mode)
-end
-
+  steps(40)
+  st, s = state()
+  if st ~= 4 and st ~= 6 then fail("after a head-on hit the quad should still be flying (state " .. st .. ")") end
+  print(string.format("head-on hit at 20 m/s: stopped at the wall, still flying 2 s later (%.1f m up)", s[2]))
+  -- turtle: upside down on the ground, full throttle doesn't lift it, a roll stick flips it over
+  T.track(1) T.start(2) steps(70)
+  local _, s0 = state()
+  T.state(4) T.pose(s0[1] + 3, 0.15, s0[3], 0, 0, 180)
+  sticks.ail, sticks.ele, sticks.rud, sticks.thr = 0, 0, 0, 1024
+  steps(10)
+  st, s = state()
+  if st ~= 4 or s[2] > 0.3 or s[11] > 0 then fail(string.format("upside down on the ground it should stay there (state %d, %.2f m up, up %.2f)", st, s[2], s[11])) end
+  sticks.thr, sticks.ail = -1024, 1024
+  steps(24)
+  sticks.ail = 0
+  steps(2)
+  st, s = state()
+  if s[11] < 0.99 then fail(string.format("turtle: a roll stick should flip it back over (up %.2f)", s[11])) end
+  sticks.thr = 1024
+  steps(10)
+  st, s = state()
+  if st ~= 4 or s[2] < 1.5 then fail(string.format("after the turtle it should take off (%.2f m up)", s[2])) end
+  print("turtle: flipped back over with the roll stick and took off")
+  -- the pause menu's Respawn: back at the last gate, ready to go
+  T.next(3)
+  frame(EVT_VIRTUAL_EXIT) frame(EVT_VIRTUAL_NEXT) frame(EVT_VIRTUAL_ENTER)
+  st, s = state()
+  local _, _, _, _, _, _, _, ax, ay, az = T.gate(2)
+  local dd = math.sqrt((s[1] - ax) ^ 2 + (s[3] - az) ^ 2)
+  if st ~= 6 or dd > 3 then fail(string.format("pause, Respawn: should be ready at gate 2 (state %d, %.1f m away)", st, dd)) end
+  print("pause menu: Respawn puts the quad back at the last gate")
+  idleSticks()
+  T.set("mode", mode)
+end
+
 -- 13. ghost (Practice): the first lap becomes the ghost, saved on the SD card (a faster lap would
 -- replace it); the ghost flies along with the next lap near the quad; a new start loads it; another
 -- track's file is not taken; Ghost Off records nothing. (The color game only)
@@ -755,6 +755,99 @@ if GAME_COLOR then
   T.set("ghost", 1)
   idleSticks()
   T.set("mode", mode)
+end
+
+-- 14. battery: Off changes nothing; a fresh pack flies as without it (Betaflight's sag compensation)
+-- and a drained one loses thrust on a punch; it runs down only while flying; at the end of a pack it
+-- warns, limps, then the motors stop and EMPTY ends the flight without counting a crash, with a fresh
+-- pack; a hit or a respawn keeps the pack; Long has twice the capacity
+do
+  local quad, twr, mode = T.S.quad, T.S.twr, T.S.mode
+  T.track(1) T.set("mode", 2) T.set("quad", 1) T.set("twr", 0)
+  local function fly(b)
+    idleSticks()
+    T.set("batt", b) T.start(2) steps(70) T.state(4)
+  end
+  local function hold(thr, n)                    -- n frames 60 m up at this throttle (never crashes)
+    for _ = 1, n do
+      T.pose(0, 60, 0, 0, 0, 0)
+      sticks.ail, sticks.ele, sticks.rud, sticks.thr = 0, 0, 0, thr
+      frame(0)
+    end
+  end
+  local function punch(b, s)                     -- 1 s of full throttle from 60 m: the thrust, a share of full
+    fly(b)
+    if s then T.bat("s", s) end
+    T.pose(0, 60, 0, 0, 0, 0) T.vel(0, 0, 0)
+    sticks.ail, sticks.ele, sticks.rud, sticks.thr = 0, 0, 0, 1024
+    steps(20)
+    return select(4, T.audio())
+  end
+  local fOff = punch(0)
+  if T.bat("s") ~= 1 then fail("battery Off: the pack ran down") end
+  local fFresh = punch(1)
+  local iFresh, vFresh, sFresh = T.bat("i"), T.bat("v"), T.bat("s")
+  local fLow = punch(1, 0.3)
+  if math.abs(fFresh - fOff) > 1e-4 then fail(string.format("battery: a fresh pack should fly as without it (thrust %.4f, %.4f off)", fFresh, fOff)) end
+  if math.abs(iFresh - 95) > 1 or vFresh > 4.05 or vFresh < 3.63 or sFresh > 0.985 then
+    fail(string.format("battery: a 1 s punch on a fresh racer pack: %.1f A, %.2f V a cell, charge %.3f", iFresh, vFresh, sFresh))
+  end
+  if fLow > 0.9 or fLow < 0.7 then fail(string.format("battery: a punch at 30%% charge should lose thrust (%.2f of full)", fLow)) end
+  -- pausing stops it
+  fly(1)
+  hold(0, 10)
+  local s0, t0 = T.bat("s"), T.bat("t")
+  frame(EVT_VIRTUAL_EXIT) steps(40)
+  if state() ~= 7 or T.bat("s") ~= s0 or T.bat("t") ~= t0 then fail("battery: the pack ran down while paused") end
+  frame(EVT_VIRTUAL_EXIT)
+  -- Long: twice the capacity, half the share of it used
+  hold(1024, FPS)
+  local uReal, mReal = s0 - T.bat("s"), T.bat("mah")
+  fly(2)
+  hold(1024, FPS)
+  local uLong, mLong = 1 - T.bat("s"), T.bat("mah")
+  if mLong ~= 2 * mReal or math.abs(uLong * 2 / uReal - 1) > 0.1 then fail(string.format("battery Long: %d mAh used %.4f, Real %d mAh used %.4f", mLong, uLong, mReal, uReal)) end
+  -- the end of a pack at 2 g (fast forward flight): LOW, LAND, the motors stop, EMPTY
+  fly(1)
+  T.bat("s", 0.15) T.bat("v", 3.7)
+  local cruise, n0, tLow, tLand, tEnd = (hoverStick(2) * 2 - 1) * 1024, tones
+  for f = 1, FPS * 120 do
+    hold(cruise, 1)
+    local w = T.bat("w")
+    if w >= 1 and not tLow then tLow = f / FPS end
+    if w >= 2 and not tLand then tLand = f / FPS end
+    if state() ~= 4 then tEnd = f / FPS break end
+  end
+  local _, why = T.bat("s")
+  local crashes = select(6, T.race())
+  if state() ~= 5 or why ~= "EMPTY" or crashes ~= 0 then
+    fail(string.format("battery: the end of a pack should be EMPTY, not a crash (state %d, %s, %d crashes)", state(), tostring(why), crashes))
+  elseif not (tLow and tLand and tLow < tLand and tLand + 5 < tEnd and tEnd > 25 and tEnd < 70) then
+    fail(string.format("battery: from 15%% at 2 g LOW %s s, LAND %s s, EMPTY %s s", tostring(tLow), tostring(tLand), tostring(tEnd)))
+  elseif tones - n0 < 5 then fail("battery: no warning beeps")
+  end
+  idleSticks()
+  steps(30)
+  if state() ~= 6 or T.bat("s") ~= 1 then fail("battery: EMPTY should respawn with a fresh pack (state " .. state() .. ")") end
+  -- a hard hit keeps the pack (and counts), so does the pause menu's Respawn
+  fly(1)
+  T.bat("s", 0.5)
+  T.pose(0, 3, 0, 0, 0, 0) T.vel(0, -15, 0)
+  steps(30)
+  frame(EVT_VIRTUAL_EXIT) frame(EVT_VIRTUAL_NEXT) frame(EVT_VIRTUAL_ENTER)
+  local s1, why1 = T.bat("s")
+  if state() ~= 6 or why1 or select(6, T.race()) ~= 1 or s1 > 0.5 or s1 < 0.49 then
+    fail(string.format("battery: a hit and a respawn should keep the pack (state %d, %s, charge %.3f)", state(), tostring(why1), s1))
+  end
+  -- the pause and finish screens with the pack's flight time and mAh used
+  T.state(4) frame(EVT_VIRTUAL_EXIT) frame(0) frame(EVT_VIRTUAL_EXIT)
+  T.state(8) frame(0) frame(0)
+  print(string.format("battery: punch on a fresh pack %.0f A, thrust %.3f (%.3f off); at 30%% %.2f; Long %d mAh; " ..
+    "from 15%% at 2 g: LOW %.1f s, LAND %.1f s, EMPTY %.1f s", iFresh, fFresh, fOff, fLow, mLong, tLow or -1, tLand or -1, tEnd or -1))
+  T.set("batt", 0) T.set("quad", quad) T.set("twr", twr) T.set("mode", mode)
+  idleSticks()
+  T.state(1)
+  frame(0)
 end
 
 -- 10. custom tracks: StickTimeTracks/c1-c8.txt are tracks 9-16 (empty slots skipped); a slot's
