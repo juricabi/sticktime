@@ -12,93 +12,63 @@ A real 3D FPV quad simulator that runs **on your radio** as an EdgeTX Lua tool. 
 
 ## Install
 
-Download `StickTime-<version>-sdcard.zip` from the [latest release](https://github.com/juricabi/sticktime/releases/latest), copy what your radio needs from its `SCRIPTS/TOOLS/` to `/SCRIPTS/TOOLS/` on the SD card, and start it from **SYS → Tools**. The first start on a color radio takes a few seconds while EdgeTX compiles it. Or, in Chrome or Edge on a computer, let the [emulator](https://juricabi.github.io/sticktime/) do it (the hosted site only, not a downloaded copy): plug the radio in by USB, choose USB Storage on it, then click **Install** and use **Connect radio** and **Install / update**. It also brings an older version up to date, removes old files the release doesn't have, and leaves your saves, tracks and ghosts alone.
+Download `StickTime-<version>-sdcard.zip` from the [latest release](https://github.com/juricabi/sticktime/releases/latest), copy what your radio needs from its `SCRIPTS/TOOLS/` to `/SCRIPTS/TOOLS/` on the SD card, and start it from **SYS → Tools**. Or let the [emulator](https://juricabi.github.io/sticktime/) do it (Chrome or Edge on a computer, the radio plugged in by USB in USB Storage mode): **Install** → **Connect radio** → **Install / update**; it also updates an older version and leaves your saves, tracks and ghosts alone.
 
 | Radio | Copy | EdgeTX |
 |---|---|---|
-| Any color screen: RadioMaster TX16S, TX16S MkII and TX16S MK3, TX15, GX15, Jumper T15 / T16 / T18, FrSky X10 / X12S, HelloRadioSky V12 / V16, FlySky NV14 / EL18 / PL18 / PA01 and the others in [Screens](#screens) | `StickTime.lua`, and the `StickTimeGhosts` and `StickTimeTracks` folders | 2.11+, older works too |
-| B&W with an STM32F4: TX12 MkII, Zorro, Boxer, Pocket, MT12, GX12, X9D+ 2019, X9E, X7 ACCESS, T14, T20, T-Pro V2 / S, T12 Max, Bumblebee, Commando 8 | `StickTimeBW.lua`, the `StickTimeBW` folder and the `StickTimeTracks` folder | 2.11+ |
-| Older B&W (STM32F2): TX12 MkI, X7, X9D, X9D+, X9 Lite, X-Lite, T12, T8, T-Lite, T-Pro, LR3 Pro | `StickTimeLite.lua` and the `StickTimeLite` folder | 2.11 (their last EdgeTX) |
+| Any color screen (TX16S / MkII / MK3, TX15, GX15, T15, T16, T18, X10, X12S, V12, V16, NV14, EL18, PL18, PA01, ...) | `StickTime.lua`, `StickTimeGhosts/`, `StickTimeTracks/` | 2.11+, older works too |
+| B&W with an STM32F4 (TX12 MkII, Zorro, Boxer, Pocket, MT12, GX12, X9D+ 2019, X9E, X7 ACCESS, T14, T20, ...) | `StickTimeBW.lua`, `StickTimeBW/`, `StickTimeTracks/` | 2.11+ |
+| Older B&W, STM32F2 (TX12 MkI, X7, X9D, X9D+, X9 Lite, X-Lite, T12, T8, ...) | `StickTimeLite.lua`, `StickTimeLite/` | 2.11 (their last) |
 
-On EdgeTX 2.10 and older the B&W versions don't start: they say "Needs EdgeTX 2.11 or newer" on the radio. When updating StickTime BW, replace the whole `StickTimeBW` folder; when updating the Lite, replace the `StickTimeLite` folder but keep its `data.txt` (your Lite saves), or let **Install** do it, which keeps it. The radio can't make folders: without `StickTimeGhosts` no ghost is saved, without `StickTimeTracks` there are no tracks of your own (the zip has both).
-
-Your own tracks (made with the [emulator's](#browser-emulator) track editor) go in `/SCRIPTS/TOOLS/StickTimeTracks/` as `c1.txt` to `c8.txt`: they are tracks 9 to 16 in StickTime and StickTime BW (StickTime Lite doesn't read them), listed by name after Pro Track (empty slots are skipped). The game reads their names when it starts, so restart it after adding one. In Chrome or Edge on a computer the editor can put them there itself: plug the radio in by USB, choose USB Storage on it, then use the button next to the slot (**Connect radio…**, then **Send to radio**). Eject the drive before you unplug the radio.
+- **Updating:** replace the `StickTimeBW` folder whole; replace `StickTimeLite` but keep its `data.txt` (your Lite saves). Install does both for you.
+- **Your own tracks** go in `StickTimeTracks/` as `c1.txt` to `c8.txt` (tracks 9-16, color and BW). Restart the game after adding one.
+- The B&W versions need EdgeTX 2.11 ("Needs EdgeTX 2.11 or newer" on older). They also run on color radios, in B&W style.
 
 > **Safety:** the radio keeps transmitting your sticks while the sim runs. Unplug the quad's battery or switch the RF module off first.
 
-StickTime BW and StickTime Lite also run on color radios, drawn in B&W style at the screen's full resolution, which is faster on slow radios. StickTime was called FPV Sim up to version 1.2: it takes over FPV Sim's settings and best times on its first start, after which the old `FPVSim…` and `FPVLite…` files can go.
-
 ## Features
 
-- **Flight model.** Fitted class by class to a detailed per-prop model and within 0.2-0.5 m/s of it in steady flight at any pitch and throttle (see [docs/flight-model.md](docs/flight-model.md)): each class's own Betaflight-style idle and throttle curve, with its bottom dead zone and steeper top end; props lose thrust as the air through them speeds up; translational lift (flying edgewise the same throttle gives up to about 50% more thrust, levelling off by about 15 m/s, more with more throttle); a cushion when you drop, while at idle the blades stall in a fast drop; ground effect within a twentieth of a prop diameter of the ground or a roof (up to 25% more thrust on a 5", 45% on a 3"); body drag along the flow, a little more at low speed; downforce from the frame when it flies nose-down at speed; rotor drag set by **Grip**; full-stick flips shift the thrust as Betaflight's airmode mixer does (a dip at full throttle, a lift near hover); motors that spool up in about 6 ms; 1.1 g gravity for a planted feel. All at 80 Hz. The stock Racer 5": hovers at a third of the stick, about 140 km/h top speed, 125 km/h punch-outs, 63 km/h flat fall.
-- **Your quad.** **Racer 5"** (0.49 kg, 7.7:1, snappy), **Freestyle 5"** (a 0.66 kg HD freestyler, 6.9:1, heavier and floatier than the racer), **3" toothpick** (0.11 kg 3S, 5.3:1, light and draggy) **Whoop 65mm** (a 24 g ducted 1S whoop, 2.6:1, slow and grippy) or **Whoop 75mm** (a 47 g ducted 2S whoop, 3.5:1). Power **Stock** (the class's own) or the range quads of its kind have: 5:1 to 12:1 on the racer, 4:1 to 10:1 on the freestyler and the 3", 3:1 to 8:1 on the whoops. Acro or Angle mode.
-- **Rates.** Betaflight Actual rates: Soft, Normal and Fast presets, or Custom center sensitivity (10–500 deg/s), max rate (100–2000 deg/s) and expo (0.00–1.00) for roll/pitch and yaw, in Betaflight's own steps (10 deg/s and 0.01), so your Actual rates go in exactly as they are. Hold a key or spin the wheel quickly for five times bigger steps.
-- **Eight tracks, and eight of your own.** **Meadow** (a kidney with an S on the way home, for a start), **Figure 8**, **Dive Tower** (up through a 10 m gate, round a hoop and down through the dive gate), **Slalom**, **Hoop Forest** (S-bends through the trees, hoops at 2 to 6 m), **Grand Prix** (a long straight, a flag hairpin, a hoop chicane, the dive gate and a fast back section), the **Bando** (an open-roof ruin with doors to fly through, a 36 m tower for orbits and dives, and stacked containers) and **Pro Track**, laid out like a real race: lanes up and down the field joined by flag hairpins, a high gate and a dive gate on the start straight, and a split-S. Gates, high gates, dive gates, hoops, arches, flags (pass on the marked side, shown by a yellow marker) and gaps in walls. Tracks 9 to 16 are your own, made in the [emulator's](#browser-emulator) track editor. (1.7.0 relaid Meadow, Dive Tower, Hoop Forest and the Grand Prix, which were ovals: their lap, race and Gate Rush bests started over.)
-- **Four ways to play.**
-    - **Race** up to three AI pilots (Easy, Medium, Hard) with a live position and a results screen.
-    - **Practice**: lap times against your best, and in the color edition a **ghost** of your fastest practice lap on the track flying along from each lap's start (setting **Ghost**, saved on the SD card; StickTime BW has no ghost, not even on a color radio).
-    - **Freestyle**: flips, rolls, 360s, power loops, dives, hang time, gap shots and proximity runs score points; chain them within 2.5 s for up to a ×4 combo.
-    - **Gate Rush**: 30 s on the clock, every gate adds time and lights the next one at random.
-- **Medals** on every track: **Gold**, **Silver** and **Bronze** are the lap times of the Hard, Medium and Easy AI pilot at the Power you fly (more Power, faster medal times). Your best lap is judged against them, whichever quad set it. The color menu shows your medal next to the best lap; Practice shows the next medal's lap time on the OSD (B&W: at the top; in the B&W menu on 212×64 screens); a new best lap that earns a better medal says so ("GOLD!"); the race results show the medal of the race's best lap.
-- **Hits don't end the flight.** Gates, poles, trees, walls and the ground are solid, and the quad stops against them (no bounce) and slides on. A hit at 1.5 m/s or more with the props or arms edge-on is a prop strike: for up to half a second (longer the harder the hit) the props lose most of their thrust and the flight controller its hold, so the quad tumbles and you fly it out, as in real life; a level landing doesn't strike (the skids take it). A strike ends a Freestyle combo. Land on roofs and containers. On its back or side on the ground (tipped past about 66°) the props can't lift it: **turtle mode**, a roll or pitch stick turns it back over ("roll to flip"). Only flying off the world puts you back by itself; the pause menu's **Respawn** takes you to the last gate (in Freestyle: where you were a second or two before; before the first gate: the start pad) with a fresh battery pack, the clock running on.
-- **Wind** (off, light, strong, with gusts; each track has its own direction, shown by a small arrow on the OSD: up is where your nose points), optional **prop wash** - Off, **Stock** (each class's own strength) or **Max** (sinking into your own downwash costs thrust and shakes the quad, hardest when you catch a dive), **Grip** - Low (the full momentum of the fitted model), **Medium** (the default) or High (rotor drag: props moving edgewise are pushed back, harder the faster they spin, so the quad carves and stops sooner: a racer's slide halves in 4, 3 or 2 s), beeps for the countdown, gates, laps, hits and battery warnings, and a **vibration** on hits and laps (On, Off).
-- **Battery** - Off (the default), **Real**, **1.5x** or **2x** (one and a half or twice the capacity): each class flies its own pack (a 4S 1300 mAh on the racer, a 4S 1500 on the freestyler, a 3S 550 LiHV on the 3", a 1S and a 2S 300 LiHV on the whoops) that sags under load and runs down: about 2 minutes of hard racing on the racer, nearly 5 cruising. A fresh pack flies as the quad without it (Betaflight's sag compensation), so no lap gets faster; as it drains, the punches fade; more Power draws more current at full throttle. Below 3.5 V a cell a beep every 2 s, below 3.3 V a double beep; on the color OSD a small battery that empties and the cell voltage, yellow below 3.5 V, red and blinking below 3.3 V; on B&W the cell voltage and a small gauge, inverted and blinking from 3.5 V, and LAND below 3.3 V. Near empty the quad limps, and once full throttle can't lift more than 1.25 times its weight the motors stop: EMPTY (shown instead of CRASH) and you respawn with a fresh pack. A fresh pack comes with every start, the pause menu's **Respawn** and EMPTY; hits keep the pack (flying off the world too), pausing stops it. The pause screen shows the flight time and mAh used (color: also the pack's voltage), and so does the finish screen.
-- **Saved per track:** best lap, race, combo and Gate Rush score, the Practice ghost (color edition), plus all settings. A new best and a new ghost are written to the SD card the moment you set them, so switching the radio off right after keeps them. In Practice the lap that sets a new ghost writes a 5 KB file, which can show as a short pause on the radio; a race lap only writes the small save file.
-- **Color radios:** filled sky and ground, haze and fog, mountains, shaded structures, an FPV-style OSD, a minimap with the AI pilots and the ghost, optional stick view and FPS, and touch. **B&W radios:** the same game in wireframe, with greyscale ground on 212×64 screens. **Lite:** the same flight model, quads, prop wash, Grip and the eight tracks, with Time trial, Practice, Freestyle and Gate Rush; no AI pilots, custom rates, battery, medals, ghost or your own tracks, and a hit is still a crash (it has no memory to spare).
+- **Flight model:** each quad class fitted to a detailed per-prop model (within 0.2-0.5 m/s in steady flight): Betaflight-style throttle curves, thrust loss climbing, translational lift, a cushion when you drop, ground effect, frame downforce, the airmode mixer in flips, 6 ms motors, 80 Hz physics. Details in [docs/flight-model.md](docs/flight-model.md).
+- **Quads:** Racer 5", Freestyle 5", 3" toothpick, Whoop 65mm, Whoop 75mm; Power Stock or the range quads of their kind have; Acro or Angle. **Rates:** Betaflight Actual (Soft, Normal, Fast or Custom, in Betaflight's own steps).
+- **Tracks:** Meadow, Figure 8, Dive Tower, Slalom, Hoop Forest, Grand Prix, the Bando (an open-roof ruin with a 36 m tower) and Pro Track, with gates, high gates, dive gates, hoops, arches, flags and gaps in walls; plus 8 of your own from the emulator's track editor.
+- **Modes:** **Race** up to 3 AI pilots (Easy, Medium, Hard) · **Practice** against your best, with a **ghost** of your fastest lap (color edition) · **Freestyle** tricks and combos · **Gate Rush** against the clock.
+- **Medals:** Gold, Silver and Bronze are the Hard, Medium and Easy AI's lap at the Power you fly; shown in the menu, the Practice OSD and the results.
+- **Hits:** the quad stops against what it hits and flies on. A hard hit edge-on is a prop strike: half a second of tumbling to fly out of. Upside down on the ground: **turtle mode**, roll or pitch to flip back. **Pause → Respawn** puts you at the last gate.
+- **Battery** (Off, Real, 1.5x, 2x): each class's real pack sags and runs down (about 2 min of hard racing on a 5"); a fresh pack flies exactly like no battery. Beeps and a yellow/red battery below 3.5 / 3.3 V a cell, then EMPTY and a fresh pack. Respawn also brings a fresh pack.
+- **Also:** wind with gusts, prop wash (Off, Stock, Max), Grip (rotor drag), vibration on hits and laps.
+- **Saving:** bests and the ghost are saved the moment you set them, so switching the radio off keeps them. (A lap that sets a new ghost writes a 5 KB file, which can pause the radio for a moment; races never write a ghost.)
 
-**What each edition has**
-
-| | StickTime (color) | StickTime BW | StickTime Lite |
+| What each edition has | Color | BW | Lite |
 |---|---|---|---|
-| Flight model, the five quads, prop wash, Grip, wind | yes | yes | yes |
-| The eight tracks (1.7.0 layouts) | yes | yes | yes |
+| Flight model, quads, prop wash, Grip, wind, the 8 tracks | yes | yes | yes |
 | Practice, Freestyle, Gate Rush | yes | yes | yes |
-| Race against AI pilots | yes | yes | no (Time trial) |
-| Custom rates | yes | yes | no (Soft, Normal, Fast) |
-| Hits without respawn, prop strikes, turtle mode, Respawn | yes | yes | no (a hit is a crash) |
-| Medals | yes | yes (menu: 212×64 only) | no |
-| Battery | yes | yes (gauge, LAND) | no |
-| Ghost | yes | no | no |
-| Your own tracks 9-16 | yes | yes | no |
-| Minimap, stick view, touch | yes | no | no |
+| Race against AI pilots, custom rates | yes | yes | no |
+| Hits without respawn, turtle mode, Respawn | yes | yes | no (a hit is a crash) |
+| Medals, battery, your own tracks | yes | yes | no |
+| Ghost, minimap, stick view, touch | yes | no | no |
 
-**Files on the SD card** (all in `/SCRIPTS/TOOLS/`)
-
-| | |
+| Files in `/SCRIPTS/TOOLS/` | |
 |---|---|
-| `StickTime.lua` | the color edition; its save is `StickTime.dat` |
-| `StickTimeBW.lua`, `StickTimeBW/` | StickTime BW; its save is `StickTimeBW.dat` |
-| `StickTimeLite.lua`, `StickTimeLite/` | StickTime Lite; its save is `StickTimeLite/data.txt` (keep it when you replace the folder) |
-| `StickTimeTracks/c1.txt` … `c8.txt` | your own tracks: slot 1 is track 9, slot 8 track 16 |
-| `StickTimeGhosts/c1.txt` … `c16.txt` | the color edition's ghosts, numbered by track (track 9's is `c9.txt`); delete one to forget it |
+| `StickTime.lua` · `StickTimeBW.lua`, `StickTimeBW/` · `StickTimeLite.lua`, `StickTimeLite/` | the three editions; saves in `StickTime.dat`, `StickTimeBW.dat`, `StickTimeLite/data.txt` |
+| `StickTimeTracks/c1.txt` … `c8.txt` | your tracks 9 to 16 |
+| `StickTimeGhosts/c1.txt` … `c16.txt` | ghosts, by track number (delete one to forget it) |
 
 ## Controls
 
 | | |
 |---|---|
-| Sticks | fly the quad (the radio applies your stick mode) |
-| ENTER | select; on a setting, edit it and change it with the wheel or +/- |
-| EXIT | pause while flying (Resume, Respawn, Restart, Settings, Main menu; the Lite: Resume, Restart, Menu), back in menus, quit from the main menu; long EXIT closes the tool on color radios |
-| Wheel, +/-, up/down | move through menus |
-| Touch | tap rows; on a setting tap the left or right part to step back or forward; the pause button is at the top |
+| Sticks | fly (the radio applies your stick mode) |
+| ENTER | select; on a setting, edit it with the wheel or +/- |
+| EXIT | pause (Resume, Respawn, Restart, Settings, Main menu), back, quit; long EXIT closes the tool on color radios |
+| Touch | tap rows and setting halves; the pause button is at the top |
 
 ## Screens
 
-| Screen | Radios |
-|---|---|
-| 480×272 | RadioMaster TX16S / MkII, FrSky X10 / X10S / X12S, Jumper T16 / T18, HelloRadioSky V16, Fatfish F16, iFlight Commando 14, Senduwing H17 |
-| 480×320 | RadioMaster TX15 / GX15, Jumper T15 / T15 Pro / T22, FlySky PL18 / PL18EV / PL18U / ST16 |
-| 320×480 | FlySky NV14, EL18, NB4+ (portrait: FPV view on top, instruments below) |
-| 320×240 | FlySky PA01, HelloRadioSky V12 |
-| 800×480 | RadioMaster TX16S MK3 |
-| 212×64 grey | FrSky X9D+ 2019, X9E (StickTime BW); X9D, X9D+ (Lite) |
-| 128×64 | the other B&W radios in the install table |
-
-The layout follows `LCD_W` / `LCD_H` and the radio's real font sizes, so new screen sizes work too.
+480×272 (TX16S, X10, X12S, T16, T18, V16), 480×320 (TX15, GX15, T15, PL18), 320×480 portrait (NV14, EL18), 320×240 (PA01, V12), 800×480 (TX16S MK3), 212×64 grey (X9D+ 2019, X9E; X9D, X9D+ with the Lite) and 128×64. The layout follows the screen size and fonts, so new sizes work too.
 
 ## Faster firmware (optional)
 
-Stock EdgeTX runs a tool at most every 50 ms (20 fps) and shows each frame one cycle late. The [`fast-lua-20ms` prerelease](https://github.com/juricabi/edgetx/releases/tag/fast-lua-20ms) has firmware for every color radio (EdgeTX `main` plus [`firmware/edgetx-fast-lua.patch`](firmware/edgetx-fast-lua.patch)): Lua tools run every 20 ms, each frame goes straight to the display, and drawing is much faster. It has a build for each TX16S: the TX16S and TX16S MkII (one firmware, `tx16s`) and the TX16S MK3 (`tx16smk3`). On every STM32H750 radio (RadioMaster TX16S MK3, TX15 and GX15, Jumper T15 Pro, HelloRadioSky V12 and V15, and more) it also runs the Lua interpreter from ITCM. On the HelloRadioSky V12 and the Flysky PA01, whose screens hang on an SPI bus, it also sends frames to the screen in the background. On the V12 that makes up to 50 fps, and stick-to-screen latency drops from about 90 ms to about 40 ms. With **Show FPS** on, StickTime shows how long each frame took to run and to reach the screen. These are test builds: back up your SD card first.
+Stock EdgeTX runs a tool at most every 50 ms (20 fps) and shows each frame a cycle late. The [`fast-lua-20ms` prerelease](https://github.com/juricabi/edgetx/releases/tag/fast-lua-20ms) (EdgeTX `main` plus [`firmware/edgetx-fast-lua.patch`](firmware/edgetx-fast-lua.patch)) runs Lua tools every 20 ms with each frame going straight to the display and much faster drawing, for every color radio (`tx16s` for the TX16S and MkII, `tx16smk3` for the MK3). On the V12 that makes up to 50 fps and about 40 ms stick-to-screen. Test builds: back up your SD card first.
 
 <details>
 <summary>What the patch changes</summary>
@@ -123,25 +93,13 @@ The script is ready for any frame rate: physics runs in 80 Hz substeps on the me
 
 ## Browser emulator
 
-Play at **[juricabi.github.io/sticktime](https://juricabi.github.io/sticktime/)**, or open `web/simulator.html` (one file, works offline) in Chrome, Edge or Firefox. It runs the real `.lua` files in a Lua 5.3 VM with an EdgeTX-style API, drawn pixel by pixel the way the firmware draws.
+Play at **[juricabi.github.io/sticktime](https://juricabi.github.io/sticktime/)**, or open `web/simulator.html` (one file, works offline). It runs the real `.lua` files in a Lua 5.3 VM with an EdgeTX-style API, drawn pixel by pixel like the firmware.
 
-- Any radio screen, color or B&W, or **PC screen** (1280×720 or Full HD 1920×1080, at 60 fps); **Fullscreen** with F.
-- Fly with the keyboard (W/S throttle, A/D yaw, arrows for pitch and roll), the on-screen gimbals, or your radio as a USB joystick (**Radio / gamepad**, then map the axes).
-- **Sound**: the slider sets the volume of the beeps and the synthesized motor sound (0 is off, the
-  speaker mutes and unmutes, the mouse wheel steps it). Four motors, each with its own rpm (they
-  follow your stick inputs), tuned against recordings of real quads: a nearly pure blade-pass tone
-  over a soft air whoosh (no hiss), the shaft growl and the electrical whine, a steady pitch, panned
-  left/right and beating like four real props; descending into your own wash adds a dark rumble, and
-  with prop wash on the motors chatter like a real quad's fighting it. Shaped per class (a screaming
-  1S whoop sounds nothing like a 5").
-- **Music**: melodic electronic music composed live in the browser (free, nothing downloaded): every
-  song has its own key, tempo, seventh-chord progression and hook, arranged like a real track (a
-  filtered intro, the groove, a build, the drop, a breakdown, a second drop, an outro). Or **Songs**
-  to play your own files. Its own switch, level and next-song button, apart from Sound.
-- Keyboard or **Radio / gamepad** input, the gamepad and its axis mapping are remembered.
-- Real radio refresh (20 Hz) and the color screen's one-frame delay are on by default and can be turned off; B&W LCD ghosting is optional.
-- **Tracks**: the track editor. Lay out your own track on a map seen from above (gates in race order, hoops, flags, dive gates, structures, walls with gaps), from any of the eight tracks or a blank one. It checks that the game can take it, then **Fly it** starts it in the emulator, or **Save file** downloads `c1.txt` to `c8.txt` for your radio; in Chrome or Edge, **Send to radio** writes it straight to the radio's SD card (the radio plugged in by USB in USB Storage mode). **Install**, next to it, connects to that card, lists the tracks on it (open one in the editor, copy them either way) and, on the hosted site, installs StickTime on the radio or brings it up to date.
-- **Radio load** estimates the frame time on F2, F4 and H7 radios; **Open .lua** runs any other EdgeTX tool script.
+- Any radio screen or a **PC screen** (1280×720, 1920×1080 at 60 fps); keyboard, on-screen gimbals or your radio as a USB joystick.
+- Synthesized motor sound tuned against real quads, and live-composed music (or your own songs).
+- **Tracks:** the track editor. Lay out gates, hoops, flags, dive gates, structures and walls on a map, from any track or a blank one; **Fly it**, **Save file**, or **Send to radio** (Chrome/Edge, radio in USB Storage mode).
+- **Install:** connect the radio's SD card to install or update StickTime and manage the tracks on it (hosted site only).
+- **Radio load** estimates the frame time on F2, F4 and H7 radios; **Open .lua** runs any EdgeTX tool script.
 
 ## Under the hood
 
