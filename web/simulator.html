@@ -303,6 +303,21 @@ footer.credits a { color: inherit; }
 .ed-size { margin-left: auto; font: 500 12px/1.3 var(--font-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
 .ed-size.bad { color: var(--bad); }
 .ed-lite { margin: 8px 0 0; }
+/* the radio's SD card (File System Access: Chrome, Edge, Opera on a computer) */
+.ed-radio { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
+.ed-rlabel { font: 600 11px/1 var(--font-display); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.ed-rstate { font: 500 12.5px/1.3 var(--font-mono); color: var(--muted); overflow-wrap: anywhere; }
+.ed-rstate.on { color: var(--ok); }
+.ed-rstate.on::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: currentColor; }
+.ed-rnote { margin: 6px 0 0; }
+.ed-rpanel { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.ed-rpath { margin: 0 0 6px; font: 500 12px/1.3 var(--font-mono); color: var(--muted); overflow-wrap: anywhere; }
+.ed-rslots { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+.ed-rslots li { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 34px; border-bottom: 1px dashed var(--line); }
+.ed-rslots li:last-child { border-bottom: 0; }
+.ed-rslots b { font: 600 12px var(--font-mono); }
+.ed-rslots em { font-style: normal; color: var(--muted); }
+.ed-rslots .btn { height: 28px; padding: 0 10px; font-size: 12.5px; }
 .ed-status { margin: 6px 0 0; min-height: 1.45em; font-size: 12.5px; color: var(--muted); }
 .ed-status.ok { color: var(--ok); }
 .ed-status.bad { color: var(--bad); }
@@ -440,6 +455,23 @@ footer.credits a { color: inherit; }
         <button class="btn" id="edEmpty" type="button" title="Take this slot's track off the emulator's SD card">Empty slot</button>
         <span class="ed-size" id="edSize"></span>
       </div>
+      <div class="ed-radio" id="edRadio">
+        <span class="ed-rlabel">Radio SD</span>
+        <span class="ed-rstate" id="edRadioState">not connected</span>
+        <button class="btn" id="edConnect" type="button" title="Pick the radio's SD card (the radio plugged in by USB, in USB Storage mode)">Connect radio…</button>
+        <button class="btn" id="edSend" type="button" hidden>Send to radio</button>
+        <button class="btn" id="edFromRadio" type="button" aria-expanded="false" aria-controls="edRadioPanel" hidden>From radio…</button>
+        <button class="btn" id="edForget" type="button" title="Forget this SD card" hidden>Disconnect</button>
+      </div>
+      <p class="note ed-rnote" id="edRadioNote">Plug the radio in by USB and choose USB Storage (SD) on it, then Connect radio and pick its SD card (the drive).</p>
+      <div class="ed-rpanel" id="edRadioPanel" hidden>
+        <p class="ed-rpath" id="edRadioPath"></p>
+        <ul class="ed-rslots" id="edRadioSlots"></ul>
+        <div class="ed-row">
+          <button class="btn" id="edRadioToEmu" type="button" title="The radio's tracks into the same slots of the emulator">Copy the radio's tracks here</button>
+          <button class="btn" id="edEmuToRadio" type="button" title="The emulator's tracks into the same slots of the radio">Send all of mine to the radio</button>
+        </div>
+      </div>
       <p class="note warn ed-lite" id="edLite" hidden></p>
       <p class="ed-status" id="edStatus" role="status" aria-live="polite"></p>
     </div>
@@ -469,7 +501,7 @@ footer.credits a { color: inherit; }
         <summary>How to use on the radio</summary>
         <ol>
           <li><strong>Save file</strong> downloads the track as <code>c1.txt</code> (the slot's number).</li>
-          <li>On the radio's SD card, make the folder <code>/SCRIPTS/TOOLS/StickTimeTracks/</code> and copy the file into it.</li>
+          <li>On the radio's SD card, make the folder <code>/SCRIPTS/TOOLS/StickTimeTracks/</code> and copy the file into it. In Chrome or Edge on a computer, <strong>Connect radio</strong> and <strong>Send to radio</strong> do both: the radio plugged in by USB, in USB Storage mode.</li>
           <li>Up to 8 tracks, <code>c1.txt</code> to <code>c8.txt</code>: they come after the 8 built-in ones, as tracks 9 to 16 in the track menu.</li>
           <li>StickTime and StickTime BW read them; StickTime Lite doesn't.</li>
           <li>Best times are kept while the track stays the same: any change to it starts them over.</li>
@@ -10200,19 +10232,21 @@ const TRACK_DATA = {"tracks":[{"name":"Meadow","seed":11,"trees":9,"gates":[[0,0
   // ---------------------------------------------------------------- the emulator
   const sim = () => (window.sim && window.sim.app ? window.sim : null);
   const slotPath = (n) => DIR + 'c' + n + '.txt';
-  function slotName(n) {
-    const s = sim();
-    const t = s && s.app.sd ? s.app.sd.get(slotPath(n)) : undefined;
-    if (typeof t !== 'string') return null;
-    return (t.replace(/^\s+/, '').split(/[\r\n]/)[0] || '').trim().slice(0, 16) || '(no name)';
-  }
+  // a track file's name, as the game reads it (its first line, 16 characters)
+  const nameOf = (t) => (t.replace(/^\s+/, '').split(/[\r\n]/)[0] || '').trim().slice(0, 16) || '(no name)';
+  const emuSlot = (n) => {
+    const s = sim(), t = s && s.app.sd ? s.app.sd.get(slotPath(n)) : undefined;
+    return typeof t === 'string' ? t : null;
+  };
+  const slotName = (n) => { const t = emuSlot(n); return t === null ? null : nameOf(t); };
 
   // ---------------------------------------------------------------- the page
   const el = {};
   for (const k of ['tracksBtn', 'edClose', 'edTemplate', 'edOpen', 'edGateType', 'edAddGate', 'edAddBox', 'edAddWall',
     'edRotL', 'edRotR', 'edDup', 'edDel', 'edUndo', 'edRedo', 'edFit', 'edTrees', 'edMap', 'edMapBox', 'edReadout',
     'edSlot', 'edFly', 'edSave', 'edEmpty', 'edSize', 'edLite', 'edStatus', 'edName', 'edSeed', 'edShuffle', 'edTreesN',
-    'edSel', 'edProblems', 'edProbPill', 'edOrder']) el[k] = $(k);
+    'edSel', 'edProblems', 'edProbPill', 'edOrder', 'edRadio', 'edRadioState', 'edConnect', 'edSend', 'edFromRadio',
+    'edForget', 'edRadioNote', 'edRadioPanel', 'edRadioPath', 'edRadioSlots', 'edRadioToEmu', 'edEmuToRadio']) el[k] = $(k);
   const cv = el.edMap, ctx = cv.getContext('2d');
   const UP = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3.5 10l4.5-4.5 4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const DOWN = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3.5 6l4.5 4.5 4.5-4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -10395,6 +10429,7 @@ const TRACK_DATA = {"tracks":[{"name":"Meadow","seed":11,"trees":9,"gates":[[0,0
     el.edLite.textContent = lite
       ? 'StickTime Lite doesn\'t read custom tracks (its radios have no memory to spare): Fly it switches the script to Auto.'
       : a && a.custom ? a.custom.name + ' is running: Fly it switches back to StickTime.' : '';
+    renderRadio();
   }
   function renderSlots() {
     let h = '';
@@ -11191,14 +11226,8 @@ const TRACK_DATA = {"tracks":[{"name":"Meadow","seed":11,"trees":9,"gates":[[0,0
     if (file.size > 32768) { status(file.name + ' is too big for a track file.', 'bad'); return; }
     const rd = new FileReader();
     rd.onload = () => {
-      const r = parseFile(String(rd.result));
-      if (r.error) { status('Can\'t open ' + file.name + ': ' + r.error, 'bad'); return; }
-      pushUndo();
-      load(r.T, true);
       const m = /^c([1-8])\.txt$/i.exec(file.name);
-      if (m) { ed.slot = +m[1]; renderSlots(); renderFly(); }
-      fit();
-      status('Opened ' + file.name + ': ' + r.T.gates.length + ' gates, ' + r.T.boxes.length + ' structures.' + (r.note ? ' ' + r.note : ''), r.note ? 'bad' : 'ok');
+      openText(String(rd.result), file.name, m ? +m[1] : 0);
     };
     rd.onerror = () => status('Can\'t read ' + file.name + '.', 'bad');
     rd.readAsText(file);
@@ -11263,6 +11292,278 @@ const TRACK_DATA = {"tracks":[{"name":"Meadow","seed":11,"trees":9,"gates":[[0,0
     status('Slot c' + ed.slot + ' is empty. The game\'s track menu shows it at its next start.', 'ok');
   });
 
+  // ---------------------------------------------------------------- the radio's SD card
+  // Chrome, Edge and Opera on a computer can read and write a folder the user picks (File System
+  // Access). A radio plugged in by USB in USB Storage mode is a drive: the user picks it once, the
+  // handle is kept in IndexedDB, and a later visit reconnects with a click (or by itself while the
+  // browser still allows it). Elsewhere (Firefox, Safari, phones, a page in another site's frame)
+  // one line says to use Save file.
+  const NO_RADIO = 'This browser can\'t write to the radio\'s SD card: use Save file and copy it to ' + DIR + ' on the radio.';
+  const NOT_CARD = 'This doesn\'t look like the radio\'s SD card: no SCRIPTS folder. Pick the drive the radio shows up as.';
+  function canPick() {
+    if (typeof window.showDirectoryPicker !== 'function') return false;
+    try { return window.top === window.self || !!window.top.location.href; } catch (e) { return false; }   // another site's frame
+  }
+  // dir: what the user picked; at: where that is on the card (the card, SCRIPTS, TOOLS, StickTimeTracks)
+  const radio = { ok: canPick(), state: 'off', dir: null, at: null, busy: false, open: false };
+  const STEPS = { card: ['SCRIPTS', 'TOOLS', 'StickTimeTracks'], scripts: ['TOOLS', 'StickTimeTracks'], tools: ['StickTimeTracks'], tracks: [] };
+  const kv = {
+    db: null,
+    store(mode, fn) {
+      if (!kv.db) {
+        kv.db = new Promise((res, rej) => {
+          const r = indexedDB.open('fpvsim', 1);
+          r.onupgradeneeded = () => r.result.createObjectStore('handles');
+          r.onsuccess = () => res(r.result);
+          r.onerror = () => rej(r.error);
+        });
+      }
+      return kv.db.then((db) => new Promise((res, rej) => {
+        const t = db.transaction('handles', mode), r = fn(t.objectStore('handles'));
+        t.oncomplete = () => res(r.result);
+        t.onerror = t.onabort = () => rej(t.error);
+      }));
+    },
+    get: (k) => kv.store('readonly', (s) => s.get(k)),
+    set: (k, v) => kv.store('readwrite', (s) => s.put(v, k)),
+    del: (k) => kv.store('readwrite', (s) => s.delete(k)),
+  };
+  // a folder or file in dir by name, in any case (the card is FAT: the radio doesn't mind case)
+  async function child(dir, name, kind, create) {
+    try { return kind === 'file' ? await dir.getFileHandle(name) : await dir.getDirectoryHandle(name); }
+    catch (e) { if (e.name !== 'NotFoundError' && e.name !== 'TypeMismatchError') throw e; }
+    const low = name.toLowerCase();
+    for await (const h of dir.values()) if (h.kind === kind && h.name.toLowerCase() === low) return h;
+    if (!create) return null;
+    return kind === 'file' ? dir.getFileHandle(name, { create: true }) : dir.getDirectoryHandle(name, { create: true });
+  }
+  async function locate(dir) {
+    const n = dir.name.toLowerCase();
+    if (n === 'sticktimetracks') return 'tracks';
+    if (await child(dir, 'SCRIPTS', 'directory')) return 'card';
+    if (n === 'scripts') return 'scripts';
+    if (n === 'tools' || await child(dir, 'StickTimeTracks', 'directory') || await child(dir, 'StickTime.lua', 'file')
+      || await child(dir, 'StickTimeBW.lua', 'file')) return 'tools';
+    return null;
+  }
+  async function walk(steps, create) {
+    let d = radio.dir;
+    for (const s of steps) if (!(d = await child(d, s, 'directory', create))) return null;
+    return d;
+  }
+  const tracksDir = (create) => walk(STEPS[radio.at], create);
+  async function readSlot(dir, n) {
+    const f = dir && await child(dir, 'c' + n + '.txt', 'file');
+    return f ? (await f.getFile()).text() : null;
+  }
+  async function writeSlot(dir, n, text) {
+    const f = await child(dir, 'c' + n + '.txt', 'file', true);
+    const w = await f.createWritable();
+    await w.write(text);
+    await w.close();
+  }
+  async function readAll() {
+    const dir = await tracksDir(false), out = [];
+    for (let i = 1; i <= SLOTS; i++) out.push(await readSlot(dir, i));
+    return out;
+  }
+  // which StickTime is on the card (where we can see SCRIPTS/TOOLS)
+  async function installed() {
+    if (radio.at === 'tracks') return '';
+    const tools = await walk(STEPS[radio.at].slice(0, -1), false);
+    const has = async (f) => !!(tools && await child(tools, f, 'file'));
+    if (await has('StickTime.lua') || await has('StickTimeBW.lua')) return '';
+    if (await has('StickTimeLite.lua')) return ' Only StickTime Lite is on this card, and the Lite doesn\'t read custom tracks.';
+    return ' StickTime isn\'t on this card yet: copy it to /SCRIPTS/TOOLS/ too.';
+  }
+
+  function renderRadio() {
+    const on = radio.state === 'on', ask = radio.state === 'ask';
+    el.edRadio.hidden = !radio.ok;
+    el.edRadioNote.className = 'note ed-rnote' + (radio.ok ? '' : ' warn');
+    el.edRadioNote.textContent = radio.ok
+      ? 'Plug the radio in by USB and choose USB Storage (SD) on it, then Connect radio and pick its SD card (the drive).' : NO_RADIO;
+    el.edRadioNote.hidden = radio.ok && on;
+    if (!radio.ok) { el.edRadioPanel.hidden = true; return; }
+    const name = radio.dir ? radio.dir.name : '';
+    el.edRadioState.textContent = on ? name + ' connected' : ask ? name + ': allow again' : 'not connected';
+    el.edRadioState.classList.toggle('on', on);
+    el.edConnect.textContent = ask ? 'Reconnect' : 'Connect radio…';
+    el.edConnect.hidden = on;
+    el.edSend.hidden = el.edFromRadio.hidden = !on;
+    el.edForget.hidden = !(on || ask);
+    const bad = ed.probs.length > 0;
+    el.edSend.disabled = bad || radio.busy;
+    el.edSend.title = bad ? 'Fix the problems listed under Check first' : 'Write c' + ed.slot + '.txt to the radio\'s SD card (track ' + (8 + ed.slot) + ')';
+    el.edConnect.disabled = el.edFromRadio.disabled = el.edRadioToEmu.disabled = el.edEmuToRadio.disabled = radio.busy;
+    el.edRadioPanel.hidden = !(on && radio.open);
+    el.edFromRadio.setAttribute('aria-expanded', String(on && radio.open));
+  }
+  // a radio job: one at a time; a card that went away (unplugged) or lost its permission says so
+  async function job(fn) {
+    if (radio.busy) return;
+    radio.busy = true;
+    renderRadio();
+    try { await fn(); }
+    catch (e) {
+      if (e && (e.name === 'NotFoundError' || e.name === 'NotAllowedError' || e.name === 'SecurityError')) {
+        radio.state = 'ask';
+        radio.open = false;
+        status('The radio\'s SD card isn\'t there any more: plug the radio in (USB Storage) and Reconnect, or Connect radio to pick it again.', 'bad');
+      } else status('The radio\'s SD card: ' + (e && e.message || e), 'bad');
+    } finally {
+      radio.busy = false;
+      renderRadio();
+    }
+  }
+  async function useCard(dir, said) {
+    const at = await locate(dir);
+    if (!at) {
+      status(NOT_CARD, 'bad');
+      return;
+    }
+    radio.dir = dir;
+    radio.at = at;
+    radio.state = 'on';
+    try { await kv.set('radio', dir); } catch (e) { /* not kept: Connect radio again next time */ }
+    const where = at === 'card' ? '' : ' (' + ['SCRIPTS', 'SCRIPTS/TOOLS', 'SCRIPTS/TOOLS/StickTimeTracks'][['scripts', 'tools', 'tracks'].indexOf(at)] + ')';
+    if (said) status('Radio SD: ' + dir.name + where + ' connected.' + await installed(), 'ok');
+    if (radio.open) await listRadio();
+  }
+  // Connect radio… (or Reconnect): the picker and the permission both need this click
+  function connect() {
+    if (radio.state === 'ask' && radio.dir) {
+      const dir = radio.dir;
+      const ask = typeof dir.requestPermission === 'function' ? dir.requestPermission({ mode: 'readwrite' }) : Promise.resolve('granted');
+      job(async () => {
+        if (await ask === 'granted') await useCard(dir, true);
+        else { radio.state = 'off'; status('The radio\'s SD card wasn\'t allowed: Connect radio to pick it again.', 'bad'); }
+      });
+      return;
+    }
+    let picking;
+    try { picking = window.showDirectoryPicker({ mode: 'readwrite', id: 'sticktime-radio' }); }
+    catch (e) { picking = Promise.reject(e); }
+    job(async () => {
+      let dir;
+      try { dir = await picking; }
+      catch (e) {
+        if (e && e.name === 'AbortError') return;          // the picker was closed
+        if (e && (e.name === 'SecurityError' || e instanceof TypeError)) { radio.ok = false; status(NO_RADIO, 'bad'); return; }
+        throw e;
+      }
+      await useCard(dir, true);
+    });
+  }
+  function sendToRadio() {
+    if (ed.probs.length || radio.state !== 'on') return;
+    const slot = ed.slot, text = ed.file.text, name = ed.T.name.trim();
+    job(async () => {
+      const dir = await tracksDir(true);
+      const old = await readSlot(dir, slot);
+      if (old !== null && old !== text && !window.confirm('Slot c' + slot + ' on the radio holds "' + nameOf(old) + '". Replace it with "' + name + '"?')) {
+        status('Nothing sent: c' + slot + '.txt on the radio stays as it was.');
+        return;
+      }
+      if (old !== text) await writeSlot(dir, slot, text);
+      status('Sent to the radio as track ' + (8 + slot) + ' (c' + slot + '.txt). On the radio: restart StickTime, the track is in the Track list.', 'ok');
+      if (radio.open) await listRadio();
+    });
+  }
+  let radioSlots = [];
+  async function listRadio() {
+    radioSlots = await readAll();
+    el.edRadioPath.textContent = 'On ' + radio.dir.name + (STEPS[radio.at].length ? ' · ' + STEPS[radio.at].join('/') : '');
+    el.edRadioSlots.innerHTML = radioSlots.map((t, i) => '<li><span><b>c' + (i + 1) + '</b> · track ' + (i + 9) + ' · ' +
+      (t === null ? '<em>empty</em>' : esc(nameOf(t))) + '</span>' +
+      (t === null ? '' : '<button class="btn" type="button" data-ropen="' + (i + 1) + '">Open</button>') + '</li>').join('');
+  }
+  // a track file into the editor (Open file, a radio slot), checked as the game reads it
+  function openText(text, what, slot) {
+    const r = parseFile(text);
+    if (r.error) { status('Can\'t open ' + what + ': ' + r.error, 'bad'); return; }
+    pushUndo();
+    load(r.T, true);
+    if (slot) { ed.slot = slot; renderSlots(); renderFly(); }
+    fit();
+    status('Opened ' + what + ': ' + r.T.gates.length + ' gates, ' + r.T.boxes.length + ' structures.' + (r.note ? ' ' + r.note : ''), r.note ? 'bad' : 'ok');
+  }
+  // the radio's tracks into the emulator's slots, or the emulator's onto the radio (same slots);
+  // a different track that would be replaced is named first
+  const differs = (from, to) => from.map((t, i) => (t !== null && to[i] !== null && to[i] !== t ? 'c' + (i + 1) + ' "' + nameOf(to[i]) + '"' : null)).filter(Boolean);
+  function radioToEmu() {
+    const s = sim();
+    if (!s) return;
+    job(async () => {
+      const rad = await readAll(), emu = rad.map((t, i) => emuSlot(i + 1));
+      const n = rad.filter((t) => t !== null).length;
+      if (!n) { status('No tracks on the radio to copy.'); return; }
+      const lose = differs(rad, emu);
+      if (lose.length && !window.confirm('Replace in the emulator: ' + lose.join(', ') + '?')) return;
+      const got = changedSlots(rad, emu);
+      got.forEach((i) => s.writeSD(slotPath(i), rad[i - 1]));
+      renderSlots();
+      status(got.length ? 'Copied ' + slotList(got) + ' from the radio into the emulator. Fly it, or Restart the game to find them in its Track list.'
+        : 'The emulator already has the radio\'s tracks.', 'ok');
+    });
+  }
+  // the slots (1-8) where from has a track that to hasn't; c1, c3 and c5
+  const changedSlots = (from, to) => from.map((t, i) => (t !== null && t !== to[i] ? i + 1 : 0)).filter(Boolean);
+  const slotList = (l) => l.map((i) => 'c' + i).join(', ').replace(/, ([^,]*)$/, ' and $1');
+  function emuToRadio() {
+    job(async () => {
+      const emu = [];
+      for (let i = 1; i <= SLOTS; i++) emu.push(emuSlot(i));
+      const n = emu.filter((t) => t !== null).length;
+      if (!n) { status('No tracks in the emulator\'s slots: Fly it puts one there.'); return; }
+      const dir = await tracksDir(true), rad = [];
+      for (let i = 1; i <= SLOTS; i++) rad.push(await readSlot(dir, i));
+      const lose = differs(emu, rad);
+      if (lose.length && !window.confirm('Replace on the radio: ' + lose.join(', ') + '?')) return;
+      const put = changedSlots(emu, rad);
+      for (const i of put) await writeSlot(dir, i, emu[i - 1]);
+      status(put.length ? 'Sent ' + slotList(put) + ' to the radio. On the radio: restart StickTime, the tracks are in the Track list.'
+        : 'The radio already has the emulator\'s tracks.', 'ok');
+      await listRadio();
+    });
+  }
+  el.edConnect.addEventListener('click', connect);
+  el.edSend.addEventListener('click', sendToRadio);
+  el.edFromRadio.addEventListener('click', () => {
+    radio.open = !radio.open;
+    if (radio.open) job(listRadio); else renderRadio();
+  });
+  el.edForget.addEventListener('click', () => {
+    radio.state = 'off';
+    radio.dir = null;
+    radio.open = false;
+    kv.del('radio').catch(() => { /* nothing kept */ });
+    renderRadio();
+    status('The radio\'s SD card is forgotten: Connect radio to pick it again.');
+    el.edConnect.focus();
+  });
+  el.edRadioSlots.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-ropen]');
+    const t = b && radioSlots[+b.dataset.ropen - 1];
+    if (typeof t === 'string') openText(t, 'c' + b.dataset.ropen + '.txt from the radio', +b.dataset.ropen);
+  });
+  el.edRadioToEmu.addEventListener('click', radioToEmu);
+  el.edEmuToRadio.addEventListener('click', emuToRadio);
+  // the card picked on an earlier visit: back at once if the browser still allows it, else Reconnect
+  async function restoreRadio() {
+    if (!radio.ok) return;
+    let dir = null;
+    try { dir = await kv.get('radio'); } catch (e) { return; }
+    if (!dir || typeof dir.getDirectoryHandle !== 'function') return;
+    radio.dir = dir;
+    let p = 'granted';
+    try { if (typeof dir.queryPermission === 'function') p = await dir.queryPermission({ mode: 'readwrite' }); } catch (e) { p = 'prompt'; }
+    if (p === 'granted') {
+      try { await useCard(dir, false); } catch (e) { radio.state = 'ask'; }
+    } else radio.state = p === 'denied' ? 'off' : 'ask';
+    renderRadio();
+  }
+
   const reduced = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   function openEditor() {
     ed.open = true;
@@ -11320,11 +11621,13 @@ const TRACK_DATA = {"tracks":[{"name":"Meadow","seed":11,"trees":9,"gates":[[0,0
       file: () => ed.file.text,
       problems: () => ed.probs.map((p) => p.msg),
       selected: () => [...ed.sel],
+      radio: () => ({ ok: radio.ok, state: radio.state, at: radio.at, name: radio.dir && radio.dir.name, busy: radio.busy }),
       at(x, z) { const r = cv.getBoundingClientRect(); return [r.left + sx(x), r.top + sy(z)]; },   // a map point on the page
     };
   }
   if (typeof ResizeObserver === 'function') new ResizeObserver(resize).observe(el.edMapBox);
   window.addEventListener('resize', resize);
+  restoreRadio();
 })();
 
 </script>

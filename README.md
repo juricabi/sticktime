@@ -22,7 +22,7 @@ Download `StickTime-<version>-sdcard.zip` from the [latest release](https://gith
 
 On EdgeTX 2.10 and older the B&W versions don't start: they say "Needs EdgeTX 2.11 or newer" on the radio. When updating StickTime BW or Lite, replace the whole `StickTimeBW` / `StickTimeLite` folder.
 
-Your own tracks (made with the [emulator's](#browser-emulator) track editor) go in `/SCRIPTS/TOOLS/StickTimeTracks/` as `c1.txt` to `c8.txt`: they are tracks 9 to 16 in StickTime and StickTime BW (StickTime Lite doesn't read them).
+Your own tracks (made with the [emulator's](#browser-emulator) track editor) go in `/SCRIPTS/TOOLS/StickTimeTracks/` as `c1.txt` to `c8.txt`: they are tracks 9 to 16 in StickTime and StickTime BW (StickTime Lite doesn't read them). In Chrome or Edge on a computer the editor can put them there itself: plug the radio in by USB, choose USB Storage on it, then **Connect radio** and **Send to radio**.
 
 > **Safety:** the radio keeps transmitting your sticks while the sim runs. Unplug the quad's battery or switch the RF module off first.
 
@@ -112,7 +112,7 @@ Play at **[juricabi.github.io/sticktime](https://juricabi.github.io/sticktime/)*
   to play your own files. Its own switch, level and next-song button, apart from Sound.
 - Keyboard or **Radio / gamepad** input, the gamepad and its axis mapping are remembered.
 - Real radio refresh (20 Hz) and the color screen's one-frame delay are on by default and can be turned off; B&W LCD ghosting is optional.
-- **Track editor** (**Tracks**): lay out your own track on a map seen from above (gates in race order, hoops, flags, dive gates, structures, walls with gaps), from any of the eight tracks or a blank one. It checks that the game can take it, then **Fly it** starts it in the emulator, or **Save file** downloads `c1.txt` to `c8.txt` for your radio.
+- **Track editor** (**Tracks**): lay out your own track on a map seen from above (gates in race order, hoops, flags, dive gates, structures, walls with gaps), from any of the eight tracks or a blank one. It checks that the game can take it, then **Fly it** starts it in the emulator, or **Save file** downloads `c1.txt` to `c8.txt` for your radio. In Chrome or Edge, **Send to radio** writes it straight to the radio's SD card (the radio plugged in by USB in USB Storage mode), and **From radio** reads the tracks already there.
 - **Radio load** estimates the frame time on F2, F4 and H7 radios; **Open .lua** runs any other EdgeTX tool script.
 
 ## Under the hood
