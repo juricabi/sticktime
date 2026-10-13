@@ -13,6 +13,8 @@ folder picker, so the editor's own reads and writes run: Send to radio, the over
 From radio (list, open, copy both ways), the card remembered across a reload, a picked SCRIPTS/
 TOOLS or StickTimeTracks folder, a folder that isn't a card, and the line shown where the browser
 can't do it (no picker, a SecurityError, the page in another site's frame)."""
+import hashlib
+import json
 import pathlib
 import re
 import sys
@@ -137,17 +139,28 @@ CARD_WRITE = """async ([path, text]) => { let d = await navigator.storage.getDir
 TRACKS = "RADIO-SD/SCRIPTS/TOOLS/StickTimeTracks/c"
 
 
+sys.path.insert(0, str(ROOT / "tools"))
+import sd_manifest  # noqa: E402  (the site's sdcard/: the game's files and manifest.json)
+
+GAME_FILES = sd_manifest.files()
+MANIFEST = sd_manifest.manifest(GAME_FILES)
+
+
 def served(ctx):
-    """simulator.html and artifact.html at https://sticktime.test/, a page at https://another.test/
+    """simulator.html and artifact.html at https://sticktime.test/ with the game's SD card files
+    beside them in sdcard/ (as the Pages workflow publishes them), a page at https://another.test/
     that frames artifact.html, fengari at its CDN address; nothing else answers"""
     pages = {SITE + "simulator.html": (ROOT / "web" / "simulator.html").read_bytes(),
              SITE + "artifact.html": (ROOT / "web" / "artifact.html").read_bytes(),
-             PARENT: (f'<!doctype html><iframe src="{SITE}artifact.html" width="1300" height="900"></iframe>').encode()}
+             PARENT: (f'<!doctype html><iframe src="{SITE}artifact.html" width="1300" height="900"></iframe>').encode(),
+             SITE + "sdcard/manifest.json": json.dumps(MANIFEST).encode()}
+    for k, v in GAME_FILES.items():
+        pages[SITE + "sdcard/SCRIPTS/TOOLS/" + k] = v
 
     def route(r):
         u = r.request.url
         if u in pages:
-            r.fulfill(body=pages[u], content_type="text/html; charset=utf-8")
+            r.fulfill(body=pages[u], content_type="text/html; charset=utf-8" if u.endswith(".html") or u == PARENT else "application/octet-stream")
         elif "fengari-web" in u:
             r.fulfill(body=FENGARI, content_type="application/javascript")
         else:
@@ -301,6 +314,144 @@ def radio_tests(br, errors):
     frame.wait_for_function("window.sim && window.sim.editor", timeout=30000)
     check(frame.evaluate("sim.editor.radio().ok") is False and frame.evaluate("document.getElementById('edRadioNote').textContent") == NO_RADIO,
           "radio: artifact.html in another site's frame gives the Save file line")
+    ctx.close()
+
+
+# a card from scratch: {path: text, or a list of byte values}; the stand-in picker answers with it
+MAKE_CARD = """async ([name, files]) => {
+  const root = await navigator.storage.getDirectory();
+  try { await root.removeEntry(name, { recursive: true }); } catch (e) { }
+  const card = await root.getDirectoryHandle(name, { create: true });
+  for (const [path, data] of Object.entries(files)) {
+    let d = card; const p = path.split('/');
+    for (const s of p.slice(0, -1)) d = await d.getDirectoryHandle(s, { create: true });
+    const w = await (await d.getFileHandle(p[p.length - 1], { create: true })).createWritable();
+    await w.write(typeof data === 'string' ? data : new Uint8Array(data)); await w.close();
+  }
+  window.__pick = card;
+  window.showDirectoryPicker = async () => window.__pick;
+}"""
+CARD_HASH = """async (path) => { try { let d = await navigator.storage.getDirectory(); const p = path.split('/');
+  for (const s of p.slice(0, -1)) d = await d.getDirectoryHandle(s);
+  const b = await (await (await d.getFileHandle(p[p.length - 1])).getFile()).arrayBuffer();
+  return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', b)), (x) => x.toString(16).padStart(2, '0')).join('');
+  } catch (e) { return null; } }"""
+CARD_LS = """async (path) => { let d = await navigator.storage.getDirectory();
+  for (const s of path.split('/')) d = await d.getDirectoryHandle(s);
+  const out = []; for await (const h of d.values()) out.push(h.name); return out.sort(); }"""
+PICKED = "[...document.querySelectorAll('#edEditions [data-ed]')].filter((i) => i.checked).map((i) => i.dataset.ed)"
+sha = lambda b: hashlib.sha256(b if isinstance(b, bytes) else b.encode()).hexdigest()  # noqa: E731
+
+
+def connect_card(page, name, files):
+    page.evaluate(MAKE_CARD, [name, files])
+    if page.is_visible("#edForget"):
+        page.click("#edForget")
+    page.click("#edConnect")
+    radio_done(page)
+    page.click("#edInstall")
+    return radio_done(page)
+
+
+def install_tests(br, errors):
+    ctx = br.new_context(viewport={"width": 1400, "height": 1000})
+    served(ctx)
+    page = ctx.new_page()
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    page.goto(SITE + "simulator.html")
+    wait_sim(page)
+    page.click("#tracksBtn")
+    version, T = MANIFEST["version"], "CARD/SCRIPTS/TOOLS/"
+
+    # the edition to start with: what RADIO/radio.yml says the radio is, else nothing
+    for board, want in (("tx16s", ["color"]), ("x7", ["lite"]), ("tx12mk2", ["bw"]), ("mystery9", [])):
+        connect_card(page, "CARD", {"SCRIPTS/TOOLS/StickTime.dat": "my settings\n", "RADIO/radio.yml": f"semver: 2.11.3\nboard: {board}\n"})
+        check(page.evaluate(PICKED) == want and page.inner_text("#edEditions").count("not installed") == 3,
+              f"install: board {board} in radio.yml: {want or 'nothing'} picked, nothing installed yet")
+    check("which this page doesn't know" in page.inner_text("#edInstallHint"), "install: an unknown board: the player picks")
+
+    # a fresh install of all three editions (the card from radio.yml: a TX16S)
+    user = {"SCRIPTS/TOOLS/StickTime.dat": "my settings\n", "SCRIPTS/TOOLS/FPVSim.dat": "FPVSIM old\n", "RADIO/radio.yml": "board: tx16s\n"}
+    connect_card(page, "CARD", user)
+    check(f"StickTime {version} from this site" in page.inner_text("#edInstallHead"), "install: the site's version shown")
+    page.check('#edEditions [data-ed="bw"]')
+    page.check('#edEditions [data-ed="lite"]')
+    page.click("#edInstallGo")
+    radio_done(page)
+    check(page.inner_text("#edStatus") == f"StickTime {version} is on the radio: Color, B&W and Lite. Eject the drive before unplugging it.",
+          f"install: {page.inner_text('#edStatus')!r}")
+    wrong = [k for k, v in GAME_FILES.items() if page.evaluate(CARD_HASH, T + k) != sha(v)]
+    check(not wrong, f"install: every file of the release on the card as published ({len(GAME_FILES)} files){wrong}")
+    for luac in ("StickTimeBW/game.luac", "StickTimeLite/game.luac"):
+        check(page.evaluate(CARD_HASH, T + luac) == sha((ROOT / "sdcard/SCRIPTS/TOOLS" / luac).read_bytes()), f"install: {luac} byte for byte the repo's")
+    check(all(page.evaluate(CARD_HASH, "CARD/" + k) == sha(v) for k, v in user.items()), "install: the saves and radio.yml untouched")
+    check(page.inner_text("#edEditions").count("up to date") == 3, "install: all three up to date afterwards")
+    check(not any(n.endswith(".new") for d in ("", "StickTimeBW", "StickTimeLite") for n in page.evaluate(CARD_LS, (T + d).rstrip("/"))),
+          "install: no temporary files left")
+    page.click("#edInstallGo")
+    radio_done(page)
+    check(page.inner_text("#edStatus").startswith(f"StickTime {version} was already on the radio"), "install: again: nothing to write")
+
+    # an update over an old version: stale files go, the player's files stay byte for byte
+    old_luac = [27, 76, 117, 97, 83, 0, 25, 147, 13, 10, 26, 10, 4, 4, 4, 0, 1, 2, 3]
+    mine = {"SCRIPTS/TOOLS/StickTimeBW.dat": "FPVSIM2 lay=2 track=9 l9=4321\n", "SCRIPTS/TOOLS/StickTimeLite/data.txt": "lite save 1 2 3\n",
+            "SCRIPTS/TOOLS/StickTimeTracks/c1.txt": "My Loop\n1 4242 7 9 0 0 1 0 0 0 40 1 0 0\n",
+            "SCRIPTS/TOOLS/StickTimeGhosts/c3.txt": "ghost 1 2 3\n", "SCRIPTS/TOOLS/FPVSimBW.dat": "old\n"}
+    old = dict(mine, **{"SCRIPTS/TOOLS/StickTimeBW.lua": "local toolName = \"TNS|StickTime BW|TNE\"\n--[[\n  StickTime BW v1.6.5  -  loader\n]]\n",
+                        "SCRIPTS/TOOLS/StickTimeBW/core.lua": "-- old core\n", "SCRIPTS/TOOLS/StickTimeBW/core.luac": old_luac,
+                        "SCRIPTS/TOOLS/StickTimeBW/game.luac": old_luac,
+                        "SCRIPTS/TOOLS/StickTimeLite.lua": "--[[\n  StickTime Lite v1.6.5  -  loader\n]]\n",
+                        "SCRIPTS/TOOLS/StickTimeLite/t9.txt": "1 9 0 0 1 0 0\n"})
+    connect_card(page, "CARD", old)
+    states = page.inner_text("#edEditions")
+    check(page.evaluate(PICKED) == ["bw", "lite"] and "will be updated (1.6.5 on the card), 1 old file removed" in states,
+          f"install: B&W and Lite found and picked, older: {states!r}")
+    page.mouse.move(0, 0)
+    shot_clip(page, OUT / "editor_install.png")
+    print("wrote test/shots/editor_install.png")
+    page.click("#edInstallGo")
+    radio_done(page)
+    bw, lite = page.evaluate(CARD_LS, T + "StickTimeBW"), page.evaluate(CARD_LS, T + "StickTimeLite")
+    check("core.luac" not in bw and "t9.txt" not in lite, "install: the stale core.luac and t9.txt removed")
+    check(bw == sorted(k.split("/")[1] for k in GAME_FILES if k.startswith("StickTimeBW/")), f"install: StickTimeBW/ is the release's: {bw}")
+    check(all(page.evaluate(CARD_HASH, "CARD/" + k) == sha(v) for k, v in mine.items()),
+          "install: saves, StickTimeLite/data.txt, tracks and ghosts kept byte for byte")
+    check(page.evaluate(CARD_HASH, T + "StickTimeBW/game.luac") == sha(GAME_FILES["StickTimeBW/game.luac"]), "install: the new game.luac")
+    check(page.evaluate(CARD_HASH, T + "StickTime.lua") is None and page.inner_text("#edEditions").count("up to date") == 2,
+          "install: Color not picked, not put on the card; B&W and Lite up to date")
+
+    # a newer version on the card: asked first
+    connect_card(page, "CARD", {"SCRIPTS/TOOLS/StickTime.lua": "--[[\n  StickTime v9.9.9  -  from the future\n]]\n"})
+    check("newer on the card (9.9.9)" in page.inner_text("#edEditions") and page.evaluate(PICKED) == ["color"], "install: a newer version on the card is shown")
+    asked = []
+    page.once("dialog", lambda dl: (asked.append(dl.message), dl.dismiss()))
+    page.click("#edInstallGo")
+    radio_done(page)
+    check(asked and "9.9.9" in asked[0] and page.inner_text("#edStatus") == "Nothing changed on the radio."
+          and page.evaluate(CARD_HASH, T + "StickTime.lua") == sha("--[[\n  StickTime v9.9.9  -  from the future\n]]\n"),
+          f"install: asked before replacing a newer one, and No changes nothing: {asked}")
+    ctx.close()
+
+    # no install where the site's files aren't beside the page: artifact.html, file:// pages
+    ctx = br.new_context(viewport={"width": 1400, "height": 1000})
+    served(ctx)
+    page = ctx.new_page()
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    page.goto(SITE + "artifact.html")
+    wait_sim(page)
+    page.click("#tracksBtn")
+    page.evaluate(MAKE_CARD, ["CARD", {"SCRIPTS/TOOLS/StickTime.dat": "x\n"}])
+    page.click("#edConnect")
+    radio_done(page)
+    check(page.is_hidden("#edInstall") and page.is_visible("#edInstallNote") and "latest release" in page.inner_text("#edInstallNote"),
+          "install: artifact.html hides it and points to the release zip")
+    ctx.close()
+    ctx = br.new_context()
+    offline(ctx)
+    page = ctx.new_page()
+    page.goto(SIM)
+    wait_sim(page)
+    check(page.evaluate("sim.editor.radio().game") == "", "install: a file:// page has no site files to install from")
     ctx.close()
 
 
@@ -510,6 +661,7 @@ def main():
 
         # ---- the radio's SD card
         radio_tests(br, errors)
+        install_tests(br, errors)
         br.close()
     for e in errors:
         print("page error:", e)
