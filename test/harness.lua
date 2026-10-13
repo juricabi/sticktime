@@ -412,7 +412,7 @@ do
   idleSticks()
 end
 
--- 5c. flips (the airmode mixer): at full throttle the motors' differential drops the collective, so a
+-- 5d. flips (the airmode mixer): at full throttle the motors' differential drops the collective, so a
 -- full-stick flip ends lower than without it; near hover it lifts it
 do
   local mode, rates = T.S.mode, T.S.rates
@@ -436,7 +436,7 @@ do
   local hW, s3 = flip(hover, am)
   local hO, s4 = flip(hover, 0)
   print(string.format("flips: full throttle %+.2f m (%+.2f without the mixer), hover throttle %+.2f m (%+.2f without)", fW, fO, hW, hO))
-  if s1 ~= 4 or s2 ~= 4 or s3 ~= 4 or s4 ~= 4 or not (fW < fO - 0.2 and hW > hO + 0.05) then
+  if s1 ~= 4 or s2 ~= 4 or s3 ~= 4 or s4 ~= 4 or not (fW < fO - 0.15 and hW > hO + 0.05) then
     fail("flips don't shift the thrust as an airmode mixer")
   end
   T.set("mode", mode) T.set("rates", rates)

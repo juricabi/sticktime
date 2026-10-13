@@ -16,7 +16,8 @@ Model (mass-normalised, body axes r/u/f; the same steps as physics() in src/stic
   frame lift: s = vu/|v|, q = lr*s*0.813*(2|s|sqrt(1-s^2))^0.6*S*|v|/sqrt(1-s^2)
               a_u -= q*(1-s^2), a_r += q*s*vr/|v|, a_f += q*s*vf/|v|
   gravity 10.78 (1.1 g)
-  flips: the motors' rate follows the body rate no faster than am*(1 + MIX_K*(hover level - level)); while
+  flips: the motors' rate follows the stick's rate no faster than am*max(0.3, 1 + MIX_K*(hover level - level))
+  (am and MIX_K are fitted to the reference's thrust while a flip starts, not a physical spin-up); while
   it spins up, the differential u (share of the motors' range) shifts the collective as an airmode mixer
   does, in command units c = sqrt((T/Tmax - i0)/(1 - i0)): c + u/2 <= 1, c >= u/2,
   T = Tmax*(i0 + (1-i0)*(c^2 + (u/2)^2))
@@ -137,19 +138,20 @@ def mix(p, Tm, u):
 def flip(p, thr, rate=667.0, after=0.3, h=0.01):
     """a full-stick roll (`rate` deg/s) from a still, level quad until it has turned 360 deg, then the
     stick centred for `after` s: height change (m) and vertical speed (m/s). The body rate follows the
-    stick through the tr lag; the motors' own rate follows it no faster than authority() (as in
-    physics() in src/sticktime.lua, 80 Hz substeps)"""
+    stick through the tr lag; the motors' own rate follows the stick's rate no faster than authority()
+    (as in physics() in src/sticktime.lua, whose substeps are 10 ms at 50 ms frames)"""
     Tm = thrust(p, thr)
     A = authority(p, Tm)
     a = w = wm = vx = vy = y = t = ang = 0.0
     target, done = math.radians(rate), None
     while done is None or t < done + after:
-        w += ((target if done is None else 0.0) - w) * h / (p["tr"] + h)
+        cmd = target if done is None else 0.0
+        w += (cmd - w) * h / (p["tr"] + h)
         a += w * h
         ang += abs(w) * h
         T = Tm
         if A > 0:
-            dm = max(-A * h, min(A * h, w - wm))
+            dm = max(-A * h, min(A * h, cmd - wm))
             wm += dm
             T = mix(p, Tm, abs(dm) / (A * h))
         uy, ux = math.cos(a), math.sin(a)

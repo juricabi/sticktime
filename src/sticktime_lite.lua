@@ -530,15 +530,15 @@ physics = function(dt)
   local GG, GL, GEW, SQ, CQ = P[22], P[23], P[24], P[31], P[32]                     -- GEW: not GW (gate widths)
   local CE, SE, RF = P[38], P[39], P[40]
   local KH = P[44] * (S.grip > 1 and 1 or S.grip * 0.4)                       -- Grip: rotor drag
-  -- flips (an airmode mixer): the motors' own rate follows the body rate no faster than they can spin
-  -- the quad up (am, more toward full throttle); the differential they need meanwhile drops the
-  -- collective at full throttle and lifts it near hover (levels in motor command, thrust ~ c^2)
+  -- flips (an airmode mixer): the motors' own rate follows the stick's rate no faster than am (more
+  -- toward full throttle; fitted); the differential they need meanwhile drops the collective at full
+  -- throttle and lifts it near hover (levels in motor command, thrust ~ c^2)
   local I0 = P[8]
   local ch, AM = (1 / P[7] - I0) / (1 - I0), (T / Tmax - I0) / (1 - I0)
   ch, AM = ch > 0 and sqrt(ch) or 0, AM > 0 and sqrt(AM) or 0
-  AM = P[48] * (1 - ch + AM)
-  if AM < P[48] * 0.3 then AM = P[48] * 0.3 end
-  AM = AM * h
+  AM = 1 - ch + AM
+  if AM < 0.3 then AM = 0.3 end
+  AM = (P[48] or 0) * AM * h                                                   -- (an old class file: none)
   -- the surface under the quad, for ground effect: the ground, or the top of a structure
   local fl = 0
   for i = 1, NB do
@@ -569,7 +569,7 @@ physics = function(dt)
     -- the flip's differential d (half of it, a share of the motors' range) and the collective Te
     local Te = Tm
     if AM > 0 then
-      local dr, dp = wr0 - mr, wp0 - mp
+      local dr, dp = wr - mr, wp - mp
       if dr > AM then dr = AM elseif dr < -AM then dr = -AM end
       if dp > AM then dp = AM elseif dp < -AM then dp = -AM end
       mr, mp = mr + dr, mp + dp

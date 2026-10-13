@@ -5,13 +5,14 @@ fitted to (see [flight-model.md](flight-model.md)), measured the same way as eve
 
 ## Motor saturation in flips: slowing the snap too
 
-The thrust side of it is in the flight model since 1.6.8 (the airmode mixer in
+The thrust side of it is in the flight model since 1.6.7 (the airmode mixer in
 [flight-model.md](flight-model.md)): a full-stick flip dips the thrust at full throttle and lifts it
 near hover. The body rate is left as it was, so a full-stick snap still reaches 63% of its rate in
-about 9 ms. In the per-prop model the motors also limit how fast it spins up: 14-16 ms at half stick,
-20-30 ms at full stick (whoops 20 / 42-46 ms), slower at full throttle. The idea is to let the body
-rate follow the motors' own rate (already computed for the mixer) instead of the stick's lag, as an
-option, since quick snaps help with the sim's own latency.
+about 9 ms. In the per-prop model the motors also limit how fast the quad spins up: on average 55,000
+deg/s² at hover throttle and 47,000 at full on a 5" racer, 17,000-18,000 on a 65 mm whoop, and its PID
+loop overshoots the rate by about 30% for the first 50 ms. The idea would be a physical spin-up limit
+on the body rate (the mixer's `am` is fitted to the thrust, not to that), as an option, since quick,
+clean snaps help with the sim's own latency.
 
 ## Scraping obstacles instead of crashing
 

@@ -453,9 +453,9 @@ local KH = P[44] * (S.grip > 1 and 1 or S.grip * 0.4)                       -- G
 local I0 = P[8]
 local ch, AM = (1 / P[7] - I0) / (1 - I0), (T / Tmax - I0) / (1 - I0)
 ch, AM = ch > 0 and sqrt(ch) or 0, AM > 0 and sqrt(AM) or 0
-AM = P[48] * (1 - ch + AM)
-if AM < P[48] * 0.3 then AM = P[48] * 0.3 end
-AM = AM * h
+AM = 1 - ch + AM
+if AM < 0.3 then AM = 0.3 end
+AM = (P[48] or 0) * AM * h                                                   -- (an old class file: none)
 local fl = 0
 for i = 1, NB do
 if px > bx0[i] and px < bx1[i] and pz > bz0[i] and pz < bz1[i] and py > by1[i] and by1[i] > fl then fl = by1[i] end
@@ -483,7 +483,7 @@ wr0, wp0, wy0 = wr0 + (wr - wr0) * kr, wp0 + (wp - wp0) * kr, wy0 + (wy - wy0) *
 rotate(wr0 * h, wp0 * h, wy0 * h)
 local Te = Tm
 if AM > 0 then
-local dr, dp = wr0 - mr, wp0 - mp
+local dr, dp = wr - mr, wp - mp
 if dr > AM then dr = AM elseif dr < -AM then dr = -AM end
 if dp > AM then dp = AM elseif dp < -AM then dp = -AM end
 mr, mp = mr + dr, mp + dp

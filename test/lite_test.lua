@@ -327,7 +327,7 @@ do
   local hW, s3 = flip(hov, am)
   local hO, s4 = flip(hov, 0)
   print(string.format("flips: full throttle %+.2f m (%+.2f without the mixer), hover throttle %+.2f m (%+.2f without)", fW, fO, hW, hO))
-  if s1 ~= FLY or s2 ~= FLY or s3 ~= FLY or s4 ~= FLY or not (fW < fO - 0.2 and hW > hO + 0.05) then
+  if s1 ~= FLY or s2 ~= FLY or s3 ~= FLY or s4 ~= FLY or not (fW < fO - 0.15 and hW > hO + 0.05) then
     fail("flips don't shift the thrust as an airmode mixer")
   end
 end

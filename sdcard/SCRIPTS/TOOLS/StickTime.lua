@@ -86,11 +86,11 @@ local RKEYS = { rc = 1, rm = 2, re = 3, yc = 4, ym = 5, ye = 6 }
 local QK = { "twr", "i0", "tn", "dz", "vp", "vk", "tl", "vt", "te", "ks", "kf", "ku", "er", "vd", "lr", "gg", "gl", "gw", "tm", "tr", "ty", "pw", "wl", "wv", "sq", "cq", "wls", "wvs", "pws", "vc", "ta", "ce", "se", "rf", "pf", "tlo", "thi", "kh", "tk", "tb", "rq", "am" }
 local QP = {
   -- twr i0 tn dz vp vk tl vt te ks kf ku er vd lr gg gl gw tm tr ty pw wl wv sq cq wls wvs pws vc ta ce se rf pf tlo thi kh tk tb rq am
-  "7.67 .0315 1.43 .123 87.5 -.362 .517 7.88 .566 .0152 .00819 .0287 .357 15 .229 .24 .25 .113 .006 .009 .02 .347 .326 6.01 13.2 1.42 .119 3.8 .19 .61 65.3 .655 .496 .72 26 5 12 .363 .184 .874 .334 450",  -- Racer 5": 0.49 kg, 2500KV, 5045 tri-blade
-  "6.88 .026 1.5 .075 75.6 -.278 .502 7.61 .712 .011 .00635 .0184 .357 15 .257 .26 .25 .113 .006 .008 .02 .347 .348 7 11.4 1.42 .132 4.56 .19 .539 453 .75 .317 .661 24 4 10 .263 .015 .367 .272 640",       -- Freestyle 5": HD, 0.66 kg, 2400KV, 5045
-  "5.35 .0221 1.76 0 69.6 -.786 .891 9.7 .204 .0176 .0167 .0417 .5 15 .1 .44 .15 .135 .006 .009 .02 .42 .291 7.04 14.7 1.57 .103 5.17 .23 .713 14.3 .121 .537 .577 35 3 10 .433 .032 .297 6.34 450",         -- 3" toothpick: 0.11 kg, 3S, 5000KV, 76 mm
-  "2.58 .0059 .987 .094 117 -4.79 .824 9.1 .287 .0741 .07 .0875 .286 7 0 .17 .0625 .0344 .006 .02 .02 .854 .237 5.61 8.42 1.34 .0243 2.5 .27 .919 25.6 .0789 .517 0 45 3 8 1.59 -.041 .536 11.9 250",        -- Whoop 65mm: ducted 1S, 24 g, 28000KV, 31 mm
-  "3.54 .0198 .916 .09 116 -2.78 .864 9.01 .042 .0962 .0822 .0288 .556 15 .4 .19 .08 .036 .006 .016 .02 .456 .285 5.61 8.68 1.32 .0949 3.63 .25 .952 24.6 .0829 .526 .203 40 3 8 2.38 -.031 .212 5.67 420",  -- Whoop 75mm: ducted 2S, 47 g, 12000KV, 4-blade 40 mm
+  "7.67 .0315 1.43 .123 87.5 -.362 .517 7.88 .566 .0152 .00819 .0287 .357 15 .229 .24 .25 .113 .006 .009 .02 .347 .326 6.01 13.2 1.42 .119 3.8 .19 .61 65.3 .655 .496 .72 26 5 12 .363 .184 .874 .334 430",  -- Racer 5": 0.49 kg, 2500KV, 5045 tri-blade
+  "6.88 .026 1.5 .075 75.6 -.278 .502 7.61 .712 .011 .00635 .0184 .357 15 .257 .26 .25 .113 .006 .008 .02 .347 .348 7 11.4 1.42 .132 4.56 .19 .539 453 .75 .317 .661 24 4 10 .263 .015 .367 .272 550",       -- Freestyle 5": HD, 0.66 kg, 2400KV, 5045
+  "5.35 .0221 1.76 0 69.6 -.786 .891 9.7 .204 .0176 .0167 .0417 .5 15 .1 .44 .15 .135 .006 .009 .02 .42 .291 7.04 14.7 1.57 .103 5.17 .23 .713 14.3 .121 .537 .577 35 3 10 .433 .032 .297 6.34 410",         -- 3" toothpick: 0.11 kg, 3S, 5000KV, 76 mm
+  "2.58 .0059 .987 .094 117 -4.79 .824 9.1 .287 .0741 .07 .0875 .286 7 0 .17 .0625 .0344 .006 .02 .02 .854 .237 5.61 8.42 1.34 .0243 2.5 .27 .919 25.6 .0789 .517 0 45 3 8 1.59 -.041 .536 11.9 200",        -- Whoop 65mm: ducted 1S, 24 g, 28000KV, 31 mm
+  "3.54 .0198 .916 .09 116 -2.78 .864 9.01 .042 .0962 .0822 .0288 .556 15 .4 .19 .08 .036 .006 .016 .02 .456 .285 5.61 8.68 1.32 .0949 3.63 .25 .952 24.6 .0829 .526 .203 40 3 8 2.38 -.031 .212 5.67 350",  -- Whoop 75mm: ducted 2S, 47 g, 12000KV, 4-blade 40 mm
 }
 
 -- -------------------------------------------------------------- tracks
@@ -639,6 +639,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
       wr, wp = rate(sA, P.rc, P.rm, P.re), -rate(sE, P.rc, P.rm, P.re)
     end
     local wy = rate(sR, P.yc, P.ym, P.ye)
+    local cwr, cwp = wr, wp                       -- the stick's rates, before the prop wash shake (the mixer's)
     -- stick -> thrust: idle (min_throttle), the bottom dead zone, then the class curve (rpm ~ stick, thrust ~ rpm^2)
     local tx = (sT - P.dz) / (1 - P.dz)
     if tx < 0 then tx = 0 end
@@ -699,7 +700,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     end
     if grounded and T < G * 1.02 then
       -- resting on the ground: stays level, can only yaw
-      wr, wp, P.wr, P.wp, mr, mp = 0, 0, 0, 0, 0, 0
+      wr, wp, P.wr, P.wp, mr, mp, cwr, cwp = 0, 0, 0, 0, 0, 0, 0, 0
       if uy < 0.999 then placeDrone(px, DR, pz, fx, fz) end
     end
     -- wind with gusts, weaker near the ground
@@ -716,16 +717,17 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     local TL, VT2, TE, TA, ER, VD, LR, GG, GL, GW = P.tl, P.vt * P.vt, P.te, P.ta, P.er, P.vd, P.lr, P.gg, P.gl, P.gw
     local SQ, CQ, CE, SE, RF, RQ, TB = P.sq, P.cq, P.ce, P.se, P.rf, P.rq, P.tb
     local KH = (P.kh or 0) * (S.grip == 2 and 1 or S.grip == 1 and 0.4 or 0)
-    -- flips (an airmode mixer): the motors' own rate follows the body rate no faster than they can
-    -- spin the quad up (am, more toward full throttle); while it spins up they need a differential on
-    -- top of the collective: at full throttle the collective drops (the high side can't go higher),
-    -- near hover it rises (the low side can't go below idle). Levels in motor command (thrust ~ c^2)
+    -- flips (an airmode mixer): the motors' own rate follows the stick's rate no faster than am (more
+    -- toward full throttle; both fitted to the reference's thrust while a flip starts); while it catches
+    -- up they need a differential on top of the collective: at full throttle the collective drops (the
+    -- high side can't go higher), near hover it rises (the low side can't go below idle). Levels in
+    -- motor command (thrust ~ c^2)
     local I0 = P.i0
     local ch, c0 = (1 / P.twr - I0) / (1 - I0), (T / Tmax - I0) / (1 - I0)
     ch, c0 = ch > 0 and sqrt(ch) or 0, c0 > 0 and sqrt(c0) or 0
-    local AM = P.am * (1 - ch + c0)
-    if AM < P.am * 0.3 then AM = P.am * 0.3 end
-    AM = AM * h
+    local AM = 1 - ch + c0
+    if AM < 0.3 then AM = 0.3 end
+    AM = P.am * AM * h
     local x0, x1, z0, z1 = TR.x0 - 160, TR.x1 + 160, TR.z0 - 160, TR.z1 + 160
     local bx0, bx1, by0, by1, bz0, bz1 = BX.x0, BX.x1, BX.y0, BX.y1, BX.z0, BX.z1
     -- broad phase once per frame: only objects within reach get tested per substep
@@ -769,7 +771,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
       -- on a motor) and the collective Te it leaves
       local Te = Tm
       if AM > 0 then
-        local dr, dp = pwr - mr, pwp - mp
+        local dr, dp = cwr - mr, cwp - mp
         if dr > AM then dr = AM elseif dr < -AM then dr = -AM end
         if dp > AM then dp = AM elseif dp < -AM then dp = -AM end
         mr, mp = mr + dr, mp + dp
