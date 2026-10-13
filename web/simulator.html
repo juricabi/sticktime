@@ -4566,7 +4566,11 @@ local render, hitTest, pauseHit, initUI
       drawSticks(CX - s - 2, VY + VH - m - s, s, 4)
     end
     if TOUCH then pauseButton(W / 2 - floor(11 * SC + 3), m, floor(22 * SC + 6)) end
-    if S.fps == 1 then txt(W / 2, VY + VH - m - hS - (S.sticks == 1 and floor(VH * 0.16) + 2 or 0), R.fps .. " fps" .. R.fpsX, SMLSIZE + CENTER + C.dim) end
+    -- (a row higher with the battery on: with the firmware's timings the line is wide enough to reach it)
+    if S.fps == 1 then
+      local y = VY + VH - m - hS - (S.sticks == 1 and floor(VH * 0.16) + 2 or S.batt > 0 and hS + 2 or 0)
+      txt(W / 2, y, R.fps .. " fps" .. R.fpsX, SMLSIZE + CENTER + C.dim)
+    end
   end
 
   -- portrait radios (320x480): 4:3 FPV view on top, instrument panel below
