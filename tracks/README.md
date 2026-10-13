@@ -2,7 +2,7 @@
 
 Tracks for StickTime and StickTime BW that anyone can fly:
 
-- **In the browser:** open the [emulator](https://juricabi.github.io/sticktime/) and go to **Tracks** → **Gallery**. **Fly it** flies a track straight away, and **Open** loads it into the track editor. From the editor, **Send to radio** or **Save file** puts it on your radio.
+- **In the browser:** open the [emulator](https://juricabi.github.io/sticktime/) and go to **Tracks** → **Open**: under Gallery, **Fly it** flies a track straight away and **Open** loads it into the track editor. From the editor, **Send to radio** or **Save file** puts it on your radio.
 - **On the radio:** copy a `.txt` file from this folder to `/SCRIPTS/TOOLS/StickTimeTracks/` on the SD card as `c1.txt` … `c8.txt`. These are tracks 9 to 16 in the game. Restart StickTime to see it.
 
 ## Add your track

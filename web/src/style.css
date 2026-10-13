@@ -283,8 +283,21 @@ footer.credits a { color: inherit; }
   pointer-events: none; font-variant-numeric: tabular-nums; }
 .editor .ed-hint { margin: 10px 2px 0; line-height: 1.55; }
 .ed-hint kbd { font-size: 10.5px; }
-.ed-fly { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
-.ed-fly .btn.primary { padding: 0 16px; }
+/* where the track goes: one slot number for the emulator and the radio, a row for each place */
+.ed-out { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+.ed-slotrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 12px; }
+.ed-slotrow .field { min-width: 0; }
+.ed-slotrow select { max-width: min(100%, 460px); }
+.ed-dests { display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content; gap: 8px 14px; align-items: center; }
+.ed-dest { display: contents; }
+.ed-where { font: 600 10.5px/1 var(--font-display); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.ed-has { min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
+.ed-acts { display: flex; gap: 6px; justify-content: flex-end; }
+.ed-acts .btn { height: 32px; padding: 0 12px; }
+.ed-acts .btn:first-child { min-width: 200px; justify-content: center; }
+.ed-rsync { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 12px 0 0; padding: 8px 12px; border: 1px solid var(--warn);
+  border-radius: 8px; font-size: 13px; }
+.ed-rsync .btn { height: 30px; padding: 0 12px; font-size: 12.5px; }
 .ed-size { margin-left: auto; font: 500 12px/1.3 var(--font-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
 .ed-size.bad { color: var(--bad); }
 .editor .ed-lite { margin: 12px 2px 0; }
@@ -306,6 +319,33 @@ footer.credits a { color: inherit; }
 .ed-cbtns .btn { height: 30px; padding: 0 12px; font-size: 12.5px; }
 .ed-cbtns .btn svg { margin-right: 2px; }
 .ed-cnone { color: var(--muted); }
+/* New / open: its sections; the slots as a table, the emulator's and the radio's side by side */
+.ed-lsec { margin-top: 20px; }
+.ed-lsec h4 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 0 0 10px;
+  font: 700 11.5px/1.2 var(--font-display); letter-spacing: .1em; text-transform: uppercase; }
+.ed-lsec h4 small { font: 400 13px/1.3 var(--font-body); letter-spacing: 0; text-transform: none; color: var(--muted); }
+.ed-newcards { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.ed-newcards .ed-thumb { height: 110px; }
+.ed-newcards .ed-cinfo { padding-top: 8px; }
+.ed-newcards .ed-cinfo strong { font-size: 14px; }
+.ed-newcards .ed-cbtns { padding-top: 8px; }
+.ed-stable { overflow-x: auto; }
+.ed-stable table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ed-stable th, .ed-stable td { padding: 6px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
+.ed-stable thead th { font: 600 10.5px/1.2 var(--font-display); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.ed-stable thead small { font: 500 12px var(--font-mono); letter-spacing: 0; text-transform: none; margin-left: 6px; }
+.ed-stable thead .btn { height: 28px; padding: 0 10px; margin-left: 8px; font: 500 12.5px var(--font-body); letter-spacing: 0; text-transform: none; color: var(--fg); }
+.ed-stable tbody th { font: 600 12px var(--font-mono); white-space: nowrap; }
+.ed-stable tbody th small { font-weight: 400; color: var(--muted); margin-left: 4px; }
+.ed-stable td i, .ed-none { color: var(--muted); font-style: normal; }
+.ed-stable td .bad { color: var(--bad); }
+.ed-stable .linkbtn { margin-left: 4px; }
+.ed-gallery .ed-row { margin-top: 10px; }
+.ed-title { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.ed-editing { margin: 0; font-size: 13px; color: var(--muted); }
+.ed-editing b { color: var(--fg); font-weight: 600; }
+.ed-editing .ok { color: var(--ok); }
+.ed-editing .warn { color: var(--warn); }
 .ed-in { font-size: 12.5px; color: var(--ok); }
 .ed-old { font-size: 12.5px; color: var(--warn); }
 .ed-gsync { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0 0 12px; padding: 8px 12px; border: 1px solid var(--warn);
@@ -319,7 +359,6 @@ footer.credits a { color: inherit; }
 .ed-rstate.on { color: var(--ok); }
 .ed-rstate.on::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: currentColor; }
 .ed-rnote { margin: 6px 0 0; }
-.editor .ed-rline { margin: 12px 2px 0; line-height: 1.5; }
 .linkbtn { padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 .linkbtn:hover { color: var(--fg); }
 /* the Install panel: the connection and the game on the left, the tracks on the right */
@@ -407,6 +446,11 @@ footer.credits a { color: inherit; }
   .editor { padding: 12px; }
   .ed-map { height: 56vh; min-height: 300px; }
   .ed-size { margin-left: 0; flex-basis: 100%; }
+  .ed-slotrow .field { flex: 1 1 100%; }
+  .ed-slotrow select { flex: 1; min-width: 0; max-width: none; }
+  .ed-dests { grid-template-columns: max-content minmax(0, 1fr); }
+  .ed-acts { grid-column: 1 / -1; justify-content: flex-start; margin-bottom: 4px; }
+  .ed-acts .btn:first-child { min-width: 0; flex: 1; }
   .ed-actions { width: 100%; }
   .ed-actions .field { flex: 1 1 100%; }
   .ed-actions .field select { flex: 1; max-width: none; }

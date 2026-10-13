@@ -110,11 +110,22 @@ def editor(page):
 
 
 def open_file(page, path):
-    """Open file, and wait for the editor to say what it made of it (FileReader is asynchronous)"""
-    page.evaluate("document.getElementById('edStatus').textContent = ''")
+    """Open a file (Open), and wait for the editor to say what it made of it (FileReader is
+    asynchronous): on the map's line, or Open's when it stays open (the track kept)"""
+    page.evaluate("for (const i of ['edStatus', 'edGalStatus']) document.getElementById(i).textContent = ''")
     page.set_input_files("#edOpen", str(path))
-    page.wait_for_function(f"document.getElementById('edStatus').textContent.includes({path.name!r})", timeout=5000)
-    return page.inner_text("#edStatus")
+    said = f"['edStatus', 'edGalStatus'].map((i) => document.getElementById(i).textContent).find((t) => t.includes({path.name!r})) || ''"
+    page.wait_for_function(said, timeout=5000)
+    return page.evaluate(said)
+
+
+def start_from(page, name):
+    """Open: a copy of a built-in track (Tracks and Open opened when they aren't)"""
+    if page.is_hidden("#editor"):
+        page.click("#tracksBtn")
+    if page.is_hidden("#edGallery"):
+        page.click("#edGalBtn")
+    page.click(f"#edNewCards button[aria-label='Open a copy of {name}']")
 
 
 def offline(ctx, cdn=False):
@@ -244,8 +255,8 @@ def radio_tests(br, errors):
     page.click("#tracksBtn")
     check(page.is_hidden("#radioPanel") and page.get_attribute("#radioBtn", "aria-expanded") == "false"
           and page.get_attribute("#tracksBtn", "aria-expanded") == "true" and page.inner_text("#edSend") == "Send to radio"
-          and page.inner_text("#edRadioLineText") == "Radio SD: RADIO-SD connected.", "radio: Tracks closes Install, and shares the connection")
-    page.select_option("#edTemplate", label="Grand Prix")
+          and page.inner_text("#edRadioLineText") == "c1: empty · RADIO-SD", "radio: Tracks closes Install, and shares the connection: the Radio row says what its c1 holds")
+    start_from(page, "Grand Prix")
     page.select_option("#edSlot", "1")
     with page.expect_download() as d:
         page.click("#edSave")
@@ -259,7 +270,9 @@ def radio_tests(br, errors):
     shot_clip(page, OUT / "editor_connected.png")
 
     # another track for slot 1: asked first, with the names
-    page.select_option("#edTemplate", label="Bando")
+    start_from(page, "Bando")
+    check(page.input_value("#edSlot") == "2", "radio: a new track goes to an empty slot (c2)")
+    page.select_option("#edSlot", "1")
     asked = []
     page.once("dialog", lambda dl: (asked.append(dl.message), dl.dismiss()))
     page.click("#edSend")
@@ -271,12 +284,12 @@ def radio_tests(br, errors):
     radio_done(page)
     bando = page.evaluate("sim.editor.file()")
     check(page.evaluate(CARD_FILE, TRACKS + "1.txt") == bando, "radio: Yes replaces it")
-    page.select_option("#edTemplate", label="Meadow")
+    start_from(page, "Meadow")
     meadow = page.evaluate("sim.editor.file()")
 
-    # the radio's tracks (the editor's link to the panel), one opened in the editor (CR LF on the card)
+    # the radio's tracks (the Install panel), one opened in the editor (CR LF on the card)
     page.evaluate(CARD_WRITE, [TRACKS + "3.txt", saved.replace("\n", "\r\n")])
-    page.click("#edRadioLink")
+    page.click("#radioBtn")
     radio_done(page)
     rows = page.inner_text("#edRadioSlots")
     check(page.is_hidden("#editor") and "c1 · track 9 · My Bando" in rows and "c3 · track 11 · My Grand Prix" in rows and rows.count("empty") == 6,
@@ -326,7 +339,7 @@ def radio_tests(br, errors):
     # (another track each time: the radio has the first one in c2 already, and Send to radio makes no second copy)
     for path, slot, track in (("RADIO-SD/SCRIPTS/TOOLS", "2", "Slalom"), ("RADIO-SD/SCRIPTS/TOOLS/StickTimeTracks", "4", "Hoop Forest")):
         editor(page)
-        page.select_option("#edTemplate", label=track)
+        start_from(page, track)
         page.evaluate(PICK, path)
         radio_panel(page)
         if page.is_visible("#edForget"):
@@ -369,7 +382,7 @@ def radio_tests(br, errors):
           f"radio: ... and the game from the release zip: {note!r}")
     editor(page)
     check(page.is_hidden("#edSend") and page.is_hidden("#edRadioLine"), "radio: ... the editor without Send to radio")
-    page.select_option("#edTemplate", label="Grand Prix")
+    start_from(page, "Grand Prix")
     page.click("#edFly")
     check(page.evaluate("sim.test('info')")[10] == "My Grand Prix", "radio: ... and Fly it still works")
     # artifact.html in another site's frame
@@ -645,8 +658,8 @@ def panel_tests(br, errors):
     page.click("#tracksBtn")
     check(page.is_visible("#editor") and page.is_hidden("#radioPanel") and expanded() == ("true", "false")
           and page.text_content("#edTitle").startswith("Track editor"), "panels: Tracks opens the editor and closes Install")
-    page.click("#edRadioLink")
-    check(page.is_visible("#radioPanel") and page.is_hidden("#editor"), "panels: the editor's link line opens Install")
+    page.click("#radioBtn")
+    check(page.is_visible("#radioPanel") and page.is_hidden("#editor"), "panels: Install again: Install opens, the editor closes")
     page.evaluate("sim.engine.__mark = 1")
     page.focus("#rpClose")
     page.keyboard.press("r")
@@ -722,14 +735,15 @@ def slot_tests(br, errors, tmp):
     wait_sim(page)
     dlg = Dialogs(page)
     page.click("#tracksBtn")
-    page.select_option("#edTemplate", label="Grand Prix")
+    start_from(page, "Grand Prix")
     page.select_option("#edSlot", "1")
     page.click("#edFly")
     gp = emu(page, 1)
     check(not dlg.take() and gp and gp.startswith("My Grand Prix\n"), "slots: an empty slot: Fly it without a question")
     page.click("#tracksBtn")
-    page.select_option("#edTemplate", label="Bando")
-    check(not dlg.take(), "slots: Start from over a track that is in a slot: no question")
+    start_from(page, "Bando")
+    check(not dlg.take() and page.input_value("#edSlot") == "2", "slots: a new track over a track that is in a slot: no question, an empty slot (c2)")
+    page.select_option("#edSlot", "1")
     page.click("#edFly")
     q = dlg.take()
     check(len(q) == 1 and '"My Grand Prix"' in q[0] and '"My Bando"' in q[0] and emu(page, 1) == gp and page.is_visible("#editor")
@@ -747,7 +761,7 @@ def slot_tests(br, errors, tmp):
     dlg.answer = False
     page.click("#edEmpty")
     q = dlg.take()
-    check(len(q) == 1 and "Empty slot c1" in q[0] and '"My Bando"' in q[0] and emu(page, 1) == bando, f"slots: Empty slot asks first: {q}")
+    check(len(q) == 1 and "Remove c1 from the emulator" in q[0] and '"My Bando"' in q[0] and emu(page, 1) == bando, f"slots: Remove (the emulator's) asks first: {q}")
     dlg.answer = True
     page.click("#edEmpty")
     check(len(dlg.take()) == 1 and emu(page, 1) is None and "c1 · track 9 · empty" in page.inner_text("#edSlot"), "slots: ... Yes empties it")
@@ -756,10 +770,10 @@ def slot_tests(br, errors, tmp):
     click_map(page, 0, 0)                                      # gate 1
     page.keyboard.press("r")
     dlg.answer = False
-    page.select_option("#edTemplate", label="Meadow")
+    start_from(page, "Meadow")
     q = dlg.take()
     check(len(q) == 1 and '"My Bando"' in q[0] and page.evaluate("sim.editor.track()")["name"] == "My Bando"
-          and page.text_content("#edStatus") == "Kept your track.", f"slots: Start from over unsaved work asks; No keeps it: {q}")
+          and page.text_content("#edGalStatus") == "Kept your track.", f"slots: New track over unsaved work asks; No keeps it: {q}")
     f = tmp / "c5.txt"
     f.write_text(gp, encoding="ascii", newline="")
     status = open_file(page, f)
@@ -903,7 +917,7 @@ def main():
         # ---- the Grand Prix as a custom track
         page.click("#tracksBtn")
         check(page.is_visible("#editor") and page.get_attribute("#tracksBtn", "aria-expanded") == "true", "Tracks opens the editor")
-        page.select_option("#edTemplate", label="Grand Prix")
+        start_from(page, "Grand Prix")
         gp = page.evaluate("sim.editor.track()")
         check(page.input_value("#edName") == "My Grand Prix" and len(gp["gates"]) == NGP, f"the Grand Prix template: {NGP} gates")
         check(page.evaluate("sim.editor.problems()") == [] and page.is_enabled("#edFly") and page.is_enabled("#edSave"),
@@ -942,7 +956,7 @@ def main():
         # ---- Open file: CR LF, and a broken file
         crlf = tmp / "c3.txt"
         crlf.write_bytes(text.replace("\n", "\r\n").encode())
-        page.select_option("#edTemplate", label="Meadow")
+        start_from(page, "Meadow")
         status = open_file(page, crlf)
         t = page.evaluate("sim.editor.track()")
         check(t["name"] == "My Grand Prix" and len(t["gates"]) == NGP, f"a CR LF file opens: {status!r}")
@@ -955,7 +969,7 @@ def main():
         check(page.evaluate("sim.editor.track()")["name"] == "My Grand Prix", "and the track stays as it was")
 
         # ---- the checks
-        page.select_option("#edTemplate", label="Bando")
+        start_from(page, "Bando")
         check(page.evaluate("sim.editor.problems()") == [], "the Bando passes the checks (16 structures, walls touching)")
         check(page.is_disabled("#edAddBox") and page.is_disabled("#edAddWall"), "no more structures than 16")
         click_map(page, -36, 50)                                 # structure 16, onto the blue container
@@ -1010,7 +1024,7 @@ def main():
         page.click("#tracksBtn")
         asked = []
         page.once("dialog", lambda dl: (asked.append(dl.message), dl.accept()))
-        page.select_option("#edTemplate", label="Meadow")
+        start_from(page, "Meadow")
         check(len(asked) == 1 and asked[0].startswith('Replace "My Bando') and "isn't in a slot" in asked[0],
               f"Start from over the turned Bando asks first: {asked}")
         page.click("#edAddWall")
@@ -1032,7 +1046,7 @@ def main():
         page.evaluate("sim.script('lite')")
         page.click("#tracksBtn")
         check(page.is_visible("#edLite") and "Lite" in page.inner_text("#edLite"), "the editor says the Lite doesn't read them")
-        page.select_option("#edTemplate", label="Bando")
+        start_from(page, "Bando")
         page.select_option("#edSlot", "2")
         page.click("#edFly")
         info = page.evaluate("sim.test('info')")
@@ -1042,7 +1056,7 @@ def main():
         # ---- StickTime BW (a B&W radio): the same files
         page.evaluate("sim.radio('tx12')")
         page.click("#tracksBtn")
-        page.select_option("#edTemplate", label="Hoop Forest")
+        start_from(page, "Hoop Forest")
         page.select_option("#edSlot", "4")
         page.click("#edFly")
         info = page.evaluate("sim.test('info')")
@@ -1052,7 +1066,7 @@ def main():
 
         # ---- screenshots: desktop (light and dark), phone width
         page.click("#tracksBtn")
-        page.select_option("#edTemplate", label="Bando")
+        start_from(page, "Bando")
         click_map(page, 0, 34)                                   # a wall of the Bando: its group
         check(len(page.evaluate("sim.editor.selected()")) == 4, "a click on a gap in a wall selects the wall (4 items)")
         page.mouse.move(0, 0)
@@ -1070,7 +1084,7 @@ def main():
         page.goto(SIM)
         wait_sim(page)
         page.tap("#tracksBtn")
-        page.select_option("#edTemplate", label="Grand Prix")
+        start_from(page, "Grand Prix")
         check(page.evaluate("document.documentElement.scrollWidth <= innerWidth"), "phone width: nothing sticks out sideways")
         px, py = page.evaluate("([x, z]) => sim.editor.at(x, z)", GP["gates"][2][:2])   # gate 3
         page.touchscreen.tap(px, py)
@@ -1086,7 +1100,7 @@ def main():
         page.goto(ART)
         wait_sim(page)
         page.click("#tracksBtn")
-        page.select_option("#edTemplate", label="Pro Track")
+        start_from(page, "Pro Track")
         page.select_option("#edSlot", "8")
         page.click("#edFly")
         info = page.evaluate("sim.test('info')")

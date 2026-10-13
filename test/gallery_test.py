@@ -152,7 +152,7 @@ def tracks_tests(br, errors, tracks):
         held[slot] = i
     check(all("from the gallery" not in a for a in asked), "site: opening a gallery track over another gallery track asks nothing")
     open_gallery(page)
-    ok = all(card_line(page, i, "ed-in") == f"In c{n} here" for n, i in held.items())
+    ok = all(card_line(page, i, "ed-in") == f"In c{n} in the emulator" for n, i in held.items())
     check(ok and all(card_line(page, i, "ed-in") == "" for i in range(len(tracks)) if i not in held.values()),
           "site: each card says which slot has its track")
     n = len(asked)
@@ -167,14 +167,14 @@ def tracks_tests(br, errors, tracks):
     page.evaluate("sim.boot()")                                    # the game in its menu
     open_gallery(page)
     check(page.is_visible("#edGalSync") and "older version of \"" + tracks[3]["name"] + "\"" in page.inner_text("#edGalSync")
-          and card_line(page, 3, "ed-old") == "An older version in c4 here" and page.is_visible("[data-gsync='3']"),
+          and card_line(page, 3, "ed-old") == "An older version in c4 in the emulator" and page.is_visible("[data-gsync='3']"),
           f"site: an older version in c4 is shown: {page.inner_text('#edGalSync')!r}")
     n = len(asked)
     page.click("[data-gsync='3']")
-    check(len(asked) == n + 1 and tracks[3]["name"] in asked[-1] and "c4 here" in asked[-1] and "start over" in asked[-1],
+    check(len(asked) == n + 1 and tracks[3]["name"] in asked[-1] and "c4 in the emulator" in asked[-1] and "start over" in asked[-1],
           f"site: Update asks first: {asked[n:]}")
-    check(slot_text(page, 4) == tracks[3]["text"] and page.is_hidden("#edGalSync") and card_line(page, 3, "ed-in") == "In c4 here"
-          and page.inner_text("#edGalStatus") == "Updated c4 here.",
+    check(slot_text(page, 4) == tracks[3]["text"] and page.is_hidden("#edGalSync") and card_line(page, 3, "ed-in") == "In c4 in the emulator"
+          and page.inner_text("#edGalStatus") == "Updated c4 in the emulator.",
           f"site: Update puts the gallery's version in c4, the game started again: {page.inner_text('#edGalStatus')!r}")
     ctx.close()
 
@@ -222,13 +222,60 @@ def radio_tests(br, errors, tracks):
     check(page.evaluate(CARD_FILE, "RADIO/" + T + "5.txt") == tracks[0]["text"] and "c5 on the radio" in asked[-1]
           and page.inner_text("#edGalStatus").startswith("Updated c5 on the radio") and card_line(page, 0, "ed-in") == "In c5 on the radio",
           f"radio: Update writes the gallery's version to c5 on the card: {page.inner_text('#edGalStatus')!r}")
-    # Send to radio of a track the radio has in another slot: no second copy
+    # the slot list has the radio's slots beside the emulator's
+    opts = page.eval_on_selector_all("#edSlot option", "els => els.map(e => e.textContent)")
+    check(opts[5] == f"c6 · track 14 · {tracks[1]['name']} (radio only)" and opts[4] == f"c5 · track 13 · {tracks[0]['name']} (radio only)"
+          and opts[6] == "c7 · track 15 · empty", f"radio: the slot list shows the radio's slots too: {opts[4:7]}")
+    # a track the radio has: opened on its slot
     page.click("[data-gopen='1']")
-    slot = int(page.input_value("#edSlot"))
+    check(int(page.input_value("#edSlot")) == 6 and "it is in c6 (track 14) on the radio." in page.inner_text("#edStatus"),
+          f"radio: a gallery track the radio has in c6 opens on c6: {page.inner_text('#edStatus')!r}")
+    page.click("#edFly")
+    page.click("#tracksBtn")
+    opts = page.eval_on_selector_all("#edSlot option", "els => els.map(e => e.textContent)")
+    check(opts[5] == f"c6 · track 14 · {tracks[1]['name']} (emulator and radio)" and page.inner_text("#edEmuHas") == "c6: this track"
+          and page.inner_text("#edRadioLineText") == "c6: this track · RADIO", f"radio: flown in c6 here too: {opts[5]!r}")
+    # the slots that differ, and a copy from the radio from the editor
+    check(page.is_visible("#edSyncLine") and page.inner_text("#edSyncText") == "The emulator's slots and the radio's differ: c5."
+          and page.is_visible("#edSyncFrom") and page.is_hidden("#edSyncTo"), f"radio: the editor says where the slots differ: {page.inner_text('#edSyncText')!r}")
+    page.click("#edSyncFrom")
+    page.wait_for_function("!sim.editor.radio().busy", timeout=10000)
+    check(slot_text(page, 5) == tracks[0]["text"] and page.is_hidden("#edSyncLine") and page.inner_text("#edStatus").startswith("Copied c5 from the radio"),
+          f"radio: Copy the radio's here: c5 copied, nothing differs ({page.inner_text('#edStatus')!r})")
+    # Send to radio of a track the radio has in another slot: no second copy
+    page.select_option("#edSlot", "2")
     page.click("#edSend")
     page.wait_for_function("!sim.editor.radio().busy", timeout=10000)
-    check(slot != 6 and page.evaluate(CARD_FILE, f"RADIO/{T}{slot}.txt") is None and page.inner_text("#edStatus").startswith("The radio has this track already, in c6"),
-          f"radio: Send to radio of a track the radio has in c6: nothing sent to c{slot} ({page.inner_text('#edStatus')!r})")
+    check(page.evaluate(CARD_FILE, f"RADIO/{T}2.txt") is None and page.inner_text("#edStatus").startswith("The radio has this track already, in c6"),
+          f"radio: Send to radio to c2 of a track the radio has in c6: nothing sent ({page.inner_text('#edStatus')!r})")
+    # the slot list picks where the track goes and never changes it; Open beside a slot's track opens it
+    before = page.evaluate("sim.editor.file()")
+    page.select_option("#edSlot", "5")
+    check(page.evaluate("sim.editor.file()") == before and page.inner_text("#edEmuHas") == f'c5: "{tracks[0]["name"]}"'
+          and page.inner_text("#edRadioLineText") == f'c5: "{tracks[0]["name"]}" · RADIO' and page.is_visible("#edEmuOpen") and page.is_visible("#edRadioOpen"),
+          f"radio: picking c5 keeps the track; the rows say what c5 holds, with Open ({page.inner_text('#edEmuHas')!r})")
+    page.click("#edRadioOpen")
+    check(page.evaluate("sim.editor.file()") == tracks[0]["text"] and int(page.input_value("#edSlot")) == 5 and page.inner_text("#edEmuHas") == "c5: this track"
+          and page.is_hidden("#edEmuOpen") and page.is_hidden("#edRadioOpen"), "radio: Open (the radio's c5) puts its track in the editor")
+    page.select_option("#edSlot", "2")
+    # a file opened that the radio has: on its slot
+    page.click("#edGalBtn")
+    page.click("button[aria-label='Open a copy of Meadow']")
+    with tempfile.TemporaryDirectory() as tmp:
+        f = pathlib.Path(tmp) / "some-name.txt"
+        f.write_text(old.replace("\n", "\r\n"), newline="")
+        page.evaluate("document.getElementById('edStatus').textContent = ''")
+        page.set_input_files("#edOpen", str(f))
+        page.wait_for_function("document.getElementById('edStatus').textContent.includes('some-name.txt')", timeout=5000)
+    # (c5 on the radio has the gallery's version by now: this older one is in no slot)
+    check(int(page.input_value("#edSlot")) == 2, f"radio: a file in no slot stays on the slot picked (c{page.input_value('#edSlot')})")
+    with tempfile.TemporaryDirectory() as tmp:
+        f = pathlib.Path(tmp) / "some-name.txt"
+        f.write_text(tracks[0]["text"], newline="")
+        page.evaluate("document.getElementById('edStatus').textContent = ''")
+        page.set_input_files("#edOpen", str(f))
+        page.wait_for_function("document.getElementById('edStatus').textContent.includes('some-name.txt')", timeout=5000)
+    check(int(page.input_value("#edSlot")) == 5, f"radio: a file the radio has in c5 opens on c5 (c{page.input_value('#edSlot')})")
     open_gallery(page)
     page.click("[data-gopen='2']")
     slot = int(page.input_value("#edSlot"))
@@ -273,11 +320,19 @@ def page_tests(br, errors, tracks):
     check(page.evaluate("sim.editor.file()") == before, "page: the map's keys do nothing with the gallery shown")
     page.keyboard.press("Escape")
     check(page.is_hidden("#edGallery") and page.is_visible("#edMap") and page.is_visible("#editor"), "page: Escape goes back to the map")
-    opts = page.eval_on_selector_all("#edTemplate optgroup[label='Gallery'] option", "els => els.map(e => e.textContent)")
-    check(opts == bundled, "page: Start from lists the gallery's tracks too")
-    page.select_option("#edTemplate", label=bundled[1])
+    # Open: new tracks (Blank and the built-in ones), your slots, the gallery, in one place
+    page.click("#edGalBtn")
+    new = page.eval_on_selector_all("#edNewCards button", "els => els.map(e => e.getAttribute('aria-label'))")
+    rows = page.eval_on_selector_all("#edSlotList tbody tr", "els => els.map(e => e.textContent)")
+    check(new[0] == "Open a blank track" and new[1:] == ["Open a copy of " + t for t in ("Meadow", "Figure 8", "Dive Tower", "Slalom", "Hoop Forest", "Grand Prix", "Bando", "Pro Track")]
+          and len(rows) == 8 and rows[0].startswith("c1 track 9"), f"page: Open has the new tracks and the 8 slots: {new[:2]}, {rows[:1]}")
+    page.click("button[aria-label='Open a copy of Slalom']")
+    check(page.is_hidden("#edGallery") and page.input_value("#edName") == "My Slalom" and page.inner_text("#edEditing") == "Editing a local copy of My Slalom: in no slot yet",
+          f"page: Start from Slalom: a copy in the editor, in no slot yet ({page.inner_text('#edEditing')!r})")
+    page.click("#edGalBtn")
+    page.click("[data-gopen='1']")
     check(page.evaluate("sim.editor.file()") == built[1]["text"] and page.input_value("#edName") == bundled[1],
-          "page: Start from a gallery track: opened as it is (not a copy)")
+          "page: a gallery track: opened as it is (not a copy)")
     page.click("#edGalBtn")
     OUT.mkdir(parents=True, exist_ok=True)
     page.evaluate("document.querySelector('header.top').style.position = 'static'")
@@ -285,7 +340,8 @@ def page_tests(br, errors, tracks):
     print("wrote test/shots/gallery_desktop.png")
     # a track of your own isn't lost to a gallery track without a question
     page.click("#edGalBtn")
-    page.select_option("#edTemplate", label="Meadow")
+    page.click("#edGalBtn")
+    page.click("button[aria-label='Open a copy of Meadow']")
     page.locator("#edName").fill("Mine")
     page.locator("#edName").press("Tab")
     page.click("#edGalBtn")

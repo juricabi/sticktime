@@ -51,20 +51,32 @@
 
 <section class="card editor" id="editor" hidden aria-labelledby="edTitle" tabindex="-1">
   <div class="ed-head">
-    <h2 id="edTitle">Track editor <small>your tracks are 9 to 16 in the game</small></h2>
+    <div class="ed-title"><h2 id="edTitle">Track editor</h2><p class="ed-editing" id="edEditing" aria-live="polite"></p></div>
     <div class="ed-actions">
-      <button class="btn" id="edGalBtn" type="button" aria-expanded="false" aria-controls="edGallery" title="Tracks others made: fly one, open it or put it on your radio"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>Gallery</button>
-      <label class="field"><span>Start from</span><select id="edTemplate" aria-label="Start from a built-in track or a blank one"></select></label>
-      <label class="btn file-btn" title="Open a track file (c1.txt to c8.txt)">Open file<input type="file" id="edOpen" accept=".txt,text/plain"></label>
+      <button class="btn" id="edGalBtn" type="button" aria-expanded="false" aria-controls="edGallery" title="Open a track: a new one, one of yours, one from the gallery or a file"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>Open</button>
       <button class="btn" id="edClose" type="button" title="Close the editor (your work is kept)">Close</button>
     </div>
   </div>
   <section class="ed-gallery" id="edGallery" hidden aria-labelledby="edGalH">
-    <h3 id="edGalH">Gallery <small>tracks to fly, open in the editor or send to your radio</small></h3>
-    <p class="ed-gsync" id="edGalSync" hidden><span id="edGalSyncText"></span> <button class="btn" id="edGalSyncAll" type="button">Update them</button></p>
+    <h3 id="edGalH">Open <small>a new track, one of yours, or one from the gallery: the editor works on a copy of it</small></h3>
     <p class="ed-status" id="edGalStatus" role="status" aria-live="polite"></p>
-    <ul class="ed-cards" id="edCards"></ul>
-    <p class="note ed-galnote">Made a track others should fly? Add it to the gallery with a pull request: <a href="https://github.com/juricabi/sticktime/tree/main/tracks#readme" target="_blank" rel="noopener">tracks/ on GitHub</a> says how.</p>
+    <section class="ed-lsec" aria-labelledby="edNewH">
+      <h4 id="edNewH">New track <small>a blank one, or a copy of a built-in track to change</small></h4>
+      <ul class="ed-cards ed-newcards" id="edNewCards"></ul>
+    </section>
+    <section class="ed-lsec" aria-labelledby="edMineH">
+      <h4 id="edMineH">Your tracks <small>what the game plays: slots c1 to c8 are tracks 9 to 16, in the emulator and on the radio</small></h4>
+      <div class="ed-stable" id="edSlotList"></div>
+      <div class="ed-row">
+        <label class="btn file-btn" title="Open a track file (c1.txt to c8.txt)">Open a file…<input type="file" id="edOpen" accept=".txt,text/plain"></label>
+      </div>
+    </section>
+    <section class="ed-lsec" aria-labelledby="edGalleryH">
+      <h4 id="edGalleryH">Gallery <small>tracks others made: fly one, or open it to change it or send it to your radio</small></h4>
+      <p class="ed-gsync" id="edGalSync" hidden><span id="edGalSyncText"></span> <button class="btn" id="edGalSyncAll" type="button">Update them</button></p>
+      <ul class="ed-cards" id="edCards"></ul>
+      <p class="note ed-galnote">Made a track others should fly? Add it to the gallery with a pull request: <a href="https://github.com/juricabi/sticktime/tree/main/tracks#readme" target="_blank" rel="noopener">tracks/ on GitHub</a> says how.</p>
+    </section>
   </section>
   <div class="ed-grid" id="edGrid">
     <div class="ed-main">
@@ -92,15 +104,38 @@
         <div class="ed-readout" id="edReadout" aria-hidden="true"></div>
       </div>
       <p class="note ed-hint" id="edHint">Drag a gate or a structure to move it (it snaps to half metres; hold Alt to place it freely), the round handle to turn a gate, the square handles to size a structure. Drag the ground to pan; wheel or pinch to zoom. On the map: <kbd>R</kbd> turns, <kbd>Del</kbd> deletes, the arrows nudge, <kbd>Shift</kbd>+click selects more, <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes.</p>
-      <div class="ed-fly">
-        <label class="field"><span>Slot</span><select id="edSlot" aria-label="Slot on the SD card"></select></label>
-        <button class="btn primary" id="edFly" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 4.5v15l12-7.5z" fill="currentColor"/></svg>Fly it</button>
-        <button class="btn" id="edSave" type="button">Save file</button>
-        <button class="btn" id="edSend" type="button" hidden>Send to radio</button>
-        <button class="btn" id="edEmpty" type="button" title="Take this slot's track off the emulator's SD card">Empty slot</button>
-        <span class="ed-size" id="edSize"></span>
+      <div class="ed-out">
+        <div class="ed-slotrow">
+          <label class="field"><span>To slot</span><select id="edSlot" aria-label="To slot: where the Send buttons and Save file put the track (c1 to c8 are tracks 9 to 16 in the game)"></select></label>
+          <span class="ed-size" id="edSize"></span>
+        </div>
+        <div class="ed-dests" role="group" aria-label="Where the track goes">
+          <div class="ed-dest">
+            <span class="ed-where">Emulator</span>
+            <span class="ed-has"><span id="edEmuHas"></span> <button class="linkbtn" id="edEmuOpen" type="button" hidden>Open</button></span>
+            <span class="ed-acts">
+              <button class="btn" id="edFly" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 4.5v15l12-7.5z" fill="currentColor"/></svg><span>Send to emulator &amp; fly</span></button>
+              <button class="btn" id="edEmpty" type="button">Remove</button>
+            </span>
+          </div>
+          <div class="ed-dest" id="edRadioLine" hidden>
+            <span class="ed-where">Radio</span>
+            <span class="ed-has"><span id="edRadioLineText"></span> <button class="linkbtn" id="edRadioOpen" type="button" hidden>Open</button></span>
+            <span class="ed-acts">
+              <button class="btn" id="edSend" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 2.5h8.5A1.5 1.5 0 0 1 19 4v16a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 20V6.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 8.5v8M8.8 13.5l3.2 3.2 3.2-3.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="edSendText">Send to radio</span></button>
+              <button class="btn" id="edRadioDel" type="button" hidden>Remove</button>
+            </span>
+          </div>
+          <div class="ed-dest">
+            <span class="ed-where">File</span>
+            <span class="ed-has" id="edFileHas"></span>
+            <span class="ed-acts"><button class="btn" id="edSave" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 3.5v11M7.5 10.5l4.5 4.5 4.5-4.5M5 19.5h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Save file</span></button></span>
+          </div>
+        </div>
+        <p class="ed-rsync" id="edSyncLine" hidden><span id="edSyncText"></span>
+          <button class="btn" id="edSyncFrom" type="button">Copy radio → emulator</button>
+          <button class="btn" id="edSyncTo" type="button">Copy emulator → radio</button></p>
       </div>
-      <p class="note ed-rline" id="edRadioLine" hidden><span id="edRadioLineText"></span> <button class="linkbtn" id="edRadioLink" type="button">Your tracks on the radio, install StickTime: Install</button></p>
       <p class="note warn ed-lite" id="edLite" hidden></p>
       <p class="ed-status" id="edStatus" role="status" aria-live="polite"></p>
     </div>
@@ -129,7 +164,7 @@
       <details class="ed-sec ed-howto">
         <summary>How to use on the radio</summary>
         <ol>
-          <li><strong>Save file</strong> downloads the track as <code>c1.txt</code> (the slot's number).</li>
+          <li>Each slot, <code>c1</code> to <code>c8</code>, is the same track number on the emulator and on the radio. <strong>Send to emulator &amp; fly</strong> puts the track in the emulator's slot and flies it here; <strong>Send to radio</strong> puts it in the radio's; <strong>Save file</strong> downloads it as <code>c1.txt</code> (the slot's number).</li>
           <li>Copy the file to <code>/SCRIPTS/TOOLS/StickTimeTracks/</code> on the radio's SD card (the folder is in the release zip; make it if it's missing). In Chrome or Edge on a computer, <strong>Send to radio</strong> does it for you: the radio plugged in by USB, in USB Storage mode. On the hosted site, <strong>Install</strong> (next to Tracks) also installs or updates the game. Eject the drive before you unplug the radio, and restart StickTime on it to see a new track.</li>
           <li>Up to 8 tracks, <code>c1.txt</code> to <code>c8.txt</code>: they come after the 8 built-in ones in the track menu, by name (tracks 9 to 16).</li>
           <li>StickTime and StickTime BW read them; StickTime Lite doesn't.</li>
@@ -181,8 +216,8 @@
         <p class="ed-rpath" id="edRadioPath"></p>
         <ul class="ed-rslots" id="edRadioSlots"></ul>
         <div class="ed-row">
-          <button class="btn" id="edRadioToEmu" type="button" title="The radio's tracks into the same slots of the emulator">Copy the radio's tracks here</button>
-          <button class="btn" id="edEmuToRadio" type="button" title="The emulator's tracks into the same slots of the radio">Send all of mine to the radio</button>
+          <button class="btn" id="edRadioToEmu" type="button" title="The radio's tracks into the same slots of the emulator">Copy radio → emulator</button>
+          <button class="btn" id="edEmuToRadio" type="button" title="The emulator's tracks into the same slots of the radio">Copy emulator → radio</button>
         </div>
       </div>
     </section>
