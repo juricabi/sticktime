@@ -53,8 +53,12 @@ The body rate itself stays as it was (full-stick snaps are as quick), only the t
 is fitted to the per-prop model's thrust over the first 80 ms of a half and a full-stick roll held
 still at hover, 70% and full throttle (within 0.08-0.11 m/s; 0.27-0.51 without the mixer). A
 full-stick 360 flip then ends within 0.1-0.6 m of the model's height (0.4-1.0 m without): at hover
-throttle it matches, at full throttle StickTime keeps about half of the difference, the rest coming
-from each prop's own inflow while the quad turns, which one body can't have.
+throttle it matches; at full throttle about half of the difference is left. Most of that comes from
+the model's PID loop: its roll rate overshoots by about 30% for the first 50 ms and swings back when
+the stick centres, so the quad is a few degrees further round all through the flip (with that rate
+profile StickTime's thrust lands within 0.1-0.2 m on every class but the racer); the racer's last
+0.5 m comes from how its props' own inflow catches up during the turn. Each prop's own airflow from
+the rotation itself changes a flip by under 0.05 m.
 
 Prop wash (setting): in the per-prop model it is a thrust loss, not a shake: all four props sink
 into the same downwash, so the quad mushes and sinks faster (a 5" at the same throttle sinks at
