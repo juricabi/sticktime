@@ -40,12 +40,17 @@ Download `StickTime-<version>-sdcard.zip` from the [latest release](https://gith
 
 | What each edition has | Color | BW | Lite |
 |---|---|---|---|
-| Flight model, quads, prop wash, Grip, wind, the 8 tracks | yes | yes | yes |
+| Flight model, the five quads, prop wash, Grip, wind | yes | yes | yes |
+| The eight tracks (1.7.0 layouts) | yes | yes | yes |
 | Practice, Freestyle, Gate Rush | yes | yes | yes |
-| Race against AI pilots, custom rates | yes | yes | no |
-| Hits without respawn, turtle mode, Respawn | yes | yes | no (a hit is a crash) |
-| Medals, battery, your own tracks | yes | yes | no |
-| Ghost, minimap, stick view, touch | yes | no | no |
+| Race against AI pilots | yes | yes | no (Time trial instead) |
+| Custom rates | yes | yes | no (Soft, Normal, Fast) |
+| Hits without respawn, prop strikes, turtle mode, Respawn | yes | yes | no (a hit is a crash) |
+| Medals | yes (menu, Practice OSD, results) | yes (Practice OSD, results; menu only on 212×64) | no |
+| Battery | yes (battery icon and cell voltage; flight time, mAh and pack voltage when paused) | yes (cell voltage and gauge, LAND below 3.3 V; flight time and mAh when paused) | no |
+| Your own tracks 9-16 | yes | yes | no |
+| Ghost | yes | no (not enough memory on B&W radios) | no |
+| Minimap, stick view, touch | yes | no | no |
 
 | Files in `/SCRIPTS/TOOLS/` | |
 |---|---|
