@@ -480,7 +480,7 @@ local lapStart, lap, nextGate, lastGate = nil, 0, 1, 0
 local R = { laps = {}, n = 0, total = 0, newLap = false, newRace = false, newBest = false, msg = nil, msgT = 0, good = true,
             ready = 0, crashes = 0, cd = -1, fps = 0, fpsN = 0, fpsT = 0, fpsX = "", runS = 0, showS = 0,
             pk = 0, pos = 1, sc = 0, ch = 0, chn = 0, cht = 0, prox = 9, rn = 0, rt = 0, smp = 0,
-            fi = 5, pt = 0 }                                  -- frame interval, sim time (10 ms ticks)
+            fi = 5, pt = 0, st = 0 }          -- frame interval, sim time (10 ms ticks), prop strike left (s)
 
 local function timeStr(cs)
   cs = floor(cs)
@@ -552,6 +552,8 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
   -- thrust loss
   local wob1, wob2, wob3, wq1, wq2, wq3, sW, sH, sV, wl = 0, 0, 0, 0, 0, 0, 0, 0, 1, 0
   local mr, mp = 0, 0                            -- the motors' own roll and pitch rate (flips)
+  local kwr, kwp, kwy                            -- body rates a hit adds (rad/s)
+  local turtle, hitT = false, 0                  -- on its back on the ground; when a hit last buzzed
   local seed = 7
 
   rnd = function()
@@ -621,7 +623,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     fx, fy, fz, rx, ry, rz, ux, uy, uz = hx, 0, hz, hz, 0, -hx, 0, 1, 0
     grounded = y <= DR + 0.01
     speed, Tm, P.wr, P.wp, P.wy, sW, sH, wob1, wob2, wob3, wq1, wq2, wq3 = 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-    mr, mp = 0, 0
+    mr, mp, R.st, kwr, turtle = 0, 0, 0, nil, false
     for i = 1, NG do
       gd[i] = (px - gx[i]) * gnx[i] + (py - gy[i]) * gny[i] + (pz - gz[i]) * gnz[i]
     end
@@ -649,6 +651,44 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     end
     beep(260, 400, PLAY_NOW)
     if playHaptic and S.vib == 1 then playHaptic(60, 0) end
+  end
+
+  -- a contact (n: the surface's outward normal): no bounce, the quad stops into the surface and slides
+  -- on with friction mu. From 1.5 m/s into it, the hit is a prop strike: for up to half a second the
+  -- props lose most of their thrust and the flight controller its hold, and the quad tumbles about
+  -- the point that touched (the rim of a disk the size of the quad, nearest the surface; most at 45
+  -- deg to it, none flat on), so the pilot has to fly it out. Nothing breaks: no respawn
+  local function hit(nx, ny, nz, mu)
+    local vn = -(vx * nx + vy * ny + vz * nz)
+    if vn <= 0 then return end
+    vx, vy, vz = vx + vn * nx, vy + vn * ny, vz + vn * nz
+    local vt = sqrt(vx * vx + vy * vy + vz * vz)
+    local f = vt > 0.01 and mu * vn / vt or 1
+    if f > 1 then f = 1 end
+    local jx, jy, jz = vn * nx - vx * f, vn * ny - vy * f, vn * nz - vz * f   -- the impulse (per kg)
+    vx, vy, vz = vx * (1 - f), vy * (1 - f), vz * (1 - f)
+    if vn < 1.5 then return end
+    -- toward the rim point (length sqrt(1 - d^2): flat on, the whole disk touches and nothing turns
+    -- it); the turn 3 * c x j is 1.5 rad/s per m/s into a surface at 45 deg, at most 20 rad/s
+    local d = nx * ux + ny * uy + nz * uz
+    local cx, cy, cz = d * ux - nx, d * uy - ny, d * uz - nz
+    local ax, ay, az = (cy * jz - cz * jy) * 3, (cz * jx - cx * jz) * 3, (cx * jy - cy * jx) * 3
+    local w = sqrt(ax * ax + ay * ay + az * az)
+    if w > 20 then ax, ay, az = ax * 20 / w, ay * 20 / w, az * 20 / w end
+    kwr, kwp, kwy = -(ax * fx + ay * fy + az * fz), -(ax * rx + ay * ry + az * rz), ax * ux + ay * uy + az * uz
+    local t = vn * 0.04
+    if t > 0.5 then t = 0.5 end
+    if t > R.st then R.st = t end
+    R.crashes = R.crashes + 1
+    if gmode == 3 then
+      R.ch, R.chn = 0, 0
+      tricks(-1)
+    end
+    if gt - hitT > 30 then
+      hitT = gt
+      beep(160 + vn * 8, 90, PLAY_NOW)
+      if playHaptic and S.vib == 1 and vn > 3 then playHaptic(vn > 8 and 60 or 30, 0) end
+    end
   end
 
   local function finishRace()
@@ -792,10 +832,24 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
         wob1, wob2, wob3 = j1, j2, j3
       end
     end
-    if grounded and T < G * 1.02 then
-      -- resting on the ground: stays level, can only yaw
-      wr, wp, P.wr, P.wp, mr, mp, cwr, cwp = 0, 0, 0, 0, 0, 0, 0, 0
-      if uy < 0.999 then placeDrone(px, DR, pz, fx, fz) end
+    if grounded and uy < 0.4 then
+      -- on its back or side on the ground (or a roof): the props can't lift it. Turtle mode: a roll
+      -- or pitch stick spins two motors backwards and flips it back over
+      wr = sA > 0.25 and 3.5 or sA < -0.25 and -3.5 or 0
+      wp = sE > 0.25 and -3.5 or sE < -0.25 and 3.5 or 0
+      wy, T, R.st, kwr = 0, 0, 0, nil
+      P.wr, P.wp, P.wy, mr, mp, cwr, cwp = wr, wp, 0, 0, 0, 0, 0
+      if not turtle then
+        turtle = true
+        showMsg("TURTLE: roll to flip", false)
+      end
+    else
+      turtle = false
+      if grounded and T < G * 1.02 and speed < 2 then
+        -- resting on the ground (once a skid has slowed down): stays level, can only yaw
+        wr, wp, P.wr, P.wp, mr, mp, cwr, cwp = 0, 0, 0, 0, 0, 0, 0, 0
+        if uy < 0.999 then placeDrone(px, py, pz, fx, fz) end
+      end
     end
     -- wind with gusts, weaker near the ground
     local wx, wz = 0, 0
@@ -859,7 +913,16 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     local pwr, pwp, pwy = P.wr, P.wp, P.wy
     for _ = 1, n do
       Tm = Tm + (T - Tm) * km
-      pwr, pwp, pwy = pwr + (wr - pwr) * kr, pwp + (wp - pwp) * kr, pwy + (wy - pwy) * ky
+      if kwr then pwr, pwp, pwy, kwr = pwr + kwr, pwp + kwp, pwy + kwy, nil end
+      local st = R.st
+      if st > 0 then
+        -- a prop strike: the flight controller has lost its hold, the quad tumbles on
+        R.st = st - h
+        local k = 1 - 1.5 * h
+        pwr, pwp, pwy = pwr * k, pwp * k, pwy * k
+      else
+        pwr, pwp, pwy = pwr + (wr - pwr) * kr, pwp + (wp - pwp) * kr, pwy + (wy - pwy) * ky
+      end
       rotate(pwr * h, pwp * h, pwy * h)
       -- the flip's differential d (half of it, as a share of the motors' range; roll and pitch add up
       -- on a motor) and the collective Te it leaves
@@ -879,6 +942,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
           Te = Tmax * (I0 + (1 - I0) * (c * c + d * d))
         end
       end
+      if st > 0 then Te = Te * 0.3 end              -- struck props: most of the thrust gone
       -- air-relative velocity in body axes
       local ax_, az_ = vx - wx, vz - wz
       local vu = ax_ * ux + vy * uy + az_ * uz
@@ -899,7 +963,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
         if r < fl then r = fl end
         Ta = Te * r
       else
-        if Te > 0 then                                -- the loss grows with thrust as T*(Tmax/T)^VC
+        if Te > 0.001 then                            -- the loss grows with thrust as T*(Tmax/T)^VC
           local den = VP + vu * VK                    -- and bends with VK as the inflow grows
           if den < VP * 0.3 then den = VP * 0.3 end
           Ta = Te - vu * Te * (Tmax / Te) ^ VC / den
@@ -967,9 +1031,8 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
       px, py, pz = px + vx * h, py + vy * h, pz + vz * h
       grounded = false
       if py < DR then
-        if vy < -6 or vx * vx + vz * vz > 196 or uy < 0.35 then crash() return end
         py, grounded = DR, true
-        if vy < 0 then vy = 0 end
+        if vy < 0 then hit(0, 1, 0, 0.6) end
         local fr = 1 - 7 * h
         vx, vz = vx * fr, vz * fr
       end
@@ -988,15 +1051,25 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
           local ly = qx_ * gax[i] + qy_ * gay[i] + qz_ * gaz[i]
           local k = gk[i]
           local iw, ih, sh = GHW[k], GHH[k], GSH[k]
+          local bump = false
           if sh == 2 then
             local r2, a, b = lx * lx + ly * ly, iw - DR * 0.5, iw + GT + DR
             if r2 < a * a then gatePassed(i, d1 >= 0)
-            elseif r2 < b * b then crash() return end
+            elseif r2 < b * b then bump = true end
           else
             if lx < 0 then lx = -lx end
             if ly < 0 then ly = -ly end
             if lx < iw - DR * 0.5 and ly < ih - DR * 0.5 then gatePassed(i, d1 >= 0)
-            elseif sh == 1 and lx < iw + GT + DR and ly < ih + GT + DR then crash() return end
+            elseif sh == 1 and lx < iw + GT + DR and ly < ih + GT + DR then bump = true end
+          end
+          if bump then
+            -- the frame or rim: back on the side it came from, against it
+            local sg = d0 < 0 and -1 or 1
+            local m = sg * (GT * 0.5 + DR)
+            local e = m - d1
+            px, py, pz = px + gnx[i] * e, py + gny[i] * e, pz + gnz[i] * e
+            gd[i] = m
+            hit(gnx[i] * sg, gny[i] * sg, gnz[i] * sg, 0.3)
           end
           if state ~= FLY and state ~= DONE then return end
         end
@@ -1005,12 +1078,46 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
       for j = 1, np do
         local i = nearP[j]
         local dx, dz, r = px - qx[i], pz - qz[i], qr[i] + DR
-        if dx < r and dx > -r and dz < r and dz > -r and py < qh[i] and dx * dx + dz * dz < r * r then crash() return end
+        if dx < r and dx > -r and dz < r and dz > -r and py < qh[i] and dx * dx + dz * dz < r * r then
+          -- out from the middle of the trunk or pole
+          if dx * dx + dz * dz < 1e-4 then dx, dz = ox - qx[i], oz - qz[i] + 0.01 end
+          local l = sqrt(dx * dx + dz * dz)
+          dx, dz = dx / l, dz / l
+          px, pz = qx[i] + dx * r, qz[i] + dz * r
+          hit(dx, 0, dz, 0.3)
+        end
       end
       for j = 1, nb do
         local i = nearB[j]
-        if px > bx0[i] - DR and px < bx1[i] + DR and pz > bz0[i] - DR and pz < bz1[i] + DR and py < by1[i] + DR and py > by0[i] - DR then
-          crash() return
+        local a0, a1, b0, b1, c0, c1 = bx0[i] - DR, bx1[i] + DR, by0[i] - DR, by1[i] + DR, bz0[i] - DR, bz1[i] + DR
+        if px > a0 and px < a1 and pz > c0 and pz < c1 and py < b1 and py > b0 then
+          -- out through the face it came in by: the one it crossed last on the way, else the nearest
+          local t, k = -1, 0
+          local mx, my, mz = px - ox, py - oy, pz - oz
+          if ox <= a0 and mx > 0 and (a0 - ox) / mx > t then t, k = (a0 - ox) / mx, 1 end
+          if ox >= a1 and mx < 0 and (a1 - ox) / mx > t then t, k = (a1 - ox) / mx, 2 end
+          if oz <= c0 and mz > 0 and (c0 - oz) / mz > t then t, k = (c0 - oz) / mz, 3 end
+          if oz >= c1 and mz < 0 and (c1 - oz) / mz > t then t, k = (c1 - oz) / mz, 4 end
+          if oy >= b1 and my < 0 and (b1 - oy) / my > t then t, k = (b1 - oy) / my, 5 end
+          if oy <= b0 and my > 0 and (b0 - oy) / my > t then k = 6 end
+          if k == 0 then
+            t, k = px - a0, 1
+            if a1 - px < t then t, k = a1 - px, 2 end
+            if pz - c0 < t then t, k = pz - c0, 3 end
+            if c1 - pz < t then t, k = c1 - pz, 4 end
+            if b1 - py < t then k = 5 end
+          end
+          if k == 1 then px = a0 hit(-1, 0, 0, 0.3)
+          elseif k == 2 then px = a1 hit(1, 0, 0, 0.3)
+          elseif k == 3 then pz = c0 hit(0, 0, -1, 0.3)
+          elseif k == 4 then pz = c1 hit(0, 0, 1, 0.3)
+          elseif k == 5 then
+            -- the roof: like the ground
+            py, grounded = b1, true
+            hit(0, 1, 0, 0.6)
+            local fr = 1 - 7 * h
+            vx, vz = vx * fr, vz * fr
+          else py = b0 hit(0, -1, 0, 0.3) end
         end
       end
     end
@@ -1114,7 +1221,7 @@ end)()
   end
 
   tricks = function(dt)
-    if dt < 0 then
+    if dt < 0 or R.st > 0 then                 -- (a tumble after a hit is no trick)
       for a = 1, 3 do acc[a], nrot[a], idle[a] = 0, 0, 0 end
       hiY, inv, prox = 0, 0, 0
       return
@@ -2714,7 +2821,7 @@ end
 
 -- menus
 local MAIN_ITEMS = { "Race", "Practice", "Freestyle", "Gate Rush", "Track", "Settings", "Exit" }
-local PAUSE_ITEMS = { "Resume", "Restart", "Settings", "Main menu" }
+local PAUSE_ITEMS = { "Resume", "Respawn", "Restart", "Settings", "Main menu" }
 
 local optStep, optText
 do
@@ -3383,7 +3490,7 @@ end)()
       fillRect(14 * U, 6 * U, W - 28 * U, H - 12 * U, ERASE)
       lcd.drawRectangle(14 * U, 6 * U, W - 28 * U, H - 12 * U, BLK)
       for i = 1, #PAUSE_ITEMS do
-        drawText(22 * U, (10 + (i - 1) * 11) * U, PAUSE_ITEMS[i], i == focus and INVERS or 0)
+        drawText(22 * U, (8 + (i - 1) * 9) * U, PAUSE_ITEMS[i], i == focus and INVERS or 0)
       end
     elseif state == DONE then
       fillRect(8 * U, 4 * U, W - 16 * U, H - 8 * U, ERASE)
@@ -3459,9 +3566,15 @@ local handleEvent
 
   local function pauseSelect(i)
     if i == 1 then state = pausedFrom
-    elseif i == 2 then startRace(gmode)
-    elseif i == 3 then prevState, state, focus, scroll, editing = PAUSED, SETUP, 1, 0, false
-    elseif i == 4 then toMenu()
+    elseif i == 2 then
+      -- back at the last gate (Freestyle: where it flew a second ago), the clock running on
+      if pausedFrom == COUNT then state = COUNT else
+        respawn()
+        state, R.ready = READY, gt
+      end
+    elseif i == 3 then startRace(gmode)
+    elseif i == 4 then prevState, state, focus, scroll, editing = PAUSED, SETUP, 1, 0, false
+    elseif i == 5 then toMenu()
     end
   end
 
@@ -3510,7 +3623,7 @@ local handleEvent
         saveData()
         editing = false
         if prevState == PAUSED then
-          state, focus, scroll = PAUSED, 3, 0
+          state, focus, scroll = PAUSED, 4, 0
         else
           state, focus, scroll = MENU, 6, 0
         end
@@ -3586,6 +3699,7 @@ local function init()
     TEST.ai = function(a) return AI.x[a], AI.y[a], AI.z[a], AI.k[a], AI.d[a], AI.v[a], AI.seg[a] end
     TEST.best = function(t) return BEST.l[t], BEST.r[t], BEST.g[t], BEST.f[t] end
     TEST.medals = function() return MED[1], MED[2], MED[3], medal end
+    TEST.stun = function() return R.st end
     TEST.box = function(b) return BX.x0[b], BX.x1[b], BX.y0[b], BX.y1[b], BX.z0[b], BX.z1[b] end
     TEST.S = S
     TEST.order = function()

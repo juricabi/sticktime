@@ -327,7 +327,8 @@ for m = 2, 4 do
     if f == 300 then ev = EVT_VIRTUAL_EXIT end            -- pause
     if f == 305 then ev = EVT_VIRTUAL_NEXT end
     if f == 306 then ev = EVT_VIRTUAL_NEXT end
-    if f == 307 then ev = EVT_VIRTUAL_ENTER end           -- settings from pause
+    if f == 307 then ev = EVT_VIRTUAL_NEXT end
+    if f == 308 then ev = EVT_VIRTUAL_ENTER end           -- settings from pause
     if f == 310 then ev = EVT_VIRTUAL_EXIT end            -- back to pause
     if f == 312 then ev = EVT_VIRTUAL_EXIT end            -- resume
     if GAME_COLOR and f == 500 then frame(EVT_TOUCH_TAP, { x = floor(W / 2), y = 10 }) end
@@ -362,7 +363,12 @@ T.state(4)
 T.next(5)
 T.pose(gx5 + 2.1, gy5 + 3, gz5, 0, 0, 0)
 steps(30)
-if state() ~= 5 and state() ~= 6 then fail("hitting the dive gate frame should crash (state " .. state() .. ")") else print("dive gate frame: crash registered") end
+do
+  local st, s = state()
+  if st ~= 4 or s[18] ~= 5 or s[2] < gy5 then
+    fail(string.format("the dive gate frame should stop the quad on top (state %d, next gate %d, %.2f m over it)", st, s[18], s[2] - gy5))
+  else print(string.format("dive gate frame: the quad stops on it (%.2f m over the gate)", s[2] - gy5)) end
+end
 
 -- 5. flags and hoops: wrong side of a flag does not count, the hoop rim crashes
 T.track(4)
@@ -386,7 +392,10 @@ do
   T.state(4) T.next(6)
   T.pose(cx + 1.3, cy, cz - 3, 0, 0, 0) T.vel(0, 0, 8)
   steps(12)
-  if state() ~= 5 and state() ~= 6 then fail("hitting the hoop rim should crash (state " .. state() .. ")") else print("hoop rim: crash registered") end
+  local st, s = state()
+  if st ~= 4 or s[18] ~= 6 or s[3] > cz or s[6] > 1 then
+    fail(string.format("the hoop rim should stop the quad in front of it (state %d, next gate %d, %.2f m past it, %.1f m/s on)", st, s[18], s[3] - cz, s[6]))
+  else print("hoop rim: the quad stops in front of it") end
 end
 idleSticks()
 
@@ -443,7 +452,7 @@ do
   idleSticks()
 end
 
--- 5c. Vibration: a hard landing crashes with one buzz when it is on, none when it is off
+-- 5c. Vibration: a hard landing buzzes once when it is on, none when it is off (and flies on)
 do
   local vib = T.S.vib
   T.track(1) T.start(2) steps(70) T.state(4)
@@ -454,10 +463,10 @@ do
     T.state(4) T.pose(s0[1], 3, s0[3], 0, 0, 0) T.vel(0, -15, 0)
     local b = buzz
     steps(6)
-    if state() ~= 5 and state() ~= 6 then fail("hard landing should crash (state " .. state() .. ")") end
-    if (buzz > b) ~= (v == 1) then fail("Vibration " .. (v == 1 and "on" or "off") .. ": " .. (buzz - b) .. " buzzes on a crash") end
+    if state() ~= 4 then fail("a hard landing should not end the flight (state " .. state() .. ")") end
+    if (buzz > b) ~= (v == 1) then fail("Vibration " .. (v == 1 and "on" or "off") .. ": " .. (buzz - b) .. " buzzes on a hard landing") end
   end
-  print("vibration: buzz on a crash only with Vibration on")
+  print("vibration: buzz on a hard landing only with Vibration on")
   T.set("vib", vib)
   idleSticks()
 end
@@ -615,6 +624,71 @@ do
   print("medals (AI lap/medal, easy medium hard): " .. table.concat(out, ", "))
 end
 
+-- 12. contacts: nothing forces a respawn. A wall scraped at a shallow angle slows the quad a little,
+-- one hit head-on stops it dead and knocks it about (a prop strike); upside down on the ground it
+-- can't take off, a roll stick flips it back over (turtle mode); the pause menu respawns it
+do
+  local mode = T.S.mode
+  T.set("mode", 2)
+  local hover = (hoverStick(1) * 2 - 1) * 1024
+  T.track(7) T.start(2) steps(70)
+  local x0, x1, y0, y1, z0, z1 = T.box(1)                       -- a wall 8 m long along x, 0.5 m thick
+  local ym = math.min(y1 - 0.8, 2.5)
+  -- scrape: 5 m/s along its south face, 1.2 m/s into it
+  T.state(4) T.pose(x0 + 1, ym, z0 - 0.3, 90, 0, 0) T.vel(5, 0, 1.2)
+  sticks.ail, sticks.ele, sticks.rud, sticks.thr = 0, 0, 0, hover
+  steps(8)
+  local st, s = state()
+  local sp = math.sqrt(s[4] ^ 2 + s[6] ^ 2)
+  if st ~= 4 or s[3] > z0 - 0.14 or sp < 3 or T.stun() > 0 or s[1] > x1 then
+    fail(string.format("a scrape along a wall: state %d, %.2f m into the wall, %.1f m/s left, stun %.2f", st, s[3] - z0 + 0.15, sp, T.stun()))
+  end
+  print(string.format("wall scrape: flies on at %.1f m/s", sp))
+  -- head on at 20 m/s
+  local c0 = select(6, T.race())
+  T.state(4) T.pose((x0 + x1) / 2, ym, z0 - 2, 0, 0, 0) T.vel(0, 0, 20)
+  steps(4)
+  st, s = state()
+  local st2 = T.stun()
+  if st ~= 4 or s[3] > z0 - 0.14 or s[6] > 0.5 or select(6, T.race()) ~= c0 + 1 or st2 <= 0 then
+    fail(string.format("a head-on hit at 20 m/s: state %d, %.2f m into the wall, %.1f m/s on, hits %d, stun %.2f",
+      st, s[3] - z0 + 0.15, s[6], select(6, T.race()) - c0, st2))
+  end
+  steps(40)
+  st, s = state()
+  if st ~= 4 and st ~= 6 then fail("after a head-on hit the quad should still be flying (state " .. st .. ")") end
+  print(string.format("head-on hit at 20 m/s: stopped at the wall, still flying 2 s later (%.1f m up)", s[2]))
+  -- turtle: upside down on the ground, full throttle doesn't lift it, a roll stick flips it over
+  T.track(1) T.start(2) steps(70)
+  local _, s0 = state()
+  T.state(4) T.pose(s0[1] + 3, 0.15, s0[3], 0, 0, 180)
+  sticks.ail, sticks.ele, sticks.rud, sticks.thr = 0, 0, 0, 1024
+  steps(10)
+  st, s = state()
+  if st ~= 4 or s[2] > 0.3 or s[11] > 0 then fail(string.format("upside down on the ground it should stay there (state %d, %.2f m up, up %.2f)", st, s[2], s[11])) end
+  sticks.thr, sticks.ail = -1024, 1024
+  steps(24)
+  sticks.ail = 0
+  steps(2)
+  st, s = state()
+  if s[11] < 0.99 then fail(string.format("turtle: a roll stick should flip it back over (up %.2f)", s[11])) end
+  sticks.thr = 1024
+  steps(10)
+  st, s = state()
+  if st ~= 4 or s[2] < 1.5 then fail(string.format("after the turtle it should take off (%.2f m up)", s[2])) end
+  print("turtle: flipped back over with the roll stick and took off")
+  -- the pause menu's Respawn: back at the last gate, ready to go
+  T.next(3)
+  frame(EVT_VIRTUAL_EXIT) frame(EVT_VIRTUAL_NEXT) frame(EVT_VIRTUAL_ENTER)
+  st, s = state()
+  local _, _, _, _, _, _, _, ax, ay, az = T.gate(2)
+  local dd = math.sqrt((s[1] - ax) ^ 2 + (s[3] - az) ^ 2)
+  if st ~= 6 or dd > 3 then fail(string.format("pause, Respawn: should be ready at gate 2 (state %d, %.1f m away)", st, dd)) end
+  print("pause menu: Respawn puts the quad back at the last gate")
+  idleSticks()
+  T.set("mode", mode)
+end
+
 -- 10. custom tracks: StickTimeTracks/c1-c8.txt are tracks 9-16 (empty slots skipped); a slot's
 -- bests start over when a different track (another id) is put in it; a broken file is left out
 do
