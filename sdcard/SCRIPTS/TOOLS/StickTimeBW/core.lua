@@ -42,7 +42,8 @@ local focus, scroll, editing = 1, 0, false     -- menus: focused row, list scrol
 
 -- ------------------------------------------------------------ settings
 local S = { track = 1, quad = 1, twr = 0, mode = 1, rates = 2, rc = 100, rm = 600, re = 50, yc = 100, ym = 500, ye = 40,
-            tilt = 20, fov = 100, laps = 3, ai = 2, skill = 2, wind = 0, wash = 0, grip = 1, vib = 1, map = 1, sticks = 0, fps = 0 }
+            tilt = 20, fov = 100, laps = 3, ai = 2, skill = 2, ghost = 1, wind = 0, wash = 0, grip = 1, vib = 1, map = 1,
+            sticks = 0, fps = 0 }
 -- rows: label, key, then either a value list (+ names, suffix) or nil, nil, suffix, min, max, step
 local OPTS = {
   { "Quad", "quad", { 1, 2, 3, 4, 5 }, { 'Racer 5"', 'Freestyle 5"', '3" toothpick', 'Whoop 65mm', 'Whoop 75mm' } },
@@ -463,8 +464,8 @@ end
 
 -- medals: Bronze, Silver and Gold are the lap times of the Easy, Medium and Hard AI pilot with
 -- the pilot's class and power, a flying lap along the racing line as AI.update flies it (ticks)
-local MED, MEDN = { 0, 0, 0 }, { "BRONZE", "SILVER", "GOLD" }
-local function medalTimes()
+local MED = { 0, 0, 0, n = { "BRONZE", "SILVER", "GOLD" } }
+MED.calc = function()
   for m = 1, 3 do
     local vb, v, t = AI.vs[m] * (0.75 + 0.05 * P.twr), 0, 0
     for k = 1, 2 * NG do                     -- the second lap counts: it starts at racing speed
@@ -484,7 +485,7 @@ local function medalTimes()
     MED[m] = floor(t * 100 + 0.5)
   end
 end
-local function medal(t)                      -- 0 none, 1 bronze, 2 silver, 3 gold
+MED.of = function(t)                         -- 0 none, 1 bronze, 2 silver, 3 gold
   local m = 0
   for i = 1, 3 do
     if t > 0 and t <= MED[i] then m = i end
@@ -492,10 +493,10 @@ local function medal(t)                      -- 0 none, 1 bronze, 2 silver, 3 go
   return m
 end
 -- the next medal to fly for on this track ("SILVER 16.48"), or the gold the pilot has; and which
-local function medalGoal()
-  local m = medal(BEST.l[S.track])
-  if m == 3 then return MEDN[3], 3 end
-  return MEDN[m + 1] .. " " .. timeStr(MED[m + 1]), m + 1
+MED.goal = function()
+  local m = MED.of(BEST.l[S.track])
+  if m == 3 then return MED.n[3], 3 end
+  return MED.n[m + 1] .. " " .. timeStr(MED[m + 1]), m + 1
 end
 
 local function beep(f, d, flags)
@@ -505,6 +506,7 @@ end
 local function showMsg(s, good)
   R.msg, R.msgT, R.good = s, gt, good
 end
+
 
 -- -------------------------------------------------------------- physics
 local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rushNext
@@ -703,8 +705,8 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
         local b = BEST.l[S.track]
         if b == 0 or lt < b then
           BEST.l[S.track], R.newLap = lt, true
-          local m = medal(lt)
-          showMsg("LAP " .. lap .. "  " .. timeStr(lt) .. "  " .. (m > medal(b) and MEDN[m] or "BEST") .. "!", true)
+          local m = MED.of(lt)
+          showMsg("LAP " .. lap .. "  " .. timeStr(lt) .. "  " .. (m > MED.of(b) and MED.n[m] or "BEST") .. "!", true)
           saveData()
         else
           showMsg("LAP " .. lap .. "  " .. timeStr(lt) .. "  +" .. timeStr(lt - b), false)
@@ -1364,7 +1366,7 @@ local function applySettings()
   P.tc, P.ts = cos(t), sin(t)
   tanH = sin(S.fov * 0.00872665) / cos(S.fov * 0.00872665)
   F = (VW / 2) / tanH
-  medalTimes()
+  MED.calc()
 end
 
 -- visible objects, drawn far -> near (painter's algorithm). ids: gates 1..NG, trees -i,
@@ -1694,7 +1696,7 @@ end
 local function selectTrack(t)
   S.track = t
   buildTrack(t)
-  medalTimes()
+  MED.calc()
   AI.n = 0
   placeDrone(TR.px, DR, TR.pz, TR.hx, TR.hz)
 end
@@ -1833,7 +1835,7 @@ local render, hitTest, pauseHit, initUI
       if gmode == 1 then s = s .. "/" .. S.laps end
       if gmode == 1 and AI.n > 0 then s = "P" .. R.pos .. " L" .. s end
       drawText(XM, U, s, SMLSIZE + RIGHT)
-      if gmode == 2 then drawText(CX, U, medalGoal(), SMLSIZE + CENTER) end
+      if gmode == 2 then drawText(CX, U, MED.goal(), SMLSIZE + CENTER) end
     elseif gmode == 3 then
       drawNumber(U, U, R.sc, SMLSIZE + LEFT)
       if R.chn > 0 then drawText(XM, U, "x" .. R.chn .. " " .. R.ch, SMLSIZE + RIGHT) end
@@ -1921,7 +1923,7 @@ local render, hitTest, pauseHit, initUI
       lcd.clear()
       if state == MENU then
         drawText(U, 0, "StickTime", MIDSIZE)
-        if W > 150 * U then drawText(XM, U, medalGoal(), SMLSIZE + RIGHT) end   -- where it fits
+        if W > 150 * U then drawText(XM, U, MED.goal(), SMLSIZE + RIGHT) end   -- where it fits
         drawList(nil, #MAIN_ITEMS, mainLabel, mainValue, 13 * U, 8 * U)
       else
         drawList("SETTINGS", #OPTS + 1, setLabel, setValue, 0, 9 * U)
@@ -1961,8 +1963,8 @@ local render, hitTest, pauseHit, initUI
         for i = 1, R.n do
           if b == 0 or R.laps[i] < b then b = R.laps[i] end
         end
-        local m = medal(b)
-        drawText(x, 7 * U, (R.newRace and "NEW RECORD!" or "FINISHED") .. (m > 0 and " " .. MEDN[m] or ""), SMLSIZE + INVERS)
+        local m = MED.of(b)
+        drawText(x, 7 * U, (R.newRace and "NEW RECORD!" or "FINISHED") .. (m > 0 and " " .. MED.n[m] or ""), SMLSIZE + INVERS)
         drawText(x, 17 * U, "Total " .. timeStr(R.total), SMLSIZE)
         drawText(x, 26 * U, "Best lap " .. timeStr(b), SMLSIZE)
         if AI.n > 0 then drawText(x, 35 * U, place(R.pos) .. " of " .. (AI.n + 1), SMLSIZE) end
@@ -2153,7 +2155,7 @@ local function init()
     TEST.audio = function() return sT, S.quad, state, aTf, aVu, aE2, aW, sA, sE, sR, aS, aF end
     TEST.ai = function(a) return AI.x[a], AI.y[a], AI.z[a], AI.k[a], AI.d[a], AI.v[a], AI.seg[a] end
     TEST.best = function(t) return BEST.l[t], BEST.r[t], BEST.g[t], BEST.f[t] end
-    TEST.medals = function() return MED[1], MED[2], MED[3], medal end
+    TEST.medals = function() return MED[1], MED[2], MED[3], MED.of end
     TEST.stun = function() return R.st end
     TEST.box = function(b) return BX.x0[b], BX.x1[b], BX.y0[b], BX.y1[b], BX.z0[b], BX.z1[b] end
     TEST.S = S

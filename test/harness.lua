@@ -235,7 +235,7 @@ local function idleSticks() sticks.ail, sticks.ele, sticks.rud, sticks.thr = 0, 
 
 -- ------------------------------------------------------------ scenarios
 -- 1. menus: walk every item, open settings, change every option both ways
-local OPTN = GAME_COLOR and 22 or 20
+local OPTN = GAME_COLOR and 23 or 20
 steps(20)
 for i = 1, 9 do frame(EVT_VIRTUAL_NEXT) frame(0) end
 for i = 1, 9 do frame(EVT_VIRTUAL_PREV) frame(0) end
@@ -689,6 +689,74 @@ do
   T.set("mode", mode)
 end
 
+-- 13. ghost (Practice): the first lap becomes the ghost, saved on the SD card (a faster lap would
+-- replace it); the ghost flies along with the next lap near the quad; a new start loads it; another
+-- track's file is not taken; Ghost Off records nothing. (The color game only)
+if GAME_COLOR then
+  local mode = T.S.mode
+  T.set("mode", 2)
+  T.track(1) T.start(2)
+  idleSticks()
+  local gmax, gfile = select(10, T.ghost())
+  local path = gfile .. "1.txt"
+  SD[path] = nil
+  local laps, near, far, seen = {}, 0, 0, 0
+  for _ = 1, FPS * 120 do
+    local st, s = state()
+    if st == 4 then autopilot() else idleSticks() end
+    frame(0)
+    local n, iv, lap, on, gx, gy, gz = T.ghost()
+    local nl = select(3, T.race())
+    if nl >= 1 and on then
+      seen = seen + 1
+      local d = math.sqrt((gx - s[1]) ^ 2 + (gy - s[2]) ^ 2 + (gz - s[3]) ^ 2)
+      if d < 15 then near = near + 1 else far = far + 1 end
+    end
+    if nl >= 2 then break end
+  end
+  local _, _, nl, lt = T.race()
+  local n, iv, glap = T.ghost()
+  local best = math.min(lt[1] or 1e9, lt[2] or 1e9)
+  if nl < 2 then fail("ghost: the autopilot should fly 2 practice laps (" .. nl .. ")")
+  elseif n < 2 or n > gmax or glap ~= best then
+    fail(string.format("ghost: %d samples (max %d), its lap %s, the best of %s %s %s", n, gmax, tostring(glap), lt[1], lt[2], lt[3]))
+  end
+  if not SD[path] or #SD[path] ~= 42 + n * 9 then fail("ghost: not saved as " .. path .. " (" .. (SD[path] and #SD[path] or 0) .. " bytes)") end
+  if seen < FPS * 10 or near < seen * 0.8 then fail(string.format("ghost: shown %d frames, within 15 m of the quad %d of them", seen, near)) end
+  print(string.format("ghost: laps %.2f %.2f s, the ghost %d samples every %.1f s (%.2f s lap), within 15 m of the quad %d%% of the time",
+    (lt[1] or 0) / 100, (lt[2] or 0) / 100, n, iv / 100, glap / 100, math.floor(near * 100 / math.max(1, seen))))
+  -- a new start reads it back
+  local saved = SD[path]
+  local inst2
+  STICKTIME_TEST = {}
+  inst2 = chunk()
+  inst2.init()
+  local L = STICKTIME_TEST
+  L.track(1) L.start(2)
+  local n2, iv2, lap2 = L.ghost()
+  if n2 ~= n or iv2 ~= iv or lap2 ~= glap then fail(string.format("ghost: read back %d samples / %s / %s, saved %d / %s / %s", n2, iv2, lap2, n, iv, glap)) end
+  -- another track's file (other gates) is not this track's ghost
+  SD[gfile .. "2.txt"] = saved
+  L.track(2) L.start(2)
+  if L.ghost() ~= 0 then fail("ghost: another track's ghost was taken") end
+  SD[gfile .. "2.txt"] = nil
+  STICKTIME_TEST = T
+  -- Ghost Off: nothing recorded
+  SD[path] = nil
+  T.set("ghost", 0)
+  T.track(1) T.start(2)
+  for _ = 1, FPS * 70 do
+    local st = state()
+    if st == 4 then autopilot() else idleSticks() end
+    frame(0)
+    if select(3, T.race()) >= 1 then break end
+  end
+  if SD[path] or T.ghost() ~= 0 then fail("ghost: recorded with Ghost Off") end
+  T.set("ghost", 1)
+  idleSticks()
+  T.set("mode", mode)
+end
+
 -- 10. custom tracks: StickTimeTracks/c1-c8.txt are tracks 9-16 (empty slots skipped); a slot's
 -- bests start over when a different track (another id) is put in it; a broken file is left out
 do
