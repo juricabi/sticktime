@@ -22,6 +22,12 @@ def b64(p):
     return base64.b64encode(pathlib.Path(p).read_bytes()).decode()
 
 
+def b64_text(p):
+    """A text file (the SVG icon) as in the repo, with LF line ends: the same bundle from any
+    checkout (git on Windows may give the working copy CRLF)"""
+    return base64.b64encode(pathlib.Path(p).read_bytes().replace(b"\r\n", b"\n")).decode()
+
+
 def main():
     lua_color = read(ROOT / "sdcard/SCRIPTS/TOOLS/StickTime.lua")
     lua_bw = read(ROOT / "sdcard/SCRIPTS/TOOLS/StickTimeBW/core.lua")
@@ -37,7 +43,7 @@ def main():
     assert tracks, "no StickTime Lite track files (run build.py)"
     lite_tracks = json.dumps(tracks, indent=0)
     # the icon (docs/icon.svg; its PNGs from tools/make_icons.py)
-    icon_svg = "data:image/svg+xml;base64," + b64(ROOT / "docs/icon.svg")
+    icon_svg = "data:image/svg+xml;base64," + b64_text(ROOT / "docs/icon.svg")
     icon_png = "data:image/png;base64," + b64(ROOT / "docs/icon-32.png")
     for s in (lua_color, lua_bw, lua_lite, lua_bwcolor, lua_litecolor, lite_tracks):
         assert "</script" not in s.lower()
