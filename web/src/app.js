@@ -255,7 +255,7 @@
     const wgn = gainNode(0);
     ws.connect(wf); wf.connect(wgn); wgn.connect(master);
     synth = { master, sum, motors, buf, waves, wave: 0, chatSrc, chatAm, chatFm, flut, dvf, dvg, dvCh, wf, wgn,
-              rpmS: [0, 0, 0, 0], prev: 0, state: 0, vol: 0, dirty: 0, stop: srcs };
+              rpmS: [0, 0, 0, 0], prev: 0, state: 0, hits: -1, vol: 0, dirty: 0, stop: srcs };
   }
   function stopSynth() {
     if (!synth) return;
@@ -301,19 +301,23 @@
       for (let i = 0; i < 4; i++) synth.rpmS[i] *= 0.92;
     }
     synth.dirty += (dirty - synth.dirty) * Math.min(1, dt / 120);
-    // a crash: a short thud, and the motors cut with it
-    if (live && synth.state === 4 && a[2] === 5) {
+    // a crash: a short thud, and the motors cut with it; a hit (the quad flies on) thuds as hard
+    // as it hit, its props struck
+    const hits = live && a.length >= 14 ? a[12] : -1;
+    const hit = hits > synth.hits && synth.hits >= 0 ? Math.min(1, 0.3 + a[13] / 12) : 0;
+    if (live) synth.hits = hits;
+    if (live && ((synth.state === 4 && a[2] === 5) || hit > 0)) {
       const t = actx.currentTime;
       const bs = actx.createBufferSource();
       bs.buffer = synth.buf;
       const f = actx.createBiquadFilter();
       f.type = 'lowpass'; f.frequency.value = 420;
       const g = actx.createGain();
-      g.gain.setValueAtTime(0.9, t);
+      g.gain.setValueAtTime(hit > 0 ? 0.9 * hit : 0.9, t);
       g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
       bs.connect(f); f.connect(g); g.connect(synth.master);
       bs.start(t); bs.stop(t + 0.22);
-      for (let i = 0; i < 4; i++) synth.rpmS[i] *= 0.3;
+      for (let i = 0; i < 4; i++) synth.rpmS[i] *= hit > 0 ? 1 - 0.5 * hit : 0.3;
     }
     if (live) synth.state = a[2];
     const mean = (synth.rpmS[0] + synth.rpmS[1] + synth.rpmS[2] + synth.rpmS[3]) / 4;

@@ -767,7 +767,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     local t = vn * 0.04
     if t > 0.5 then t = 0.5 end
     if t > R.st then R.st = t end
-    R.crashes = R.crashes + 1
+    R.crashes, R.hv = R.crashes + 1, vn
     if gmode == 3 then
       R.ch, R.chn = 0, 0
       tricks(-1)
@@ -3313,7 +3313,7 @@ local function init()
       while not TRACKS[n] do n = n - 1 end          -- the highest track that exists
       return n, P.twr, gmode, R.pos, AI.n, R.sc, R.rn, R.rt, R.chn, BX.n, TRACKS[S.track][1] end
     TEST.thrust = function() return P.twr, P.i0, P.tn, P.dz, P.tk end
-    TEST.audio = function() return sT, S.quad, state, aTf, aVu, aE2, aW, sA, sE, sR, aS, aF end
+    TEST.audio = function() return sT, S.quad, state, aTf, aVu, aE2, aW, sA, sE, sR, aS, aF, R.crashes, R.hv or 0 end
     TEST.ai = function(a) return AI.x[a], AI.y[a], AI.z[a], AI.k[a], AI.d[a], AI.v[a], AI.seg[a] end
     TEST.best = function(t) return BEST.l[t], BEST.r[t], BEST.g[t], BEST.f[t] end
     TEST.medals = function() return MED[1], MED[2], MED[3], MED.of end
