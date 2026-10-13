@@ -376,6 +376,9 @@ def radio_tests(br, errors):
     editor(page)
     check(page.inner_text("#edSend") == "Connect radio…", "radio: not connected, the editor's button says Connect radio…")
     page.click("#edSend")
+    check(page.is_visible("#connectDlg") and "USB Storage (SD)" in page.inner_text("#connectDlg"),
+          "radio: ... which says first what to do on the radio")
+    page.click("#connectGo")
     radio_done(page)
     check(page.inner_text("#edSend") == "Send to radio" and page.inner_text("#edStatus").startswith("Radio SD: RADIO-SD connected."),
           "radio: ... and connects")

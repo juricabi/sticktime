@@ -58,6 +58,19 @@
       <button class="btn" id="edClose" type="button" title="Close the editor (your work is kept)">Close</button>
     </div>
   </div>
+  <dialog class="ed-dialog" id="connectDlg" aria-labelledby="connectH">
+    <h3 id="connectH">Connect the radio</h3>
+    <ol>
+      <li>Plug the radio into this computer with a USB cable.</li>
+      <li>On the radio, choose <strong>USB Storage (SD)</strong>.</li>
+      <li>Press <strong>Choose the SD card</strong>, and in the window that opens pick the radio's drive (its SD card).</li>
+    </ol>
+    <p class="note">Eject the drive before you unplug the radio.</p>
+    <div class="ed-row">
+      <button class="btn primary" id="connectGo" type="button">Choose the SD card…</button>
+      <button class="btn" id="connectCancel" type="button">Cancel</button>
+    </div>
+  </dialog>
   <section class="ed-gallery" id="edGallery" hidden aria-labelledby="edGalH">
     <div class="ed-phead">
       <h3 id="edGalH">Open <small>pick a track to edit: the editor works on a copy of it</small></h3>

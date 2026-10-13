@@ -438,7 +438,7 @@
   // ---------------------------------------------------------------- the page
   const el = {};
   for (const k of ['tracksBtn', 'edClose', 'radioBtn', 'rpClose',
-    'edOpen', 'edGalBtn', 'edMineBtn', 'edMine', 'edMineStatus', 'edMineNote', 'edOpenList', 'edUpdList', 'edSyncMine', 'edNewCards', 'edSlotList', 'edEditing', 'edGallery', 'edCards', 'edGrid', 'edGalStatus', 'edGalSync', 'edGalSyncText', 'edGalSyncAll', 'edGateType', 'edAddGate', 'edAddBox', 'edAddWall',
+    'edOpen', 'connectDlg', 'connectGo', 'connectCancel', 'edGalBtn', 'edMineBtn', 'edMine', 'edMineStatus', 'edMineNote', 'edOpenList', 'edUpdList', 'edSyncMine', 'edNewCards', 'edSlotList', 'edEditing', 'edGallery', 'edCards', 'edGrid', 'edGalStatus', 'edGalSync', 'edGalSyncText', 'edGalSyncAll', 'edGateType', 'edAddGate', 'edAddBox', 'edAddWall',
     'edRotL', 'edRotR', 'edDup', 'edDel', 'edUndo', 'edRedo', 'edFit', 'edTrees', 'edMap', 'edMapBox', 'edReadout',
     'edSlot', 'edFly', 'edFlyText', 'edSendEmu', 'edSave', 'edSize', 'edLite', 'edStatus', 'edEmuHas', 'edFileHas',
     'edSyncLine', 'edSyncText', 'edSendText', 'edName', 'edSeed', 'edShuffle', 'edTreesN',
@@ -1348,6 +1348,7 @@
   root.addEventListener('keydown', (e) => {
     const t = e.target, k = e.key;
     const typing = t && ((t.tagName === 'INPUT' && !/^(checkbox|radio|button|file)$/i.test(t.type)) || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA');
+    if (el.connectDlg.open) return;
     // the gallery shown: the map's keys are not for it, Escape goes back to the map
     if ((gal.open || gal.mine) && !typing) {
       if (k === 'Escape' && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); const b = gal.open ? el.edGalBtn : el.edMineBtn; showPanel(null); b.focus(); }
@@ -1635,7 +1636,7 @@
         (norm(x.text) === ed.file.text ? '<em>in the editor</em>'
           : '<button class="btn" type="button" data-sopen="' + key + i + '" aria-label="Open c' + i + (key === 'e' ? ' of the emulator' : ' of the radio') + '">Open</button>') +
         '</li>').join('') : '<li class="ed-cnone">No tracks in your slots yet.</li>') +
-        (radio.ok && !rad ? '<li class="ed-cnone">' + (on ? 'Reading the radio…' : 'The radio\'s tracks show here once it is connected. ' + esc(HOW_CONNECT) + ' ' +
+        (radio.ok && !rad ? '<li class="ed-cnone">' + (on ? 'Reading the radio…' : 'The radio\'s tracks show here once it is connected. ' +
           '<button class="btn" type="button" data-connect="1"' + (radio.busy ? ' disabled' : '') + '>' + (radio.state === 'ask' ? 'Reconnect radio' : 'Connect radio…') + '</button>') + '</li>' : '');
     });
   }
@@ -1695,9 +1696,7 @@
     el.edAllFrom.hidden = !from;
     el.edAllTo.hidden = !to;
     el.edAllFrom.disabled = el.edAllTo.disabled = radio.busy;
-    // without the radio: how to connect it (as Install says), or that this browser can't
-    el.edMineNote.hidden = radio.ok && radio.state === 'on';
-    el.edMineNote.textContent = radio.ok ? HOW_CONNECT : 'This browser can\'t reach the radio: Save file in the editor, and copy the file to ' + DIR + ' on its SD card.';
+    el.edMineNote.hidden = radio.ok;                  // (this browser can't reach the radio)
     // the gallery's newer versions
     const old = outdated();
     el.edGalSync.hidden = !old.length;
@@ -1804,7 +1803,7 @@
     if (!b) return;
     const d = b.dataset;
     if (d.new !== undefined) newTrack(d.new);
-    else if (d.connect !== undefined) connect(galStatus);
+    else if (d.connect !== undefined) askConnect(galStatus);
     else if (d.sopen !== undefined) {
       const n = clamp(+d.sopen.slice(1) || 1, 1, SLOTS), r = d.sopen[0] === 'r';
       const x = r ? (radioRead() ? radioSlots[n - 1] : null) : asEntry(emuSlot(n));
@@ -1815,7 +1814,7 @@
     const b = e.target.closest('button');
     if (!b) return;
     const d = b.dataset;
-    if (d.connect !== undefined) connect(mineStatus);
+    if (d.connect !== undefined) askConnect(mineStatus);
     else if (d.sdel !== undefined) {
       const n = clamp(+d.sdel.slice(1) || 1, 1, SLOTS);
       if (d.sdel[0] === 'r') removeFromRadio(n, mineStatus); else removeEmu(n, mineStatus);
@@ -2172,9 +2171,21 @@
       await useCard(dir, true, say);
     }, say);
   }
+  // Connect radio in the track editor (its Radio row, Open, My tracks): first a dialog that says
+  // what to do on the radio, whose button opens the folder picker (a click the picker needs); a card
+  // connected before only needs the browser's leave again (Reconnect), no dialog
+  let connectSay = null;
+  function askConnect(say) {
+    if (radio.state === 'ask' || typeof el.connectDlg.showModal !== 'function') { connect(say); return; }
+    connectSay = say;
+    el.connectDlg.showModal();
+    el.connectGo.focus();
+  }
+  el.connectGo.addEventListener('click', () => { el.connectDlg.close(); connect(connectSay || status); });
+  el.connectCancel.addEventListener('click', () => el.connectDlg.close());
   // the editor's Send to radio: connects first when it has to
   function sendToRadio() {
-    if (radio.state !== 'on') { connect(status); return; }
+    if (radio.state !== 'on') { askConnect(status); return; }
     if (ed.probs.length) return;
     const slot = ed.slot, text = ed.file.text, name = ed.T.name.trim();
     job(async () => {

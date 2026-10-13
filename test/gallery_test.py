@@ -358,8 +358,11 @@ def page_tests(br, errors, tracks):
           and order == ["Your tracks", "New track", "Gallery"] and page.inner_text("#edOpenList").startswith("No tracks in your slots yet.")
           and page.is_visible("#edGallery .ed-phead .file-btn"), f"page: Open: your tracks, new tracks, the gallery; a file at the top: {order}")
     page.click("#edMineBtn")
-    check(page.is_visible("#edMine") and page.is_hidden("#edGallery") and page.is_visible("#edMineNote") and "USB Storage" in page.inner_text("#edMineNote")
-          and page.is_visible("#edSlotList [data-connect]"), "page: My tracks without the radio: Connect radio and how to connect it")
+    page.click("#edSlotList [data-connect]")
+    check(page.is_visible("#edMine") and page.is_hidden("#edGallery") and page.is_hidden("#edMineNote") and page.is_visible("#connectDlg")
+          and "USB Storage (SD)" in page.inner_text("#connectDlg"), "page: My tracks: Connect radio… says first what to do on the radio")
+    page.keyboard.press("Escape")
+    check(page.is_hidden("#connectDlg") and page.is_visible("#edMine"), "page: ... Escape closes it, My tracks stays")
     page.click("#edGalBtn")
     page.click("button[aria-label='Open a copy of Slalom']")
     check(page.is_hidden("#edGallery") and page.input_value("#edName") == "My Slalom" and page.inner_text("#edEditing") == "Editing a local copy of My Slalom (kept in this browser as you edit): in no slot yet",
