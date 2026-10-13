@@ -412,12 +412,12 @@ footer.credits a { color: inherit; }
 #radioPanel .ed-sec:first-child { padding-top: 0; }
 #radioPanel .ed-sec h3 { margin-bottom: 12px; }
 #radioPanel .ed-sec .note { margin-top: 10px; line-height: 1.55; }
-#radioPanel .rp-grid > .rp-tracks { border-top: 0; padding-top: 0; }
+#radioPanel .rp-grid > .rp-right { border-top: 0; padding-top: 0; }
 @media (max-width: 900px) {
   .rp-grid { grid-template-columns: minmax(0, 1fr); }
-  #radioPanel .rp-grid > .rp-tracks { border-top: 1px solid var(--line); padding-top: 18px; }
+  #radioPanel .rp-grid > .rp-right { border-top: 1px solid var(--line); padding-top: 18px; }
 }
-#rpInstSec .ed-row, #rpTracksSec .ed-row { margin-top: 12px; }
+#rpInstSec .ed-row { margin-top: 12px; }
 .ed-rpath { margin: 0 0 6px; font: 500 12px/1.3 var(--font-mono); color: var(--muted); overflow-wrap: anywhere; }
 .ed-rslots { list-style: none; margin: 0; padding: 0; font-size: 13px; }
 .ed-rslots li { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 34px; border-bottom: 1px dashed var(--line); }
@@ -706,30 +706,25 @@ footer.credits a { color: inherit; }
         <div class="ed-radio" id="edRadio">
           <span class="ed-rstate" id="edRadioState">not connected</span>
           <button class="btn primary" id="edConnect" type="button" title="Pick the radio's SD card (the radio plugged in by USB, in USB Storage mode)">Connect radio…</button>
-          <button class="btn" id="edRefresh" type="button" title="Read the card again (its tracks, the game on it)" hidden>Read again</button>
+          <button class="btn" id="edRefresh" type="button" title="Read the card again (the game on it)" hidden>Read again</button>
           <button class="btn" id="edForget" type="button" title="Forget this SD card" hidden>Disconnect</button>
         </div>
         <p class="note ed-rnote" id="edRadioNote"></p>
       </section>
-      <section class="ed-sec" id="rpInstSec" aria-labelledby="rpInstH">
-        <h3 id="rpInstH">Install / update StickTime</h3>
-        <p class="note" id="edInstallNote" hidden>To put the game itself on the card, copy the SCRIPTS folder of the SD card zip from the <a href="https://github.com/juricabi/sticktime/releases/latest" target="_blank" rel="noopener">latest release</a><span id="edInstallMore">; the emulator at juricabi.github.io/sticktime can install it for you</span>.</p>
-        <p class="note" id="rpInstWait" hidden></p>
-        <div id="edInstallPanel" hidden>
-          <p class="ed-rpath" id="edInstallHead"></p>
-          <ul class="ed-rslots ed-editions" id="edEditions"></ul>
-          <p class="note" id="edInstallHint"></p>
-          <div class="ed-row">
-            <button class="btn primary" id="edInstallGo" type="button">Install / update</button>
-            <progress id="edInstallBar" max="1" value="0" hidden aria-label="Install progress"></progress>
-          </div>
-        </div>
-      </section>
     </div>
-    <section class="ed-sec rp-tracks" id="rpTracksSec" aria-labelledby="rpTracksH">
-      <h3 id="rpTracksH">Your tracks</h3>
-      <p class="note">The radio's tracks are in the track editor, beside the emulator's: open them, remove them or copy them between the two there.</p>
-      <div class="ed-row"><button class="btn" id="rpShowTracks" type="button">Show your tracks</button></div>
+    <section class="ed-sec rp-right" id="rpInstSec" aria-labelledby="rpInstH">
+      <h3 id="rpInstH">Install / update StickTime</h3>
+      <p class="note" id="edInstallNote" hidden>To put the game itself on the card, copy the SCRIPTS folder of the SD card zip from the <a href="https://github.com/juricabi/sticktime/releases/latest" target="_blank" rel="noopener">latest release</a><span id="edInstallMore">; the emulator at juricabi.github.io/sticktime can install it for you</span>.</p>
+      <p class="note" id="rpInstWait" hidden></p>
+      <div id="edInstallPanel" hidden>
+        <p class="ed-rpath" id="edInstallHead"></p>
+        <ul class="ed-rslots ed-editions" id="edEditions"></ul>
+        <p class="note" id="edInstallHint"></p>
+        <div class="ed-row">
+          <button class="btn primary" id="edInstallGo" type="button">Install / update</button>
+          <progress id="edInstallBar" max="1" value="0" hidden aria-label="Install progress"></progress>
+        </div>
+      </div>
     </section>
   </div>
   <p class="ed-status" id="rpStatus" role="status" aria-live="polite"></p>
@@ -10656,7 +10651,7 @@ const GALLERY_FILES = 'tracks/';
     'edSyncLine', 'edSyncText', 'edSendText', 'edName', 'edSeed', 'edShuffle', 'edTreesN',
     'edSel', 'edProblems', 'edProbPill', 'edOrder', 'edSend', 'edRadioLine', 'edRadioLineText',
     // the Install panel
-    'radioPanel', 'rpStatus', 'rpInstWait', 'rpInstSec', 'rpTracksSec', 'rpShowTracks', 'edAllFrom', 'edAllTo',
+    'radioPanel', 'rpStatus', 'rpInstWait', 'rpInstSec', 'edAllFrom', 'edAllTo',
     'edRadio', 'edRadioState', 'edConnect', 'edRefresh', 'edForget', 'edRadioNote', 'edInstallNote', 'edInstallMore', 'edInstallPanel', 'edInstallHead', 'edEditions', 'edInstallHint',
     'edInstallGo', 'edInstallBar']) el[k] = $(k);
   const rp = el.radioPanel;
@@ -11847,7 +11842,7 @@ const GALLERY_FILES = 'tracks/';
         (norm(x.text) === ed.file.text ? '<em>in the editor</em>'
           : '<button class="btn" type="button" data-sopen="' + key + i + '" aria-label="Open c' + i + (key === 'e' ? ' of the emulator' : ' of the radio') + '">Open</button>') +
         '</li>').join('') : '<li class="ed-cnone">No tracks in your slots yet.</li>') +
-        (radio.ok && !rad ? '<li class="ed-cnone">' + (on ? 'Reading the radio…' : 'The radio\'s tracks show here once it is connected. ' +
+        (radio.ok && !rad ? '<li class="ed-cnone">' + (on ? 'Reading the radio…' : 'The radio\'s tracks show here once it is connected. ' + esc(HOW_CONNECT) + ' ' +
           '<button class="btn" type="button" data-connect="1"' + (radio.busy ? ' disabled' : '') + '>' + (radio.state === 'ask' ? 'Reconnect radio' : 'Connect radio…') + '</button>') + '</li>' : '');
     });
   }
@@ -11907,7 +11902,9 @@ const GALLERY_FILES = 'tracks/';
     el.edAllFrom.hidden = !from;
     el.edAllTo.hidden = !to;
     el.edAllFrom.disabled = el.edAllTo.disabled = radio.busy;
-    el.edMineNote.hidden = radio.ok;
+    // without the radio: how to connect it (as Install says), or that this browser can't
+    el.edMineNote.hidden = radio.ok && radio.state === 'on';
+    el.edMineNote.textContent = radio.ok ? HOW_CONNECT : 'This browser can\'t reach the radio: Save file in the editor, and copy the file to ' + DIR + ' on its SD card.';
     // the gallery's newer versions
     const old = outdated();
     el.edGalSync.hidden = !old.length;
@@ -12153,6 +12150,8 @@ const GALLERY_FILES = 'tracks/';
   // handle is kept in IndexedDB, and a later visit reconnects with a click (or by itself while the
   // browser still allows it). Elsewhere (Firefox, Safari, phones, a page in another site's frame)
   // one line says to use Save file.
+  const HOW_CONNECT = 'Plug the radio in by USB and choose USB Storage (SD) on it, then Connect radio and pick its SD card ' +
+    '(the drive). Eject the drive before you unplug the radio.';
   const NO_RADIO = 'This browser can\'t write to the radio\'s SD card: use Save file and copy it to ' + DIR + ' on the radio.';
   const NOT_CARD = 'This doesn\'t look like the radio\'s SD card: no SCRIPTS folder. Pick the drive the radio shows up as.';
   function canPick() {
@@ -12270,10 +12269,9 @@ const GALLERY_FILES = 'tracks/';
     el.edSyncLine.hidden = !diff.length;
     el.edSyncText.textContent = 'The emulator and the radio hold different tracks in ' + andList(diff.map((i) => 'c' + i)) + '.';
     // the panel: the connection
-    el.edRadio.hidden = el.rpTracksSec.hidden = !radio.ok;
+    el.edRadio.hidden = !radio.ok;
     el.edRadioNote.className = 'note ed-rnote' + (radio.ok ? '' : ' warn');
-    el.edRadioNote.textContent = radio.ok ? 'Plug the radio in by USB and choose USB Storage (SD) on it, then Connect radio and pick its SD card ' +
-      '(the drive). Eject the drive before you unplug the radio.' : NO_RADIO;
+    el.edRadioNote.textContent = radio.ok ? HOW_CONNECT : NO_RADIO;
     // the game itself: from the site's sdcard/ where this browser can write to the card (not offline,
     // not in a hosted artifact), else the release zip
     el.edInstallNote.hidden = !!GAME && radio.ok;
@@ -12540,7 +12538,6 @@ const GALLERY_FILES = 'tracks/';
   });
   // a radio slot into the track editor, on that slot
   // Install's Show your tracks: the table of the slots, in the track editor's Open
-  el.rpShowTracks.addEventListener('click', () => { openEditor(); showPanel('mine'); });
 
   // ---------------------------------------------------------------- the two panels
   // Tracks (the track editor) and Install (the radio's SD card), each with its toolbar button, in the

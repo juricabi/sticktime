@@ -357,6 +357,10 @@ def page_tests(br, errors, tracks):
     check(new[0] == "Open a blank track" and new[1:] == ["Open a copy of " + t for t in ("Meadow", "Figure 8", "Dive Tower", "Slalom", "Hoop Forest", "Grand Prix", "Bando", "Pro Track")]
           and order == ["Your tracks", "New track", "Gallery"] and page.inner_text("#edOpenList").startswith("No tracks in your slots yet.")
           and page.is_visible("#edGallery .ed-phead .file-btn"), f"page: Open: your tracks, new tracks, the gallery; a file at the top: {order}")
+    page.click("#edMineBtn")
+    check(page.is_visible("#edMine") and page.is_hidden("#edGallery") and page.is_visible("#edMineNote") and "USB Storage" in page.inner_text("#edMineNote")
+          and page.is_visible("#edSlotList [data-connect]"), "page: My tracks without the radio: Connect radio and how to connect it")
+    page.click("#edGalBtn")
     page.click("button[aria-label='Open a copy of Slalom']")
     check(page.is_hidden("#edGallery") and page.input_value("#edName") == "My Slalom" and page.inner_text("#edEditing") == "Editing a local copy of My Slalom (kept in this browser as you edit): in no slot yet",
           f"page: Start from Slalom: a copy in the editor, in no slot yet ({page.inner_text('#edEditing')!r})")

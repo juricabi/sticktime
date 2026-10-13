@@ -444,7 +444,7 @@
     'edSyncLine', 'edSyncText', 'edSendText', 'edName', 'edSeed', 'edShuffle', 'edTreesN',
     'edSel', 'edProblems', 'edProbPill', 'edOrder', 'edSend', 'edRadioLine', 'edRadioLineText',
     // the Install panel
-    'radioPanel', 'rpStatus', 'rpInstWait', 'rpInstSec', 'rpTracksSec', 'rpShowTracks', 'edAllFrom', 'edAllTo',
+    'radioPanel', 'rpStatus', 'rpInstWait', 'rpInstSec', 'edAllFrom', 'edAllTo',
     'edRadio', 'edRadioState', 'edConnect', 'edRefresh', 'edForget', 'edRadioNote', 'edInstallNote', 'edInstallMore', 'edInstallPanel', 'edInstallHead', 'edEditions', 'edInstallHint',
     'edInstallGo', 'edInstallBar']) el[k] = $(k);
   const rp = el.radioPanel;
@@ -1635,7 +1635,7 @@
         (norm(x.text) === ed.file.text ? '<em>in the editor</em>'
           : '<button class="btn" type="button" data-sopen="' + key + i + '" aria-label="Open c' + i + (key === 'e' ? ' of the emulator' : ' of the radio') + '">Open</button>') +
         '</li>').join('') : '<li class="ed-cnone">No tracks in your slots yet.</li>') +
-        (radio.ok && !rad ? '<li class="ed-cnone">' + (on ? 'Reading the radio…' : 'The radio\'s tracks show here once it is connected. ' +
+        (radio.ok && !rad ? '<li class="ed-cnone">' + (on ? 'Reading the radio…' : 'The radio\'s tracks show here once it is connected. ' + esc(HOW_CONNECT) + ' ' +
           '<button class="btn" type="button" data-connect="1"' + (radio.busy ? ' disabled' : '') + '>' + (radio.state === 'ask' ? 'Reconnect radio' : 'Connect radio…') + '</button>') + '</li>' : '');
     });
   }
@@ -1695,7 +1695,9 @@
     el.edAllFrom.hidden = !from;
     el.edAllTo.hidden = !to;
     el.edAllFrom.disabled = el.edAllTo.disabled = radio.busy;
-    el.edMineNote.hidden = radio.ok;
+    // without the radio: how to connect it (as Install says), or that this browser can't
+    el.edMineNote.hidden = radio.ok && radio.state === 'on';
+    el.edMineNote.textContent = radio.ok ? HOW_CONNECT : 'This browser can\'t reach the radio: Save file in the editor, and copy the file to ' + DIR + ' on its SD card.';
     // the gallery's newer versions
     const old = outdated();
     el.edGalSync.hidden = !old.length;
@@ -1941,6 +1943,8 @@
   // handle is kept in IndexedDB, and a later visit reconnects with a click (or by itself while the
   // browser still allows it). Elsewhere (Firefox, Safari, phones, a page in another site's frame)
   // one line says to use Save file.
+  const HOW_CONNECT = 'Plug the radio in by USB and choose USB Storage (SD) on it, then Connect radio and pick its SD card ' +
+    '(the drive). Eject the drive before you unplug the radio.';
   const NO_RADIO = 'This browser can\'t write to the radio\'s SD card: use Save file and copy it to ' + DIR + ' on the radio.';
   const NOT_CARD = 'This doesn\'t look like the radio\'s SD card: no SCRIPTS folder. Pick the drive the radio shows up as.';
   function canPick() {
@@ -2058,10 +2062,9 @@
     el.edSyncLine.hidden = !diff.length;
     el.edSyncText.textContent = 'The emulator and the radio hold different tracks in ' + andList(diff.map((i) => 'c' + i)) + '.';
     // the panel: the connection
-    el.edRadio.hidden = el.rpTracksSec.hidden = !radio.ok;
+    el.edRadio.hidden = !radio.ok;
     el.edRadioNote.className = 'note ed-rnote' + (radio.ok ? '' : ' warn');
-    el.edRadioNote.textContent = radio.ok ? 'Plug the radio in by USB and choose USB Storage (SD) on it, then Connect radio and pick its SD card ' +
-      '(the drive). Eject the drive before you unplug the radio.' : NO_RADIO;
+    el.edRadioNote.textContent = radio.ok ? HOW_CONNECT : NO_RADIO;
     // the game itself: from the site's sdcard/ where this browser can write to the card (not offline,
     // not in a hosted artifact), else the release zip
     el.edInstallNote.hidden = !!GAME && radio.ok;
@@ -2328,7 +2331,6 @@
   });
   // a radio slot into the track editor, on that slot
   // Install's Show your tracks: the table of the slots, in the track editor's Open
-  el.rpShowTracks.addEventListener('click', () => { openEditor(); showPanel('mine'); });
 
   // ---------------------------------------------------------------- the two panels
   // Tracks (the track editor) and Install (the radio's SD card), each with its toolbar button, in the

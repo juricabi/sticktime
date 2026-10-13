@@ -267,8 +267,7 @@ def radio_tests(br, errors):
     note = page.inner_text("#edRadioNote")
     check(page.is_visible("#edConnect") and page.is_hidden("#editor") and "USB Storage" in note and "Eject" in note,
           "radio: the Radio SD panel: Connect radio… and what to do on the radio")
-    check("Connect the radio's SD card" in page.inner_text("#rpInstWait") and page.is_visible("#rpShowTracks"),
-          "radio: install waits for the card; Show your tracks points to the track editor")
+    check("Connect the radio's SD card" in page.inner_text("#rpInstWait"), "radio: install waits for the card")
 
     # a folder that isn't the card
     page.evaluate(PICK, "Documents")
@@ -325,7 +324,7 @@ def radio_tests(br, errors):
     page.evaluate(CARD_WRITE, [TRACKS + "3.txt", saved.replace("\n", "\r\n")])
     page.click("#radioBtn")
     radio_done(page)
-    page.click("#rpShowTracks")
+    page.click("#tracksBtn")
     rows = my_tracks(page)
     check(page.is_hidden("#radioPanel") and page.is_visible("#edMine") and rows[0][3].startswith("My Bando") and rows[2][3].startswith("My Grand Prix")
           and [r[3] for r in rows].count("") == 0 and sum(r[3] == "—" for r in rows) == 6, f"radio: Show your tracks: the slots table, the radio's by name: {rows[:3]}")
@@ -406,7 +405,7 @@ def radio_tests(br, errors):
     page.evaluate("() => { window.showDirectoryPicker = async () => { throw new DOMException('no pickers in this frame', 'SecurityError'); }; }")
     page.click("#edConnect")
     radio_done(page)
-    check(page.is_hidden("#edRadio") and page.inner_text("#edRadioNote") == NO_RADIO and page.is_hidden("#rpTracksSec"),
+    check(page.is_hidden("#edRadio") and page.inner_text("#edRadioNote") == NO_RADIO,
           "radio: a SecurityError gives the Save file line")
     editor(page)
     check(page.is_hidden("#edSend"), "radio: ... and the editor has no Send to radio")
@@ -423,7 +422,7 @@ def radio_tests(br, errors):
     radio_panel(page)
     note = page.text_content("#edInstallNote")
     check(page.is_hidden("#edRadio") and page.is_visible("#edRadioNote") and page.inner_text("#edRadioNote") == NO_RADIO
-          and page.is_hidden("#rpTracksSec") and page.is_hidden("#rpInstWait") and page.is_hidden("#edInstallPanel"), "radio: without the picker, one line: use Save file")
+          and page.is_hidden("#rpInstWait") and page.is_hidden("#edInstallPanel"), "radio: without the picker, one line: use Save file")
     check(page.is_visible("#edInstallNote") and "latest release" in note and "Chrome or Edge on a computer, this page can install it" in note,
           f"radio: ... and the game from the release zip: {note!r}")
     editor(page)
