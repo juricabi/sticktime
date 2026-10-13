@@ -825,7 +825,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
       if AI.d[a] > 0 then p = p + 1 end
     end
     R.pos = p
-    state, tState, focus = DONE, gt, 1
+    state, tState, focus, R.dirty = DONE, gt, 1, false
     saveData()
     beep(1800, 120)
     beep(2400, 300)
@@ -862,7 +862,8 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
           BEST.l[S.track], R.newLap = lt, true
           local m = MED.of(lt)
           showMsg("LAP " .. lap .. "  " .. timeStr(lt) .. "  " .. (m > MED.of(b) and MED.n[m] or "BEST") .. "!", true)
-          saveData()
+          -- (a race saves at its end, or when it is left: no SD card write while racing)
+          if gmode == 1 then R.dirty = true else saveData() end
         else
           showMsg("LAP " .. lap .. "  " .. timeStr(lt) .. "  +" .. timeStr(lt - b), false)
         end
@@ -2603,6 +2604,7 @@ end)()
 
 -- ---------------------------------------------------------- game flow
 local function startRace(m)
+  if R.dirty then saveData() R.dirty = false end      -- a best lap of a race left early
   gmode = m
   lap, nextGate, lastGate, lapStart = 0, 1, 0, nil
   R.n, R.total, R.newLap, R.newRace, R.newBest, R.crashes, R.msg, R.cd = 0, 0, false, false, false, 0, nil, -1
@@ -3268,6 +3270,7 @@ local handleEvent
   end
 
   local function toMenu()
+    if R.dirty then saveData() R.dirty = false end    -- a best lap of a race left early
     state, focus, scroll, editing = MENU, 1, 0, false
     AI.n = 0
     placeDrone(TR.px, DR, TR.pz, TR.hx, TR.hz)
