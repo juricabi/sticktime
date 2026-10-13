@@ -325,6 +325,9 @@ footer.credits a { color: inherit; }
 #edInstallBar { flex: 1 1 160px; height: 10px; accent-color: var(--accent); }
 .ed-status, .editor .ed-status { margin: 10px 2px 0; font-size: 12.5px; color: var(--muted); }
 .ed-status:empty { display: none; }
+/* the panels take the focus when their plain text is clicked (keys stay away from the game): no ring */
+#editor:focus, #radioPanel:focus { outline: none; }
+.ed-rslots .bad { color: var(--bad); font-style: normal; }
 .ed-status.ok { color: var(--ok); }
 .ed-status.bad { color: var(--bad); }
 .ed-side { min-width: 0; }

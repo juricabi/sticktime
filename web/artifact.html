@@ -330,6 +330,9 @@ footer.credits a { color: inherit; }
 #edInstallBar { flex: 1 1 160px; height: 10px; accent-color: var(--accent); }
 .ed-status, .editor .ed-status { margin: 10px 2px 0; font-size: 12.5px; color: var(--muted); }
 .ed-status:empty { display: none; }
+/* the panels take the focus when their plain text is clicked (keys stay away from the game): no ring */
+#editor:focus, #radioPanel:focus { outline: none; }
+.ed-rslots .bad { color: var(--bad); font-style: normal; }
 .ed-status.ok { color: var(--ok); }
 .ed-status.bad { color: var(--bad); }
 .ed-side { min-width: 0; }
@@ -433,7 +436,7 @@ footer.credits a { color: inherit; }
   </div>
 </header>
 
-<section class="card editor" id="editor" hidden aria-labelledby="edTitle">
+<section class="card editor" id="editor" hidden aria-labelledby="edTitle" tabindex="-1">
   <div class="ed-head">
     <h2 id="edTitle">Track editor <small>your tracks are 9 to 16 in the game</small></h2>
     <div class="ed-actions">
@@ -444,7 +447,7 @@ footer.credits a { color: inherit; }
   </div>
   <div class="ed-grid">
     <div class="ed-main">
-      <div class="ed-tools" role="toolbar" aria-label="Edit the track">
+      <div class="ed-tools" role="group" aria-label="Edit the track">
         <span class="ed-pair">
           <select id="edGateType" aria-label="Type of gate to add"></select>
           <button class="btn" id="edAddGate" type="button" title="Add a gate after the selected one">Add gate</button>
@@ -516,7 +519,7 @@ footer.credits a { color: inherit; }
   </div>
 </section>
 
-<section class="card editor rpanel" id="radioPanel" hidden aria-labelledby="rpTitle">
+<section class="card editor rpanel" id="radioPanel" hidden aria-labelledby="rpTitle" tabindex="-1">
   <div class="ed-head">
     <h2 id="rpTitle">Radio &amp; install <small>the radio's SD card over USB: StickTime and your tracks on it</small></h2>
     <div class="ed-actions">
@@ -530,13 +533,14 @@ footer.credits a { color: inherit; }
         <div class="ed-radio" id="edRadio">
           <span class="ed-rstate" id="edRadioState">not connected</span>
           <button class="btn primary" id="edConnect" type="button" title="Pick the radio's SD card (the radio plugged in by USB, in USB Storage mode)">Connect radio…</button>
+          <button class="btn" id="edRefresh" type="button" title="Read the card again (its tracks, the game on it)" hidden>Read again</button>
           <button class="btn" id="edForget" type="button" title="Forget this SD card" hidden>Disconnect</button>
         </div>
         <p class="note ed-rnote" id="edRadioNote"></p>
       </section>
       <section class="ed-sec" id="rpInstSec" aria-labelledby="rpInstH">
         <h3 id="rpInstH">Install / update StickTime</h3>
-        <p class="note" id="edInstallNote" hidden>To put the game itself on the card, copy the SCRIPTS folder of the SD card zip from the <a href="https://github.com/juricabi/sticktime/releases/latest" target="_blank" rel="noopener">latest release</a>; the emulator at juricabi.github.io/sticktime can install it for you.</p>
+        <p class="note" id="edInstallNote" hidden>To put the game itself on the card, copy the SCRIPTS folder of the SD card zip from the <a href="https://github.com/juricabi/sticktime/releases/latest" target="_blank" rel="noopener">latest release</a><span id="edInstallMore">; the emulator at juricabi.github.io/sticktime can install it for you</span>.</p>
         <p class="note" id="rpInstWait" hidden></p>
         <div id="edInstallPanel" hidden>
           <p class="ed-rpath" id="edInstallHead"></p>
@@ -544,7 +548,7 @@ footer.credits a { color: inherit; }
           <p class="note" id="edInstallHint"></p>
           <div class="ed-row">
             <button class="btn primary" id="edInstallGo" type="button">Install / update</button>
-            <progress id="edInstallBar" max="1" value="0" hidden></progress>
+            <progress id="edInstallBar" max="1" value="0" hidden aria-label="Install progress"></progress>
           </div>
         </div>
       </section>
@@ -8580,7 +8584,8 @@ const ROBOTO = { r: "d09GMgABAAAAAFV8ABIAAAAAsBgAAFUTAAEAAAAAAAAAAAAAAAAAAAAAAAA
   const store = {
     // (the key prefix is from StickTime's old name, FPV Sim: kept so saved settings stay)
     get(k, d) { try { const v = localStorage.getItem('fpvsim.' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
-    set(k, v) { try { localStorage.setItem('fpvsim.' + k, JSON.stringify(v)); } catch (e) { /* storage blocked */ } },
+    // true when it was kept (false: storage blocked or full)
+    set(k, v) { try { localStorage.setItem('fpvsim.' + k, JSON.stringify(v)); return true; } catch (e) { return false; } },
   };
 
   const app = {
@@ -9429,7 +9434,8 @@ const ROBOTO = { r: "d09GMgABAAAAAFV8ABIAAAAAsBgAAFUTAAEAAAAAAAAAAAAAAAAAAAAAAAA
   const held = new Set();
   let exitDown = 0, exitLongSent = false;
   // form fields keep their keys, and so do the Tracks and Install panels (editor.js): what is typed
-  // there (R to turn a gate, Delete, Enter on a button) never flies the quad
+  // there (R to turn a gate, Delete, Enter on a button) never flies the quad. The panels take the
+  // focus themselves (tabindex -1) when their plain text is clicked, so it doesn't fall to the page.
   const isField = (t) => t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA'
     || (t.closest && t.closest('#editor, #radioPanel') !== null));
   function key(name) { if (app.engine) app.engine.key(name); }
@@ -9891,8 +9897,9 @@ const ROBOTO = { r: "d09GMgABAAAAAFV8ABIAAAAAsBgAAFUTAAEAAAAAAAAAAAAAAAAAAAAAAAA
     key, pause(p) { app.paused = p; $('pauseChk').checked = p; },
     // a file on the virtual SD card, kept (localStorage) like the game's own saves; the game
     // reads it when it next starts (boot)
-    writeSD(path, text) { app.sd.set(path, String(text)); saveSD(); },
-    removeSD(path) { app.sd.delete(path); saveSD(); },
+    // (true when kept; false: the browser's storage is full or blocked, the file lasts this visit)
+    writeSD(path, text) { app.sd.set(path, String(text)); return saveSD(); },
+    removeSD(path) { app.sd.delete(path); return saveSD(); },
     touch(type, x, y) { app.engine.touch(type, { x, y, startX: x, startY: y, slideX: 0, slideY: 0, tapCount: 1 }); },
     step(n, ms) { for (let i = 0; i < (n || 1); i++) { if (ms) app.rate = ms; frame(); } draw(); showOverlay(); return app.engine.error; },
     test(name, ...args) { return app.engine.callTest(name, ...args); },
@@ -9958,6 +9965,12 @@ const GAME_FILES = '';
     return h >>> 0;
   }
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  // the ranges the editor keeps every item in (an opened file, a stored work in progress, an edit),
+  // so that reading a track back never changes it
+  const pos = (v) => r2(clamp(v, -999, 999));
+  const gateOf = (x, z, t, yaw, h) => ({ x: pos(x), z: pos(z), t, yaw: normYaw(yaw), h: r2(clamp(h, 0, 100)) });
+  const boxOf = (x, z, hx, hz, y0, y1, k) => ({ x: pos(x), z: pos(z), hx: r2(clamp(Math.abs(hx), 0.05, 200)), hz: r2(clamp(Math.abs(hz), 0.05, 200)),
+    y0: r2(clamp(y0, 0, 200)), y1: r2(clamp(y1, 0.1, 300)), k });
 
   // ---------------------------------------------------------------- the file
   // A track: { name, seed, trees, gates: [{ id, g, x, z, t, yaw, h }], boxes: [{ id, g, x, z, hx, hz,
@@ -10001,16 +10014,23 @@ const GAME_FILES = '';
     for (let i = 0; i < g.length; i += 5) {
       const t = g[i + 2];
       if (!(Number.isInteger(t) && t >= 1 && t <= 8)) return { error: 'gate ' + (i / 5 + 1) + ' is of type ' + t + ': the types are 1 to 8.' };
-      T.gates.push({ x: r2(g[i]), z: r2(g[i + 1]), t, yaw: normYaw(g[i + 3]), h: Math.max(0, r2(g[i + 4])) });
+      T.gates.push(gateOf(g[i], g[i + 1], t, g[i + 3], g[i + 4]));
     }
     for (let i = 0; i < b.length; i += 7) {
       const k = b[i + 6];
       if (!(Number.isInteger(k) && k >= 1 && k <= 3)) return { error: 'structure ' + (i / 7 + 1) + ' is of kind ' + k + ': the kinds are 1 to 3.' };
-      T.boxes.push({ x: r2(b[i]), z: r2(b[i + 1]), hx: r2(Math.abs(b[i + 2])), hz: r2(Math.abs(b[i + 3])), y0: r2(b[i + 4]), y1: r2(b[i + 5]), k });
+      T.boxes.push(boxOf(b[i], b[i + 1], b[i + 2], b[i + 3], b[i + 4], b[i + 5], k));
     }
-    const big = new TextEncoder().encode(s).length > 1000;
-    return { T, note: big ? 'The game reads only the first 1000 bytes of a track file: make it smaller.' : '' };
+    const notes = [];
+    if (new TextEncoder().encode(s).length > 1000) notes.push('The game reads only the first 1000 bytes of a track file: make it smaller.');
+    // numbers the editor writes otherwise (rounded, kept in range, another format): a new id
+    if (head.slice(2).concat(cut < 0 ? [] : ['/'].concat(tail)).join(' ') !== numbersOf(T)) {
+      notes.push('Some values were adjusted to what the editor writes (rounded or kept in range): saving gives the track a new id, so its best times on the radio start over.');
+    }
+    return { T, note: notes.join(' ') };
   }
+  // a track file the editor (and so the game) can't read: marked in the slot lists, never copied
+  const unreadable = (t) => !!parseFile(t).error;
 
   // ---------------------------------------------------------------- geometry (buildTrack's)
   function gateGeom(g) {
@@ -10161,17 +10181,18 @@ const GAME_FILES = '';
   function clean(T) {
     if (!T || typeof T !== 'object' || !Array.isArray(T.gates) || !Array.isArray(T.boxes)) return null;
     const n = (v, d) => (Number.isFinite(+v) ? +v : d);
-    const pos = (v) => r2(clamp(n(v, 0), -999, 999));
     const id = (v) => (Number.isInteger(v) && v > 0 ? v : 0);
     const out = { name: typeof T.name === 'string' ? T.name.slice(0, 40) : 'My Track',
       seed: clamp(Math.round(n(T.seed, 1)), 1, 99), trees: clamp(Math.round(n(T.trees, 9)), 0, 30), gates: [], boxes: [] };
     for (const g of T.gates.slice(0, 64)) {
-      if (g && typeof g === 'object') out.gates.push({ id: id(g.id), g: id(g.g), x: pos(g.x), z: pos(g.z), t: clamp(Math.round(n(g.t, 1)), 1, 8), yaw: normYaw(n(g.yaw, 0)), h: r2(clamp(n(g.h, 0), 0, 100)) });
+      if (g && typeof g === 'object') {
+        out.gates.push(Object.assign({ id: id(g.id), g: id(g.g) }, gateOf(n(g.x, 0), n(g.z, 0), clamp(Math.round(n(g.t, 1)), 1, 8), n(g.yaw, 0), n(g.h, 0))));
+      }
     }
     for (const b of T.boxes.slice(0, 64)) {
       if (b && typeof b === 'object') {
-        out.boxes.push({ id: id(b.id), g: id(b.g), x: pos(b.x), z: pos(b.z), hx: r2(clamp(n(b.hx, 1), 0.05, 200)), hz: r2(clamp(n(b.hz, 1), 0.05, 200)),
-          y0: r2(clamp(n(b.y0, 0), 0, 200)), y1: r2(clamp(n(b.y1, 4), 0.1, 300)), k: clamp(Math.round(n(b.k, 1)), 1, 3) });
+        out.boxes.push(Object.assign({ id: id(b.id), g: id(b.g) },
+          boxOf(n(b.x, 0), n(b.z, 0), n(b.hx, 1), n(b.hz, 1), n(b.y0, 0), n(b.y1, 4), clamp(Math.round(n(b.k, 1)), 1, 3))));
       }
     }
     const seen = new Set();
@@ -10185,6 +10206,9 @@ const GAME_FILES = '';
     undo: [], redo: [], nextId: 1, nextGroup: 1,
     slot: 1, showTrees: false, open: false, fitted: false, hadView: false,
     G: [], pad: null, file: null, probs: [], bad: new Set(), trees: null, wind: null,
+    // the track as it came (a template, a file), and what was saved (Save file, Send to radio, Fly
+    // it): replacing a track that is in neither, nor in a slot, asks first
+    pristine: '', saved: new Set(),
   };
   const V = { x: 0, z: 30, s: 4 };                  // map centre (m) and scale (px per m)
 
@@ -10290,13 +10314,22 @@ const GAME_FILES = '';
   // ---------------------------------------------------------------- the emulator
   const sim = () => (window.sim && window.sim.app ? window.sim : null);
   const slotPath = (n) => DIR + 'c' + n + '.txt';
+  const MAX_FILE = 32768;                          // a track file is far smaller: a bigger one isn't read
   // a track file's name, as the game reads it (its first line, 16 characters)
   const nameOf = (t) => (t.replace(/^\s+/, '').split(/[\r\n]/)[0] || '').trim().slice(0, 16) || '(no name)';
   const emuSlot = (n) => {
     const s = sim(), t = s && s.app.sd ? s.app.sd.get(slotPath(n)) : undefined;
     return typeof t === 'string' ? t : null;
   };
-  const slotName = (n) => { const t = emuSlot(n); return t === null ? null : nameOf(t); };
+  // a slot's file: null (none), else { text, bad }: bad says why the game and the editor can't use it
+  // ('big': too big to be read at all, text null; 'parse': the editor's checks reject it)
+  const BAD = { big: 'too big to be a track', parse: 'can\'t be read' };
+  const asEntry = (t) => (t === null ? null : { text: t, bad: unreadable(t) ? 'parse' : '' });
+  // a slot's file in a question: "its name", or what is wrong with it
+  const what = (e) => (e.bad === 'big' ? 'a file too big to be a track' : e.bad ? 'a file that can\'t be read' : '"' + nameOf(e.text) + '"');
+  // what a slot's file is called in the lists: its name, or that it can't be read
+  const slotText = (t) => (unreadable(t) ? BAD.parse : nameOf(t));
+  const slotName = (n) => { const t = emuSlot(n); return t === null ? null : slotText(t); };
 
   // ---------------------------------------------------------------- the page
   const el = {};
@@ -10307,8 +10340,8 @@ const GAME_FILES = '';
     'edSel', 'edProblems', 'edProbPill', 'edOrder', 'edSend', 'edRadioLine', 'edRadioLineText', 'edRadioLink',
     // the Install panel
     'radioPanel', 'rpStatus', 'rpInstWait', 'rpTracksWait', 'rpInstSec', 'rpTracksSec',
-    'edRadio', 'edRadioState', 'edConnect', 'edForget', 'edRadioNote', 'edRadioPanel', 'edRadioPath', 'edRadioSlots',
-    'edRadioToEmu', 'edEmuToRadio', 'edInstallNote', 'edInstallPanel', 'edInstallHead', 'edEditions', 'edInstallHint',
+    'edRadio', 'edRadioState', 'edConnect', 'edRefresh', 'edForget', 'edRadioNote', 'edRadioPanel', 'edRadioPath', 'edRadioSlots',
+    'edRadioToEmu', 'edEmuToRadio', 'edInstallNote', 'edInstallMore', 'edInstallPanel', 'edInstallHead', 'edEditions', 'edInstallHint',
     'edInstallGo', 'edInstallBar']) el[k] = $(k);
   const rp = el.radioPanel;
   const cv = el.edMap, ctx = cv.getContext('2d');
@@ -10438,7 +10471,7 @@ const GAME_FILES = '';
     if (key === 'x' || key === 'z') {
       // the whole group moves with it
       const d = r2(clamp(val, -999, 999)) - it[key];
-      for (const o of items()) if (o === it || (it.g && o.g === it.g && ed.sel.has(o.id))) o[key] = r2(o[key] + d);
+      for (const o of items()) if (o === it || (it.g && o.g === it.g && ed.sel.has(o.id))) o[key] = pos(o[key] + d);
     } else if (f.kind === 'gate') {
       if (key === 't') it.t = clamp(Math.round(val), 1, 8);
       else if (key === 'yaw') it.yaw = normYaw(val);
@@ -10537,7 +10570,7 @@ const GAME_FILES = '';
       x = a.x + A.hx * 20; z = a.z + A.hz * 20; yaw = a.yaw;
     }
     pushUndo();
-    const g = { id: ed.nextId++, g: 0, x: r2(snapTo(x, GRID)), z: r2(snapTo(z, GRID)), t, yaw: normYaw(snapTo(yaw, 5)), h: 0 };
+    const g = { id: ed.nextId++, g: 0, x: pos(snapTo(x, GRID)), z: pos(snapTo(z, GRID)), t, yaw: normYaw(snapTo(yaw, 5)), h: 0 };
     T.gates.splice(at, 0, g);
     setSel([g.id], g.id);
     changed();
@@ -10546,7 +10579,7 @@ const GAME_FILES = '';
   function addBox() {
     if (ed.T.boxes.length >= MAX_BOXES) return;
     pushUndo();
-    const b = { id: ed.nextId++, g: 0, x: r2(snapTo(V.x - 2, GRID) + 2), z: r2(snapTo(V.z - 2, GRID) + 2), hx: 2, hz: 2, y0: 0, y1: 4, k: 1 };
+    const b = { id: ed.nextId++, g: 0, x: pos(snapTo(V.x - 2, GRID) + 2), z: pos(snapTo(V.z - 2, GRID) + 2), hx: 2, hz: 2, y0: 0, y1: 4, k: 1 };
     ed.T.boxes.push(b);
     setSel([b.id], b.id);
     changed();
@@ -10556,7 +10589,7 @@ const GAME_FILES = '';
     const T = ed.T;
     if (T.gates.length >= MAX_GATES || T.boxes.length > MAX_BOXES - 3) return;
     pushUndo();
-    const cx = r2(snapTo(V.x, GRID)), cz = r2(snapTo(V.z, GRID)), g = ed.nextGroup++;
+    const cx = r2(clamp(snapTo(V.x, GRID), -990, 990)), cz = r2(clamp(snapTo(V.z, GRID), -990, 990)), g = ed.nextGroup++;
     const iw = GHW[8], open = 2 * GHH[8], top = 7, side = 4, th = 0.25;
     const gate = { id: ed.nextId++, g, x: cx, z: cz, t: 8, yaw: 0, h: GHH[8] };
     const mk = (x, hx, y0) => ({ id: ed.nextId++, g, x: r2(x), z: cz, hx: r2(hx), hz: th, y0: r2(y0), y1: top, k: 1 });
@@ -10600,8 +10633,8 @@ const GAME_FILES = '';
     const c = quarter ? 0 : Math.cos(step * dir * D2R), sn = quarter ? dir : Math.sin(step * dir * D2R);
     for (const o of s.all) {
       const dx = o.x - px, dz = o.z - pz;
-      o.x = r2(px + dx * c + dz * sn);
-      o.z = r2(pz - dx * sn + dz * c);
+      o.x = pos(px + dx * c + dz * sn);
+      o.z = pos(pz - dx * sn + dz * c);
     }
     for (const g of s.gates) g.yaw = normYaw(g.yaw + step * dir);
     if (quarter) for (const b of s.boxes) [b.hx, b.hz] = [b.hz, b.hx];
@@ -10618,7 +10651,7 @@ const GAME_FILES = '';
     pushUndo();
     const b = boundsOf(s.all), off = snapTo(b.x1 - b.x0, GRID) + 2, groups = new Map(), ids = [];
     const copy = (o) => {
-      const c = Object.assign({}, o, { id: ed.nextId++, x: r2(o.x + off) });
+      const c = Object.assign({}, o, { id: ed.nextId++, x: pos(o.x + off) });
       if (o.g) { if (!groups.has(o.g)) groups.set(o.g, ed.nextGroup++); c.g = groups.get(o.g); }
       ids.push(c.id);
       return c;
@@ -10636,7 +10669,7 @@ const GAME_FILES = '';
     const now = performance.now();
     if (now - nudgeT > 1000) pushUndo();             // a run of nudges is one undo step
     nudgeT = now;
-    for (const o of s) { o.x = r2(o.x + dx); o.z = r2(o.z + dz); }
+    for (const o of s) { o.x = pos(o.x + dx); o.z = pos(o.z + dz); }
     changed();
   }
   function moveGate(i, d) {
@@ -10655,12 +10688,25 @@ const GAME_FILES = '';
     for (const o of s) o.g = g;
     changed();
   }
-  function load(T, infer) {
+  function load(T, infer, unsure) {
     ed.T = withIds(T);
     if (infer) inferGroups(ed.T);
     setSel([]);
     ed.hover = null;
     changed();
+    ed.pristine = unsure ? '' : ed.file.text;          // (a stored work in progress may be unsaved)
+  }
+  // the track would be lost: changed since it came, and in no slot and no saved file (a slot's
+  // file with CR LF line ends is the same track)
+  function unsaved() {
+    const t = ed.file.text;
+    if (t === ed.pristine || ed.saved.has(t)) return false;
+    for (let i = 1; i <= SLOTS; i++) { const f = emuSlot(i); if (f !== null && f.replace(/\r\n?/g, '\n') === t) return false; }
+    return true;
+  }
+  function okToReplace(what) {
+    return !unsaved() || window.confirm('Replace "' + ed.T.name.trim() + '" with ' + what + '? Your track isn\'t in a slot or a saved file ' +
+      'yet (Fly it, Save file or Send to radio keeps it), and undo goes only as far back as this visit.');
   }
 
   // ---------------------------------------------------------------- map view
@@ -11026,6 +11072,7 @@ const GAME_FILES = '';
   function endDrag() {
     if (drag && drag.moved && drag.mode !== 'pan') changed();
     drag = null;
+    el.edProblems.setAttribute('aria-live', 'polite');  // (quiet while dragging: say it once, at the end)
   }
   cv.addEventListener('pointerdown', (e) => {
     e.preventDefault();                                // no text selection on the page while dragging
@@ -11088,7 +11135,7 @@ const GAME_FILES = '';
       redraw();
       return;
     }
-    if (!drag.moved) { drag.moved = true; pushUndo(); }
+    if (!drag.moved) { drag.moved = true; pushUndo(); el.edProblems.setAttribute('aria-live', 'off'); }
     const free = e.altKey, x = wx(p.x), z = wz(p.y);
     if (drag.mode === 'move') {
       let dx = x - drag.x, dz = z - drag.z;
@@ -11157,7 +11204,11 @@ const GAME_FILES = '';
     if (typing || e.altKey) return;
     if (k === 'r' || k === 'R') { e.preventDefault(); rotateSel(e.shiftKey ? -1 : 1); }
     else if (k === 'Delete' || k === 'Backspace') { e.preventDefault(); deleteSel(); }
-    else if (k === 'Escape') { if (ed.sel.size) { e.preventDefault(); setSel([]); refresh(); } }
+    else if (k === 'Escape') {
+      // the first one lets go of the selection, the next closes the editor
+      e.preventDefault();
+      if (ed.sel.size) { setSel([]); refresh(); } else closeEditor(true);
+    }
     else if (t === cv && k.startsWith('Arrow')) {
       // the selection moves (Shift: 5 m at a time); with nothing selected, the map does
       e.preventDefault();
@@ -11276,6 +11327,7 @@ const GAME_FILES = '';
     const v = el.edTemplate.value;
     el.edTemplate.value = '';
     if (v === '') return;
+    if (!okToReplace(v === 'blank' ? 'a blank track' : 'a copy of ' + D.tracks[+v].name)) { status('Kept your track.'); return; }
     pushUndo();
     load(v === 'blank' ? blankTrack() : fromBuiltin(D.tracks[+v]), true);
     fit();
@@ -11285,7 +11337,7 @@ const GAME_FILES = '';
     const file = el.edOpen.files && el.edOpen.files[0];
     el.edOpen.value = '';
     if (!file) return;
-    if (file.size > 32768) { status(file.name + ' is too big for a track file.', 'bad'); return; }
+    if (file.size > MAX_FILE) { status(file.name + ' is too big for a track file.', 'bad'); return; }
     const rd = new FileReader();
     rd.onload = () => {
       const m = /^c([1-8])\.txt$/i.exec(file.name);
@@ -11307,8 +11359,14 @@ const GAME_FILES = '';
     if (ed.probs.length) return;
     const s = sim();
     if (!s || !s.engine) { status('The emulator is still starting: try again in a moment.', 'bad'); return; }
-    const slot = ed.slot, t = 8 + slot;
-    s.writeSD(slotPath(slot), ed.file.text);
+    const slot = ed.slot, t = 8 + slot, old = asEntry(emuSlot(slot));
+    if (old && old.text !== ed.file.text && !window.confirm('Slot c' + slot + ' of the emulator holds ' + what(old) + '. Replace it with "' +
+      ed.T.name.trim() + '"?')) {
+      status('Not flown: c' + slot + ' keeps ' + what(old) + '. Pick another slot.');
+      return;
+    }
+    const kept = s.writeSD(slotPath(slot), ed.file.text) !== false;
+    ed.saved.add(ed.file.text);
     // StickTime Lite (and any other script) doesn't read custom tracks: back to the screen's own
     if (s.app.custom || s.app.script === 'lite') s.script('auto'); else s.boot();
     s.pause(false);
@@ -11325,7 +11383,8 @@ const GAME_FILES = '';
       status('The game could not build the track: ' + String(err && err.message || err).split('\n')[0], 'bad');
       return;
     }
-    status('Flying ' + (name || ed.T.name.trim()) + ' (track ' + t + ', c' + slot + '.txt) in Practice.', 'ok');
+    status('Flying ' + (name || ed.T.name.trim()) + ' (track ' + t + ', c' + slot + '.txt) in Practice.' + (kept ? ''
+      : ' The browser\'s storage is full: c' + slot + ' lasts only this visit (Save file keeps the track).'), kept ? 'ok' : 'bad');
     closeEditor(false);
     const radio = $('radio');
     if (radio) radio.scrollIntoView({ block: 'center', behavior: reduced() ? 'auto' : 'smooth' });
@@ -11342,16 +11401,20 @@ const GAME_FILES = '';
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 4000);
+    ed.saved.add(ed.file.text);
     status('Saved c' + ed.slot + '.txt: copy it to ' + DIR + ' on the radio\'s SD card.', 'ok');
   }
   el.edFly.addEventListener('click', fly);
   el.edSave.addEventListener('click', saveFile);
   el.edEmpty.addEventListener('click', () => {
-    const s = sim();
-    if (!s || !slotName(ed.slot)) return;
-    s.removeSD(slotPath(ed.slot));
+    const s = sim(), slot = ed.slot, t = emuSlot(slot);
+    if (!s || t === null) return;
+    if (!window.confirm('Empty slot c' + slot + ' of the emulator? ' + what(asEntry(t)).replace(/^a/, 'A') +
+      ' goes from its SD card (a file you saved stays where it is).')) return;
+    const kept = s.removeSD(slotPath(slot)) !== false;
     renderSlots();
-    status('Slot c' + ed.slot + ' is empty. The game\'s track menu shows it at its next start.', 'ok');
+    status('Slot c' + slot + ' is empty. The game\'s track menu shows it at its next start.' +
+      (kept ? '' : ' The browser\'s storage is blocked: the slot comes back at the next visit.'), kept ? 'ok' : 'bad');
   });
 
   // ---------------------------------------------------------------- the radio's SD card
@@ -11367,8 +11430,9 @@ const GAME_FILES = '';
     try { return window.top === window.self || !!window.top.location.href; } catch (e) { return false; }   // another site's frame
   }
   // dir: what the user picked; at: where that is on the card (the card, SCRIPTS, TOOLS, StickTimeTracks);
-  // panel: the Install panel is open; listed: its list of the card's slots is read
-  const radio = { ok: canPick(), state: 'off', dir: null, at: null, busy: false, panel: false, listed: false };
+  // panel: the Install panel is open; listed: its list of the card's slots is read; writing: the
+  // job under way writes to the card; gen: counts Disconnects (a job that outlives its card says nothing)
+  const radio = { ok: canPick(), state: 'off', dir: null, at: null, busy: false, writing: false, panel: false, listed: false, gen: 0, again: false };
   // what the Install panel says (the editor has its own line: status)
   function rstatus(msg, kind) {
     el.rpStatus.textContent = msg || '';
@@ -11420,9 +11484,12 @@ const GAME_FILES = '';
     return d;
   }
   const tracksDir = (create) => walk(STEPS[radio.at], create);
+  // a slot's file on the card, as asEntry has it (one too big to be a track isn't read at all)
   async function readSlot(dir, n) {
     const f = dir && await child(dir, 'c' + n + '.txt', 'file');
-    return f ? (await f.getFile()).text() : null;
+    if (!f) return null;
+    const file = await f.getFile();
+    return file.size > MAX_FILE ? { text: null, bad: 'big' } : asEntry(await file.text());
   }
   async function writeSlot(dir, n, text) {
     const f = await child(dir, 'c' + n + '.txt', 'file', true);
@@ -11459,51 +11526,72 @@ const GAME_FILES = '';
       : bad ? 'Fix the problems listed under Check first' : 'Write c' + ed.slot + '.txt to the radio\'s SD card (track ' + (8 + ed.slot) + ')';
     el.edRadioLineText.textContent = 'Radio SD: ' + (on ? name + ' connected.' : ask ? name + ', to allow again.' : 'not connected.');
     // the panel: the connection
-    el.edRadio.hidden = el.rpInstSec.hidden = el.rpTracksSec.hidden = !radio.ok;
+    el.edRadio.hidden = el.rpTracksSec.hidden = !radio.ok;
     el.edRadioNote.className = 'note ed-rnote' + (radio.ok ? '' : ' warn');
     el.edRadioNote.textContent = radio.ok ? 'Plug the radio in by USB and choose USB Storage (SD) on it, then Connect radio and pick its SD card ' +
       '(the drive). Eject the drive before you unplug the radio.' : NO_RADIO;
-    if (!radio.ok) return;
+    // the game itself: from the site's sdcard/ where this browser can write to the card (not offline,
+    // not in a hosted artifact), else the release zip
+    el.edInstallNote.hidden = !!GAME && radio.ok;
+    el.edInstallMore.textContent = '; in Chrome or Edge on a computer, ' + (GAME ? 'this page' : 'the emulator at juricabi.github.io/sticktime') + ' can install it for you';
+    if (!radio.ok) {
+      el.edInstallPanel.hidden = el.rpInstWait.hidden = true;
+      return;
+    }
     el.edRadioState.textContent = on ? name + ' connected' : ask ? name + ': allow again' : 'not connected';
     el.edRadioState.classList.toggle('on', on);
     el.edConnect.textContent = ask ? 'Reconnect' : 'Connect radio…';
     el.edConnect.hidden = on;
+    el.edRefresh.hidden = !on;
     el.edForget.hidden = !(on || ask);
-    el.edConnect.disabled = el.edRadioToEmu.disabled = el.edEmuToRadio.disabled = radio.busy;
-    // the game itself, from the site's sdcard/ (not offline, not in a hosted artifact)
+    el.edConnect.disabled = el.edRefresh.disabled = el.edForget.disabled = el.edRadioToEmu.disabled = el.edEmuToRadio.disabled = radio.busy;
     const noTools = radio.at === 'tracks', shown = !!(on && GAME && !noTools && inst.card);
-    el.edInstallNote.hidden = !!GAME;
     el.edInstallPanel.hidden = !shown;
     el.rpInstWait.hidden = !GAME || shown;
     el.rpInstWait.textContent = !on ? 'Connect the radio\'s SD card to install StickTime on it or bring it up to date.'
-      : noTools ? 'Connect the card\'s drive (or its SCRIPTS/TOOLS folder) to install the game.' : 'Reading the card…';
+      : noTools ? 'Connect the card\'s drive (or its SCRIPTS/TOOLS folder) to install the game.'
+        : inst.err || (radio.busy ? 'Reading the card…' : 'The game on the card isn\'t read yet: Read again.');
     el.edInstallGo.disabled = radio.busy || !inst.card || !Object.values(inst.pick).some(Boolean);
     // your tracks on the radio
     el.edRadioPanel.hidden = !(on && radio.listed);
     el.rpTracksWait.hidden = on && radio.listed;
-    el.rpTracksWait.textContent = on ? 'Reading the card…' : 'Connect the radio\'s SD card to see the tracks on it.';
+    el.rpTracksWait.textContent = !on ? 'Connect the radio\'s SD card to see the tracks on it.'
+      : radio.busy ? 'Reading the card…' : 'The card\'s tracks aren\'t read yet: Read again.';
   }
   // a radio job: one at a time; a card that went away (unplugged) or lost its permission says so
-  // (say: the panel's line, or the editor's for Send to radio)
-  async function job(fn, say) {
+  // (say: the panel's line, or the editor's for Send to radio; writes: leaving the page asks first)
+  async function job(fn, say, writes) {
     say = say || rstatus;
     if (radio.busy) return;
+    const gen = radio.gen;
     radio.busy = true;
+    radio.writing = !!writes;
     renderRadio();
     try { await fn(); }
     catch (e) {
-      if (e && (e.name === 'NotFoundError' || e.name === 'NotAllowedError' || e.name === 'SecurityError')) {
+      if (gen !== radio.gen) { /* the card was let go meanwhile: nothing to say about it */ }
+      else if (e && (e.name === 'NotFoundError' || e.name === 'NotAllowedError' || e.name === 'SecurityError')) {
         radio.state = 'ask';
         radio.listed = false;
         say('The radio\'s SD card isn\'t there any more: plug the radio in (USB Storage) and Reconnect, or Connect radio to pick it again.', 'bad');
       } else say(e && e.site ? e.message : 'The radio\'s SD card: ' + (e && e.message || e), 'bad');
     } finally {
-      radio.busy = false;
+      radio.busy = radio.writing = false;
       renderRadio();
+      if (radio.again) {
+        radio.again = false;
+        if (radio.panel && radio.state === 'on' && !radio.listed) job(refreshRadio);
+      }
     }
   }
+  window.addEventListener('beforeunload', (e) => {
+    if (!radio.writing) return;
+    e.preventDefault();
+    e.returnValue = '';                                // a file half written on the card
+  });
   async function useCard(dir, said, say) {
-    const at = await locate(dir);
+    const gen = radio.gen, at = await locate(dir);
+    if (gen !== radio.gen) return;
     if (!at) {
       say(NOT_CARD, 'bad');
       return;
@@ -11514,6 +11602,7 @@ const GAME_FILES = '';
     radio.listed = false;
     inst.card = null;                                  // another card: looked at afresh
     try { await kv.set('radio', dir); } catch (e) { /* not kept: Connect radio again next time */ }
+    if (gen !== radio.gen) { kv.del('radio').catch(() => { /* nothing kept */ }); return; }
     const where = at === 'card' ? '' : ' (' + ['SCRIPTS', 'SCRIPTS/TOOLS', 'SCRIPTS/TOOLS/StickTimeTracks'][['scripts', 'tools', 'tracks'].indexOf(at)] + ')';
     if (said) say('Radio SD: ' + cardName(dir) + where + ' connected.' + await installed(), 'ok');
     if (radio.panel) await refreshRadio();
@@ -11558,80 +11647,97 @@ const GAME_FILES = '';
     job(async () => {
       const dir = await tracksDir(true);
       const old = await readSlot(dir, slot);
-      if (old !== null && old !== text && !window.confirm('Slot c' + slot + ' on the radio holds "' + nameOf(old) + '". Replace it with "' + name + '"?')) {
+      if (old && old.text !== text && !window.confirm('Slot c' + slot + ' on the radio holds ' + what(old) + '. Replace it with "' + name + '"?')) {
         status('Nothing sent: c' + slot + '.txt on the radio stays as it was.');
         return;
       }
-      if (old !== text) await writeSlot(dir, slot, text);
+      if (!old || old.text !== text) await writeSlot(dir, slot, text);
+      ed.saved.add(text);
       radio.listed = false;
       status('Sent to the radio as track ' + (8 + slot) + ' (c' + slot + '.txt). On the radio: restart StickTime, the track is in the Track list.', 'ok');
-    }, status);
+    }, status, true);
   }
   let radioSlots = [];
   async function listRadio() {
     radioSlots = await readAll();
     radio.listed = true;
     el.edRadioPath.textContent = 'On ' + cardName(radio.dir) + (STEPS[radio.at].length ? ' · ' + STEPS[radio.at].join('/') : '');
-    el.edRadioSlots.innerHTML = radioSlots.map((t, i) => '<li><span><b>c' + (i + 1) + '</b> · track ' + (i + 9) + ' · ' +
-      (t === null ? '<em>empty</em>' : esc(nameOf(t))) + '</span>' +
-      (t === null ? '' : '<button class="btn" type="button" data-ropen="' + (i + 1) + '">Open in editor</button>') + '</li>').join('');
+    el.edRadioSlots.innerHTML = radioSlots.map((e, i) => '<li><span><b>c' + (i + 1) + '</b> · track ' + (i + 9) + ' · ' +
+      (e === null ? '<em>empty</em>' : e.bad ? '<em class="bad">' + BAD[e.bad] + '</em>' : esc(nameOf(e.text))) + '</span>' +
+      (e === null || e.bad ? '' : '<button class="btn" type="button" data-ropen="' + (i + 1) + '">Open in editor</button>') + '</li>').join('');
   }
   // a track file into the editor (Open file, a radio slot), checked as the game reads it
   function openText(text, what, slot) {
     const r = parseFile(text);
     if (r.error) { status('Can\'t open ' + what + ': ' + r.error, 'bad'); return; }
+    if (!okToReplace('"' + r.T.name + '" (' + what + ')')) { status('Kept your track: ' + what + ' not opened.'); return; }
     pushUndo();
     load(r.T, true);
     if (slot) { ed.slot = slot; renderSlots(); renderFly(); }
     fit();
     status('Opened ' + what + ': ' + r.T.gates.length + ' gates, ' + r.T.boxes.length + ' structures.' + (r.note ? ' ' + r.note : ''), r.note ? 'bad' : 'ok');
   }
-  // the radio's tracks into the emulator's slots, or the emulator's onto the radio (same slots);
-  // a different track that would be replaced is named first
-  const differs = (from, to) => from.map((t, i) => (t !== null && to[i] !== null && to[i] !== t ? 'c' + (i + 1) + ' "' + nameOf(to[i]) + '"' : null)).filter(Boolean);
+  // the radio's tracks into the emulator's slots, or the emulator's onto the radio (same slots):
+  // put, the slots to write; lose, a different file there that would be replaced (named first);
+  // skip, the files the game can't read (never copied)
+  function plan(from, to) {
+    const put = [], lose = [], skip = [];
+    from.forEach((f, i) => {
+      const t = to[i], c = 'c' + (i + 1);
+      if (!f || (t && t.text === f.text)) return;
+      if (f.bad) { skip.push(c + ' (' + BAD[f.bad] + ')'); return; }
+      put.push(i + 1);
+      if (t) lose.push(c + (t.bad ? ' (' + BAD[t.bad] + ')' : ' "' + nameOf(t.text) + '"'));
+    });
+    return { put, lose, skip, none: !from.some((f) => f && !f.bad) };
+  }
+  const emuEntries = () => Array.from({ length: SLOTS }, (_, i) => asEntry(emuSlot(i + 1)));
+  const skipped = (p) => (p.skip.length ? ' Not copied, the game can\'t read ' + (p.skip.length > 1 ? 'them' : 'it') + ': ' + andList(p.skip) + '.' : '');
   function radioToEmu() {
     const s = sim();
     if (!s) return;
     job(async () => {
-      const rad = await readAll(), emu = rad.map((t, i) => emuSlot(i + 1));
-      const n = rad.filter((t) => t !== null).length;
-      if (!n) { rstatus('No tracks on the radio to copy.'); return; }
-      const lose = differs(rad, emu);
-      if (lose.length && !window.confirm('Replace in the emulator: ' + lose.join(', ') + '?')) return;
-      const got = changedSlots(rad, emu);
-      got.forEach((i) => s.writeSD(slotPath(i), rad[i - 1]));
+      const rad = await readAll(), p = plan(rad, emuEntries());
+      if (!rad.some(Boolean)) { rstatus('No tracks on the radio to copy.'); return; }
+      if (p.none) { rstatus('No tracks on the radio the game can read.' + skipped(p), 'bad'); return; }
+      if (p.lose.length && !window.confirm('Replace in the emulator: ' + p.lose.join(', ') + '?')) return;
+      let full = false;
+      p.put.forEach((i) => { if (s.writeSD(slotPath(i), rad[i - 1].text) === false) full = true; });
       renderSlots();
-      rstatus(got.length ? 'Copied ' + slotList(got) + ' from the radio into the emulator. Fly them from the track editor, or Restart the game to find them in its Track list.'
-        : 'The emulator already has the radio\'s tracks.', 'ok');
+      rstatus((p.put.length ? 'Copied ' + slotList(p.put) + ' from the radio into the emulator. Fly them from the track editor, or Restart the game to find them in its Track list.'
+        : 'The emulator already has the radio\'s tracks.') + skipped(p) +
+        (full ? ' The browser\'s storage is full or blocked: the emulator keeps them only for this visit.' : ''), full ? 'bad' : 'ok');
     });
   }
-  // the slots (1-8) where from has a track that to hasn't; c1, c3 and c5
-  const changedSlots = (from, to) => from.map((t, i) => (t !== null && t !== to[i] ? i + 1 : 0)).filter(Boolean);
-  const slotList = (l) => l.map((i) => 'c' + i).join(', ').replace(/, ([^,]*)$/, ' and $1');
+  // c1, c3 and c5
+  const andList = (l) => (l.length > 6 ? [...l.slice(0, 5), (l.length - 5) + ' more'] : l).join(', ').replace(/, ([^,]*)$/, ' and $1');
+  const slotList = (l) => andList(l.map((i) => 'c' + i));
   function emuToRadio() {
     job(async () => {
-      const emu = [];
-      for (let i = 1; i <= SLOTS; i++) emu.push(emuSlot(i));
-      const n = emu.filter((t) => t !== null).length;
-      if (!n) { rstatus('No tracks in the emulator\'s slots: Fly it in the track editor puts one there.'); return; }
+      const emu = emuEntries();
+      if (!emu.some(Boolean)) { rstatus('No tracks in the emulator\'s slots: Fly it in the track editor puts one there.'); return; }
       const dir = await tracksDir(true), rad = [];
       for (let i = 1; i <= SLOTS; i++) rad.push(await readSlot(dir, i));
-      const lose = differs(emu, rad);
-      if (lose.length && !window.confirm('Replace on the radio: ' + lose.join(', ') + '?')) return;
-      const put = changedSlots(emu, rad);
-      for (const i of put) await writeSlot(dir, i, emu[i - 1]);
-      rstatus(put.length ? 'Sent ' + slotList(put) + ' to the radio. On the radio: restart StickTime, the tracks are in the Track list.'
-        : 'The radio already has the emulator\'s tracks.', 'ok');
+      const p = plan(emu, rad);
+      if (p.none) { rstatus('No tracks in the emulator\'s slots the game can read.' + skipped(p), 'bad'); return; }
+      if (p.lose.length && !window.confirm('Replace on the radio: ' + p.lose.join(', ') + '?')) return;
+      for (const i of p.put) await writeSlot(dir, i, emu[i - 1].text);
+      rstatus((p.put.length ? 'Sent ' + slotList(p.put) + ' to the radio. On the radio: restart StickTime, the tracks are in the Track list.'
+        : 'The radio already has the emulator\'s tracks.') + skipped(p), 'ok');
       await listRadio();
-    });
+    }, rstatus, true);
   }
   el.edConnect.addEventListener('click', () => connect(rstatus));
   el.edSend.addEventListener('click', sendToRadio);
+  el.edRefresh.addEventListener('click', () => job(refreshRadio));
   el.edForget.addEventListener('click', () => {
+    if (radio.busy) return;                            // (the button is off then)
+    radio.gen++;
     radio.state = 'off';
-    radio.dir = null;
+    radio.dir = radio.at = null;
     radio.listed = false;
-    inst.card = null;
+    inst.man = inst.card = null;                       // the site's files are asked for afresh too
+    inst.err = '';
     kv.del('radio').catch(() => { /* nothing kept */ });
     renderRadio();
     rstatus('The radio\'s SD card is forgotten: Connect radio to pick it again.');
@@ -11641,9 +11747,9 @@ const GAME_FILES = '';
   el.edRadioSlots.addEventListener('click', (e) => {
     const b = e.target.closest('[data-ropen]');
     const n = b ? +b.dataset.ropen : 0, t = radioSlots[n - 1];
-    if (typeof t !== 'string') return;
+    if (!t || t.bad) return;
     openEditor();
-    openText(t, 'c' + n + '.txt from the radio', n);
+    openText(t.text, 'c' + n + '.txt from the radio', n);
   });
 
   // ---------------------------------------------------------------- the two panels
@@ -11676,7 +11782,7 @@ const GAME_FILES = '';
     renderRadio();
     intoView(rp);
     (el.edConnect.hidden ? el.rpClose : el.edConnect).focus({ preventScroll: true });
-    if (radio.state === 'on') job(refreshRadio);
+    if (radio.state === 'on') { if (radio.busy) radio.again = true; else job(refreshRadio); }   // (after the job under way)
   }
   function closeRadio(focusButton) {
     radio.panel = false;
@@ -11688,22 +11794,34 @@ const GAME_FILES = '';
   el.edClose.addEventListener('click', () => closeEditor(true));
   el.radioBtn.addEventListener('click', () => (radio.panel ? closeRadio(false) : openRadio()));
   el.rpClose.addEventListener('click', () => closeRadio(true));
+  // Escape closes the panel (not from a field: there it's the field's)
+  rp.addEventListener('keydown', (e) => {
+    const t = e.target;
+    const typing = t && ((t.tagName === 'INPUT' && !/^(checkbox|radio|button|file)$/i.test(t.type)) || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA');
+    if (e.key !== 'Escape' || typing || e.ctrlKey || e.metaKey || e.altKey) return;
+    e.preventDefault();
+    closeRadio(true);
+  });
   el.edRadioLink.addEventListener('click', openRadio);
   el.edRadioToEmu.addEventListener('click', radioToEmu);
   el.edEmuToRadio.addEventListener('click', emuToRadio);
   // the card picked on an earlier visit: back at once if the browser still allows it, else Reconnect
-  async function restoreRadio() {
+  // (a job: Disconnect waits for it)
+  function restoreRadio() {
     if (!radio.ok) return;
-    let dir = null;
-    try { dir = await kv.get('radio'); } catch (e) { return; }
-    if (!dir || typeof dir.getDirectoryHandle !== 'function') return;
-    radio.dir = dir;
-    let p = 'granted';
-    try { if (typeof dir.queryPermission === 'function') p = await dir.queryPermission({ mode: 'readwrite' }); } catch (e) { p = 'prompt'; }
-    if (p === 'granted') {
-      try { await useCard(dir, false, rstatus); } catch (e) { radio.state = 'ask'; }
-    } else radio.state = p === 'denied' ? 'off' : 'ask';
-    renderRadio();
+    job(async () => {
+      let dir = null;
+      try { dir = await kv.get('radio'); } catch (e) { return; }
+      if (!dir || typeof dir.getDirectoryHandle !== 'function') return;
+      let p = 'granted';
+      try { if (typeof dir.queryPermission === 'function') p = await dir.queryPermission({ mode: 'readwrite' }); } catch (e) { p = 'prompt'; }
+      if (p === 'granted') {
+        try { await useCard(dir, false, rstatus); } catch (e) { radio.dir = dir; radio.state = 'ask'; }
+      } else {
+        radio.dir = dir;
+        radio.state = p === 'denied' ? 'off' : 'ask';
+      }
+    });
   }
 
   // ---------------------------------------------------------------- the game on the radio
@@ -11712,9 +11830,10 @@ const GAME_FILES = '';
   // picked and makes their folders match the release, as replacing the whole folder would (an old
   // core.luac left in StickTimeBW/ has EdgeTX compile core.lua on the radio, which runs it out of
   // memory). The player's own files are never touched: the saves (*.dat, StickTimeLite/data.txt),
-  // the tracks and the ghosts.
+  // the tracks and the ghosts. The manifest is asked for afresh each time (a new release may be out),
+  // and what it may write is checked first: only the game's own files, all under SCRIPTS/TOOLS.
   const GAME = typeof GAME_FILES === 'string' && GAME_FILES && /^https?:$/.test(location.protocol) ? GAME_FILES : '';
-  const inst = { man: null, card: null, pick: {}, hint: '' };
+  const inst = { man: null, card: null, pick: {}, hint: '', err: '' };
   // EdgeTX's board in RADIO/radio.yml, only as a hint (when unsure, nothing is picked)
   const BOARDS = {
     color: /^(tx16s|tx16smk3|tx15|t15|t15pro|t16|t18|x10|x10express|x12s|nv14|el18|pl18|pl18ev|pl18u|nb4p|v12|v16|pa01|f16|gx15|st16|t22)$/,
@@ -11730,8 +11849,53 @@ const GAME_FILES = '';
   async function sha256(buf) {
     return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', buf)), (b) => b.toString(16).padStart(2, '0')).join('');
   }
-  // the player's own: kept even inside an edition folder
-  const keepFile = (path) => inst.man.keep.some((k) => k.toLowerCase() === path.toLowerCase()) || /\.dat$/i.test(path) || /(^|\/)c\d+\.txt$/i.test(path);
+  // the player's own (the saves, the tracks and the ghosts): never written, never removed
+  const KEEP = /(^|\/)(c\d+\.txt|[^/]*\.dat|data\.txt)$/i;
+  const keepFile = (path) => KEEP.test(path) || !!(inst.man && inst.man.keep.some((k) => k.toLowerCase() === path.toLowerCase()));
+  // what the site may write: the loaders, the game's files in the B&W and Lite folders, and the
+  // READMEs of the tracks' and ghosts' folders (those only where there is none)
+  const LOADERS = ['StickTime.lua', 'StickTimeBW.lua', 'StickTimeLite.lua'];
+  const ED_FOLDERS = ['StickTimeBW', 'StickTimeLite'];
+  const SHARED = ['StickTimeTracks/README.txt', 'StickTimeGhosts/README.txt'];
+  const GAME_NAME = /^[A-Za-z0-9_-]+\.(lua|luac|txt)$/;
+  const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+  // what is wrong with the site's manifest ('' when nothing): it says what goes on the card
+  function manProblem(m) {
+    if (!m || typeof m !== 'object' || !Array.isArray(m.files) || !m.editions || typeof m.editions !== 'object' || !Array.isArray(m.keep)) return 'not a list of files';
+    if (typeof m.version !== 'string' || !/^\d+(\.\d+)+$/.test(m.version) || m.base !== 'SCRIPTS/TOOLS') return 'its version or its folder';
+    if (!m.keep.every((k) => typeof k === 'string')) return 'its list of the player\'s files';
+    for (const [e, info] of Object.entries(m.editions)) {
+      if (!own(KIND, e) || !info || typeof info.label !== 'string' || !LOADERS.includes(info.loader)
+        || (info.folder !== null && !ED_FOLDERS.includes(info.folder))) return 'the ' + e + ' edition';
+    }
+    const seen = new Set();
+    for (const f of m.files) {
+      const p = f && typeof f.path === 'string' ? f.path : '';
+      if (!p || seen.has(p.toLowerCase())) return 'a file without a name, or twice';
+      seen.add(p.toLowerCase());
+      if (KEEP.test(p) || m.keep.some((k) => k.toLowerCase() === p.toLowerCase())) return p + ' is the player\'s own';
+      const info = own(m.editions, f.edition) ? m.editions[f.edition] : null;
+      const ok = f.edition === 'shared' ? SHARED.includes(p)
+        : !!info && (p === info.loader || (!!info.folder && p.startsWith(info.folder + '/') && GAME_NAME.test(p.slice(info.folder.length + 1))));
+      if (!ok) return p + ' isn\'t one of the game\'s files';
+      if (!Number.isInteger(f.size) || f.size < 0 || f.size > 1048576 || typeof f.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(f.sha256)) return p + '\'s size';
+    }
+    for (const info of Object.values(m.editions)) if (!m.files.some((f) => f.path === info.loader)) return info.loader + ' is missing';
+    return '';
+  }
+  const siteError = (msg) => Object.assign(new Error(msg), { site: true });
+  async function getManifest() {
+    let man = null;
+    try {
+      const r = await fetch(new URL(GAME + 'manifest.json', location.href), { cache: 'no-cache' });
+      if (r.ok) man = await r.json();
+    } catch (e) { man = null; }
+    if (!man) throw siteError('Couldn\'t get the game\'s files from the site: check the connection and try again.');
+    const why = manProblem(man);
+    if (why) throw siteError('The site\'s list of the game\'s files isn\'t right (' + why + '), so nothing is written: try again later.');
+    inst.man = man;
+    return man;
+  }
   const toolsDir = (create) => walk(STEPS[radio.at].slice(0, -1), create);
   async function fileAt(dir, path, create) {
     const p = path.split('/');
@@ -11742,59 +11906,49 @@ const GAME_FILES = '';
     const file = h && await h.getFile();
     return !!file && file.size === f.size && await sha256(await file.arrayBuffer()) === f.sha256;
   };
-  const siteError = (msg) => Object.assign(new Error(msg), { site: true });
   // a file of the release from the site, checked against the manifest (bytes as they are)
-  async function siteFile(f) {
+  async function siteFile(man, f) {
     let buf = null;
     try {
-      const r = await fetch(new URL(GAME + inst.man.base + '/' + f.path, location.href), { cache: 'no-cache' });
+      const r = await fetch(new URL(GAME + man.base + '/' + f.path, location.href), { cache: 'no-cache' });
       if (r.ok) buf = await r.arrayBuffer();
     } catch (e) { buf = null; }
     if (!buf) throw siteError('Couldn\'t get ' + f.path + ' from the site: check the connection and try again.');
     if (buf.byteLength !== f.size || await sha256(buf) !== f.sha256) throw siteError('The site\'s ' + f.path + ' didn\'t arrive whole: try again.');
     return buf;
   }
-  async function writeBytes(h, buf) {
-    const w = await h.createWritable();
-    await w.write(buf);
-    await w.close();
-  }
-  // a whole new file first, then moved in place where the browser can (else written in place)
+  // a file of the release onto the card, over the one there (Chrome writes a swap file beside it and
+  // puts it in place when the write is done: a cable pulled midway leaves the old file whole)
   async function putFile(tools, path, buf) {
     const p = path.split('/'), name = p.pop();
     let dir = tools;
     for (const s of p) dir = await child(dir, s, 'directory', true);
-    const old = await child(dir, name, 'file');
-    if (typeof FileSystemFileHandle === 'function' && typeof FileSystemFileHandle.prototype.move === 'function') {
-      const tmp = await dir.getFileHandle(name + '.new', { create: true });
-      await writeBytes(tmp, buf);
-      try { await tmp.move(old ? old.name : name); return; } catch (e) { /* not over a file: out of the way first */ }
-      try {
-        if (old) await dir.removeEntry(old.name);
-        await tmp.move(name);
-        return;
-      } catch (e) {
-        try { await dir.removeEntry(name + '.new'); } catch (e2) { /* gone */ }
-      }
-    }
-    await writeBytes(await child(dir, name, 'file', true), buf);
+    const h = await child(dir, name, 'file', true);
+    const w = await h.createWritable();
+    await w.write(buf);
+    await w.close();
+  }
+  // a file that is gone already is fine (the card itself being gone shows at the next step)
+  async function removeFile(dir, name) {
+    try { await dir.removeEntry(name); return true; }
+    catch (e) { if (e && e.name === 'NotFoundError') return false; throw e; }
   }
   // what is on the card, edition by edition: installed, its version, the same as the release, and
-  // the files in its folder the release doesn't have
-  async function survey() {
-    const man = inst.man, tools = await toolsDir(false), card = {};
+  // the files in its folder the release doesn't have (whether its loader is there or not: Install
+  // removes them all the same)
+  async function survey(man) {
+    const tools = await toolsDir(false), card = {};
     const release = new Set(man.files.map((f) => f.path.toLowerCase()));
     for (const [e, info] of Object.entries(man.editions)) {
       const files = man.files.filter((f) => f.edition === e);
       const loader = tools && await fileAt(tools, info.loader);
       let version = null, same = 0;
-      const stale = [];
       if (loader) {
         const m = /StickTime(?: BW| Lite)? v(\d+(?:\.\d+)+)/.exec(await (await loader.getFile()).slice(0, 600).text());
         version = m ? m[1] : null;
         for (const f of files) if (await sameAs(await fileAt(tools, f.path), f)) same++;
-        stale.push(...await staleIn(tools, info.folder, release));
       }
+      const stale = tools ? await staleIn(tools, info.folder, release) : [];
       card[e] = { installed: !!loader, version, current: !!loader && same === files.length && !stale.length, stale };
     }
     return card;
@@ -11809,6 +11963,19 @@ const GAME_FILES = '';
     }
     return out;
   }
+  // name.new files an older version of this page left behind (it wrote a copy first, then moved it)
+  async function leftovers(tools, release) {
+    const out = [];
+    for (const folder of ['', ...ED_FOLDERS, 'StickTimeTracks', 'StickTimeGhosts']) {
+      const dir = folder ? await child(tools, folder, 'directory') : tools;
+      if (!dir) continue;
+      for await (const h of dir.values()) {
+        const p = (folder ? folder + '/' : '') + h.name;
+        if (h.kind === 'file' && /\.new$/i.test(h.name) && release.has(p.slice(0, -4).toLowerCase())) out.push({ dir, name: h.name, path: p });
+      }
+    }
+    return out;
+  }
   async function boardHint() {
     const f = radio.at === 'card' && await fileAt(radio.dir, 'RADIO/radio.yml');
     const m = f && /^board:\s*["']?([\w+-]+)/m.exec(await (await f.getFile()).slice(0, 4096).text());
@@ -11817,21 +11984,18 @@ const GAME_FILES = '';
     return { board: m[1], e: ['color', 'lite', 'bw'].find((e) => BOARDS[e].test(b)) || null };
   }
   async function loadInstall() {
-    if (!inst.man) {
-      let man = null;
-      try {
-        const r = await fetch(new URL(GAME + 'manifest.json', location.href), { cache: 'no-cache' });
-        if (r.ok) man = await r.json();
-      } catch (e) { man = null; }
-      if (!man || !Array.isArray(man.files)) {
-        inst.card = null;
-        rstatus('Couldn\'t get the game\'s files from the site: check the connection and try again.', 'bad');
-        return;
-      }
-      inst.man = man;
+    let man;
+    try { man = await getManifest(); }
+    catch (e) {
+      if (!e.site) throw e;
+      inst.man = inst.card = null;
+      inst.err = e.message;
+      renderRadio();
+      return;
     }
+    inst.err = '';
     const first = !inst.card;
-    inst.card = await survey();
+    inst.card = await survey(man);
     if (first) {
       // what is on the card already; else what RADIO/radio.yml says the radio is; else the player picks
       inst.pick = {};
@@ -11852,10 +12016,12 @@ const GAME_FILES = '';
     el.edInstallHead.textContent = 'StickTime ' + man.version + ' from this site, onto ' + cardName(radio.dir);
     el.edEditions.innerHTML = Object.entries(man.editions).map(([e, info]) => {
       const c = card[e], newer = c.version && cmpVer(c.version, man.version) > 0;
-      const st = !c.installed ? 'not installed' : newer ? 'newer on the card (' + c.version + ')' : c.current ? 'up to date'
-        : 'will be updated' + (c.version ? ' (' + c.version + ' on the card)' : '') + (c.stale.length ? ', ' + c.stale.length + ' old file' + (c.stale.length > 1 ? 's' : '') + ' removed' : '');
+      const gone = c.stale.length ? 'removes ' + andList(c.stale) : '';
+      const st = !c.installed ? 'not installed' + (gone ? ' (installing ' + gone + ' from ' + info.folder + '/)' : '')
+        : newer ? 'newer on the card (' + c.version + ')' : c.current ? 'up to date'
+          : 'will be updated' + (c.version ? ' (' + c.version + ' on the card)' : '') + (gone ? ', ' + gone : '');
       return '<li><label><input type="checkbox" data-ed="' + e + '"' + (inst.pick[e] ? ' checked' : '') + '><b>' + esc(info.label) + '</b> ' +
-        esc(info.loader) + (info.folder ? ' + ' + esc(info.folder) + '/' : '') + '</label><span class="ed-estate' + (c.installed && c.current ? ' ok' : '') + '">' + st + '</span></li>';
+        esc(info.loader) + (info.folder ? ' + ' + esc(info.folder) + '/' : '') + '</label><span class="ed-estate' + (c.installed && c.current ? ' ok' : '') + '">' + esc(st) + '</span></li>';
     }).join('');
     el.edInstallHint.textContent = inst.hint + 'Color: color screens. B&W: B&W radios with an STM32F4 (TX12 MkII, Zorro, Boxer, X9D+ 2019...). ' +
       'Lite: older B&W radios with an STM32F2 (X7, X9D, X9D+, T12...). Your tracks, ghosts and saves stay as they are.';
@@ -11863,48 +12029,50 @@ const GAME_FILES = '';
   }
   function installGame() {
     job(async () => {
-      const man = inst.man, eds = Object.keys(man.editions).filter((e) => inst.pick[e]);
+      const man = await getManifest(), eds = Object.keys(man.editions).filter((e) => inst.pick[e]);
       if (!eds.length) return;
-      const card = inst.card = await survey();
+      const card = inst.card = await survey(man);
       const newer = eds.filter((e) => card[e].version && cmpVer(card[e].version, man.version) > 0);
       if (newer.length && !window.confirm('The radio has a newer StickTime (' + newer.map((e) => man.editions[e].label + ' ' + card[e].version).join(', ') +
         ') than this site\'s ' + man.version + '. Replace it with ' + man.version + '?')) {
         rstatus('Nothing changed on the radio.');
+        renderInstall();
         return;
       }
       const files = man.files.filter((f) => f.edition === 'shared' || eds.includes(f.edition));
-      const tools = await toolsDir(true), bar = el.edInstallBar;
+      const release = new Set(man.files.map((f) => f.path.toLowerCase()));
+      const tools = await toolsDir(true), bar = el.edInstallBar, removed = [];
       bar.hidden = false;
       bar.max = files.length;
-      let n = 0, changed = 0;
+      let n = 0, wrote = 0;
       try {
         for (const f of files) {
           bar.value = n++;
           rstatus('Writing ' + f.path + ' (' + n + ' of ' + files.length + ')…');
-          if (await sameAs(await fileAt(tools, f.path), f)) continue;
-          await putFile(tools, f.path, await siteFile(f));
-          changed++;
+          const h = await fileAt(tools, f.path);
+          if (h && (f.edition === 'shared' || keepFile(f.path))) continue;      // a README there already; never the player's own
+          if (await sameAs(h, f)) continue;
+          await putFile(tools, f.path, await siteFile(man, f));
+          wrote++;
         }
-        // the edition folders as in the release: the files it doesn't have go (not the player's own)
-        const release = new Set(man.files.map((f) => f.path.toLowerCase()));
+        for (const o of await leftovers(tools, release)) if (await removeFile(o.dir, o.name)) removed.push(o.path);
+        // the edition folders as in the release: the files it doesn't have go (not the player's own);
+        // not when going back to an older version, whose list can't know what the newer one needs
         for (const e of eds) {
-          const folder = man.editions[e].folder;
-          for (const name of await staleIn(tools, folder, release)) {
-            await (await child(tools, folder, 'directory')).removeEntry(name);
-            changed++;
-          }
+          const folder = man.editions[e].folder, dir = folder && !newer.includes(e) && await child(tools, folder, 'directory');
+          if (!dir) continue;
+          for (const name of await staleIn(tools, folder, release)) if (await removeFile(dir, name)) removed.push(folder + '/' + name);
         }
       } finally {
         bar.value = files.length;
         bar.hidden = true;
       }
-      const labels = eds.map((e) => man.editions[e].label);
-      const list = labels.length > 1 ? labels.slice(0, -1).join(', ') + ' and ' + labels[labels.length - 1] : labels[0];
-      rstatus(changed ? 'StickTime ' + man.version + ' is on the radio: ' + list + '. Eject the drive before unplugging it.'
-        : 'StickTime ' + man.version + ' was already on the radio: ' + list + '. Nothing to write.', 'ok');
-      inst.card = await survey();
+      const list = andList(eds.map((e) => man.editions[e].label));
+      rstatus(wrote || removed.length ? 'StickTime ' + man.version + ' is on the radio: ' + list + '.' + (removed.length ? ' Removed ' + andList(removed) + '.' : '') +
+        ' Eject the drive before unplugging it.' : 'StickTime ' + man.version + ' was already on the radio: ' + list + '. Nothing to write.', 'ok');
+      inst.card = await survey(man);
       renderInstall();
-    });
+    }, rstatus, true);
   }
   el.edEditions.addEventListener('change', (e) => {
     const b = e.target.closest('[data-ed]');
@@ -11924,7 +12092,7 @@ const GAME_FILES = '';
   function saveNow() {
     clearTimeout(saveT);
     try {
-      localStorage.setItem(STORE, JSON.stringify({ v: 1, T: ed.T, slot: ed.slot, trees: ed.showTrees, view: { x: V.x, z: V.z, s: V.s } }));
+      localStorage.setItem(STORE, JSON.stringify({ v: 1, T: ed.T, slot: ed.slot, trees: ed.showTrees, view: { x: V.x, z: V.z, s: V.s }, saved: !unsaved() }));
     } catch (e) { /* storage blocked or full: the work stays for this visit */ }
   }
   function saveSoon() { clearTimeout(saveT); saveT = setTimeout(saveNow, 400); }
@@ -11940,7 +12108,7 @@ const GAME_FILES = '';
       V.x = v.x; V.z = v.z; V.s = clamp(v.s, SMIN, SMAX);
       ed.hadView = true;
     }
-    load(T, false);
+    load(T, false, !o.saved);                         // unsaved work stays so after a reload
     return true;
   }
   window.addEventListener('pagehide', saveNow);
