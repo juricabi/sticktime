@@ -218,7 +218,7 @@ do
       local f = io.open(CUSTOM .. T.file .. ".txt", "r")
       local s = f and io.read(f, 1000) or ""
       if f then io.close(f) end
-      local g, b = string.match(string.match(s, "[\r\n](.*)") or "", "([^/]*)/?(.*)")
+      local g, b = string.match(string.match(s, "^%s*[^\r\n]*[\r\n]+(.*)") or "", "([^/]*)/?(.*)")
       local n, d = 0, {}
       for v in string.gmatch(g or "", "%S+") do
         n = n + 1
@@ -228,7 +228,17 @@ do
       end
       T[3], T[4] = d, {}
       for v in string.gmatch(b or "", "%S+") do T[4][#T[4] + 1] = tonumber(v) or 0 end
-      if #d < 10 then T[3] = { 0, 0, 1, 0, 0, 0, 30, 1, 0, 0 } end   -- unreadable: two gates in a line
+      -- gates in fives with a known type, structures in sevens with a known kind (a file made by hand)
+      local ok, bd = #d >= 10 and #d % 5 == 0, T[4]
+      for i = 3, #d, 5 do
+        if d[i] < 1 or d[i] > 8 or d[i] - floor(d[i]) > 0.01 then ok = false end
+      end
+      if not ok then T[3] = { 0, 0, 1, 0, 0, 0, 30, 1, 0, 0 } end   -- unreadable: two gates in a line
+      ok = #bd % 7 == 0
+      for i = 7, #bd, 7 do
+        if bd[i] < 1 or bd[i] > 3 or bd[i] - floor(bd[i]) > 0.01 then ok = false end
+      end
+      if not ok then T[4] = {} end
     end
     local d, bd = T[3], T[4]
     NG, NP, BX.n = 0, 0, 0

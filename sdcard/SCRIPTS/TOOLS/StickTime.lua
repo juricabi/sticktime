@@ -220,7 +220,7 @@ do
       local f = io.open(CUSTOM .. T.file .. ".txt", "r")
       local s = f and io.read(f, 1000) or ""
       if f then io.close(f) end
-      local g, b = string.match(string.match(s, "[\r\n](.*)") or "", "([^/]*)/?(.*)")
+      local g, b = string.match(string.match(s, "^%s*[^\r\n]*[\r\n]+(.*)") or "", "([^/]*)/?(.*)")
       local n, d = 0, {}
       for v in string.gmatch(g or "", "%S+") do
         n = n + 1
@@ -230,7 +230,17 @@ do
       end
       T[3], T[4] = d, {}
       for v in string.gmatch(b or "", "%S+") do T[4][#T[4] + 1] = tonumber(v) or 0 end
-      if #d < 10 then T[3] = { 0, 0, 1, 0, 0, 0, 30, 1, 0, 0 } end   -- unreadable: two gates in a line
+      -- gates in fives with a known type, structures in sevens with a known kind (a file made by hand)
+      local ok, bd = #d >= 10 and #d % 5 == 0, T[4]
+      for i = 3, #d, 5 do
+        if d[i] < 1 or d[i] > 8 or d[i] - floor(d[i]) > 0.01 then ok = false end
+      end
+      if not ok then T[3] = { 0, 0, 1, 0, 0, 0, 30, 1, 0, 0 } end   -- unreadable: two gates in a line
+      ok = #bd % 7 == 0
+      for i = 7, #bd, 7 do
+        if bd[i] < 1 or bd[i] > 3 or bd[i] - floor(bd[i]) > 0.01 then ok = false end
+      end
+      if not ok then T[4] = {} end
     end
     local d, bd = T[3], T[4]
     NG, NP, BX.n = 0, 0, 0
@@ -582,11 +592,11 @@ do
     GH, RC = { n = 0, iv = 10, lap = 0, c = {}, t = S.track }, { n = 0, iv = 10, c = {}, q = "" }
     local f = io.open(GFILE .. S.track .. ".txt", "r")
     if not f then return end
-    local ng, x, z, iv, n, lt = string.match(io.read(f, 42) or "", "^STG1 +(%d+) +(%-?%d+) +(%-?%d+) +(%d+) +(%d+) +(%d+)")
+    local ng, x, z, iv, n, lt, id = string.match(io.read(f, 49) or "", "^STG2 +(%d+) +(%-?%d+) +(%-?%d+) +(%d+) +(%d+) +(%d+) +(%d+)")
     n = tonumber(n)
-    -- the same track (gate count, first gate) and a size this game can keep
+    -- the same track (gate count, first gate, a custom track's id) and a size this game can keep
     if n and tonumber(ng) == NG and tonumber(x) == floor(AX[1] * 10 + 0.5) and tonumber(z) == floor(AZ[1] * 10 + 0.5)
-       and n > 1 and n <= GMAX then
+       and tonumber(id) == (TRACKS[S.track].id or 0) and n > 1 and n <= GMAX then
       local c = {}
       for i = 1, floor((n + 15) / 16) do c[i] = io.read(f, 144) or "" end
       if #c[#c] == (n - 1) % 16 * 9 + 9 then GH = { n = n, iv = tonumber(iv), lap = tonumber(lt), c = c, t = S.track } end
@@ -600,7 +610,8 @@ do
     GH = { n = RC.n, iv = RC.iv, lap = lt, c = RC.c, t = S.track }
     local f = io.open(GFILE .. S.track .. ".txt", "w")
     if f then
-      io.write(f, string.format("STG1 %3d %6d %6d %5d %4d %7d\n", NG, floor(AX[1] * 10 + 0.5), floor(AZ[1] * 10 + 0.5), GH.iv, GH.n, lt))
+      io.write(f, string.format("STG2 %3d %6d %6d %5d %4d %7d %6d\n", NG, floor(AX[1] * 10 + 0.5), floor(AZ[1] * 10 + 0.5), GH.iv,
+        GH.n, lt, TRACKS[S.track].id or 0))
       for i = 1, #GH.c do io.write(f, GH.c[i]) end
       io.close(f)
     end

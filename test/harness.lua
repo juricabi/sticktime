@@ -723,7 +723,7 @@ if GAME_COLOR then
   elseif n < 2 or n > gmax or glap ~= best then
     fail(string.format("ghost: %d samples (max %d), its lap %s, the best of %s %s %s", n, gmax, tostring(glap), lt[1], lt[2], lt[3]))
   end
-  if not SD[path] or #SD[path] ~= 42 + n * 9 then fail("ghost: not saved as " .. path .. " (" .. (SD[path] and #SD[path] or 0) .. " bytes)") end
+  if not SD[path] or #SD[path] ~= 49 + n * 9 then fail("ghost: not saved as " .. path .. " (" .. (SD[path] and #SD[path] or 0) .. " bytes)") end
   if seen < FPS * 10 or near < seen * 0.8 then fail(string.format("ghost: shown %d frames, within 15 m of the quad %d of them", seen, near)) end
   print(string.format("ghost: laps %.2f %.2f s, the ghost %d samples every %.1f s (%.2f s lap), within 15 m of the quad %d%% of the time",
     (lt[1] or 0) / 100, (lt[2] or 0) / 100, n, iv / 100, glap / 100, math.floor(near * 100 / math.max(1, seen))))
@@ -860,9 +860,11 @@ do
   SD[CT .. "1.txt"] = "Test Loop\n1 4242 7 9  0 0 1 0 0  0 40 1 0 0  30 60 4 90 3  40 20 1 180 0 / 20 30 3 3 0 4 2\n"
   SD[CT .. "3.txt"] = "Hoops\r\n1 77 3 18  0 0 4 0 2.5  20 30 4 45 2  0 60 4 180 3\r\n"
   SD[CT .. "5.txt"] = "Broken\n2 1 1 9 0 0 1 0 0\n"                       -- a format this version can't read
+  -- made by hand: a blank first line, a gate type and a structure kind the game doesn't have
+  SD[CT .. "2.txt"] = "\nOdd File\n1 55 3 9  0 0 1 0 0  30 0 9 0 0 / 10 10 1 1 0 2 7\n"
   local inst
   for _, c in ipairs({ { 4242, 3000 }, { 999, 0 } }) do
-    SD[DATA] = "FPVSIM2 lay=2 track=10 l9=3000 i9=" .. c[1] .. " l11=2500\n"
+    SD[DATA] = "FPVSIM2 lay=2 track=12 l9=3000 i9=" .. c[1] .. " l11=2500\n"
     STICKTIME_TEST = {}
     inst = chunk()
     inst.init()
@@ -879,6 +881,12 @@ do
   local x, y, z, _, _, _, k = L.gate(3)
   if name ~= "Test Loop" or nb ~= 1 or x ~= 30 or z ~= 60 or k ~= 4 then
     fail(string.format("custom tracks: track 9 built wrong (%s, %s structures, gate 3 at %s %s type %s)", tostring(name), tostring(nb), tostring(x), tostring(z), tostring(k)))
+  end
+  L.track(10)
+  local name10, nb10 = select(11, L.info()), select(10, L.info())
+  if name10 ~= "Odd File" or select(19, L.get()) ~= 2 or nb10 ~= 0 then
+    fail(string.format("custom tracks: a hand-made file with unknown types should fly as two gates, no structures (%s, %s gates, %s)",
+      tostring(name10), tostring(select(19, L.get())), tostring(nb10)))
   end
   L.track(11)
   local name11 = select(11, L.info())
