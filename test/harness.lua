@@ -573,6 +573,48 @@ for _, c in ipairs({ { "", 0, 0 }, { "lay=2 ", 5000, 12000 } }) do
 end
 
 
+-- 11. medals: Bronze, Silver and Gold are the Easy, Medium and Hard AI pilot's lap; the AI flies
+-- its second lap within a few percent of that (its pilots are up to 2% faster or slower)
+do
+  local out = {}
+  T.set("ai", 1)
+  T.set("laps", 2)
+  for _, track in ipairs({ 1, 4, 8 }) do
+    T.track(track)
+    local m1, m2, m3, medal = T.medals()
+    if not (m3 > 0 and m3 < m2 and m2 < m1) then fail(string.format("medals: track %d times out of order (%s %s %s)", track, m1, m2, m3)) end
+    if medal(m3) ~= 3 or medal(m3 + 1) ~= 2 or medal(m1) ~= 1 or medal(m1 + 1) ~= 0 or medal(0) ~= 0 then
+      fail("medals: wrong medal for a lap time on track " .. track)
+    end
+    local s = { "track " .. track }
+    for skill = 1, 3 do
+      T.set("skill", skill)
+      T.start(1)
+      idleSticks()
+      local ng = select(19, T.get())
+      local t1, t2
+      for _ = 1, FPS * 240 do
+        frame(0)
+        local k = select(4, T.ai(1))
+        local gt = select(20, T.get())
+        if k == ng + 1 and not t1 then t1 = gt end
+        if k == 2 * ng + 1 then t2 = gt break end
+      end
+      local m = ({ m1, m2, m3 })[skill]
+      if not t2 then fail("medals: the AI didn't finish 2 laps on track " .. track)
+      elseif math.abs((t2 - t1) / m - 1) > 0.04 then
+        fail(string.format("medals: track %d skill %d: AI lap %.2f s, medal %.2f s", track, skill, (t2 - t1) / 100, m / 100))
+      end
+      s[#s + 1] = string.format("%.2f/%.2f", ((t2 or 0) - (t1 or 0)) / 100, m / 100)
+      T.state(1)
+      frame(0)
+    end
+    out[#out + 1] = table.concat(s, " ")
+  end
+  T.set("ai", 0)
+  print("medals (AI lap/medal, easy medium hard): " .. table.concat(out, ", "))
+end
+
 -- 10. custom tracks: StickTimeTracks/c1-c8.txt are tracks 9-16 (empty slots skipped); a slot's
 -- bests start over when a different track (another id) is put in it; a broken file is left out
 do
