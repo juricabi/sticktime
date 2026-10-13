@@ -317,6 +317,7 @@ footer.credits a { color: inherit; }
 .ed-rslots b { font: 600 12px var(--font-mono); }
 .ed-rslots em { font-style: normal; color: var(--muted); }
 .ed-rslots .btn { height: 28px; padding: 0 10px; font-size: 12.5px; }
+.ed-rbtns { display: flex; gap: 6px; flex: none; }
 .ed-editions li { flex-wrap: wrap; padding: 4px 0; }
 .ed-editions label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .ed-editions input { width: 16px; height: 16px; margin: 0 2px 0 0; accent-color: var(--accent); }
