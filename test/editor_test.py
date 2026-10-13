@@ -81,14 +81,32 @@ def click_map(page, x, z, **kw):
     page.mouse.click(px, py, **kw)
 
 
-def shot_clip(page, path):
-    """the editor card, from a full-page screenshot taken at the top of the page (where the sticky
-    header sits above the card, not over it)"""
-    r = page.evaluate("(() => { const b = document.getElementById('editor').getBoundingClientRect();"
-                      " return { x: b.left + scrollX, y: b.top + scrollY, width: b.width, height: b.height }; })()")
+def shot_clip(page, path, card="tracksPanel"):
+    """the Tracks & Install panel, from a full-page screenshot taken at the top of the page (where
+    the sticky header sits above the panel, not over it)"""
     page.evaluate("scrollTo(0, 0)")
-    page.wait_for_timeout(100)
+    page.wait_for_timeout(150)
+    r = page.evaluate("(id) => { const b = document.getElementById(id).getBoundingClientRect();"
+                      " return { x: b.left + scrollX, y: b.top + scrollY, width: b.width, height: b.height }; }", card)
     page.screenshot(path=str(path), full_page=True, clip=r)
+    print("wrote test/shots/" + path.name)
+
+
+def radio_panel(page):
+    """the Tracks & Install panel open on its Radio / Install tab"""
+    if page.is_hidden("#tracksPanel"):
+        page.click("#tracksBtn")
+    if page.is_hidden("#radioPanel"):
+        page.click("#tabRadio")
+    radio_done(page)
+
+
+def editor(page):
+    """the Tracks & Install panel open on its Track editor tab"""
+    if page.is_hidden("#tracksPanel"):
+        page.click("#tracksBtn")
+    if page.is_hidden("#editor"):
+        page.click("#tabEditor")
 
 
 def open_file(page, path):
@@ -199,15 +217,18 @@ def radio_tests(br, errors):
     page.goto(SITE + "simulator.html")
     wait_sim(page)
     page.evaluate(CARD)
-    page.click("#tracksBtn")
-    check(page.is_visible("#edConnect") and page.is_hidden("#edSend") and "USB Storage" in page.inner_text("#edRadioNote"),
-          "radio: Connect radio… and what to do on the radio")
+    radio_panel(page)
+    note = page.inner_text("#edRadioNote")
+    check(page.is_visible("#edConnect") and page.is_hidden("#editor") and "USB Storage" in note and "Eject" in note,
+          "radio: the Radio SD panel: Connect radio… and what to do on the radio")
+    check("Connect the radio's SD card" in page.inner_text("#rpTracksWait") and "Connect the radio's SD card" in page.inner_text("#rpInstWait"),
+          "radio: tracks and install wait for the card")
 
     # a folder that isn't the card
     page.evaluate(PICK, "Documents")
     page.click("#edConnect")
     r = radio_done(page)
-    check(page.inner_text("#edStatus") == NOT_CARD and r["state"] == "off", "radio: a folder without SCRIPTS is refused, plainly")
+    check(page.inner_text("#rpStatus") == NOT_CARD and r["state"] == "off", "radio: a folder without SCRIPTS is refused, plainly")
     # the card
     page.evaluate(PICK, "RADIO-SD")
     page.click("#edConnect")
@@ -215,8 +236,13 @@ def radio_tests(br, errors):
     check(r["state"] == "on" and r["at"] == "card" and page.inner_text("#edRadioState") == "RADIO-SD connected",
           f"radio: the card connected: {page.inner_text('#edRadioState')!r}")
     check(page.evaluate("window.__opts") == {"mode": "readwrite", "id": "sticktime-radio"}, "radio: the picker asked for read and write")
+    check(page.inner_text("#edRadioSlots").count("empty") == 8 and page.is_visible("#edEditions"),
+          "radio: the panel lists the card's 8 slots and the editions at once")
 
-    # Send to radio: the same text as Save file, the folder made
+    # the track editor's tab: Send to radio over the same connection
+    page.click("#tabEditor")
+    check(page.is_hidden("#radioPanel") and page.inner_text("#edSend") == "Send to radio"
+          and page.inner_text("#edRadioLineText") == "Radio SD: RADIO-SD connected.", "radio: the editor's tab shares the connection")
     page.select_option("#edTemplate", label="Grand Prix")
     page.select_option("#edSlot", "1")
     with page.expect_download() as d:
@@ -228,6 +254,7 @@ def radio_tests(br, errors):
     check(page.evaluate(CARD_FILE, TRACKS + "1.txt") == saved, "radio: c1.txt on the card is Save file's text (StickTimeTracks made)")
     check(page.inner_text("#edStatus") == "Sent to the radio as track 9 (c1.txt). On the radio: restart StickTime, the track is in the Track list.",
           "radio: it says where the track went")
+    shot_clip(page, OUT / "editor_connected.png")
 
     # another track for slot 1: asked first, with the names
     page.select_option("#edTemplate", label="Bando")
@@ -242,40 +269,40 @@ def radio_tests(br, errors):
     radio_done(page)
     bando = page.evaluate("sim.editor.file()")
     check(page.evaluate(CARD_FILE, TRACKS + "1.txt") == bando, "radio: Yes replaces it")
+    page.select_option("#edTemplate", label="Meadow")
+    meadow = page.evaluate("sim.editor.file()")
 
-    # From radio: the slots by name, one opened (CR LF on the card)
+    # the radio's tracks (the editor's link to the panel), one opened in the editor (CR LF on the card)
     page.evaluate(CARD_WRITE, [TRACKS + "3.txt", saved.replace("\n", "\r\n")])
-    page.click("#edFromRadio")
+    page.click("#edRadioLink")
     radio_done(page)
     rows = page.inner_text("#edRadioSlots")
-    check("c1 · track 9 · My Bando" in rows and "c3 · track 11 · My Grand Prix" in rows and rows.count("empty") == 6,
-          "radio: From radio lists the card's slots by name")
+    check(page.is_hidden("#editor") and "c1 · track 9 · My Bando" in rows and "c3 · track 11 · My Grand Prix" in rows and rows.count("empty") == 6,
+          "radio: the panel lists the card's slots by name")
     page.click('[data-ropen="3"]')
-    check(page.input_value("#edName") == "My Grand Prix" and page.input_value("#edSlot") == "3"
-          and page.evaluate("sim.editor.file()") == saved, "radio: a slot opens into the editor (slot 3)")
+    check(page.is_visible("#editor") and page.is_hidden("#radioPanel") and page.input_value("#edName") == "My Grand Prix"
+          and page.input_value("#edSlot") == "3" and page.evaluate("sim.editor.file()") == saved, "radio: Open in editor: the editor on slot 3")
     # both ways
+    radio_panel(page)
     page.click("#edRadioToEmu")
     radio_done(page)
     check(page.evaluate(f"sim.app.sd.get('{SLOT}1.txt')") == bando and page.evaluate(f"sim.app.sd.get('{SLOT}3.txt')") == saved.replace("\n", "\r\n"),
           "radio: the radio's tracks copied into the emulator's slots")
-    check(page.inner_text("#edStatus").startswith("Copied c1 and c3 from the radio"), f"radio: {page.inner_text('#edStatus')!r}")
-    page.select_option("#edTemplate", label="Meadow")
-    meadow = page.evaluate("sim.editor.file()")
+    check(page.inner_text("#rpStatus").startswith("Copied c1 and c3 from the radio"), f"radio: {page.inner_text('#rpStatus')!r}")
     page.evaluate("(t) => sim.writeSD('/SCRIPTS/TOOLS/StickTimeTracks/c5.txt', t)", meadow)
     page.click("#edEmuToRadio")
     radio_done(page)
     check(page.evaluate(CARD_FILE, TRACKS + "5.txt") == meadow and page.evaluate(CARD_FILE, TRACKS + "1.txt") == bando,
           "radio: the emulator's tracks sent to the card")
-    check(page.inner_text("#edStatus").startswith("Sent c5 to the radio."), f"radio: only what changed is written: {page.inner_text('#edStatus')!r}")
+    check(page.inner_text("#rpStatus").startswith("Sent c5 to the radio."), f"radio: only what changed is written: {page.inner_text('#rpStatus')!r}")
     page.mouse.move(0, 0)
-    shot_clip(page, OUT / "editor_radio.png")
-    print("wrote test/shots/editor_radio.png")
+    shot_clip(page, OUT / "radio_tracks.png")
 
     # the card remembered on the next visit; Disconnect forgets it
     page.reload()
     wait_sim(page)
     page.wait_for_function("sim.editor.radio().state === 'on'", timeout=10000)
-    page.click("#tracksBtn")
+    radio_panel(page)
     check(page.inner_text("#edRadioState") == "RADIO-SD connected", "radio: a later visit is connected again (IndexedDB)")
     page.click("#edForget")
     page.reload()
@@ -283,28 +310,43 @@ def radio_tests(br, errors):
     page.wait_for_timeout(500)
     check(page.evaluate("sim.editor.radio().state") == "off", "radio: Disconnect forgets the card")
 
-    # SCRIPTS/TOOLS or StickTimeTracks picked instead of the drive
+    # not connected: the editor's button connects first
     page.evaluate("() => { window.showDirectoryPicker = async () => window.__pick; }")
-    page.click("#tracksBtn")
+    page.evaluate(PICK, "RADIO-SD")
+    editor(page)
+    check(page.inner_text("#edSend") == "Connect radio…", "radio: not connected, the editor's button says Connect radio…")
+    page.click("#edSend")
+    radio_done(page)
+    check(page.inner_text("#edSend") == "Send to radio" and page.inner_text("#edStatus").startswith("Radio SD: RADIO-SD connected."),
+          "radio: ... and connects")
+
+    # SCRIPTS/TOOLS or StickTimeTracks picked instead of the drive
     page.select_option("#edTemplate", label="Slalom")
     for path, slot in (("RADIO-SD/SCRIPTS/TOOLS", "2"), ("RADIO-SD/SCRIPTS/TOOLS/StickTimeTracks", "4")):
         page.evaluate(PICK, path)
+        radio_panel(page)
         if page.is_visible("#edForget"):
             page.click("#edForget")
         page.click("#edConnect")
         radio_done(page)
+        editor(page)
         page.select_option("#edSlot", slot)
         page.click("#edSend")
         radio_done(page)
         check(page.evaluate(CARD_FILE, TRACKS + slot + ".txt") == page.evaluate("sim.editor.file()"),
               f"radio: {path.split('/')[-1]} picked: c{slot}.txt still lands in StickTimeTracks")
+    radio_panel(page)
+    check("Connect the card's drive" in page.inner_text("#rpInstWait"), "radio: StickTimeTracks picked: no install from there")
 
     # a picker that may not open here (another site's frame: SecurityError)
     page.click("#edForget")
     page.evaluate("() => { window.showDirectoryPicker = async () => { throw new DOMException('no pickers in this frame', 'SecurityError'); }; }")
     page.click("#edConnect")
     radio_done(page)
-    check(page.is_hidden("#edRadio") and page.inner_text("#edRadioNote") == NO_RADIO, "radio: a SecurityError gives the Save file line")
+    check(page.is_hidden("#edRadio") and page.inner_text("#edRadioNote") == NO_RADIO and page.is_hidden("#rpTracksSec"),
+          "radio: a SecurityError gives the Save file line")
+    editor(page)
+    check(page.is_hidden("#edSend"), "radio: ... and the editor has no Send to radio")
     ctx.close()
 
     # no picker at all (Firefox, Safari, phones): the line, and the rest still works
@@ -315,9 +357,11 @@ def radio_tests(br, errors):
     page.on("pageerror", lambda e: errors.append(str(e)))
     page.goto(SITE + "simulator.html")
     wait_sim(page)
-    page.click("#tracksBtn")
-    check(page.is_hidden("#edRadio") and page.is_visible("#edRadioNote") and page.inner_text("#edRadioNote") == NO_RADIO,
-          "radio: without the picker, one line: use Save file")
+    radio_panel(page)
+    check(page.is_hidden("#edRadio") and page.is_visible("#edRadioNote") and page.inner_text("#edRadioNote") == NO_RADIO
+          and page.is_hidden("#rpInstSec") and page.is_hidden("#rpTracksSec"), "radio: without the picker, one line: use Save file")
+    editor(page)
+    check(page.is_hidden("#edSend") and page.is_hidden("#edRadioLine"), "radio: ... the editor without Send to radio")
     page.select_option("#edTemplate", label="Grand Prix")
     page.click("#edFly")
     check(page.evaluate("sim.test('info')")[10] == "My Grand Prix", "radio: ... and Fly it still works")
@@ -362,12 +406,12 @@ sha = lambda b: hashlib.sha256(b if isinstance(b, bytes) else b.encode()).hexdig
 
 
 def connect_card(page, name, files):
+    """a card made and connected in the Radio SD panel, which reads it (its tracks, the game on it)"""
     page.evaluate(MAKE_CARD, [name, files])
+    radio_panel(page)
     if page.is_visible("#edForget"):
         page.click("#edForget")
     page.click("#edConnect")
-    radio_done(page)
-    page.click("#edInstall")
     return radio_done(page)
 
 
@@ -378,7 +422,6 @@ def install_tests(br, errors):
     page.on("pageerror", lambda e: errors.append(str(e)))
     page.goto(SITE + "simulator.html")
     wait_sim(page)
-    page.click("#tracksBtn")
     version, T = MANIFEST["version"], "CARD/SCRIPTS/TOOLS/"
 
     # the edition to start with: what RADIO/radio.yml says the radio is, else nothing
@@ -396,8 +439,8 @@ def install_tests(br, errors):
     page.check('#edEditions [data-ed="lite"]')
     page.click("#edInstallGo")
     radio_done(page)
-    check(page.inner_text("#edStatus") == f"StickTime {version} is on the radio: Color, B&W and Lite. Eject the drive before unplugging it.",
-          f"install: {page.inner_text('#edStatus')!r}")
+    check(page.inner_text("#rpStatus") == f"StickTime {version} is on the radio: Color, B&W and Lite. Eject the drive before unplugging it.",
+          f"install: {page.inner_text('#rpStatus')!r}")
     wrong = [k for k, v in GAME_FILES.items() if page.evaluate(CARD_HASH, T + k) != sha(v)]
     check(not wrong, f"install: every file of the release on the card as published ({len(GAME_FILES)} files){wrong}")
     for luac in ("StickTimeBW/game.luac", "StickTimeLite/game.luac"):
@@ -408,7 +451,7 @@ def install_tests(br, errors):
           "install: no temporary files left")
     page.click("#edInstallGo")
     radio_done(page)
-    check(page.inner_text("#edStatus").startswith(f"StickTime {version} was already on the radio"), "install: again: nothing to write")
+    check(page.inner_text("#rpStatus").startswith(f"StickTime {version} was already on the radio"), "install: again: nothing to write")
 
     # an update over an old version: stale files go, the player's files stay byte for byte
     old_luac = [27, 76, 117, 97, 83, 0, 25, 147, 13, 10, 26, 10, 4, 4, 4, 0, 1, 2, 3]
@@ -424,9 +467,12 @@ def install_tests(br, errors):
     states = page.inner_text("#edEditions")
     check(page.evaluate(PICKED) == ["bw", "lite"] and "will be updated (1.6.5 on the card), 1 old file removed" in states,
           f"install: B&W and Lite found and picked, older: {states!r}")
+    check("c1 · track 9 · My Loop" in page.inner_text("#edRadioSlots"), "install: the panel lists the card's tracks beside it")
     page.mouse.move(0, 0)
-    shot_clip(page, OUT / "editor_install.png")
-    print("wrote test/shots/editor_install.png")
+    shot_clip(page, OUT / "radio_panel_light.png")
+    page.emulate_media(color_scheme="dark")
+    shot_clip(page, OUT / "radio_panel_dark.png")
+    page.emulate_media(color_scheme="light")
     page.click("#edInstallGo")
     radio_done(page)
     bw, lite = page.evaluate(CARD_LS, T + "StickTimeBW"), page.evaluate(CARD_LS, T + "StickTimeLite")
@@ -445,7 +491,7 @@ def install_tests(br, errors):
     page.once("dialog", lambda dl: (asked.append(dl.message), dl.dismiss()))
     page.click("#edInstallGo")
     radio_done(page)
-    check(asked and "9.9.9" in asked[0] and page.inner_text("#edStatus") == "Nothing changed on the radio."
+    check(asked and "9.9.9" in asked[0] and page.inner_text("#rpStatus") == "Nothing changed on the radio."
           and page.evaluate(CARD_HASH, T + "StickTime.lua") == sha("--[[\n  StickTime v9.9.9  -  from the future\n]]\n"),
           f"install: asked before replacing a newer one, and No changes nothing: {asked}")
     ctx.close()
@@ -457,11 +503,9 @@ def install_tests(br, errors):
     page.on("pageerror", lambda e: errors.append(str(e)))
     page.goto(SITE + "artifact.html")
     wait_sim(page)
-    page.click("#tracksBtn")
-    page.evaluate(MAKE_CARD, ["CARD", {"SCRIPTS/TOOLS/StickTime.dat": "x\n"}])
-    page.click("#edConnect")
-    radio_done(page)
-    check(page.is_hidden("#edInstall") and page.is_visible("#edInstallNote") and "latest release" in page.inner_text("#edInstallNote"),
+    connect_card(page, "CARD", {"SCRIPTS/TOOLS/StickTime.dat": "x\n"})
+    check(page.evaluate("sim.editor.radio().state") == "on" and page.is_hidden("#edInstallPanel") and page.is_hidden("#rpInstWait")
+          and page.is_visible("#edInstallNote") and "latest release" in page.inner_text("#edInstallNote"),
           "install: artifact.html hides it and points to the release zip")
     ctx.close()
     ctx = br.new_context()
@@ -470,6 +514,71 @@ def install_tests(br, errors):
     page.goto(SIM)
     wait_sim(page)
     check(page.evaluate("sim.editor.radio().game") == "", "install: a file:// page has no site files to install from")
+    ctx.close()
+
+
+def toolbar_shots(br, errors):
+    """the header's controls in one row at 1400 and 1280 px, two tidy rows at 1100, stacked at 390
+    (where the button says just Tracks); the Tracks & Install icon up close (1x, 2x, dark)"""
+    for w, rows in ((1400, 1), (1280, 1), (1100, 2), (390, None)):
+        ctx = br.new_context(viewport={"width": w, "height": 900})
+        offline(ctx)
+        page = ctx.new_page()
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.goto(SIM)
+        wait_sim(page)
+        tops = page.evaluate("[...new Set([...document.querySelectorAll('.controls > .ctl-group')].map((g) => Math.round(g.getBoundingClientRect().top)))].length")
+        wide = page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+        label = page.inner_text("#tracksBtn").strip()
+        want = "Tracks" if w < 760 else "Tracks & Install"
+        if rows:
+            check(tops == rows and wide and label == want, f"toolbar at {w} px: {rows} row{'s' if rows > 1 else ''} of controls ({tops}), {label!r}")
+        else:
+            check(wide and label == want, f"toolbar at {w} px: nothing sticks out sideways, the button says {label!r}")
+        page.locator("header.top").screenshot(path=str(OUT / f"toolbar_{w}.png"))
+        print(f"wrote test/shots/toolbar_{w}.png")
+        ctx.close()
+    for scale, scheme in ((1, "light"), (2, "light"), (2, "dark")):
+        ctx = br.new_context(viewport={"width": 1400, "height": 900}, device_scale_factor=scale, color_scheme=scheme)
+        offline(ctx)
+        page = ctx.new_page()
+        page.goto(SIM)
+        wait_sim(page)
+        a = page.locator("#tracksBtn").bounding_box()
+        name = f"icon_{scale}x_{scheme}.png"
+        page.screenshot(path=str(OUT / name), clip={"x": a["x"] - 4, "y": a["y"] - 4, "width": a["width"] + 8, "height": a["height"] + 8})
+        print("wrote test/shots/" + name)
+        ctx.close()
+
+
+def tab_tests(br, errors):
+    """one panel, two tabs: the last one used comes back (also after a reload); the arrow keys move
+    between them, and they never reach the game"""
+    ctx = br.new_context(viewport={"width": 1400, "height": 1000})
+    offline(ctx)
+    page = ctx.new_page()
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    page.goto(SIM)
+    wait_sim(page)
+    page.click("#tracksBtn")
+    check(page.is_visible("#editor") and page.is_hidden("#radioPanel") and page.get_attribute("#tabEditor", "aria-selected") == "true",
+          "tabs: the first time, the track editor")
+    page.click("#tabRadio")
+    check(page.is_hidden("#editor") and page.is_visible("#radioPanel"), "tabs: Radio / Install is a screen of its own")
+    page.click("#tpClose")
+    page.click("#tracksBtn")
+    check(page.is_visible("#radioPanel"), "tabs: the panel opens on the last tab used")
+    page.reload()
+    wait_sim(page)
+    page.click("#tracksBtn")
+    check(page.is_visible("#radioPanel"), "tabs: ... after a reload too")
+    page.evaluate("sim.engine.__mark = 1")
+    page.focus("#tabRadio")
+    page.keyboard.press("ArrowLeft")
+    check(page.is_visible("#editor") and page.evaluate("document.activeElement.id") == "tabEditor", "tabs: the arrow keys move between them")
+    page.keyboard.press("Enter")
+    page.keyboard.press("r")
+    check(page.evaluate("sim.engine.__mark") == 1 and not page.evaluate("sim.engine.exited"), "tabs: keys on the tabs don't reach the game")
     ctx.close()
 
 
@@ -587,7 +696,7 @@ def main():
         page.keyboard.type("rw")
         check(page.evaluate("sim.engine.__mark") == 1, "typing a name doesn't reach the game")
         page.keyboard.press("Control+z")
-        page.click("#edClose")
+        page.click("#tpClose")
         page.keyboard.press("r")
         check(page.evaluate("sim.engine.__mark") is None, "R outside the editor restarts the game, as before")
 
@@ -638,11 +747,9 @@ def main():
         check(len(page.evaluate("sim.editor.selected()")) == 4, "a click on a gap in a wall selects the wall (4 items)")
         page.mouse.move(0, 0)
         shot_clip(page, OUT / "editor_desktop.png")
-        print("wrote test/shots/editor_desktop.png")
         page.emulate_media(color_scheme="dark")
         page.check("#edTrees")
         shot_clip(page, OUT / "editor_desktop_dark.png")
-        print("wrote test/shots/editor_desktop_dark.png")
         page.uncheck("#edTrees")
         ctx.close()
 
@@ -659,7 +766,6 @@ def main():
         page.touchscreen.tap(px, py)
         check(len(page.evaluate("sim.editor.selected()")) == 1, "a tap selects a gate")
         shot_clip(page, OUT / "editor_phone.png")
-        print("wrote test/shots/editor_phone.png")
         ctx.close()
 
         # ---- artifact.html (fengari from the CDN address)
@@ -680,6 +786,8 @@ def main():
         # ---- the radio's SD card
         radio_tests(br, errors)
         install_tests(br, errors)
+        toolbar_shots(br, errors)
+        tab_tests(br, errors)
         br.close()
     for e in errors:
         print("page error:", e)
