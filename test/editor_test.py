@@ -144,6 +144,24 @@ import sd_manifest  # noqa: E402  (the site's sdcard/: the game's files and mani
 
 GAME_FILES = sd_manifest.files()
 MANIFEST = sd_manifest.manifest(GAME_FILES)
+import bundle_web  # noqa: E402  (the built-in tracks, as the editor's templates have them)
+
+TEMPLATES = {t["name"]: t for t in json.loads(bundle_web.track_data())["tracks"]}
+GP = TEMPLATES["Grand Prix"]
+NGP = len(GP["gates"])
+
+
+def dec(v):
+    """a number as the editor writes it (to the cm, no trailing zeros); fine for values without
+    half cents, as the Grand Prix has"""
+    s = f"{round(v * 100) / 100:.2f}".rstrip("0").rstrip(".")
+    return "0" if s in ("-0", "") else s
+
+
+def numbers_of(t):
+    """the numbers line after the id, for a built-in track without structures"""
+    return " ".join([str(t["seed"]), str(t["trees"])] +
+                    [f"{dec(x)} {dec(z)} {k} {round(yaw) % 360} {dec(h)}" for x, z, k, yaw, h in t["gates"]])
 
 
 def served(ctx):
@@ -472,7 +490,7 @@ def main():
         check(page.is_visible("#editor") and page.get_attribute("#tracksBtn", "aria-expanded") == "true", "Tracks opens the editor")
         page.select_option("#edTemplate", label="Grand Prix")
         gp = page.evaluate("sim.editor.track()")
-        check(page.input_value("#edName") == "My Grand Prix" and len(gp["gates"]) == 12, "the Grand Prix template: 12 gates")
+        check(page.input_value("#edName") == "My Grand Prix" and len(gp["gates"]) == NGP, f"the Grand Prix template: {NGP} gates")
         check(page.evaluate("sim.editor.problems()") == [] and page.is_enabled("#edFly") and page.is_enabled("#edSave"),
               "nothing in the way: Fly it and Save file on")
         page.select_option("#edSlot", "1")
@@ -480,9 +498,8 @@ def main():
             page.click("#edSave")
         check(d.value.suggested_filename == "c1.txt", "Save file downloads c1.txt")
         text = pathlib.Path(d.value.path()).read_bytes().decode("ascii")
-        name, nums = check_file(text, 12, 0, "the Grand Prix's c1.txt")
-        check(name == "My Grand Prix" and nums.startswith("71 9 0 0 5 0 0 0 40 1 0 0 10 80 2 20 6 "),
-              "its numbers are the Grand Prix's (seed 71, arch, gate, high gate...)")
+        name, nums = check_file(text, NGP, 0, "the Grand Prix's c1.txt")
+        check(name == "My Grand Prix" and nums == numbers_of(GP), "its numbers are the Grand Prix's: seed, trees, every gate as in TRACKS")
         check(page.evaluate("sim.editor.file()") == text, "the download is the editor's file")
 
         # ---- Fly it: slot 1 is track 9, in Practice
@@ -491,7 +508,7 @@ def main():
         info = page.evaluate("sim.test('info')")
         check(info[0] == 9 and info[10] == "My Grand Prix", f"the game lists track 9 as {info[10]!r}")
         get = page.evaluate("sim.test('get')")
-        check(info[2] == 2 and get[18] == 12 and get[15] in (3, 4), "Practice on track 9 with its 12 gates")
+        check(info[2] == 2 and get[18] == NGP and get[15] in (3, 4), f"Practice on track 9 with its {NGP} gates")
         g3, e3 = page.evaluate("sim.test('gate', 3)"), gp["gates"][2]
         check(abs(g3[0] - e3["x"]) < 1e-9 and abs(g3[2] - e3["z"]) < 1e-9 and g3[6] == e3["t"], "gate 3 stands where the editor put it")
         check(page.evaluate(f"sim.app.sd.get('{SLOT}1.txt')") == text, "the emulator's SD card holds the file")
@@ -513,7 +530,7 @@ def main():
         page.select_option("#edTemplate", label="Meadow")
         status = open_file(page, crlf)
         t = page.evaluate("sim.editor.track()")
-        check(t["name"] == "My Grand Prix" and len(t["gates"]) == 12, f"a CR LF file opens: {status!r}")
+        check(t["name"] == "My Grand Prix" and len(t["gates"]) == NGP, f"a CR LF file opens: {status!r}")
         check(page.evaluate("sim.editor.file()") == text, "opened and saved again: the same file, the same id")
         check(page.input_value("#edSlot") == "3", "c3.txt goes to slot 3")
         bad = tmp / "bad.txt"
@@ -589,7 +606,8 @@ def main():
         page.select_option("#edSlot", "3")
         page.click("#edFly")
         info = page.evaluate("sim.test('info')")
-        check(info[10] == "My Meadow" and info[9] == 3 and page.evaluate("sim.test('get')")[18] == 8, "track 11: Meadow, its wall and its gap")
+        check(info[10] == "My Meadow" and info[9] == 3 and page.evaluate("sim.test('get')")[18] == len(TEMPLATES["Meadow"]["gates"]) + 1,
+              "track 11: Meadow, its wall and its gap")
 
         # ---- StickTime Lite reads no custom tracks: the editor says so, Fly it goes back to Auto
         page.evaluate("sim.script('lite')")
@@ -610,7 +628,7 @@ def main():
         page.click("#edFly")
         info = page.evaluate("sim.test('info')")
         check(page.evaluate("sim.app.radio.color") is False and info[0] == 12 and info[10] == "My Hoop Forest"
-              and page.evaluate("sim.test('get')")[18] == 9, "StickTime BW on a TX12: Hoop Forest flown as track 12")
+              and page.evaluate("sim.test('get')")[18] == len(TEMPLATES["Hoop Forest"]["gates"]), "StickTime BW on a TX12: Hoop Forest flown as track 12")
         page.evaluate("sim.radio('tx16s')")
 
         # ---- screenshots: desktop (light and dark), phone width
@@ -637,7 +655,7 @@ def main():
         page.tap("#tracksBtn")
         page.select_option("#edTemplate", label="Grand Prix")
         check(page.evaluate("document.documentElement.scrollWidth <= innerWidth"), "phone width: nothing sticks out sideways")
-        px, py = page.evaluate("sim.editor.at(10, 80)")
+        px, py = page.evaluate("([x, z]) => sim.editor.at(x, z)", GP["gates"][2][:2])   # gate 3
         page.touchscreen.tap(px, py)
         check(len(page.evaluate("sim.editor.selected()")) == 1, "a tap selects a gate")
         shot_clip(page, OUT / "editor_phone.png")
