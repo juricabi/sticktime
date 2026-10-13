@@ -12,17 +12,22 @@
     <div><h1>StickTime</h1><small>EdgeTX FPV sim · in the browser</small></div>
   </div>
   <div class="controls">
+    <div class="ctl-group">
     <label class="field"><span>Radio</span><select id="radioSel" aria-label="Radio screen"></select></label>
     <label class="field"><span>Script</span>
       <select id="scriptSel" aria-label="Script">
-        <option value="auto">Auto (made for the screen)</option>
+        <option value="auto">Auto (for this screen)</option>
         <option value="color">StickTime.lua (color screens)</option>
         <option value="bw">StickTimeBW.lua (B&amp;W look, any screen)</option>
         <option value="lite">StickTime Lite (B&amp;W, low memory, any screen)</option>
       </select>
     </label>
+    </div>
+    <div class="ctl-group">
     <button class="btn" id="restartBtn" type="button" title="Restart the script (R)">Restart</button>
-    <button class="btn" id="tracksBtn" type="button" aria-expanded="false" aria-controls="editor" title="Make your own tracks: the track editor"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 18.5c-1.8-.8-2.5-3-1.3-4.6L8.4 7.6c1.3-1.7 3.9-1.6 5 .2l.9 1.4c.9 1.4 2.8 1.6 4 .5l.6-.6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M14 20h5.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="19.5" cy="7.5" r="2.2" fill="currentColor"/></svg>Tracks</button>
+    <button class="btn" id="tracksBtn" type="button" aria-expanded="false" aria-controls="tracksPanel" title="Make your own tracks, and put StickTime and your tracks on the radio's SD card"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="5" cy="19.5" r="2" fill="currentColor"/><path d="M7.5 19.5h7a3.5 3.5 0 0 0 0-7h-6a3.5 3.5 0 0 1 0-7h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="2.5 2.6"/><path d="M16 9.5V1.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16 2.2h5.5l-1.6 2 1.6 2H16" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg><span class="lbl-long">Tracks &amp; Install</span><span class="lbl-short">Tracks</span></button>
+    </div>
+    <div class="ctl-group">
     <div class="btn sound" id="soundBox" title="Sound volume (wheel: 5% steps)">
       <button type="button" id="muteBtn" class="mute" aria-label="Mute" aria-pressed="false"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path class="wave" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path class="cross" d="M16 9l5 6M21 9l-5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
       <input type="range" id="soundVol" min="0" max="1" step="0.05" value="0.8" aria-label="Sound volume">
@@ -35,18 +40,28 @@
       <label class="songs" title="Play your own music files instead (MP3, OGG, WAV...)">Songs<input type="file" id="songIn" accept="audio/*" multiple></label>
       <button type="button" id="songsClear" class="mute" aria-label="Back to the generated music" title="Back to the generated music" hidden><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button>
     </div>
-    <label class="btn file-btn" title="Run any EdgeTX tool script">Open .lua<input type="file" id="fileIn" accept=".lua,.txt"></label>
-    <button class="btn" id="copyBtn" type="button" title="Copy the running script to the clipboard">Copy .lua</button>
+    </div>
+    <div class="ctl-group btn-pair">
+      <label class="btn file-btn" title="Run any EdgeTX tool script">Open .lua<input type="file" id="fileIn" accept=".lua,.txt"></label>
+      <button class="btn" id="copyBtn" type="button" title="Copy the running script (.lua) to the clipboard">Copy</button>
+    </div>
   </div>
 </header>
 
-<section class="card editor" id="editor" hidden aria-labelledby="edTitle">
+<section class="card editor tp" id="tracksPanel" hidden aria-label="Tracks and install">
+<div class="tp-bar">
+  <div class="tabs" role="tablist" aria-label="Tracks and install">
+    <button type="button" role="tab" id="tabEditor" aria-selected="true" aria-controls="editor">Track editor</button>
+    <button type="button" role="tab" id="tabRadio" aria-selected="false" aria-controls="radioPanel" tabindex="-1">Radio / Install</button>
+  </div>
+  <button class="btn" id="tpClose" type="button" title="Close (your work is kept)">Close</button>
+</div>
+<div class="tp-pane" id="editor" role="tabpanel" aria-labelledby="tabEditor">
   <div class="ed-head">
-    <h2 id="edTitle">Track editor <small>your tracks are 9 to 16 in the game</small></h2>
+    <p class="note tp-sub">Your tracks are 9 to 16 in the game.</p>
     <div class="ed-actions">
       <label class="field"><span>Start from</span><select id="edTemplate" aria-label="Start from a built-in track or a blank one"></select></label>
       <label class="btn file-btn" title="Open a track file (c1.txt to c8.txt)">Open file<input type="file" id="edOpen" accept=".txt,text/plain"></label>
-      <button class="btn" id="edClose" type="button" title="Close the editor (your work is kept)">Close</button>
     </div>
   </div>
   <div class="ed-grid">
@@ -79,37 +94,11 @@
         <label class="field"><span>Slot</span><select id="edSlot" aria-label="Slot on the SD card"></select></label>
         <button class="btn primary" id="edFly" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 4.5v15l12-7.5z" fill="currentColor"/></svg>Fly it</button>
         <button class="btn" id="edSave" type="button">Save file</button>
+        <button class="btn" id="edSend" type="button" hidden>Send to radio</button>
         <button class="btn" id="edEmpty" type="button" title="Take this slot's track off the emulator's SD card">Empty slot</button>
         <span class="ed-size" id="edSize"></span>
       </div>
-      <div class="ed-radio" id="edRadio">
-        <span class="ed-rlabel">Radio SD</span>
-        <span class="ed-rstate" id="edRadioState">not connected</span>
-        <button class="btn" id="edConnect" type="button" title="Pick the radio's SD card (the radio plugged in by USB, in USB Storage mode)">Connect radio…</button>
-        <button class="btn" id="edSend" type="button" hidden>Send to radio</button>
-        <button class="btn" id="edFromRadio" type="button" aria-expanded="false" aria-controls="edRadioPanel" hidden>From radio…</button>
-        <button class="btn" id="edInstall" type="button" aria-expanded="false" aria-controls="edInstallPanel" hidden>Install / update StickTime…</button>
-        <button class="btn" id="edForget" type="button" title="Forget this SD card" hidden>Disconnect</button>
-      </div>
-      <p class="note ed-rnote" id="edInstallNote" hidden>To put the game itself on the card, copy the SCRIPTS folder of the SD card zip from the <a href="https://github.com/juricabi/sticktime/releases/latest" target="_blank" rel="noopener">latest release</a>; the emulator at juricabi.github.io/sticktime can install it for you.</p>
-      <div class="ed-rpanel" id="edInstallPanel" hidden>
-        <p class="ed-rpath" id="edInstallHead"></p>
-        <ul class="ed-rslots ed-editions" id="edEditions"></ul>
-        <p class="note" id="edInstallHint"></p>
-        <div class="ed-row">
-          <button class="btn primary" id="edInstallGo" type="button">Install / update</button>
-          <progress id="edInstallBar" max="1" value="0" hidden></progress>
-        </div>
-      </div>
-      <p class="note ed-rnote" id="edRadioNote">Plug the radio in by USB and choose USB Storage (SD) on it, then Connect radio and pick its SD card (the drive).</p>
-      <div class="ed-rpanel" id="edRadioPanel" hidden>
-        <p class="ed-rpath" id="edRadioPath"></p>
-        <ul class="ed-rslots" id="edRadioSlots"></ul>
-        <div class="ed-row">
-          <button class="btn" id="edRadioToEmu" type="button" title="The radio's tracks into the same slots of the emulator">Copy the radio's tracks here</button>
-          <button class="btn" id="edEmuToRadio" type="button" title="The emulator's tracks into the same slots of the radio">Send all of mine to the radio</button>
-        </div>
-      </div>
+      <p class="note ed-rline" id="edRadioLine" hidden><span id="edRadioLineText"></span> <button class="linkbtn" id="edRadioLink" type="button">Tracks on the radio, install StickTime: Radio / Install</button></p>
       <p class="note warn ed-lite" id="edLite" hidden></p>
       <p class="ed-status" id="edStatus" role="status" aria-live="polite"></p>
     </div>
@@ -139,7 +128,7 @@
         <summary>How to use on the radio</summary>
         <ol>
           <li><strong>Save file</strong> downloads the track as <code>c1.txt</code> (the slot's number).</li>
-          <li>On the radio's SD card, make the folder <code>/SCRIPTS/TOOLS/StickTimeTracks/</code> and copy the file into it. In Chrome or Edge on a computer, <strong>Connect radio</strong> and <strong>Send to radio</strong> do both: the radio plugged in by USB, in USB Storage mode.</li>
+          <li>On the radio's SD card, make the folder <code>/SCRIPTS/TOOLS/StickTimeTracks/</code> and copy the file into it. In Chrome or Edge on a computer, <strong>Send to radio</strong> does both: the radio plugged in by USB, in USB Storage mode (the <strong>Radio / Install</strong> tab also installs the game).</li>
           <li>Up to 8 tracks, <code>c1.txt</code> to <code>c8.txt</code>: they come after the 8 built-in ones, as tracks 9 to 16 in the track menu.</li>
           <li>StickTime and StickTime BW read them; StickTime Lite doesn't.</li>
           <li>Best times are kept while the track stays the same: any change to it starts them over.</li>
@@ -147,6 +136,50 @@
       </details>
     </div>
   </div>
+</div>
+<div class="tp-pane" id="radioPanel" role="tabpanel" aria-labelledby="tabRadio" hidden>
+  <p class="note tp-sub">The radio's SD card over USB: install or update StickTime on it, and your tracks on the radio.</p>
+  <div class="rp-grid">
+    <div class="rp-col">
+      <section class="ed-sec" aria-labelledby="rpConnH">
+        <h3 id="rpConnH">Connection</h3>
+        <div class="ed-radio" id="edRadio">
+          <span class="ed-rstate" id="edRadioState">not connected</span>
+          <button class="btn primary" id="edConnect" type="button" title="Pick the radio's SD card (the radio plugged in by USB, in USB Storage mode)">Connect radio…</button>
+          <button class="btn" id="edForget" type="button" title="Forget this SD card" hidden>Disconnect</button>
+        </div>
+        <p class="note ed-rnote" id="edRadioNote"></p>
+      </section>
+      <section class="ed-sec" id="rpInstSec" aria-labelledby="rpInstH">
+        <h3 id="rpInstH">Install / update StickTime</h3>
+        <p class="note" id="edInstallNote" hidden>To put the game itself on the card, copy the SCRIPTS folder of the SD card zip from the <a href="https://github.com/juricabi/sticktime/releases/latest" target="_blank" rel="noopener">latest release</a>; the emulator at juricabi.github.io/sticktime can install it for you.</p>
+        <p class="note" id="rpInstWait" hidden></p>
+        <div id="edInstallPanel" hidden>
+          <p class="ed-rpath" id="edInstallHead"></p>
+          <ul class="ed-rslots ed-editions" id="edEditions"></ul>
+          <p class="note" id="edInstallHint"></p>
+          <div class="ed-row">
+            <button class="btn primary" id="edInstallGo" type="button">Install / update</button>
+            <progress id="edInstallBar" max="1" value="0" hidden></progress>
+          </div>
+        </div>
+      </section>
+    </div>
+    <section class="ed-sec rp-tracks" id="rpTracksSec" aria-labelledby="rpTracksH">
+      <h3 id="rpTracksH">Your tracks on the radio</h3>
+      <p class="note" id="rpTracksWait" hidden></p>
+      <div id="edRadioPanel" hidden>
+        <p class="ed-rpath" id="edRadioPath"></p>
+        <ul class="ed-rslots" id="edRadioSlots"></ul>
+        <div class="ed-row">
+          <button class="btn" id="edRadioToEmu" type="button" title="The radio's tracks into the same slots of the emulator">Copy the radio's tracks here</button>
+          <button class="btn" id="edEmuToRadio" type="button" title="The emulator's tracks into the same slots of the radio">Send all of mine to the radio</button>
+        </div>
+      </div>
+    </section>
+  </div>
+  <p class="ed-status" id="rpStatus" role="status" aria-live="polite"></p>
+</div>
 </section>
 
 <div class="layout">

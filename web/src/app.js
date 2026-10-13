@@ -860,10 +860,10 @@
   // ---------------------------------------------------------- keyboard
   const held = new Set();
   let exitDown = 0, exitLongSent = false;
-  // form fields keep their keys, and so does the track editor (editor.js): what is typed there
-  // (R to turn a gate, Delete, the arrows) never flies the quad or restarts the game
+  // form fields keep their keys, and so does the Tracks & Install panel (editor.js): what is typed
+  // there (R to turn a gate, Delete, Enter on a button, the arrows on its tabs) never flies the quad
   const isField = (t) => t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA'
-    || (t.closest && t.closest('#editor') !== null));
+    || (t.closest && t.closest('#tracksPanel') !== null));
   function key(name) { if (app.engine) app.engine.key(name); }
   window.addEventListener('keydown', (e) => {
     if (isField(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
@@ -1244,12 +1244,13 @@
       rd.readAsText(f);
       ev.target.value = '';
     });
+    const copyLabel = $('copyBtn').textContent;
     $('copyBtn').addEventListener('click', async () => {
       const s = scriptFor();
       const btn = $('copyBtn');
       try { await navigator.clipboard.writeText(s.text); btn.textContent = 'Copied ' + s.name; }
       catch (e) { btn.textContent = 'Copy blocked'; }
-      setTimeout(() => { btn.textContent = 'Copy .lua'; }, 1800);
+      setTimeout(() => { btn.textContent = copyLabel; }, 1800);
     });
     document.querySelectorAll('.key[data-key]').forEach((b) => {
       let downT = 0;

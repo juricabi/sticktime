@@ -385,13 +385,17 @@
 
   // ---------------------------------------------------------------- the page
   const el = {};
-  for (const k of ['tracksBtn', 'edClose', 'edTemplate', 'edOpen', 'edGateType', 'edAddGate', 'edAddBox', 'edAddWall',
+  for (const k of ['tracksBtn', 'tracksPanel', 'tabEditor', 'tabRadio', 'tpClose',
+    'edTemplate', 'edOpen', 'edGateType', 'edAddGate', 'edAddBox', 'edAddWall',
     'edRotL', 'edRotR', 'edDup', 'edDel', 'edUndo', 'edRedo', 'edFit', 'edTrees', 'edMap', 'edMapBox', 'edReadout',
     'edSlot', 'edFly', 'edSave', 'edEmpty', 'edSize', 'edLite', 'edStatus', 'edName', 'edSeed', 'edShuffle', 'edTreesN',
-    'edSel', 'edProblems', 'edProbPill', 'edOrder', 'edRadio', 'edRadioState', 'edConnect', 'edSend', 'edFromRadio',
-    'edForget', 'edRadioNote', 'edRadioPanel', 'edRadioPath', 'edRadioSlots', 'edRadioToEmu', 'edEmuToRadio',
-    'edInstall', 'edInstallNote', 'edInstallPanel', 'edInstallHead', 'edEditions', 'edInstallHint', 'edInstallGo',
-    'edInstallBar']) el[k] = $(k);
+    'edSel', 'edProblems', 'edProbPill', 'edOrder', 'edSend', 'edRadioLine', 'edRadioLineText', 'edRadioLink',
+    // the Radio / Install tab
+    'radioPanel', 'rpStatus', 'rpInstWait', 'rpTracksWait', 'rpInstSec', 'rpTracksSec',
+    'edRadio', 'edRadioState', 'edConnect', 'edForget', 'edRadioNote', 'edRadioPanel', 'edRadioPath', 'edRadioSlots',
+    'edRadioToEmu', 'edEmuToRadio', 'edInstallNote', 'edInstallPanel', 'edInstallHead', 'edEditions', 'edInstallHint',
+    'edInstallGo', 'edInstallBar']) el[k] = $(k);
+  const rp = el.radioPanel, tp = el.tracksPanel;
   const cv = el.edMap, ctx = cv.getContext('2d');
   const UP = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3.5 10l4.5-4.5 4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const DOWN = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3.5 6l4.5 4.5 4.5-4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -1255,8 +1259,6 @@
     D.tracks.map((t, i) => '<option value="' + i + '">' + esc(t.name) + '</option>').join('');
   el.edGateType.innerHTML = TYPES.slice(1).map((n, i) => '<option value="' + (i + 1) + '">' + n + '</option>').join('');
 
-  el.tracksBtn.addEventListener('click', () => (ed.open ? closeEditor(false) : openEditor()));
-  el.edClose.addEventListener('click', () => closeEditor(true));
   // a tool button that its own action disables (Delete with nothing left selected...) hands the
   // keyboard to the map rather than to the page
   const tool = (b, fn) => b.addEventListener('click', () => { fn(); if (b.disabled) cv.focus({ preventScroll: true }); });
@@ -1409,7 +1411,7 @@
       return;
     }
     status('Flying ' + (name || ed.T.name.trim()) + ' (track ' + t + ', c' + slot + '.txt) in Practice.', 'ok');
-    closeEditor(false);
+    closePanel(false);
     const radio = $('radio');
     if (radio) radio.scrollIntoView({ block: 'center', behavior: reduced() ? 'auto' : 'smooth' });
     // the keys fly the quad again
@@ -1449,8 +1451,14 @@
     if (typeof window.showDirectoryPicker !== 'function') return false;
     try { return window.top === window.self || !!window.top.location.href; } catch (e) { return false; }   // another site's frame
   }
-  // dir: what the user picked; at: where that is on the card (the card, SCRIPTS, TOOLS, StickTimeTracks)
-  const radio = { ok: canPick(), state: 'off', dir: null, at: null, busy: false, open: false };
+  // dir: what the user picked; at: where that is on the card (the card, SCRIPTS, TOOLS, StickTimeTracks);
+  // panel: the Radio / Install tab is showing; listed: its list of the card's slots is read
+  const radio = { ok: canPick(), state: 'off', dir: null, at: null, busy: false, panel: false, listed: false };
+  // what the Radio / Install tab says (the editor has its own line: status)
+  function rstatus(msg, kind) {
+    el.rpStatus.textContent = msg || '';
+    el.rpStatus.className = 'ed-status' + (kind ? ' ' + kind : '');
+  }
   const STEPS = { card: ['SCRIPTS', 'TOOLS', 'StickTimeTracks'], scripts: ['TOOLS', 'StickTimeTracks'], tools: ['StickTimeTracks'], tracks: [] };
   const kv = {
     db: null,
@@ -1519,42 +1527,48 @@
     const has = async (f) => !!(tools && await child(tools, f, 'file'));
     if (await has('StickTime.lua') || await has('StickTimeBW.lua')) return '';
     if (await has('StickTimeLite.lua')) return ' Only StickTime Lite is on this card, and the Lite doesn\'t read custom tracks.';
-    return GAME ? ' StickTime isn\'t on this card yet: Install / update StickTime puts it there.' : ' StickTime isn\'t on this card yet: copy it to /SCRIPTS/TOOLS/ too.';
+    return GAME ? ' StickTime isn\'t on this card yet: the Radio / Install tab puts it there.' : ' StickTime isn\'t on this card yet: copy it to /SCRIPTS/TOOLS/ too.';
   }
 
   function renderRadio() {
-    const on = radio.state === 'on', ask = radio.state === 'ask';
-    el.edRadio.hidden = !radio.ok;
+    const on = radio.state === 'on', ask = radio.state === 'ask', name = radio.dir ? radio.dir.name : '';
+    // the editor: Send to radio (Connect radio… first), and a line to the Radio / Install tab
+    const bad = ed.probs.length > 0;
+    el.edSend.hidden = el.edRadioLine.hidden = !radio.ok;
+    el.edSend.textContent = on ? 'Send to radio' : ask ? 'Reconnect radio' : 'Connect radio…';
+    el.edSend.disabled = radio.busy || (on && bad);
+    el.edSend.title = !on ? 'Connect the radio\'s SD card first (the radio plugged in by USB, in USB Storage mode)'
+      : bad ? 'Fix the problems listed under Check first' : 'Write c' + ed.slot + '.txt to the radio\'s SD card (track ' + (8 + ed.slot) + ')';
+    el.edRadioLineText.textContent = 'Radio SD: ' + (on ? name + ' connected.' : ask ? name + ', to allow again.' : 'not connected.');
+    // the panel: the connection
+    el.edRadio.hidden = el.rpInstSec.hidden = el.rpTracksSec.hidden = !radio.ok;
     el.edRadioNote.className = 'note ed-rnote' + (radio.ok ? '' : ' warn');
-    el.edRadioNote.textContent = radio.ok
-      ? 'Plug the radio in by USB and choose USB Storage (SD) on it, then Connect radio and pick its SD card (the drive).' : NO_RADIO;
-    el.edRadioNote.hidden = radio.ok && on;
-    if (!radio.ok) { el.edRadioPanel.hidden = true; return; }
-    const name = radio.dir ? radio.dir.name : '';
+    el.edRadioNote.textContent = radio.ok ? 'Plug the radio in by USB and choose USB Storage (SD) on it, then Connect radio and pick its SD card ' +
+      '(the drive). Eject the drive before you unplug the radio.' : NO_RADIO;
+    if (!radio.ok) return;
     el.edRadioState.textContent = on ? name + ' connected' : ask ? name + ': allow again' : 'not connected';
     el.edRadioState.classList.toggle('on', on);
     el.edConnect.textContent = ask ? 'Reconnect' : 'Connect radio…';
     el.edConnect.hidden = on;
-    el.edSend.hidden = el.edFromRadio.hidden = !on;
     el.edForget.hidden = !(on || ask);
-    const bad = ed.probs.length > 0;
-    el.edSend.disabled = bad || radio.busy;
-    el.edSend.title = bad ? 'Fix the problems listed under Check first' : 'Write c' + ed.slot + '.txt to the radio\'s SD card (track ' + (8 + ed.slot) + ')';
-    el.edConnect.disabled = el.edFromRadio.disabled = el.edRadioToEmu.disabled = el.edEmuToRadio.disabled = radio.busy;
-    el.edRadioPanel.hidden = !(on && radio.open);
-    el.edFromRadio.setAttribute('aria-expanded', String(on && radio.open));
-    // the game itself: from the site's sdcard/ (not offline, not in a hosted artifact)
-    const noTools = radio.at === 'tracks';
-    el.edInstall.hidden = !(on && GAME);
-    el.edInstall.disabled = radio.busy || noTools;
-    el.edInstall.title = noTools ? 'Connect the card\'s drive (or its SCRIPTS/TOOLS folder) to install the game' : 'Put StickTime on the radio, or bring it up to date';
-    el.edInstallNote.hidden = !(on && !GAME);
-    el.edInstallPanel.hidden = !(on && GAME && inst.open && !noTools);
-    el.edInstall.setAttribute('aria-expanded', String(!el.edInstallPanel.hidden));
+    el.edConnect.disabled = el.edRadioToEmu.disabled = el.edEmuToRadio.disabled = radio.busy;
+    // the game itself, from the site's sdcard/ (not offline, not in a hosted artifact)
+    const noTools = radio.at === 'tracks', shown = !!(on && GAME && !noTools && inst.card);
+    el.edInstallNote.hidden = !!GAME;
+    el.edInstallPanel.hidden = !shown;
+    el.rpInstWait.hidden = !GAME || shown;
+    el.rpInstWait.textContent = !on ? 'Connect the radio\'s SD card to install StickTime on it or bring it up to date.'
+      : noTools ? 'Connect the card\'s drive (or its SCRIPTS/TOOLS folder) to install the game.' : 'Reading the card…';
     el.edInstallGo.disabled = radio.busy || !inst.card || !Object.values(inst.pick).some(Boolean);
+    // your tracks on the radio
+    el.edRadioPanel.hidden = !(on && radio.listed);
+    el.rpTracksWait.hidden = on && radio.listed;
+    el.rpTracksWait.textContent = on ? 'Reading the card…' : 'Connect the radio\'s SD card to see the tracks on it.';
   }
   // a radio job: one at a time; a card that went away (unplugged) or lost its permission says so
-  async function job(fn) {
+  // (say: the panel's line, or the editor's for Send to radio)
+  async function job(fn, say) {
+    say = say || rstatus;
     if (radio.busy) return;
     radio.busy = true;
     renderRadio();
@@ -1562,39 +1576,46 @@
     catch (e) {
       if (e && (e.name === 'NotFoundError' || e.name === 'NotAllowedError' || e.name === 'SecurityError')) {
         radio.state = 'ask';
-        radio.open = false;
-        status('The radio\'s SD card isn\'t there any more: plug the radio in (USB Storage) and Reconnect, or Connect radio to pick it again.', 'bad');
-      } else status(e && e.site ? e.message : 'The radio\'s SD card: ' + (e && e.message || e), 'bad');
+        radio.listed = false;
+        say('The radio\'s SD card isn\'t there any more: plug the radio in (USB Storage) and Reconnect, or Connect radio to pick it again.', 'bad');
+      } else say(e && e.site ? e.message : 'The radio\'s SD card: ' + (e && e.message || e), 'bad');
     } finally {
       radio.busy = false;
       renderRadio();
     }
   }
-  async function useCard(dir, said) {
+  async function useCard(dir, said, say) {
     const at = await locate(dir);
     if (!at) {
-      status(NOT_CARD, 'bad');
+      say(NOT_CARD, 'bad');
       return;
     }
     radio.dir = dir;
     radio.at = at;
     radio.state = 'on';
+    radio.listed = false;
+    inst.card = null;                                  // another card: looked at afresh
     try { await kv.set('radio', dir); } catch (e) { /* not kept: Connect radio again next time */ }
     const where = at === 'card' ? '' : ' (' + ['SCRIPTS', 'SCRIPTS/TOOLS', 'SCRIPTS/TOOLS/StickTimeTracks'][['scripts', 'tools', 'tracks'].indexOf(at)] + ')';
-    if (said) status('Radio SD: ' + dir.name + where + ' connected.' + await installed(), 'ok');
-    if (radio.open) await listRadio();
-    inst.card = null;                                  // another card: looked at afresh
-    if (inst.open && GAME && at !== 'tracks') await loadInstall();
+    if (said) say('Radio SD: ' + dir.name + where + ' connected.' + await installed(), 'ok');
+    if (radio.panel) await refreshRadio();
+  }
+  // what the panel shows of the card: its tracks, and the game on it
+  async function refreshRadio() {
+    await listRadio();
+    renderRadio();
+    if (GAME && radio.at !== 'tracks') await loadInstall();
   }
   // Connect radio… (or Reconnect): the picker and the permission both need this click
-  function connect() {
+  function connect(say) {
+    say = say || rstatus;
     if (radio.state === 'ask' && radio.dir) {
       const dir = radio.dir;
       const ask = typeof dir.requestPermission === 'function' ? dir.requestPermission({ mode: 'readwrite' }) : Promise.resolve('granted');
       job(async () => {
-        if (await ask === 'granted') await useCard(dir, true);
-        else { radio.state = 'off'; status('The radio\'s SD card wasn\'t allowed: Connect radio to pick it again.', 'bad'); }
-      });
+        if (await ask === 'granted') await useCard(dir, true, say);
+        else { radio.state = 'off'; say('The radio\'s SD card wasn\'t allowed: Connect radio to pick it again.', 'bad'); }
+      }, say);
       return;
     }
     let picking;
@@ -1605,14 +1626,16 @@
       try { dir = await picking; }
       catch (e) {
         if (e && e.name === 'AbortError') return;          // the picker was closed
-        if (e && (e.name === 'SecurityError' || e instanceof TypeError)) { radio.ok = false; status(NO_RADIO, 'bad'); return; }
+        if (e && (e.name === 'SecurityError' || e instanceof TypeError)) { radio.ok = false; say(NO_RADIO, 'bad'); return; }
         throw e;
       }
-      await useCard(dir, true);
-    });
+      await useCard(dir, true, say);
+    }, say);
   }
+  // the editor's Send to radio: connects first when it has to
   function sendToRadio() {
-    if (ed.probs.length || radio.state !== 'on') return;
+    if (radio.state !== 'on') { connect(status); return; }
+    if (ed.probs.length) return;
     const slot = ed.slot, text = ed.file.text, name = ed.T.name.trim();
     job(async () => {
       const dir = await tracksDir(true);
@@ -1622,17 +1645,18 @@
         return;
       }
       if (old !== text) await writeSlot(dir, slot, text);
+      radio.listed = false;
       status('Sent to the radio as track ' + (8 + slot) + ' (c' + slot + '.txt). On the radio: restart StickTime, the track is in the Track list.', 'ok');
-      if (radio.open) await listRadio();
-    });
+    }, status);
   }
   let radioSlots = [];
   async function listRadio() {
     radioSlots = await readAll();
+    radio.listed = true;
     el.edRadioPath.textContent = 'On ' + radio.dir.name + (STEPS[radio.at].length ? ' · ' + STEPS[radio.at].join('/') : '');
     el.edRadioSlots.innerHTML = radioSlots.map((t, i) => '<li><span><b>c' + (i + 1) + '</b> · track ' + (i + 9) + ' · ' +
       (t === null ? '<em>empty</em>' : esc(nameOf(t))) + '</span>' +
-      (t === null ? '' : '<button class="btn" type="button" data-ropen="' + (i + 1) + '">Open</button>') + '</li>').join('');
+      (t === null ? '' : '<button class="btn" type="button" data-ropen="' + (i + 1) + '">Open in editor</button>') + '</li>').join('');
   }
   // a track file into the editor (Open file, a radio slot), checked as the game reads it
   function openText(text, what, slot) {
@@ -1653,13 +1677,13 @@
     job(async () => {
       const rad = await readAll(), emu = rad.map((t, i) => emuSlot(i + 1));
       const n = rad.filter((t) => t !== null).length;
-      if (!n) { status('No tracks on the radio to copy.'); return; }
+      if (!n) { rstatus('No tracks on the radio to copy.'); return; }
       const lose = differs(rad, emu);
       if (lose.length && !window.confirm('Replace in the emulator: ' + lose.join(', ') + '?')) return;
       const got = changedSlots(rad, emu);
       got.forEach((i) => s.writeSD(slotPath(i), rad[i - 1]));
       renderSlots();
-      status(got.length ? 'Copied ' + slotList(got) + ' from the radio into the emulator. Fly it, or Restart the game to find them in its Track list.'
+      rstatus(got.length ? 'Copied ' + slotList(got) + ' from the radio into the emulator. Fly them from the track editor, or Restart the game to find them in its Track list.'
         : 'The emulator already has the radio\'s tracks.', 'ok');
     });
   }
@@ -1671,39 +1695,98 @@
       const emu = [];
       for (let i = 1; i <= SLOTS; i++) emu.push(emuSlot(i));
       const n = emu.filter((t) => t !== null).length;
-      if (!n) { status('No tracks in the emulator\'s slots: Fly it puts one there.'); return; }
+      if (!n) { rstatus('No tracks in the emulator\'s slots: Fly it in the track editor puts one there.'); return; }
       const dir = await tracksDir(true), rad = [];
       for (let i = 1; i <= SLOTS; i++) rad.push(await readSlot(dir, i));
       const lose = differs(emu, rad);
       if (lose.length && !window.confirm('Replace on the radio: ' + lose.join(', ') + '?')) return;
       const put = changedSlots(emu, rad);
       for (const i of put) await writeSlot(dir, i, emu[i - 1]);
-      status(put.length ? 'Sent ' + slotList(put) + ' to the radio. On the radio: restart StickTime, the tracks are in the Track list.'
+      rstatus(put.length ? 'Sent ' + slotList(put) + ' to the radio. On the radio: restart StickTime, the tracks are in the Track list.'
         : 'The radio already has the emulator\'s tracks.', 'ok');
       await listRadio();
     });
   }
-  el.edConnect.addEventListener('click', connect);
+  el.edConnect.addEventListener('click', () => connect(rstatus));
   el.edSend.addEventListener('click', sendToRadio);
-  el.edFromRadio.addEventListener('click', () => {
-    radio.open = !radio.open;
-    if (radio.open) job(listRadio); else renderRadio();
-  });
   el.edForget.addEventListener('click', () => {
     radio.state = 'off';
     radio.dir = null;
-    radio.open = inst.open = false;
+    radio.listed = false;
     inst.card = null;
     kv.del('radio').catch(() => { /* nothing kept */ });
     renderRadio();
-    status('The radio\'s SD card is forgotten: Connect radio to pick it again.');
+    rstatus('The radio\'s SD card is forgotten: Connect radio to pick it again.');
     el.edConnect.focus();
   });
+  // a radio slot into the track editor, on that slot
   el.edRadioSlots.addEventListener('click', (e) => {
     const b = e.target.closest('[data-ropen]');
-    const t = b && radioSlots[+b.dataset.ropen - 1];
-    if (typeof t === 'string') openText(t, 'c' + b.dataset.ropen + '.txt from the radio', +b.dataset.ropen);
+    const n = b ? +b.dataset.ropen : 0, t = radioSlots[n - 1];
+    if (typeof t !== 'string') return;
+    openPanel('editor');
+    openText(t, 'c' + n + '.txt from the radio', n);
   });
+
+  // ---------------------------------------------------------------- the Tracks & Install panel
+  // One panel (the Tracks & Install button), two tabs: the track editor and Radio / Install. The
+  // last tab used is where it opens next time (localStorage fpvsim.tracksTab).
+  const TAB_KEY = 'fpvsim.tracksTab';
+  let tab = 'editor', panelOpen = false;
+  try { if (localStorage.getItem(TAB_KEY) === 'radio') tab = 'radio'; } catch (e) { /* storage blocked */ }
+  function showTab(t, focus) {
+    if (ed.open && t !== 'editor') saveNow();
+    tab = t === 'radio' ? 'radio' : 'editor';
+    try { localStorage.setItem(TAB_KEY, tab); } catch (e) { /* storage blocked */ }
+    const isEd = tab === 'editor';
+    root.hidden = !isEd;
+    rp.hidden = isEd;
+    el.tabEditor.setAttribute('aria-selected', String(isEd));
+    el.tabRadio.setAttribute('aria-selected', String(!isEd));
+    el.tabEditor.tabIndex = isEd ? 0 : -1;
+    el.tabRadio.tabIndex = isEd ? -1 : 0;
+    ed.open = panelOpen && isEd;
+    radio.panel = panelOpen && !isEd;
+    if (ed.open) {
+      renderSlots();
+      selSig = probSig = orderSig = null;           // the editor's side panel afresh
+      resize();
+      refresh();
+      if (focus) cv.focus({ preventScroll: true });
+    } else if (radio.panel) {
+      renderRadio();
+      if (focus) (el.edConnect.hidden ? el.tabRadio : el.edConnect).focus({ preventScroll: true });
+      if (radio.state === 'on') job(refreshRadio);
+    }
+  }
+  function openPanel(t) {
+    const was = panelOpen;
+    panelOpen = true;
+    tp.hidden = false;
+    el.tracksBtn.setAttribute('aria-expanded', 'true');
+    showTab(t || tab, true);
+    if (!was || t) intoView(tp);
+  }
+  function closePanel(focusButton) {
+    if (ed.open) saveNow();
+    panelOpen = ed.open = radio.panel = false;
+    tp.hidden = true;
+    el.tracksBtn.setAttribute('aria-expanded', 'false');
+    if (focusButton) el.tracksBtn.focus();
+  }
+  el.tracksBtn.addEventListener('click', () => (panelOpen ? closePanel(false) : openPanel()));
+  el.tpClose.addEventListener('click', () => closePanel(true));
+  el.tabEditor.addEventListener('click', () => showTab('editor', false));
+  el.tabRadio.addEventListener('click', () => showTab('radio', false));
+  // the tabs as a tab list: the arrows (and Home, End) move between them
+  el.tabEditor.parentNode.addEventListener('keydown', (e) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+    e.preventDefault();
+    const t = e.key === 'Home' ? 'editor' : e.key === 'End' ? 'radio' : tab === 'editor' ? 'radio' : 'editor';
+    showTab(t, false);
+    (t === 'editor' ? el.tabEditor : el.tabRadio).focus();
+  });
+  el.edRadioLink.addEventListener('click', () => showTab('radio', true));
   el.edRadioToEmu.addEventListener('click', radioToEmu);
   el.edEmuToRadio.addEventListener('click', emuToRadio);
   // the card picked on an earlier visit: back at once if the browser still allows it, else Reconnect
@@ -1716,7 +1799,7 @@
     let p = 'granted';
     try { if (typeof dir.queryPermission === 'function') p = await dir.queryPermission({ mode: 'readwrite' }); } catch (e) { p = 'prompt'; }
     if (p === 'granted') {
-      try { await useCard(dir, false); } catch (e) { radio.state = 'ask'; }
+      try { await useCard(dir, false, rstatus); } catch (e) { radio.state = 'ask'; }
     } else radio.state = p === 'denied' ? 'off' : 'ask';
     renderRadio();
   }
@@ -1729,7 +1812,7 @@
   // memory). The player's own files are never touched: the saves (*.dat, StickTimeLite/data.txt),
   // the tracks and the ghosts.
   const GAME = typeof GAME_FILES === 'string' && GAME_FILES && /^https?:$/.test(location.protocol) ? GAME_FILES : '';
-  const inst = { open: false, man: null, card: null, pick: {}, hint: '' };
+  const inst = { man: null, card: null, pick: {}, hint: '' };
   // EdgeTX's board in RADIO/radio.yml, only as a hint (when unsure, nothing is picked)
   const BOARDS = {
     color: /^(tx16s|tx16smk3|tx15|t15|t15pro|t16|t18|x10|x10express|x12s|nv14|el18|pl18|pl18ev|pl18u|nb4p|v12|v16|pa01|f16|gx15|st16|t22)$/,
@@ -1839,8 +1922,8 @@
         if (r.ok) man = await r.json();
       } catch (e) { man = null; }
       if (!man || !Array.isArray(man.files)) {
-        inst.open = false;
-        status('Couldn\'t get the game\'s files from the site: check the connection and try again.', 'bad');
+        inst.card = null;
+        rstatus('Couldn\'t get the game\'s files from the site: check the connection and try again.', 'bad');
         return;
       }
       inst.man = man;
@@ -1884,7 +1967,7 @@
       const newer = eds.filter((e) => card[e].version && cmpVer(card[e].version, man.version) > 0);
       if (newer.length && !window.confirm('The radio has a newer StickTime (' + newer.map((e) => man.editions[e].label + ' ' + card[e].version).join(', ') +
         ') than this site\'s ' + man.version + '. Replace it with ' + man.version + '?')) {
-        status('Nothing changed on the radio.');
+        rstatus('Nothing changed on the radio.');
         return;
       }
       const files = man.files.filter((f) => f.edition === 'shared' || eds.includes(f.edition));
@@ -1895,7 +1978,7 @@
       try {
         for (const f of files) {
           bar.value = n++;
-          status('Writing ' + f.path + ' (' + n + ' of ' + files.length + ')…');
+          rstatus('Writing ' + f.path + ' (' + n + ' of ' + files.length + ')…');
           if (await sameAs(await fileAt(tools, f.path), f)) continue;
           await putFile(tools, f.path, await siteFile(f));
           changed++;
@@ -1915,16 +1998,12 @@
       }
       const labels = eds.map((e) => man.editions[e].label);
       const list = labels.length > 1 ? labels.slice(0, -1).join(', ') + ' and ' + labels[labels.length - 1] : labels[0];
-      status(changed ? 'StickTime ' + man.version + ' is on the radio: ' + list + '. Eject the drive before unplugging it.'
+      rstatus(changed ? 'StickTime ' + man.version + ' is on the radio: ' + list + '. Eject the drive before unplugging it.'
         : 'StickTime ' + man.version + ' was already on the radio: ' + list + '. Nothing to write.', 'ok');
       inst.card = await survey();
       renderInstall();
     });
   }
-  el.edInstall.addEventListener('click', () => {
-    inst.open = !inst.open;
-    if (inst.open) job(loadInstall); else renderRadio();
-  });
   el.edEditions.addEventListener('change', (e) => {
     const b = e.target.closest('[data-ed]');
     if (b) { inst.pick[b.dataset.ed] = b.checked; renderRadio(); }
@@ -1932,27 +2011,12 @@
   el.edInstallGo.addEventListener('click', installGame);
 
   const reduced = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  function openEditor() {
-    ed.open = true;
-    root.hidden = false;
-    el.tracksBtn.setAttribute('aria-expanded', 'true');
-    renderSlots();
-    selSig = probSig = orderSig = null;           // the panel afresh
-    resize();
-    refresh();
+  // a panel's top just under the sticky header
+  function intoView(node) {
     const head = document.querySelector('.top');
-    const y = root.getBoundingClientRect().top + window.scrollY - (head ? head.offsetHeight : 0) - 10;
+    const y = node.getBoundingClientRect().top + window.scrollY - (head ? head.offsetHeight : 0) - 10;
     window.scrollTo({ top: Math.max(0, y), behavior: reduced() ? 'auto' : 'smooth' });
-    cv.focus({ preventScroll: true });
   }
-  function closeEditor(focusButton) {
-    ed.open = false;
-    root.hidden = true;
-    el.tracksBtn.setAttribute('aria-expanded', 'false');
-    saveNow();
-    if (focusButton) el.tracksBtn.focus();
-  }
-
   // ---------------------------------------------------------------- the work in progress
   let saveT = 0;
   function saveNow() {

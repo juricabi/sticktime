@@ -65,6 +65,14 @@ button, select, input { font: inherit; color: inherit; }
 .brand h1 { font: 700 22px/1 var(--font-display); letter-spacing: .02em; margin: 0; text-transform: uppercase; }
 .brand small { display: block; font: 500 11px/1.2 var(--font-mono); color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
 .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+/* groups that wrap as a whole: screen and script, the buttons, sound and music, the .lua pair */
+.ctl-group { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; min-width: 0; }
+#radioSel { width: 195px; max-width: 100%; }
+#scriptSel { width: 190px; max-width: 100%; }
+.btn-pair { gap: 0; flex-wrap: nowrap; }
+.btn-pair > .btn:first-child { border-radius: 8px 0 0 8px; }
+.btn-pair > .btn:last-child { border-radius: 0 8px 8px 0; margin-left: -1px; }
+.btn-pair > .btn:hover { position: relative; z-index: 1; }
 .field { display: flex; align-items: center; gap: 6px; }
 .field > span { font: 600 11px/1 var(--font-display); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
 select, .btn {
@@ -82,13 +90,13 @@ select { max-width: 270px; }
   background: none; color: inherit; cursor: pointer; }
 .sound .mute:hover { background: var(--accent-soft); }
 .sound .mute .cross { display: none; }
-.sound input[type="range"] { width: 90px; accent-color: var(--accent); cursor: pointer; }
+.sound input[type="range"] { width: 72px; accent-color: var(--accent); cursor: pointer; }
 .sound output { min-width: 3.2em; text-align: right; font: 500 12px/1 var(--font-mono); color: var(--muted); }
 .sound.snd-off .wave { display: none; }
 .sound.snd-off .cross { display: inline; }
 .sound.snd-off input[type="range"] { accent-color: var(--muted); opacity: .55; }
 .sound.snd-off output { opacity: .7; }
-.music input[type="range"] { width: 70px; }
+.music input[type="range"] { width: 56px; }
 .music.snd-off svg { opacity: .55; }
 .music .songs { position: relative; overflow: hidden; margin-left: 2px; padding: 3px 7px; border-radius: 6px;
   font: 500 12px/1 var(--font-display); color: var(--muted); cursor: pointer; }
@@ -281,13 +289,34 @@ footer.credits a { color: inherit; }
 .ed-size.bad { color: var(--bad); }
 .ed-lite { margin: 8px 0 0; }
 /* the radio's SD card (File System Access: Chrome, Edge, Opera on a computer) */
-.ed-radio { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
-.ed-rlabel { font: 600 11px/1 var(--font-display); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.ed-radio { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .ed-rstate { font: 500 12.5px/1.3 var(--font-mono); color: var(--muted); overflow-wrap: anywhere; }
 .ed-rstate.on { color: var(--ok); }
 .ed-rstate.on::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: currentColor; }
 .ed-rnote { margin: 6px 0 0; }
-.ed-rpanel { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+/* the Tracks & Install panel: two tabs, the track editor and Radio / Install */
+.tp-bar { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; margin: -4px 0 14px; border-bottom: 1px solid var(--line); }
+.tabs { display: flex; gap: 2px; min-width: 0; }
+.tabs [role="tab"] { margin-bottom: -1px; padding: 8px 12px 9px; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--muted);
+  font: 700 13px/1.2 var(--font-display); letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+.tabs [role="tab"]:hover { color: var(--fg); }
+.tabs [role="tab"][aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); }
+.tp-bar .btn { margin-bottom: 6px; }
+.tp-sub { margin: 0; }
+#radioPanel > .tp-sub { margin-bottom: 12px; }
+.lbl-short { display: none; }
+@media (max-width: 760px) { .lbl-long { display: none; } .lbl-short { display: inline; } }
+.ed-rline { margin: 8px 0 0; }
+.linkbtn { padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.linkbtn:hover { color: var(--fg); }
+/* the Radio SD panel: the connection and the game on the left, the tracks on the right */
+.rp-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 32px; align-items: start; }
+.rp-grid > .rp-tracks { border-top: 0; padding-top: 0; }
+@media (max-width: 900px) {
+  .rp-grid { grid-template-columns: minmax(0, 1fr); }
+  .rp-grid > .rp-tracks { border-top: 1px solid var(--line); padding-top: 12px; }
+}
+#rpInstSec .ed-row, #rpTracksSec .ed-row { margin-top: 12px; }
 .ed-rpath { margin: 0 0 6px; font: 500 12px/1.3 var(--font-mono); color: var(--muted); overflow-wrap: anywhere; }
 .ed-rslots { list-style: none; margin: 0; padding: 0; font-size: 13px; }
 .ed-rslots li { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 34px; border-bottom: 1px dashed var(--line); }
