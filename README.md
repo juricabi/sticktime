@@ -168,6 +168,7 @@ tools/build_etxhost.sh  EdgeTX's own Lua core with a model of the B&W radios' al
                         game.luac files and runs test/memtest.lua (main, or a release: v2.11.4, v2.10.7)
 tools/tune_physics.py   steady-state check of every quad class (hover, top speed, punch-out, fall, slide)
 docs/flight-model.md    the flight model, every class's numbers and what they were fitted to
+docs/ideas.md           ideas for later: motor saturation in flips, scraping obstacles instead of crashing
 tools/build_firmware.sh EdgeTX main + firmware/edgetx-fast-lua.patch for one radio
 test/harness.lua        headless EdgeTX mock: autopilot races with AI pilots on every track, flags, hoops,
                         dive gates, freestyle, gate rush, ground effect, vibration, menus, crashes, saves
