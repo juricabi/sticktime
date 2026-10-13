@@ -29,6 +29,11 @@ for name, sv in pairs(saves) do
     radio.setfile(sv[1], s)
   end
 end
+-- StickTime BW: a custom track as big as the editor makes them (24 gates, 16 structures) in slot 1,
+-- track 9, played like the others
+if string.find(path, "StickTimeBW", 1, true) then
+  radio.setfile("/SCRIPTS/TOOLS/StickTimeTracks/c1.txt", "Big Test" .. string.char(10) .. "1 4321 7 9 0 0 1 0 0  18 2 2 15 0  35 9 4 30 0  49 21 1 45 0  61 35 5 60 0  68 52 6 75 0  70 70 1 90 0  68 88 4 105 0  61 105 2 120 0  49 119 1 135 0  35 131 7 150 0  18 138 4 165 0  0 140 1 180 0  -18 138 2 195 0  -35 131 1 210 0  -49 119 4 225 0  -61 105 6 240 0  -68 88 1 255 0  -70 70 2 270 0  -68 52 4 285 0  -61 35 1 300 0  -49 21 7 315 0  -35 9 1 330 0  -18 2 4 345 0 / 0 -35 3 2 0 4 1  40 -27 3 2 0 5 2  74 -4 3 2 0 6 3  97 30 3 2 0 4 1  105 70 3 2 0 5 2  97 110 3 2 0 6 3  74 144 3 2 0 4 1  40 167 3 2 0 5 2  0 175 3 2 0 6 3  -40 167 3 2 0 4 1  -74 144 3 2 0 5 2  -97 110 3 2 0 6 3  -105 70 3 2 0 4 1  -97 30 3 2 0 5 2  -74 -4 3 2 0 6 3  -40 -27 3 2 0 4 1" .. string.char(10))
+end
 local base = radio.mem()
 radio.resetpeak()
 local ok, err = radio.load(path, true)
@@ -65,9 +70,10 @@ okRun, runErr = pcall(function()
   for i = 1, 5 do frame(0) end
   if pcall(radio.call, "T.info") then
     -- test hooks: every track and mode directly (the full game has 7 tracks, 4 modes)
-    local okT, _, nt = pcall(radio.call, "T.ntracks")
+    local okT, _, nt = pcall(radio.call, "T.info")     -- the highest track there is (custom ones too)
     local _, _, nm = pcall(radio.call, "T.nmodes")
-    if not okT then nt, nm = 7, 4 end
+    if not okT or type(nt) ~= "number" then nt = 7 end
+    if type(nm) ~= "number" then nm = 4 end
     for t = 1, nt do
       for m = 1, nm do
         radio.call("T.track", t)
