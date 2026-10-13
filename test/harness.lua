@@ -136,10 +136,11 @@ end
 do
   local l1, r1 = T.best(1)
   local l2, r2 = T.best(2)
-  if l1 ~= 4321 or r1 ~= 9876 or l2 ~= 5555 or r2 ~= 11111 then fail("v1 best times not migrated") end
+  -- (Meadow's are not: its layout is new since 1.7.0)
+  if l1 ~= 0 or r1 ~= 0 or l2 ~= 5555 or r2 ~= 11111 then fail("v1 best times not migrated") end
   -- and saved under the new name right away
   local s = SD[DATA]
-  if not s or string.sub(s, 1, 7) ~= "FPVSIM2" or not string.find(s, "l1=4321", 1, true) then
+  if not s or string.sub(s, 1, 7) ~= "FPVSIM2" or not string.find(s, "l2=5555", 1, true) then
     fail("the old save was not written to " .. DATA)
   end
 end
@@ -660,6 +661,22 @@ do
   st, s = state()
   if st ~= 4 and st ~= 6 then fail("after a head-on hit the quad should still be flying (state " .. st .. ")") end
   print(string.format("head-on hit at 20 m/s: stopped at the wall, still flying 2 s later (%.1f m up)", s[2]))
+  -- a level landing at 3 m/s is no prop strike (the skids take it), the same tilted 45 deg is
+  T.track(1) T.start(2) steps(70)
+  local _, s9 = state()
+  T.set("mode", 1)                                 -- (Acro: Angle mode would level it on the way down)
+  for _, c in ipairs({ { 0, false }, { 45, true } }) do
+    T.state(4) T.pose(s9[1] + 3, 0.6, s9[3], 0, 0, c[1]) T.vel(0, -3, 0)
+    idleSticks()
+    local h0, struck = select(6, T.race()), false
+    for _ = 1, math.floor(FPS * 0.25 + 0.5) do                 -- 0.25 s: down from 0.6 m
+      frame(0)
+      if T.stun() > 0 then struck = true end
+    end
+    if struck ~= c[2] or (select(6, T.race()) > h0) ~= c[2] then
+      fail(string.format("a landing at 3 m/s rolled %d deg: prop strike %s, should be %s", c[1], tostring(struck), tostring(c[2])))
+    end
+  end
   -- turtle: upside down on the ground, full throttle doesn't lift it, a roll stick flips it over
   T.track(1) T.start(2) steps(70)
   local _, s0 = state()
@@ -716,6 +733,7 @@ if GAME_COLOR then
     end
     if nl >= 2 then break end
   end
+  frame(EVT_VIRTUAL_EXIT) frame(EVT_VIRTUAL_EXIT)    -- a pause: the saves wait for a break
   local _, _, nl, lt = T.race()
   local n, iv, glap = T.ghost()
   local best = math.min(lt[1] or 1e9, lt[2] or 1e9)
@@ -834,7 +852,7 @@ do
   -- a hard hit keeps the pack (and counts); the pause menu's Respawn brings a fresh one
   fly(1)
   T.bat("s", 0.5)
-  T.pose(0, 3, 0, 0, 0, 0) T.vel(0, -15, 0)
+  T.pose(0, 0.4, 0, 0, 0, 45) T.vel(0, -15, 0)      -- (rolled 45 deg: the props strike)
   steps(30)
   local s1, why1 = T.bat("s")
   if state() ~= 4 or why1 or select(6, T.race()) ~= 1 or s1 > 0.5 or s1 < 0.49 then

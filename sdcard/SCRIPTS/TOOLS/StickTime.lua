@@ -113,7 +113,7 @@ local TRACKS = {
   { "Hoop Forest", 61, { 0,0,1,0,0, 6,22,4,35,2.4, 22,32,4,35,5, 28,52,4,45,3, 48,58,4,115,6, 56,38,2,140,0,
                          72,28,4,155,2, 70,6,4,220,4, 48,0,3,245,0, 30,-14,4,245,2.2, 12,-18,4,290,3 }, nil, 2 },
   { "Grand Prix", 71, { 0,0,5,0,0, 0,46,1,5,0, 6,84,2,30,6, 26,100,7,90,0, 36,74,4,150,3, 50,58,1,90,0, 68,78,4,50,3,
-                        92,92,6,120,0, 100,62,3,200,0, 88,30,1,175,0, 104,6,2,190,8, 80,-14,1,255,0, 50,-10,4,260,2.2,
+                        92,92,7,120,0, 100,62,3,200,0, 88,30,1,175,0, 104,6,2,190,8, 80,-14,1,255,0, 50,-10,4,260,2.2,
                         26,-24,1,275,0 } },
   { "Bando", 83, { 0,0,1,0,0, 0,34,8,0,1.8, 0,46,8,0,1.8, 20,66,4,60,4, 40,88,3,146,0, 56,64,1,180,0, 43.95,10,8,180,1.3,
                    22,-16,4,250,2.5 },
@@ -145,6 +145,7 @@ for i = 1, 8 do
     if name and ver == "1" then TRACKS[NB0 + i] = { string.sub(name, 1, 16), file = i, id = tonumber(id) } end
   end
 end
+collectgarbage()                                       -- (the files and strings: a B&W heap is tight)
 local GT, FLAGH = 0.28, 3.4                            -- frame thickness, flag pole height (m)
 local GHW = { 1.5, 1.5, 2.0, 1.25, 2.4, 6, 6, 2.2 }     -- inner half width, ring radius, flag zone
 local GHH = { 1.0, 1.0, 2.0, 1.25, 2.4, 30, 30, 1.8 }   -- inner half height
@@ -226,10 +227,15 @@ do
         n = n + 1
         if n == 3 then T[2] = tonumber(v) or 1
         elseif n == 4 then T[5] = (tonumber(v) or 9) / 9
-        elseif n > 4 then d[n - 4] = tonumber(v) or 0 end
+        elseif n > 4 and n <= 124 then d[n - 4] = tonumber(v) or 0 end   -- at most 24 gates
       end
+      local tr = T[5] or 1                             -- 0-30 trees
+      if tr < 0 then tr = 0 elseif tr > 30 / 9 then tr = 30 / 9 end
+      T[5] = tr
       T[3], T[4] = d, {}
-      for v in string.gmatch(b or "", "%S+") do T[4][#T[4] + 1] = tonumber(v) or 0 end
+      for v in string.gmatch(b or "", "%S+") do
+        if #T[4] < 112 then T[4][#T[4] + 1] = tonumber(v) or 0 end   -- at most 16 structures
+      end
       -- gates in fives with a known type, structures in sevens with a known kind (a file made by hand)
       local ok, bd = #d >= 10 and #d % 5 == 0, T[4]
       for i = 3, #d, 5 do
@@ -429,7 +435,7 @@ loadData = function()
     if lay < 2 then BEST.l[4], BEST.r[4], BEST.l[6], BEST.r[6] = 0, 0, 0, 0 end
     -- layout 3 (1.7.0): Meadow, Dive Tower, Hoop Forest and the Grand Prix are new layouts, not ovals
     if lay < 3 then
-      for _, t in ipairs({ 1, 3, 5, 6 }) do BEST.l[t], BEST.r[t] = 0, 0 end
+      for _, t in ipairs({ 1, 3, 5, 6 }) do BEST.l[t], BEST.r[t], BEST.g[t] = 0, 0, 0 end
     end
   elseif string.sub(s, 1, 6) == "FPVSIM" then
     -- version 1 file: 10 settings, then best lap / race of the first three tracks
@@ -443,7 +449,7 @@ loadData = function()
       if v[i] then S[K1[i]] = v[i] end
     end
     S.twr = ({ 3, 4, 6 })[v[6] or 2] or 6
-    for t = 1, 3 do
+    for t = 2, 2 do                -- (Meadow and Dive Tower have new layouts since 1.7.0)
       BEST.l[t], BEST.r[t] = v[9 + t * 2] or 0, v[10 + t * 2] or 0
     end
   end
@@ -452,18 +458,18 @@ loadData = function()
 end
 
 saveData = function()
-  local s = "FPVSIM2 lay=3"
-  for k, v in pairs(S) do s = s .. " " .. k .. "=" .. floor(v) end
+  -- piece by piece: a line grown by concatenation leaves 14-39 KB of strings behind
+  local f = io.open(DATA, "w")
+  if not f then return end
+  io.write(f, "FPVSIM2 lay=3")
+  for k, v in pairs(S) do io.write(f, " " .. k .. "=" .. floor(v)) end
   for k, b in pairs(BEST) do
     for t = 1, NT do
-      if b[t] > 0 then s = s .. " " .. k .. t .. "=" .. floor(b[t]) end
+      if b[t] > 0 then io.write(f, " " .. k .. t .. "=" .. floor(b[t])) end
     end
   end
-  local f = io.open(DATA, "w")
-  if f then
-    io.write(f, s .. "\n")
-    io.close(f)
-  end
+  io.write(f, "\n")
+  io.close(f)
 end
 end
 
@@ -596,7 +602,7 @@ do
     n = tonumber(n)
     -- the same track (gate count, first gate, a custom track's id) and a size this game can keep
     if n and tonumber(ng) == NG and tonumber(x) == floor(AX[1] * 10 + 0.5) and tonumber(z) == floor(AZ[1] * 10 + 0.5)
-       and tonumber(id) == (TRACKS[S.track].id or 0) and n > 1 and n <= GMAX then
+       and tonumber(id) == (TRACKS[S.track].id or 3) and n > 1 and n <= GMAX and tonumber(iv) > 0 and tonumber(lt) > 0 then
       local c = {}
       for i = 1, floor((n + 15) / 16) do c[i] = io.read(f, 144) or "" end
       if #c[#c] == (n - 1) % 16 * 9 + 9 then GH = { n = n, iv = tonumber(iv), lap = tonumber(lt), c = c, t = S.track } end
@@ -607,14 +613,17 @@ do
   ghost.lap = function(lt)                     -- a practice lap ends: is it the new ghost?
     if RC.t0 ~= lapStart or RC.n < 2 or (GH.n > 0 and lt >= GH.lap) then return end
     if #RC.q > 0 then RC.c[#RC.c + 1] = RC.q end
-    GH = { n = RC.n, iv = RC.iv, lap = lt, c = RC.c, t = S.track }
-    local f = io.open(GFILE .. S.track .. ".txt", "w")
-    if f then
-      io.write(f, string.format("STG2 %3d %6d %6d %5d %4d %7d %6d\n", NG, floor(AX[1] * 10 + 0.5), floor(AZ[1] * 10 + 0.5), GH.iv,
-        GH.n, lt, TRACKS[S.track].id or 0))
-      for i = 1, #GH.c do io.write(f, GH.c[i]) end
-      io.close(f)
-    end
+    GH = { n = RC.n, iv = RC.iv, lap = lt, c = RC.c, t = S.track, dirty = true }   -- (saved at a break: R.flush)
+  end
+
+  -- its file. The id: a custom track's, else the layout of the built-in tracks (3)
+  ghost.save = function()
+    local f = io.open(GFILE .. GH.t .. ".txt", "w")
+    if not f then return end
+    io.write(f, string.format("STG2 %3d %6d %6d %5d %4d %7d %6d\n", NG, floor(AX[1] * 10 + 0.5), floor(AZ[1] * 10 + 0.5), GH.iv,
+      GH.n, GH.lap, TRACKS[GH.t].id or 3))
+    for i = 1, #GH.c do io.write(f, GH.c[i]) end
+    io.close(f)
   end
 
   ghost.start = function()                     -- a practice lap starts: record it
@@ -630,9 +639,10 @@ do
       local t = gt - t0
       if GH.n > 0 and t > GH.lap then RC.t0 = nil          -- this lap can't beat the ghost any more
       elseif t >= RC.n * RC.iv then
-        local a, b, c = genc(px)
-        local d, e, f = genc(py)
-        local g, h, i = genc(pz)
+        local k = (RC.n * RC.iv - t) * 0.01           -- (back to the sample's own time)
+        local a, b, c = genc(px + vx * k)
+        local d, e, f = genc(py + vy * k)
+        local g, h, i = genc(pz + vz * k)
         gadd(string.char(a, b, c, d, e, f, g, h, i))
         if RC.n >= GMAX then
           local o = RC
@@ -658,6 +668,19 @@ do
     end
   end
   ghost.max, ghost.file = GMAX, GFILE
+end
+
+-- the saves wait for a break in the flying (pause, restart, the menu, a crash, the end of a run):
+-- writing the SD card in flight stalls a frame
+R.flush = function()
+  if R.dirty then
+    R.dirty = false
+    saveData()
+  end
+  if GH.dirty then
+    GH.dirty = false
+    ghost.save()
+  end
 end
 
 -- -------------------------------------------------------------- physics
@@ -767,6 +790,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
   local function crash(why)
     if state == DONE then respawn() return end
     state, tState, R.why = CRASHED, gt, why
+    R.flush()
     if not why then R.crashes = R.crashes + 1 end
     if gmode == 3 then
       R.ch, R.chn = 0, 0
@@ -791,26 +815,31 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     local jx, jy, jz = vn * nx - vx * f, vn * ny - vy * f, vn * nz - vz * f   -- the impulse (per kg)
     vx, vy, vz = vx * (1 - f), vy * (1 - f), vz * (1 - f)
     if vn < 1.5 then return end
-    -- toward the rim point (length sqrt(1 - d^2): flat on, the whole disk touches and nothing turns
-    -- it); the turn 3 * c x j is 1.5 rad/s per m/s into a surface at 45 deg, at most 20 rad/s
+    if gt - hitT > 30 then
+      hitT = gt
+      beep(160 + vn * 8, 90, PLAY_NOW)
+      if playHaptic and S.vib == 1 and vn > 3 then playHaptic(vn > 8 and 60 or 30, 0) end
+    end
+    -- the props and arms strike only edge-on: flat on (a level landing) the skids take it. Toward the
+    -- rim point (length sqrt(1 - d^2)); the turn 3 * c x j is 1.5 rad/s per m/s into a surface at 45
+    -- deg, at most 20 rad/s
     local d = nx * ux + ny * uy + nz * uz
+    local q = 1 - d * d
+    if q < 0 then q = 0 end
+    local vs = vn * sqrt(q)
+    if vs < 1.5 then return end
     local cx, cy, cz = d * ux - nx, d * uy - ny, d * uz - nz
     local ax, ay, az = (cy * jz - cz * jy) * 3, (cz * jx - cx * jz) * 3, (cx * jy - cy * jx) * 3
     local w = sqrt(ax * ax + ay * ay + az * az)
     if w > 20 then ax, ay, az = ax * 20 / w, ay * 20 / w, az * 20 / w end
     kwr, kwp, kwy = -(ax * fx + ay * fy + az * fz), -(ax * rx + ay * ry + az * rz), ax * ux + ay * uy + az * uz
-    local t = vn * 0.04
+    local t = vs * 0.04
     if t > 0.5 then t = 0.5 end
     if t > R.st then R.st = t end
-    R.crashes, R.hv = R.crashes + 1, vn
+    R.crashes, R.hv = R.crashes + 1, vs
     if gmode == 3 then
       R.ch, R.chn = 0, 0
       tricks(-1)
-    end
-    if gt - hitT > 30 then
-      hitT = gt
-      beep(160 + vn * 8, 90, PLAY_NOW)
-      if playHaptic and S.vib == 1 and vn > 3 then playHaptic(vn > 8 and 60 or 30, 0) end
     end
   end
 
@@ -825,8 +854,8 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
       if AI.d[a] > 0 then p = p + 1 end
     end
     R.pos = p
-    state, tState, focus, R.dirty = DONE, gt, 1, false
-    saveData()
+    state, tState, focus, R.dirty = DONE, gt, 1, true
+    R.flush()
     beep(1800, 120)
     beep(2400, 300)
   end
@@ -862,8 +891,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
           BEST.l[S.track], R.newLap = lt, true
           local m = MED.of(lt)
           showMsg("LAP " .. lap .. "  " .. timeStr(lt) .. "  " .. (m > MED.of(b) and MED.n[m] or "BEST") .. "!", true)
-          -- (a race saves at its end, or when it is left: no SD card write while racing)
-          if gmode == 1 then R.dirty = true else saveData() end
+          R.dirty = true                             -- (saved at a break: R.flush)
         else
           showMsg("LAP " .. lap .. "  " .. timeStr(lt) .. "  +" .. timeStr(lt - b), false)
         end
@@ -909,8 +937,8 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     -- their rest voltage. Down to 3.5 V a cell under load the quad flies as without it (Betaflight's
     -- sag compensation: a fresh pack flies as before, a lap never gets faster), below that the thrust
     -- falls with the voltage squared. Near empty the cells give no more current than takes them to
-    -- 3.0 V: the quad limps (thrust ~ current^(2/3)). Empty when that is less than the motors need at
-    -- idle: they stop
+    -- 3.0 V: the quad limps (thrust ~ current^(2/3)). Empty when full throttle would lift no more than
+    -- 1.25 times the weight: the motors stop
     if S.batt > 0 then
       local s, c, r, f = BAT.s, T / Tmax, BAT.r, BAT.f
       local I = f * (0.05 + 0.95 * c * sqrt(c))
@@ -923,7 +951,10 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
         k, I, v = 0.735 * (im / I) ^ 0.67, im, 3
       end
       s = s - I * dt / (3.6 * BAT.mah)
-      if im < 0.05 * f then
+      -- empty once full throttle would lift no more than 1.25 times the weight: limping on, it could
+      -- hardly fly any more
+      local km = im <= 0 and 0 or im < f and 0.735 * (im / f) ^ 0.67 or 1
+      if km * P.twr < 1.25 then
         s, k, I = 0, 0, 0
         BAT.e = BAT.e + dt                             -- empty: the quad drops, a second later EMPTY
         if BAT.e > 1 then crash("EMPTY") return end
@@ -1003,7 +1034,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
       P.wr, P.wp, P.wy, mr, mp, cwr, cwp = wr, wp, 0, 0, 0, 0, 0
       if not turtle then
         turtle = true
-        showMsg("TURTLE: roll to flip", false)
+        showMsg("roll to flip", false)
       end
     else
       turtle = false
@@ -1346,10 +1377,9 @@ end)()
     local v = floor(R.ch * mult())
     R.sc = R.sc + v
     if v > BEST.f[S.track] then
-      BEST.f[S.track], R.newBest = v, true
+      BEST.f[S.track], R.newBest, R.dirty = v, true, true
       showMsg("COMBO " .. v .. "  BEST!", true)
       beep(2400, 200)
-      saveData()
     elseif R.chn > 1 then
       showMsg("COMBO " .. v, true)
     end
@@ -1555,7 +1585,11 @@ local function applySettings()
   local n, c, o, f, h = string.match(BAT[S.quad] or BAT[1], "(%S+) (%S+) (%S+) (%S+) (%S+)")   -- the class's pack
   BAT.n, BAT.mah, BAT.r, BAT.f, BAT.h = tonumber(n), tonumber(c) * (S.batt == 2 and 2 or S.batt == 3 and 1.5 or 1), tonumber(o) * 0.001, tonumber(f), tonumber(h)
   if S.twr > 0 and (S.twr < P.tlo or S.twr > P.thi) then S.twr = 0 end   -- not for this class: Stock
-  if S.twr > 0 then P.twr = S.twr end       -- 0: the class's stock power
+  if S.twr > 0 then
+    -- the class's motors and props for this Power draw more at full throttle (hover current the same)
+    BAT.f = BAT.f * (S.twr / P.twr) ^ 1.5
+    P.twr = S.twr                           -- 0: the class's stock power
+  end
   if S.wash == 1 then P.wl, P.wv, P.pw = P.wls, P.wvs, P.pws end  -- Stock: the class's own wash
   P.angle = S.mode == 2
   local t = S.tilt * 0.0174533
@@ -2604,7 +2638,7 @@ end)()
 
 -- ---------------------------------------------------------- game flow
 local function startRace(m)
-  if R.dirty then saveData() R.dirty = false end      -- a best lap of a race left early
+  R.flush()
   gmode = m
   lap, nextGate, lastGate, lapStart = 0, 1, 0, nil
   R.n, R.total, R.newLap, R.newRace, R.newBest, R.crashes, R.msg, R.cd = 0, 0, false, false, false, 0, nil, -1
@@ -2668,14 +2702,18 @@ local function update(dt)
     AI.update(dt)
     if state ~= DONE then R.pos = AI.place() end
   end
-  if gmode == 2 and S.ghost == 1 then ghost.step() else GH.on = false end
+  if gmode == 2 and S.ghost == 1 and state ~= MENU then
+    if GH.t ~= S.track then ghost.load() end           -- (Ghost turned on mid-run: the saved one first)
+    ghost.step()
+  else GH.on = false end
   if gmode == 4 and (state == FLY or state == CRASHED or state == READY) then
     R.rt = R.rt - dt
     if R.rt <= 0 then
       R.rt = 0
       local t = S.track
       if R.rn > BEST.g[t] then BEST.g[t], R.newBest = R.rn, true end
-      saveData()
+      R.dirty = true
+      R.flush()
       state, tState, focus = DONE, gt, 1
       beep(900, 300)
     end
@@ -3270,7 +3308,7 @@ local handleEvent
   end
 
   local function toMenu()
-    if R.dirty then saveData() R.dirty = false end    -- a best lap of a race left early
+    R.flush()
     state, focus, scroll, editing = MENU, 1, 0, false
     AI.n = 0
     placeDrone(TR.px, DR, TR.pz, TR.hx, TR.hz)
@@ -3302,6 +3340,8 @@ local handleEvent
       if pausedFrom == COUNT then state = COUNT else
         respawn()
         BAT.new()                                  -- with a fresh pack
+        R.ch, R.chn = 0, 0                         -- (a Freestyle combo ends)
+        tricks(-1)
         state, R.ready = READY, gt
       end
     elseif i == 3 then startRace(gmode)
@@ -3380,6 +3420,7 @@ local handleEvent
       -- flying: EXIT or the on-screen pause button pauses
       if event == EV.EXIT or (EV.TAP and event == EV.TAP and touch and pauseHit(touch.x, touch.y)) then
         pausedFrom, prevState, state, focus, scroll = state, state, PAUSED, 1, 0
+        R.flush()
       end
     end
     return 0
