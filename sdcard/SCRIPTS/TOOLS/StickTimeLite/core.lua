@@ -210,7 +210,7 @@ local px, py, pz, vx, vy, vz = 0, 0.15, 0, 0, 0, 0                      -- posit
 local rx, ry, rz, ux, uy, uz, fx, fy, fz = 1, 0, 0, 0, 1, 0, 0, 0, 1   -- right, up, forward
 local sA, sE, sT, sR, speed = 0, 0, 0, 0, 0
 local wr0, wp0, wy0, Tm, grounded = 0, 0, 0, 0, true                  -- body rates (rad/s), thrust
-local sW = 0                                                          -- prop wash build-up
+local sW, mr, mp = 0, 0, 0                                            -- prop wash build-up; motors' roll, pitch rate
 local state, gm, from = 1, 1, 4
 local gt, lastT, tState, tStart, fi, pt, smp = 0, 0, 0, 0, 5, 0, 0     -- clocks (10 ms ticks)
 local lap, nextGate, lastGate, lapStart, total = 0, 1, 0, nil, 0
@@ -268,7 +268,7 @@ local l = sqrt(hx * hx + hz * hz) + 0.001
 hx, hz = hx / l, hz / l
 px, py, pz, vx, vy, vz = x, y, z, 0, 0, 0
 fx, fy, fz, rx, ry, rz, ux, uy, uz = hx, 0, hz, hz, 0, -hx, 0, 1, 0
-grounded, speed, Tm, wr0, wp0, wy0, sW = y <= 0.15 + 0.01, 0, 0, 0, 0, 0, 0
+grounded, speed, Tm, wr0, wp0, wy0, sW, mr, mp = y <= 0.15 + 0.01, 0, 0, 0, 0, 0, 0, 0, 0
 for i = 1, NG do
 gd[i] = (px - gx[i]) * gnx[i] + (py - gy[i]) * gny[i] + (pz - gz[i]) * gnz[i]
 end
@@ -433,7 +433,7 @@ end
 end
 end
 if grounded and T < G * 1.02 then
-wr, wp, wr0, wp0 = 0, 0, 0, 0
+wr, wp, wr0, wp0, mr, mp = 0, 0, 0, 0, 0, 0
 if uy < 0.999 then place(px, 0.15, pz, fx, fz) end
 end
 local wx, wz = 0, 0
@@ -450,6 +450,12 @@ local KS, KF, KU, ER, VD, LR = P[16], P[17], P[18], P[19], P[20], P[21]
 local GG, GL, GEW, SQ, CQ = P[22], P[23], P[24], P[31], P[32]                     -- GEW: not GW (gate widths)
 local CE, SE, RF = P[38], P[39], P[40]
 local KH = P[44] * (S.grip > 1 and 1 or S.grip * 0.4)                       -- Grip: rotor drag
+local I0 = P[8]
+local ch, AM = (1 / P[7] - I0) / (1 - I0), (T / Tmax - I0) / (1 - I0)
+ch, AM = ch > 0 and sqrt(ch) or 0, AM > 0 and sqrt(AM) or 0
+AM = P[48] * (1 - ch + AM)
+if AM < P[48] * 0.3 then AM = P[48] * 0.3 end
+AM = AM * h
 local fl = 0
 for i = 1, NB do
 if px > bx0[i] and px < bx1[i] and pz > bz0[i] and pz < bz1[i] and py > by1[i] and by1[i] > fl then fl = by1[i] end
@@ -475,9 +481,25 @@ for _ = 1, n do
 Tm = Tm + (T - Tm) * km
 wr0, wp0, wy0 = wr0 + (wr - wr0) * kr, wp0 + (wp - wp0) * kr, wy0 + (wy - wy0) * ky
 rotate(wr0 * h, wp0 * h, wy0 * h)
+local Te = Tm
+if AM > 0 then
+local dr, dp = wr0 - mr, wp0 - mp
+if dr > AM then dr = AM elseif dr < -AM then dr = -AM end
+if dp > AM then dp = AM elseif dp < -AM then dp = -AM end
+mr, mp = mr + dr, mp + dp
+local d = ((dr < 0 and -dr or dr) + (dp < 0 and -dp or dp)) / AM * 0.5
+if d > 1e-4 then
+if d > 0.5 then d = 0.5 end
+local c = (Tm / Tmax - I0) / (1 - I0)
+c = c > 0 and sqrt(c) or 0
+if c + d > 1 then c = 1 - d end
+if c < d then c = d end
+Te = Tmax * (I0 + (1 - I0) * (c * c + d * d))
+end
+end
 local ax_, az_ = vx - wx, vz - wz
 local vu, vr, vf = ax_ * ux + vy * uy + az_ * uz, ax_ * rx + vy * ry + az_ * rz, ax_ * fx + vy * fy + az_ * fz
-local tf = Tm / Tmax                              -- thrust fraction
+local tf = Te / Tmax                              -- thrust fraction
 local Ta
 if vu < 0 then
 local x = 9
@@ -486,12 +508,12 @@ local r = 1 + (CQ - 1) * (1 - CE * tf) * (2 * x - x * x)
 x = RF + P[47] * tf                           -- (x reused: the stall floor, rf + rq*tf)
 if x > 1 then x = 1 end
 if r < x then r = x end
-Ta = Tm * r
+Ta = Te * r
 else
-if Tm > 0 then                                -- the loss grows with thrust as Tm*(Tmax/Tm)^VC
+if Te > 0 then                                -- the loss grows with thrust as T*(Tmax/T)^VC
 local den = VP + vu * VK                    -- and bends with VK as the inflow grows
 if den < VP * 0.3 then den = VP * 0.3 end
-Ta = Tm - vu * Tm * (Tmax / Tm) ^ VC / den
+Ta = Te - vu * Te * (Tmax / Te) ^ VC / den
 else
 Ta = 0
 end
@@ -532,7 +554,7 @@ q = q * sn / v
 ar, af = ar + q * vr, af + q * vf
 end
 end
-local k = KH * sqrt(Tm * 0.0186 + 0.02)         -- rotor drag (Grip): edgewise, ~ sqrt of the thrust
+local k = KH * sqrt(Te * 0.0186 + 0.02)         -- rotor drag (Grip): edgewise, ~ sqrt of the thrust
 ar, af = ar - k * vr, af - k * vf
 vx = vx + (ux * au + rx * ar + fx * af) * h
 vy = vy + (uy * au + ry * ar + fy * af - G) * h

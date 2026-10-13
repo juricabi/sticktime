@@ -16,6 +16,10 @@ Model (mass-normalised, body axes r/u/f; the same steps as physics() in src/stic
   frame lift: s = vu/|v|, q = lr*s*0.813*(2|s|sqrt(1-s^2))^0.6*S*|v|/sqrt(1-s^2)
               a_u -= q*(1-s^2), a_r += q*s*vr/|v|, a_f += q*s*vf/|v|
   gravity 10.78 (1.1 g)
+  flips: the motors' rate follows the body rate no faster than am*(1 + MIX_K*(hover level - level)); while
+  it spins up, the differential u (share of the motors' range) shifts the collective as an airmode mixer
+  does, in command units c = sqrt((T/Tmax - i0)/(1 - i0)): c + u/2 <= 1, c >= u/2,
+  T = Tmax*(i0 + (1-i0)*(c^2 + (u/2)^2))
 The class values were fitted to a detailed per-prop model of each class; the targets they were
 fitted to are in docs/flight-model.md.
 """
@@ -105,6 +109,61 @@ def accel(p, Tm, vu, vr, vf):
     return au, ar, af
 
 
+MIX_K = -1.0       # flip authority: am*(1 + MIX_K*(hover level - level)), more toward full throttle (fitted)
+
+
+def level(p, T):
+    """the motors' command level (0..1) for a thrust: thrust ~ command^2 above idle"""
+    return math.sqrt(max(0.0, (T / (p["twr"] * G) - p["i0"]) / (1 - p["i0"])))
+
+
+def authority(p, T):
+    """how fast the motors can spin the quad up at this thrust (rad/s^2)"""
+    return p.get("am", 0.0) * max(0.3, 1 + MIX_K * (level(p, G) - level(p, T)))
+
+
+def mix(p, Tm, u):
+    """the collective thrust with a motor differential u (share of the motors' range) on top, as an
+    airmode mixer: the high side can't pass full power (the collective drops), the low side can't go
+    below idle (it rises)"""
+    c, d = level(p, Tm), min(u, 1.0) / 2
+    if c + d > 1:
+        c = 1 - d
+    if c < d:
+        c = d
+    return p["twr"] * G * (p["i0"] + (1 - p["i0"]) * (c * c + d * d))
+
+
+def flip(p, thr, rate=667.0, after=0.3, h=0.01):
+    """a full-stick roll (`rate` deg/s) from a still, level quad until it has turned 360 deg, then the
+    stick centred for `after` s: height change (m) and vertical speed (m/s). The body rate follows the
+    stick through the tr lag; the motors' own rate follows it no faster than authority() (as in
+    physics() in src/sticktime.lua, 80 Hz substeps)"""
+    Tm = thrust(p, thr)
+    A = authority(p, Tm)
+    a = w = wm = vx = vy = y = t = ang = 0.0
+    target, done = math.radians(rate), None
+    while done is None or t < done + after:
+        w += ((target if done is None else 0.0) - w) * h / (p["tr"] + h)
+        a += w * h
+        ang += abs(w) * h
+        T = Tm
+        if A > 0:
+            dm = max(-A * h, min(A * h, w - wm))
+            wm += dm
+            T = mix(p, Tm, abs(dm) / (A * h))
+        uy, ux = math.cos(a), math.sin(a)
+        vu, vr = vx * ux + vy * uy, vx * uy - vy * ux
+        au, ar, _ = accel(p, T, vu, vr, 0.0)
+        vx += (ux * au + uy * ar) * h
+        vy += (uy * au - ux * ar - G) * h
+        y += vy * h
+        t += h
+        if done is None and ang >= 2 * math.pi:
+            done = t
+    return y, vy
+
+
 def fly(p, thr, pitch_deg, v0=(0.0, 0.0), secs=14.0, h=0.0125, hold_alt=False, until=None):
     """attitude held at pitch_deg nose down (yaw 0, wings level); returns (t, vy, vz) world"""
     a = math.radians(pitch_deg)
@@ -138,8 +197,10 @@ def report(p):
         _, ar, _ = accel(p, Tm, 0.0, v, 0.0)
         v += ar * h
         t += h
+    fh, ff = flip(p, hover)[0], flip(p, 1.0)[0]
     print(f"{p['name']:44s} stock {p['twr']:.1f}:1  hover stick {hover:.2f}  punch-out {climb * 3.6:4.0f} km/h  "
-          f"flat fall {-fall * 3.6:3.0f} km/h  top {best[1] * 3.6:4.0f} km/h at {best[0]:.1f} deg  slide half-life {t:.1f} s")
+          f"flat fall {-fall * 3.6:3.0f} km/h  top {best[1] * 3.6:4.0f} km/h at {best[0]:.1f} deg  slide half-life {t:.1f} s  "
+          f"flip at hover / full throttle {fh:+.1f} / {ff:+.1f} m")
 
 
 def main():

@@ -3,32 +3,15 @@
 Not planned for a release yet. The numbers are from the detailed per-prop model the flight model is
 fitted to (see [flight-model.md](flight-model.md)), measured the same way as everything else there.
 
-## Motor saturation in flips (airmode)
+## Motor saturation in flips: slowing the snap too
 
-**Today:** body rates follow the stick through a short lag, the same at any throttle, and the thrust does
-not change during a flip. A full-stick snap starts at about 74,000 deg/s².
-
-**The per-prop model, on a full-stick flip:**
-
-| | 5" and 3" | Whoop 65mm |
-|---|---|---|
-| At full throttle | the thrust dips to about 50% for 26-30 ms while airmode makes room for the roll; the roll reaches 63% of its rate in 28-30 ms | 50% for 62 ms; 46 ms |
-| At hover throttle | the thrust rises 37-58% over the first 100 ms: the low side's motors bottom out at idle while the high side pushes, so the quad pops up | +13% |
-| Strongest roll acceleration | 33,000-37,000 deg/s² at hover throttle, about 24,000 at full throttle | about 15,000 |
-| Roll rate 63% | 14-16 ms at half stick, 20-30 ms at full stick | 20 ms, 42-46 ms |
-
-**Idea:** a small mixer on thrust fractions in each physics substep. The rate change the stick asks for
-needs a differential between the motors on top of the collective thrust:
-
-- the high side would go past full power: the collective drops (the dip at full throttle);
-- the low side would go below idle: the collective rises (the pop in flips at low throttle);
-- the differential needs more than the motors' whole range: the rotation is limited.
-
-One new number per class, `am` (the strongest angular acceleration), fitted to the per-prop model at
-idle, hover and full throttle. A choice to make: all of it (full-stick snaps then take 20-30 ms to 63%
-instead of about 9 ms, as in the model), or only the thrust dip and pop (today's snap stays). About 40
-lines in each edition, a few hundred bytes of memory on the Lite; `tools/tune_physics.py` would get a
-flip test, the headless tests checks of the dip and the pop.
+The thrust side of it is in the flight model since 1.6.8 (the airmode mixer in
+[flight-model.md](flight-model.md)): a full-stick flip dips the thrust at full throttle and lifts it
+near hover. The body rate is left as it was, so a full-stick snap still reaches 63% of its rate in
+about 9 ms. In the per-prop model the motors also limit how fast it spins up: 14-16 ms at half stick,
+20-30 ms at full stick (whoops 20 / 42-46 ms), slower at full throttle. The idea is to let the body
+rate follow the motors' own rate (already computed for the mixer) instead of the stick's lag, as an
+option, since quick snaps help with the sim's own latency.
 
 ## Scraping obstacles instead of crashing
 

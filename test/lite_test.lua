@@ -305,6 +305,32 @@ steps(6)
 local sc2, chn2 = select(10, T.info())
 if state() ~= CRASHED or chn2 ~= 0 or sc2 ~= sc then fail("freestyle: a crash should lose the combo (state " .. state() .. ", combo " .. chn2 .. ", score " .. sc2 .. " was " .. sc .. ")") end
 steps(40)
+-- flips (the airmode mixer): a full-stick flip at full throttle ends lower than without it, one near
+-- hover higher (am is the class's 48th number)
+do
+  T.set("mode", 1)
+  local function flip(thr, am)
+    local old = T.qp(48, am)
+    T.state(FLY)
+    T.pose(0, 60, 20, 0, 0, 0) T.vel(0, 0, 0)
+    sticks.ail, sticks.ele, sticks.rud, sticks.thr = 1024, 0, 0, thr
+    steps(12)
+    sticks.ail = 0
+    steps(6)
+    local st, s = state()
+    T.qp(48, old)
+    return s[2] - 60, st
+  end
+  local am, hov = T.qp(48), (hoverStick(1) * 2 - 1) * 1024
+  local fW, s1 = flip(1024, am)
+  local fO, s2 = flip(1024, 0)
+  local hW, s3 = flip(hov, am)
+  local hO, s4 = flip(hov, 0)
+  print(string.format("flips: full throttle %+.2f m (%+.2f without the mixer), hover throttle %+.2f m (%+.2f without)", fW, fO, hW, hO))
+  if s1 ~= FLY or s2 ~= FLY or s3 ~= FLY or s4 ~= FLY or not (fW < fO - 0.2 and hW > hO + 0.05) then
+    fail("flips don't shift the thrust as an airmode mixer")
+  end
+end
 T.set("mode", 2)
 idle()
 frame(EVT_VIRTUAL_EXIT) frame(EVT_VIRTUAL_NEXT) frame(EVT_VIRTUAL_NEXT) frame(EVT_VIRTUAL_ENTER)

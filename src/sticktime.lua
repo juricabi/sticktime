@@ -90,16 +90,17 @@ local RKEYS = { rc = 1, rm = 2, re = 3, yc = 4, ym = 5, ye = 6 }
 -- ce, se, rf descending: the cushion peaks at cq (less by ce near full stick) at a sink of sq*tf^se m/s,
 -- then stalls down to rf + rq*tf (at most 1: at idle the blades stall, with power they hold); pf the prop wash shake's frequency (Hz); tlo, thi the Power settings that
 -- suit the class (thrust/weight of real quads of its kind; Stock is always there); kh rotor drag at
--- Grip High (1/s, times sqrt(Tm/5g + 0.02); Medium, the default, 0.4 of it; Low none, as in the reference).
+-- Grip High (1/s, times sqrt(Tm/5g + 0.02); Medium, the default, 0.4 of it; Low none, as in the reference);
+-- am how fast the motors spin the quad up in a flip (rad/s^2 at hover throttle; the airmode mixer in physics()).
 -- One string per class (parsed for the class in use only: tables of numbers cost radio memory):
-local QK = { "twr", "i0", "tn", "dz", "vp", "vk", "tl", "vt", "te", "ks", "kf", "ku", "er", "vd", "lr", "gg", "gl", "gw", "tm", "tr", "ty", "pw", "wl", "wv", "sq", "cq", "wls", "wvs", "pws", "vc", "ta", "ce", "se", "rf", "pf", "tlo", "thi", "kh", "tk", "tb", "rq" }
+local QK = { "twr", "i0", "tn", "dz", "vp", "vk", "tl", "vt", "te", "ks", "kf", "ku", "er", "vd", "lr", "gg", "gl", "gw", "tm", "tr", "ty", "pw", "wl", "wv", "sq", "cq", "wls", "wvs", "pws", "vc", "ta", "ce", "se", "rf", "pf", "tlo", "thi", "kh", "tk", "tb", "rq", "am" }
 local QP = {
-  -- twr i0 tn dz vp vk tl vt te ks kf ku er vd lr gg gl gw tm tr ty pw wl wv sq cq wls wvs pws vc ta ce se rf pf tlo thi kh tk tb rq
-  "7.67 .0315 1.43 .123 87.5 -.362 .517 7.88 .566 .0152 .00819 .0287 .357 15 .229 .24 .25 .113 .006 .009 .02 .347 .326 6.01 13.2 1.42 .119 3.8 .19 .61 65.3 .655 .496 .72 26 5 12 .363 .184 .874 .334",  -- Racer 5": 0.49 kg, 2500KV, 5045 tri-blade
-  "6.88 .026 1.5 .075 75.6 -.278 .502 7.61 .712 .011 .00635 .0184 .357 15 .257 .26 .25 .113 .006 .008 .02 .347 .348 7 11.4 1.42 .132 4.56 .19 .539 453 .75 .317 .661 24 4 10 .263 .015 .367 .272",       -- Freestyle 5": HD, 0.66 kg, 2400KV, 5045
-  "5.35 .0221 1.76 0 69.6 -.786 .891 9.7 .204 .0176 .0167 .0417 .5 15 .1 .44 .15 .135 .006 .009 .02 .42 .291 7.04 14.7 1.57 .103 5.17 .23 .713 14.3 .121 .537 .577 35 3 10 .433 .032 .297 6.34",         -- 3" toothpick: 0.11 kg, 3S, 5000KV, 76 mm
-  "2.58 .0059 .987 .094 117 -4.79 .824 9.1 .287 .0741 .07 .0875 .286 7 0 .17 .0625 .0344 .006 .02 .02 .854 .237 5.61 8.42 1.34 .0243 2.5 .27 .919 25.6 .0789 .517 0 45 3 8 1.59 -.041 .536 11.9",  -- Whoop 65mm: ducted 1S, 24 g, 28000KV, 31 mm
-  "3.54 .0198 .916 .09 116 -2.78 .864 9.01 .042 .0962 .0822 .0288 .556 15 .4 .19 .08 .036 .006 .016 .02 .456 .285 5.61 8.68 1.32 .0949 3.63 .25 .952 24.6 .0829 .526 .203 40 3 8 2.38 -.031 .212 5.67",  -- Whoop 75mm: ducted 2S, 47 g, 12000KV, 4-blade 40 mm
+  -- twr i0 tn dz vp vk tl vt te ks kf ku er vd lr gg gl gw tm tr ty pw wl wv sq cq wls wvs pws vc ta ce se rf pf tlo thi kh tk tb rq am
+  "7.67 .0315 1.43 .123 87.5 -.362 .517 7.88 .566 .0152 .00819 .0287 .357 15 .229 .24 .25 .113 .006 .009 .02 .347 .326 6.01 13.2 1.42 .119 3.8 .19 .61 65.3 .655 .496 .72 26 5 12 .363 .184 .874 .334 450",  -- Racer 5": 0.49 kg, 2500KV, 5045 tri-blade
+  "6.88 .026 1.5 .075 75.6 -.278 .502 7.61 .712 .011 .00635 .0184 .357 15 .257 .26 .25 .113 .006 .008 .02 .347 .348 7 11.4 1.42 .132 4.56 .19 .539 453 .75 .317 .661 24 4 10 .263 .015 .367 .272 640",       -- Freestyle 5": HD, 0.66 kg, 2400KV, 5045
+  "5.35 .0221 1.76 0 69.6 -.786 .891 9.7 .204 .0176 .0167 .0417 .5 15 .1 .44 .15 .135 .006 .009 .02 .42 .291 7.04 14.7 1.57 .103 5.17 .23 .713 14.3 .121 .537 .577 35 3 10 .433 .032 .297 6.34 450",         -- 3" toothpick: 0.11 kg, 3S, 5000KV, 76 mm
+  "2.58 .0059 .987 .094 117 -4.79 .824 9.1 .287 .0741 .07 .0875 .286 7 0 .17 .0625 .0344 .006 .02 .02 .854 .237 5.61 8.42 1.34 .0243 2.5 .27 .919 25.6 .0789 .517 0 45 3 8 1.59 -.041 .536 11.9 250",        -- Whoop 65mm: ducted 1S, 24 g, 28000KV, 31 mm
+  "3.54 .0198 .916 .09 116 -2.78 .864 9.01 .042 .0962 .0822 .0288 .556 15 .4 .19 .08 .036 .006 .016 .02 .456 .285 5.61 8.68 1.32 .0949 3.63 .25 .952 24.6 .0829 .526 .203 40 3 8 2.38 -.031 .212 5.67 420",  -- Whoop 75mm: ducted 2S, 47 g, 12000KV, 4-blade 40 mm
 }
 
 -- -------------------------------------------------------------- tracks
@@ -475,6 +476,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
   -- prop wash: shake (rad) and its turning part, wash build-up (0..1), shake size and severity,
   -- thrust loss
   local wob1, wob2, wob3, wq1, wq2, wq3, sW, sH, sV, wl = 0, 0, 0, 0, 0, 0, 0, 0, 1, 0
+  local mr, mp = 0, 0                            -- the motors' own roll and pitch rate (flips)
   local seed = 7
 
   rnd = function()
@@ -544,6 +546,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     fx, fy, fz, rx, ry, rz, ux, uy, uz = hx, 0, hz, hz, 0, -hx, 0, 1, 0
     grounded = y <= DR + 0.01
     speed, Tm, P.wr, P.wp, P.wy, sW, sH, wob1, wob2, wob3, wq1, wq2, wq3 = 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+    mr, mp = 0, 0
     for i = 1, NG do
       gd[i] = (px - gx[i]) * gnx[i] + (py - gy[i]) * gny[i] + (pz - gz[i]) * gnz[i]
     end
@@ -714,7 +717,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     end
     if grounded and T < G * 1.02 then
       -- resting on the ground: stays level, can only yaw
-      wr, wp, P.wr, P.wp = 0, 0, 0, 0
+      wr, wp, P.wr, P.wp, mr, mp = 0, 0, 0, 0, 0, 0
       if uy < 0.999 then placeDrone(px, DR, pz, fx, fz) end
     end
     -- wind with gusts, weaker near the ground
@@ -731,6 +734,16 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     local TL, VT2, TE, TA, ER, VD, LR, GG, GL, GW = P.tl, P.vt * P.vt, P.te, P.ta, P.er, P.vd, P.lr, P.gg, P.gl, P.gw
     local SQ, CQ, CE, SE, RF, RQ, TB = P.sq, P.cq, P.ce, P.se, P.rf, P.rq, P.tb
     local KH = (P.kh or 0) * (S.grip == 2 and 1 or S.grip == 1 and 0.4 or 0)
+    -- flips (an airmode mixer): the motors' own rate follows the body rate no faster than they can
+    -- spin the quad up (am, more toward full throttle); while it spins up they need a differential on
+    -- top of the collective: at full throttle the collective drops (the high side can't go higher),
+    -- near hover it rises (the low side can't go below idle). Levels in motor command (thrust ~ c^2)
+    local I0 = P.i0
+    local ch, c0 = (1 / P.twr - I0) / (1 - I0), (T / Tmax - I0) / (1 - I0)
+    ch, c0 = ch > 0 and sqrt(ch) or 0, c0 > 0 and sqrt(c0) or 0
+    local AM = P.am * (1 - ch + c0)
+    if AM < P.am * 0.3 then AM = P.am * 0.3 end
+    AM = AM * h
     local x0, x1, z0, z1 = TR.x0 - 160, TR.x1 + 160, TR.z0 - 160, TR.z1 + 160
     local bx0, bx1, by0, by1, bz0, bz1 = BX.x0, BX.x1, BX.y0, BX.y1, BX.z0, BX.z1
     -- broad phase once per frame: only objects within reach get tested per substep
@@ -770,6 +783,24 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
       Tm = Tm + (T - Tm) * km
       pwr, pwp, pwy = pwr + (wr - pwr) * kr, pwp + (wp - pwp) * kr, pwy + (wy - pwy) * ky
       rotate(pwr * h, pwp * h, pwy * h)
+      -- the flip's differential d (half of it, as a share of the motors' range; roll and pitch add up
+      -- on a motor) and the collective Te it leaves
+      local Te = Tm
+      if AM > 0 then
+        local dr, dp = pwr - mr, pwp - mp
+        if dr > AM then dr = AM elseif dr < -AM then dr = -AM end
+        if dp > AM then dp = AM elseif dp < -AM then dp = -AM end
+        mr, mp = mr + dr, mp + dp
+        local d = ((dr < 0 and -dr or dr) + (dp < 0 and -dp or dp)) / AM * 0.5
+        if d > 1e-4 then
+          if d > 0.5 then d = 0.5 end
+          local c = (Tm / Tmax - I0) / (1 - I0)
+          c = c > 0 and sqrt(c) or 0
+          if c + d > 1 then c = 1 - d end
+          if c < d then c = d end
+          Te = Tmax * (I0 + (1 - I0) * (c * c + d * d))
+        end
+      end
       -- air-relative velocity in body axes
       local ax_, az_ = vx - wx, vz - wz
       local vu = ax_ * ux + vy * uy + az_ * uz
@@ -777,7 +808,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
       local vf = ax_ * fx + vy * fy + az_ * fz
       -- props lose thrust as the air through them speeds up (climbing) and gain thrust sinking,
       -- until the blades stall in a fast drop
-      local tf = Tm / Tmax                              -- thrust fraction
+      local tf = Te / Tmax                              -- thrust fraction
       local Ta
       if vu < 0 then
         -- descending: a cushion that rises to cq at a sink of sq*tf^se, then stalls away (to rf + rq*tf:
@@ -788,12 +819,12 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
         local fl = RF + RQ * tf
         if fl > 1 then fl = 1 end
         if r < fl then r = fl end
-        Ta = Tm * r
+        Ta = Te * r
       else
-        if Tm > 0 then                                -- the loss grows with thrust as Tm*(Tmax/Tm)^VC
+        if Te > 0 then                                -- the loss grows with thrust as T*(Tmax/T)^VC
           local den = VP + vu * VK                    -- and bends with VK as the inflow grows
           if den < VP * 0.3 then den = VP * 0.3 end
-          Ta = Tm - vu * Tm * (Tmax / Tm) ^ VC / den
+          Ta = Te - vu * Te * (Tmax / Te) ^ VC / den
         else
           Ta = 0
         end
@@ -848,7 +879,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
       -- rotor drag (the Grip setting; the reference model has none: Low): props moving edgewise are
       -- pushed back, harder the faster they spin (~ sqrt of the thrust)
       if KH > 0 then
-        local k = KH * sqrt(Tm * 0.0186 + 0.02)            -- 0.0186 = 1 / (5 G)
+        local k = KH * sqrt(Te * 0.0186 + 0.02)            -- 0.0186 = 1 / (5 G)
         ar, af = ar - k * vr, af - k * vf
       end
       vx = vx + (ux * au + rx * ar + fx * af) * h
@@ -3425,6 +3456,7 @@ local function init()
       rotate(roll * 0.0174533, 0, 0)
     end
     TEST.vel = function(a, b, c) vx, vy, vz = a, b, c end
+    TEST.qp = function(k, v) local o = P[k] if v then P[k] = v end return o end   -- a class number
     TEST.lapclock = function(t)
       -- first lap running for t ticks, and no "GO!" banner (for screenshots)
       lapStart, tStart, R.msgT = gt - t, gt - t, gt - 1000

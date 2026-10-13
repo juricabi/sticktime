@@ -67,7 +67,7 @@ local OPTS = {
 local RATES = nums("70 400 35 70 350 30 100 600 50 100 500 40 150 850 45 130 700 40")
 -- the quad classes: one line of numbers each in StickTimeLite/q<class>.txt (made by build.py from
 -- the color game's QP), read when the class is picked. Order: twr i0 tn dz vp vk tl vt te ks kf
--- ku er vd lr gg gl gw tm tr ty pw wl wv sq cq wls wvs pws vc ta ce se rf pf tlo thi kh tk tb rq (P[7]..P[47]), then
+-- ku er vd lr gg gl gw tm tr ty pw wl wv sq cq wls wvs pws vc ta ce se rf pf tlo thi kh tk tb rq am (P[7]..P[48]), then
 -- the class's name on the next line
 
 -- tracks: the names; each track's gates and structures are in StickTimeLite/t<number>.txt (made
@@ -258,7 +258,7 @@ local px, py, pz, vx, vy, vz = 0, DR, 0, 0, 0, 0                      -- positio
 local rx, ry, rz, ux, uy, uz, fx, fy, fz = 1, 0, 0, 0, 1, 0, 0, 0, 1   -- right, up, forward
 local sA, sE, sT, sR, speed = 0, 0, 0, 0, 0
 local wr0, wp0, wy0, Tm, grounded = 0, 0, 0, 0, true                  -- body rates (rad/s), thrust
-local sW = 0                                                          -- prop wash build-up
+local sW, mr, mp = 0, 0, 0                                            -- prop wash build-up; motors' roll, pitch rate
 --#if TEST
 local aTf, aVu, aE2, aW = 0, 0, 0, 0                                  -- sound state for the web emulator
 --#endif
@@ -327,7 +327,7 @@ local function place(x, y, z, hx, hz)
   hx, hz = hx / l, hz / l
   px, py, pz, vx, vy, vz = x, y, z, 0, 0, 0
   fx, fy, fz, rx, ry, rz, ux, uy, uz = hx, 0, hz, hz, 0, -hx, 0, 1, 0
-  grounded, speed, Tm, wr0, wp0, wy0, sW = y <= DR + 0.01, 0, 0, 0, 0, 0, 0
+  grounded, speed, Tm, wr0, wp0, wy0, sW, mr, mp = y <= DR + 0.01, 0, 0, 0, 0, 0, 0, 0, 0
   for i = 1, NG do
     gd[i] = (px - gx[i]) * gnx[i] + (py - gy[i]) * gny[i] + (pz - gz[i]) * gnz[i]
   end
@@ -512,7 +512,7 @@ physics = function(dt)
   end
   if grounded and T < G * 1.02 then
     -- resting on the ground: stays level, can only yaw
-    wr, wp, wr0, wp0 = 0, 0, 0, 0
+    wr, wp, wr0, wp0, mr, mp = 0, 0, 0, 0, 0, 0
     if uy < 0.999 then place(px, DR, pz, fx, fz) end
   end
   -- wind with gusts, weaker near the ground
@@ -530,6 +530,15 @@ physics = function(dt)
   local GG, GL, GEW, SQ, CQ = P[22], P[23], P[24], P[31], P[32]                     -- GEW: not GW (gate widths)
   local CE, SE, RF = P[38], P[39], P[40]
   local KH = P[44] * (S.grip > 1 and 1 or S.grip * 0.4)                       -- Grip: rotor drag
+  -- flips (an airmode mixer): the motors' own rate follows the body rate no faster than they can spin
+  -- the quad up (am, more toward full throttle); the differential they need meanwhile drops the
+  -- collective at full throttle and lifts it near hover (levels in motor command, thrust ~ c^2)
+  local I0 = P[8]
+  local ch, AM = (1 / P[7] - I0) / (1 - I0), (T / Tmax - I0) / (1 - I0)
+  ch, AM = ch > 0 and sqrt(ch) or 0, AM > 0 and sqrt(AM) or 0
+  AM = P[48] * (1 - ch + AM)
+  if AM < P[48] * 0.3 then AM = P[48] * 0.3 end
+  AM = AM * h
   -- the surface under the quad, for ground effect: the ground, or the top of a structure
   local fl = 0
   for i = 1, NB do
@@ -557,12 +566,29 @@ physics = function(dt)
     Tm = Tm + (T - Tm) * km
     wr0, wp0, wy0 = wr0 + (wr - wr0) * kr, wp0 + (wp - wp0) * kr, wy0 + (wy - wy0) * ky
     rotate(wr0 * h, wp0 * h, wy0 * h)
+    -- the flip's differential d (half of it, a share of the motors' range) and the collective Te
+    local Te = Tm
+    if AM > 0 then
+      local dr, dp = wr0 - mr, wp0 - mp
+      if dr > AM then dr = AM elseif dr < -AM then dr = -AM end
+      if dp > AM then dp = AM elseif dp < -AM then dp = -AM end
+      mr, mp = mr + dr, mp + dp
+      local d = ((dr < 0 and -dr or dr) + (dp < 0 and -dp or dp)) / AM * 0.5
+      if d > 1e-4 then
+        if d > 0.5 then d = 0.5 end
+        local c = (Tm / Tmax - I0) / (1 - I0)
+        c = c > 0 and sqrt(c) or 0
+        if c + d > 1 then c = 1 - d end
+        if c < d then c = d end
+        Te = Tmax * (I0 + (1 - I0) * (c * c + d * d))
+      end
+    end
     -- air-relative velocity in body axes
     local ax_, az_ = vx - wx, vz - wz
     local vu, vr, vf = ax_ * ux + vy * uy + az_ * uz, ax_ * rx + vy * ry + az_ * rz, ax_ * fx + vy * fy + az_ * fz
     -- props lose thrust as the air through them speeds up (climbing) and gain thrust sinking,
     -- until the blades stall in a fast drop
-    local tf = Tm / Tmax                              -- thrust fraction
+    local tf = Te / Tmax                              -- thrust fraction
     local Ta
     if vu < 0 then
       -- descending: a cushion that rises to cq at a sink of sq*tf^se, then stalls away (to rf + rq*tf)
@@ -572,12 +598,12 @@ physics = function(dt)
       x = RF + P[47] * tf                           -- (x reused: the stall floor, rf + rq*tf)
       if x > 1 then x = 1 end
       if r < x then r = x end
-      Ta = Tm * r
+      Ta = Te * r
     else
-      if Tm > 0 then                                -- the loss grows with thrust as Tm*(Tmax/Tm)^VC
+      if Te > 0 then                                -- the loss grows with thrust as T*(Tmax/T)^VC
         local den = VP + vu * VK                    -- and bends with VK as the inflow grows
         if den < VP * 0.3 then den = VP * 0.3 end
-        Ta = Tm - vu * Tm * (Tmax / Tm) ^ VC / den
+        Ta = Te - vu * Te * (Tmax / Te) ^ VC / den
       else
         Ta = 0
       end
@@ -623,7 +649,7 @@ physics = function(dt)
         ar, af = ar + q * vr, af + q * vf
       end
     end
-    local k = KH * sqrt(Tm * 0.0186 + 0.02)         -- rotor drag (Grip): edgewise, ~ sqrt of the thrust
+    local k = KH * sqrt(Te * 0.0186 + 0.02)         -- rotor drag (Grip): edgewise, ~ sqrt of the thrust
     ar, af = ar - k * vr, af - k * vf
     vx = vx + (ux * au + rx * ar + fx * af) * h
     vy = vy + (uy * au + ry * ar + fy * af - G) * h
@@ -1157,6 +1183,7 @@ local function init()
     T.lapclock = function(t) lapStart, tStart, msgT = gt - t, gt - t, gt - 1000 if lap < 1 then lap = 1 end end
     T.info = function() return NT, P[7], gm, lap, total, rn, rt, TRACKS[S.track], NP, sc, chn, NB end
     T.thrust = function() return P[7], P[8], P[9], P[10], P[45] end
+    T.qp = function(i, v) local o = P[i] if v then P[i] = v end return o end   -- a class number
     T.audio = function() return sT, S.quad, state, aTf, aVu, aE2, aW, sA, sE, sR end
     T.best = function(t) return BL[t], BR[t], BG[t], BF[t] end
     T.ntracks = function() return NT end

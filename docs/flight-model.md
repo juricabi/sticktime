@@ -37,6 +37,25 @@ g   = 10.78                                    1.1 g: a heavier, more planted fe
 Body rates follow the stick's Betaflight Actual rates through a first-order lag (`tr` roll and
 pitch, `ty` yaw). Wind works as before.
 
+Flips shift the thrust the way an airmode mixer does. The motors' own roll and pitch rate follows the
+body rate no faster than they can spin the quad up, `am` (rad/s² at hover throttle; it grows toward
+full throttle, `am*(1 + c - c_hover)`, the same rule for every class). While they catch up they need a
+differential `d` (half of it, as a share of their range; roll and pitch add up on a motor) on top of
+the collective, in motor-command units `c = sqrt((T/Tmax - i0)/(1 - i0))`:
+
+```
+c + d <= 1      at full throttle the high side can't go higher: the collective drops
+c >= d          near hover the low side can't go below idle: the collective rises
+T = Tmax*(i0 + (1 - i0)*(c^2 + d^2))     for that substep (thrust ~ command^2 on each side)
+```
+
+The body rate itself stays as it was (full-stick snaps are as quick), only the thrust changes. `am`
+is fitted to the per-prop model's thrust over the first 80 ms of a half and a full-stick roll held
+still at hover, 70% and full throttle (within 0.08-0.11 m/s; 0.27-0.51 without the mixer). A
+full-stick 360 flip then ends within 0.1-0.6 m of the model's height (0.4-1.0 m without): at hover
+throttle it matches, at full throttle StickTime keeps about half of the difference, the rest coming
+from each prop's own inflow while the quad turns, which one body can't have.
+
 Prop wash (setting): in the per-prop model it is a thrust loss, not a shake: all four props sink
 into the same downwash, so the quad mushes and sinks faster (a 5" at the same throttle sinks at
 3.2 m/s instead of 1 m/s). It needs a mostly vertical sink: 4 m/s of edgewise speed clears it.
@@ -94,6 +113,7 @@ Parameters (`QP` in `src/sticktime.lua`, one string per class):
 | prop wash loss / fade-out (m/s) / shake rms (deg), max | .33, 6, .35 | .35, 7, .35 | .29, 7, .42 | .24, 5.6, .85 | .28, 5.6, .46 |
 | prop wash shake frequency `pf` (Hz) | 26 | 24 | 35 | 45 | 40 |
 | rotor drag for Grip High `kh` (1/s, times sqrt(thrust/5g + 0.02): ~0.47 at hover; Medium 0.4 of it) | .36 | .26 | .43 | 1.6 | 2.4 |
+| flip authority `am` (rad/s², the motors spinning the quad up at hover throttle; airmode mixer) | 450 | 640 | 450 | 250 | 420 |
 | response `tm`, `tr`, `ty` (s) | .006 .009 .02 | .006 .008 .02 | .006 .009 .02 | .006 .02 .02 | .006 .016 .02 |
 
 Each class is the most common configuration of its kind in the reference set (for the whoop: the
@@ -118,7 +138,8 @@ stock power, attitude held) and what StickTime gives (`tools/tune_physics.py`):
 - Four props, each with its own airflow: rotating the quad changes each prop's inflow, which damps
   roll and pitch. Whoop props stall in fast vertical drops (they lose thrust beyond 4 m/s).
 - The PID loop itself: rate steps overshoot by 35-70% before they settle (strong feedforward on a
-  filtered gyro), motors saturate on full-stick flips, yaw is limited to 10000 deg/s^2.
+  filtered gyro), saturated motors also slow a full-stick snap at full throttle (StickTime keeps the
+  thrust side of it, the airmode mixer above), yaw is limited to 10000 deg/s^2.
 - Battery sag and capacity (rarely on in other sims either), prop deformation at full power,
   bent props after crashes.
 - Spec classes and bigger quads.
