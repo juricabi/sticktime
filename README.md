@@ -16,7 +16,7 @@ Download `StickTime-<version>-sdcard.zip` from the [latest release](https://gith
 
 | Radio | Copy | EdgeTX |
 |---|---|---|
-| Any color screen | `StickTime.lua` | 2.11+, older works too |
+| Any color screen: RadioMaster TX16S, TX16S MkII and TX16S MK3, TX15, GX15, Jumper T15 / T16 / T18, FrSky X10 / X12S, HelloRadioSky V12 / V16, FlySky NV14 / EL18 / PL18 / PA01 and the others in [Screens](#screens) | `StickTime.lua` | 2.11+, older works too |
 | B&W with an STM32F4: TX12 MkII, Zorro, Boxer, Pocket, MT12, GX12, X9D+ 2019, X9E, X7 ACCESS, T14, T20, T-Pro V2 / S, T12 Max, Bumblebee, Commando 8 | `StickTimeBW.lua` and the `StickTimeBW` folder | 2.11+ |
 | Older B&W (STM32F2): TX12 MkI, X7, X9D, X9D+, X9 Lite, X-Lite, T12, T8, T-Lite, T-Pro, LR3 Pro | `StickTimeLite.lua` and the `StickTimeLite` folder | 2.11 (their last EdgeTX) |
 
@@ -67,7 +67,7 @@ The layout follows `LCD_W` / `LCD_H` and the radio's real font sizes, so new scr
 
 ## Faster firmware (optional)
 
-Stock EdgeTX runs a tool at most every 50 ms (20 fps) and shows each frame one cycle late. The [`fast-lua-20ms` prerelease](https://github.com/juricabi/edgetx/releases/tag/fast-lua-20ms) has firmware for every color radio (EdgeTX `main` plus [`firmware/edgetx-fast-lua.patch`](firmware/edgetx-fast-lua.patch)): Lua tools run every 20 ms, each frame goes straight to the display, and drawing is much faster. On every STM32H750 radio (RadioMaster TX16S MK3, TX15 and GX15, Jumper T15 Pro, HelloRadioSky V12 and V15, and more) it also runs the Lua interpreter from ITCM. On the HelloRadioSky V12 and the Flysky PA01, whose screens hang on an SPI bus, it also sends frames to the screen in the background. On the V12 that makes up to 50 fps, and stick-to-screen latency drops from about 90 ms to about 40 ms. With **Show FPS** on, StickTime shows how long each frame took to run and to reach the screen. These are test builds: back up your SD card first.
+Stock EdgeTX runs a tool at most every 50 ms (20 fps) and shows each frame one cycle late. The [`fast-lua-20ms` prerelease](https://github.com/juricabi/edgetx/releases/tag/fast-lua-20ms) has firmware for every color radio (EdgeTX `main` plus [`firmware/edgetx-fast-lua.patch`](firmware/edgetx-fast-lua.patch)): Lua tools run every 20 ms, each frame goes straight to the display, and drawing is much faster. It has a build for each TX16S: the TX16S and TX16S MkII (one firmware, `tx16s`) and the TX16S MK3 (`tx16smk3`). On every STM32H750 radio (RadioMaster TX16S MK3, TX15 and GX15, Jumper T15 Pro, HelloRadioSky V12 and V15, and more) it also runs the Lua interpreter from ITCM. On the HelloRadioSky V12 and the Flysky PA01, whose screens hang on an SPI bus, it also sends frames to the screen in the background. On the V12 that makes up to 50 fps, and stick-to-screen latency drops from about 90 ms to about 40 ms. With **Show FPS** on, StickTime shows how long each frame took to run and to reach the screen. These are test builds: back up your SD card first.
 
 <details>
 <summary>What the patch changes</summary>
