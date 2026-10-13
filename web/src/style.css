@@ -67,7 +67,7 @@ button, select, input { font: inherit; color: inherit; }
 .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 /* groups that wrap as a whole: screen and script, the buttons, sound and music, the .lua pair */
 .ctl-group { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; min-width: 0; }
-#radioSel { width: 195px; max-width: 100%; }
+#radioSel { width: 176px; max-width: 100%; }
 #scriptSel { width: 190px; max-width: 100%; }
 .btn-pair { gap: 0; flex-wrap: nowrap; }
 .btn-pair > .btn:first-child { border-radius: 8px 0 0 8px; }
@@ -90,13 +90,13 @@ select { max-width: 270px; }
   background: none; color: inherit; cursor: pointer; }
 .sound .mute:hover { background: var(--accent-soft); }
 .sound .mute .cross { display: none; }
-.sound input[type="range"] { width: 72px; accent-color: var(--accent); cursor: pointer; }
+.sound input[type="range"] { width: 60px; accent-color: var(--accent); cursor: pointer; }
 .sound output { min-width: 3.2em; text-align: right; font: 500 12px/1 var(--font-mono); color: var(--muted); }
 .sound.snd-off .wave { display: none; }
 .sound.snd-off .cross { display: inline; }
 .sound.snd-off input[type="range"] { accent-color: var(--muted); opacity: .55; }
 .sound.snd-off output { opacity: .7; }
-.music input[type="range"] { width: 56px; }
+.music input[type="range"] { width: 48px; }
 .music.snd-off svg { opacity: .55; }
 .music .songs { position: relative; overflow: hidden; margin-left: 2px; padding: 3px 7px; border-radius: 6px;
   font: 500 12px/1 var(--font-display); color: var(--muted); cursor: pointer; }
@@ -294,23 +294,12 @@ footer.credits a { color: inherit; }
 .ed-rstate.on { color: var(--ok); }
 .ed-rstate.on::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: currentColor; }
 .ed-rnote { margin: 6px 0 0; }
-/* the Tracks & Install panel: two tabs, the track editor and Radio / Install */
-.tp-bar { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; margin: -4px 0 14px; border-bottom: 1px solid var(--line); }
-.tabs { display: flex; gap: 2px; min-width: 0; }
-.tabs [role="tab"] { margin-bottom: -1px; padding: 8px 12px 9px; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--muted);
-  font: 700 13px/1.2 var(--font-display); letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
-.tabs [role="tab"]:hover { color: var(--fg); }
-.tabs [role="tab"][aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); }
-.tp-bar .btn { margin-bottom: 6px; }
-.tp-sub { margin: 0; }
-#radioPanel > .tp-sub { margin-bottom: 18px; }
-.lbl-short { display: none; }
-@media (max-width: 760px) { .lbl-long { display: none; } .lbl-short { display: inline; } }
 .ed-rline { margin: 14px 2px 0; line-height: 1.5; }
 .linkbtn { padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 .linkbtn:hover { color: var(--fg); }
-/* the Radio SD panel: the connection and the game on the left, the tracks on the right */
+/* the Install panel: the connection and the game on the left, the tracks on the right */
 .rp-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 40px; align-items: start; }
+#radioPanel > .ed-head { margin-bottom: 18px; }
 #radioPanel .ed-sec { padding: 18px 0; }
 #radioPanel .ed-sec:first-child { padding-top: 0; }
 #radioPanel .ed-sec h3 { margin-bottom: 12px; }

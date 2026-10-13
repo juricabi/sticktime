@@ -81,32 +81,26 @@ def click_map(page, x, z, **kw):
     page.mouse.click(px, py, **kw)
 
 
-def shot_clip(page, path, card="tracksPanel"):
-    """the Tracks & Install panel, from a full-page screenshot taken at the top of the page (where
-    the sticky header sits above the panel, not over it)"""
-    page.evaluate("scrollTo(0, 0)")
-    page.wait_for_timeout(150)
-    r = page.evaluate("(id) => { const b = document.getElementById(id).getBoundingClientRect();"
-                      " return { x: b.left + scrollX, y: b.top + scrollY, width: b.width, height: b.height }; }", card)
-    page.screenshot(path=str(path), full_page=True, clip=r)
+def shot_clip(page, path, card="editor"):
+    """a panel (Tracks: the editor, Install: radioPanel), with the sticky header let go of for the
+    shot (so that it doesn't cover the panel's top)"""
+    page.evaluate("document.querySelector('header.top').style.position = 'static'")
+    page.locator("#" + card).screenshot(path=str(path))
+    page.evaluate("document.querySelector('header.top').style.position = ''")
     print("wrote test/shots/" + path.name)
 
 
 def radio_panel(page):
-    """the Tracks & Install panel open on its Radio / Install tab"""
-    if page.is_hidden("#tracksPanel"):
-        page.click("#tracksBtn")
+    """the Install panel open (the Tracks one closes)"""
     if page.is_hidden("#radioPanel"):
-        page.click("#tabRadio")
+        page.click("#radioBtn")
     radio_done(page)
 
 
 def editor(page):
-    """the Tracks & Install panel open on its Track editor tab"""
-    if page.is_hidden("#tracksPanel"):
-        page.click("#tracksBtn")
+    """the Tracks panel open (the Install one closes)"""
     if page.is_hidden("#editor"):
-        page.click("#tabEditor")
+        page.click("#tracksBtn")
 
 
 def open_file(page, path):
@@ -239,10 +233,11 @@ def radio_tests(br, errors):
     check(page.inner_text("#edRadioSlots").count("empty") == 8 and page.is_visible("#edEditions"),
           "radio: the panel lists the card's 8 slots and the editions at once")
 
-    # the track editor's tab: Send to radio over the same connection
-    page.click("#tabEditor")
-    check(page.is_hidden("#radioPanel") and page.inner_text("#edSend") == "Send to radio"
-          and page.inner_text("#edRadioLineText") == "Radio SD: RADIO-SD connected.", "radio: the editor's tab shares the connection")
+    # the Tracks panel: Send to radio over the same connection
+    page.click("#tracksBtn")
+    check(page.is_hidden("#radioPanel") and page.get_attribute("#radioBtn", "aria-expanded") == "false"
+          and page.get_attribute("#tracksBtn", "aria-expanded") == "true" and page.inner_text("#edSend") == "Send to radio"
+          and page.inner_text("#edRadioLineText") == "Radio SD: RADIO-SD connected.", "radio: Tracks closes Install, and shares the connection")
     page.select_option("#edTemplate", label="Grand Prix")
     page.select_option("#edSlot", "1")
     with page.expect_download() as d:
@@ -296,7 +291,7 @@ def radio_tests(br, errors):
           "radio: the emulator's tracks sent to the card")
     check(page.inner_text("#rpStatus").startswith("Sent c5 to the radio."), f"radio: only what changed is written: {page.inner_text('#rpStatus')!r}")
     page.mouse.move(0, 0)
-    shot_clip(page, OUT / "radio_tracks.png")
+    shot_clip(page, OUT / "radio_tracks.png", "radioPanel")
 
     # the card remembered on the next visit; Disconnect forgets it
     page.reload()
@@ -469,9 +464,9 @@ def install_tests(br, errors):
           f"install: B&W and Lite found and picked, older: {states!r}")
     check("c1 · track 9 · My Loop" in page.inner_text("#edRadioSlots"), "install: the panel lists the card's tracks beside it")
     page.mouse.move(0, 0)
-    shot_clip(page, OUT / "radio_panel_light.png")
+    shot_clip(page, OUT / "radio_panel_light.png", "radioPanel")
     page.emulate_media(color_scheme="dark")
-    shot_clip(page, OUT / "radio_panel_dark.png")
+    shot_clip(page, OUT / "radio_panel_dark.png", "radioPanel")
     page.emulate_media(color_scheme="light")
     page.click("#edInstallGo")
     radio_done(page)
@@ -518,8 +513,8 @@ def install_tests(br, errors):
 
 
 def toolbar_shots(br, errors):
-    """the header's controls in one row at 1400 and 1280 px, two tidy rows at 1100, stacked at 390
-    (where the button says just Tracks); the Tracks & Install icon up close (1x, 2x, dark)"""
+    """the header's controls in one row at 1400 and 1280 px, two tidy rows at 1100, stacked at 390;
+    the Tracks and Install icons up close (1x, 2x, dark)"""
     for w, rows in ((1400, 1), (1280, 1), (1100, 2), (390, None)):
         ctx = br.new_context(viewport={"width": w, "height": 900})
         offline(ctx)
@@ -529,12 +524,10 @@ def toolbar_shots(br, errors):
         wait_sim(page)
         tops = page.evaluate("[...new Set([...document.querySelectorAll('.controls > .ctl-group')].map((g) => Math.round(g.getBoundingClientRect().top)))].length")
         wide = page.evaluate("document.documentElement.scrollWidth <= innerWidth")
-        label = page.inner_text("#tracksBtn").strip()
-        want = "Tracks" if w < 760 else "Tracks & Install"
-        if rows:
-            check(tops == rows and wide and label == want, f"toolbar at {w} px: {rows} row{'s' if rows > 1 else ''} of controls ({tops}), {label!r}")
-        else:
-            check(wide and label == want, f"toolbar at {w} px: nothing sticks out sideways, the button says {label!r}")
+        labels = (page.inner_text("#tracksBtn").strip(), page.inner_text("#radioBtn").strip())
+        ok = wide and labels == ("Tracks", "Install") and (rows is None or tops == rows)
+        check(ok, f"toolbar at {w} px: " + (f"{rows} row{'s' if rows > 1 else ''} of controls ({tops})" if rows else "nothing sticks out sideways")
+              + f", Tracks and Install side by side {labels}")
         page.locator("header.top").screenshot(path=str(OUT / f"toolbar_{w}.png"))
         print(f"wrote test/shots/toolbar_{w}.png")
         ctx.close()
@@ -544,41 +537,40 @@ def toolbar_shots(br, errors):
         page = ctx.new_page()
         page.goto(SIM)
         wait_sim(page)
-        a = page.locator("#tracksBtn").bounding_box()
-        name = f"icon_{scale}x_{scheme}.png"
-        page.screenshot(path=str(OUT / name), clip={"x": a["x"] - 4, "y": a["y"] - 4, "width": a["width"] + 8, "height": a["height"] + 8})
+        a, b = page.locator("#tracksBtn").bounding_box(), page.locator("#radioBtn").bounding_box()
+        name = f"icons_{scale}x_{scheme}.png"
+        page.screenshot(path=str(OUT / name), clip={"x": a["x"] - 4, "y": a["y"] - 4, "width": b["x"] + b["width"] - a["x"] + 8, "height": a["height"] + 8})
         print("wrote test/shots/" + name)
         ctx.close()
 
 
-def tab_tests(br, errors):
-    """one panel, two tabs: the last one used comes back (also after a reload); the arrow keys move
-    between them, and they never reach the game"""
+def panel_tests(br, errors):
+    """Tracks and Install: two panels in the same place, one open at a time, each with its Close;
+    the open one's button pressed; keys in them never reach the game"""
     ctx = br.new_context(viewport={"width": 1400, "height": 1000})
     offline(ctx)
     page = ctx.new_page()
     page.on("pageerror", lambda e: errors.append(str(e)))
     page.goto(SIM)
     wait_sim(page)
+    expanded = lambda: (page.get_attribute("#tracksBtn", "aria-expanded"), page.get_attribute("#radioBtn", "aria-expanded"))  # noqa: E731
+    page.click("#radioBtn")
+    check(page.is_visible("#radioPanel") and page.is_hidden("#editor") and expanded() == ("false", "true")
+          and page.text_content("#rpTitle").startswith("Radio & install"), "panels: Install opens its own panel, its button pressed")
     page.click("#tracksBtn")
-    check(page.is_visible("#editor") and page.is_hidden("#radioPanel") and page.get_attribute("#tabEditor", "aria-selected") == "true",
-          "tabs: the first time, the track editor")
-    page.click("#tabRadio")
-    check(page.is_hidden("#editor") and page.is_visible("#radioPanel"), "tabs: Radio / Install is a screen of its own")
-    page.click("#tpClose")
-    page.click("#tracksBtn")
-    check(page.is_visible("#radioPanel"), "tabs: the panel opens on the last tab used")
-    page.reload()
-    wait_sim(page)
-    page.click("#tracksBtn")
-    check(page.is_visible("#radioPanel"), "tabs: ... after a reload too")
+    check(page.is_visible("#editor") and page.is_hidden("#radioPanel") and expanded() == ("true", "false")
+          and page.text_content("#edTitle").startswith("Track editor"), "panels: Tracks opens the editor and closes Install")
+    page.click("#edRadioLink")
+    check(page.is_visible("#radioPanel") and page.is_hidden("#editor"), "panels: the editor's link line opens Install")
     page.evaluate("sim.engine.__mark = 1")
-    page.focus("#tabRadio")
-    page.keyboard.press("ArrowLeft")
-    check(page.is_visible("#editor") and page.evaluate("document.activeElement.id") == "tabEditor", "tabs: the arrow keys move between them")
-    page.keyboard.press("Enter")
+    page.focus("#rpClose")
     page.keyboard.press("r")
-    check(page.evaluate("sim.engine.__mark") == 1 and not page.evaluate("sim.engine.exited"), "tabs: keys on the tabs don't reach the game")
+    page.keyboard.press("Enter")
+    check(page.is_hidden("#radioPanel") and expanded() == ("false", "false") and page.evaluate("sim.engine.__mark") == 1
+          and page.evaluate("document.activeElement.id") == "radioBtn", "panels: Close (with Enter) closes it; the keys don't reach the game")
+    page.click("#tracksBtn")
+    page.click("#tracksBtn")
+    check(page.is_hidden("#editor") and expanded() == ("false", "false"), "panels: a second click on Tracks closes it")
     ctx.close()
 
 
@@ -696,7 +688,7 @@ def main():
         page.keyboard.type("rw")
         check(page.evaluate("sim.engine.__mark") == 1, "typing a name doesn't reach the game")
         page.keyboard.press("Control+z")
-        page.click("#tpClose")
+        page.click("#edClose")
         page.keyboard.press("r")
         check(page.evaluate("sim.engine.__mark") is None, "R outside the editor restarts the game, as before")
 
@@ -787,7 +779,7 @@ def main():
         radio_tests(br, errors)
         install_tests(br, errors)
         toolbar_shots(br, errors)
-        tab_tests(br, errors)
+        panel_tests(br, errors)
         br.close()
     for e in errors:
         print("page error:", e)

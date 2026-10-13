@@ -12,7 +12,7 @@ A real 3D FPV quad simulator that runs **on your radio** as an EdgeTX Lua tool. 
 
 ## Install
 
-Download `StickTime-<version>-sdcard.zip` from the [latest release](https://github.com/juricabi/sticktime/releases/latest), copy what your radio needs from its `SCRIPTS/TOOLS/` to `/SCRIPTS/TOOLS/` on the SD card, and start it from **SYS → Tools**. The first start on a color radio takes a few seconds while EdgeTX compiles it. Or, in Chrome or Edge on a computer, let the [emulator](https://juricabi.github.io/sticktime/) do it: plug the radio in by USB, choose USB Storage on it, then open **Tracks & Install**, and on its **Radio / Install** tab use **Connect radio** and **Install / update**: it also brings an older version up to date and leaves your saves, tracks and ghosts alone.
+Download `StickTime-<version>-sdcard.zip` from the [latest release](https://github.com/juricabi/sticktime/releases/latest), copy what your radio needs from its `SCRIPTS/TOOLS/` to `/SCRIPTS/TOOLS/` on the SD card, and start it from **SYS → Tools**. The first start on a color radio takes a few seconds while EdgeTX compiles it. Or, in Chrome or Edge on a computer, let the [emulator](https://juricabi.github.io/sticktime/) do it: plug the radio in by USB, choose USB Storage on it, then click **Install** and use **Connect radio** and **Install / update**: it also brings an older version up to date and leaves your saves, tracks and ghosts alone.
 
 | Radio | Copy | EdgeTX |
 |---|---|---|
@@ -114,7 +114,7 @@ Play at **[juricabi.github.io/sticktime](https://juricabi.github.io/sticktime/)*
   to play your own files. Its own switch, level and next-song button, apart from Sound.
 - Keyboard or **Radio / gamepad** input, the gamepad and its axis mapping are remembered.
 - Real radio refresh (20 Hz) and the color screen's one-frame delay are on by default and can be turned off; B&W LCD ghosting is optional.
-- **Tracks & Install**: on the **Track editor** tab, lay out your own track on a map seen from above (gates in race order, hoops, flags, dive gates, structures, walls with gaps), from any of the eight tracks or a blank one. It checks that the game can take it, then **Fly it** starts it in the emulator, or **Save file** downloads `c1.txt` to `c8.txt` for your radio; in Chrome or Edge, **Send to radio** writes it straight to the radio's SD card (the radio plugged in by USB in USB Storage mode). The **Radio / Install** tab connects to that card, lists the tracks on it (open one in the editor, copy them either way) and, on the hosted site, installs StickTime on the radio or brings it up to date.
+- **Tracks**: the track editor. Lay out your own track on a map seen from above (gates in race order, hoops, flags, dive gates, structures, walls with gaps), from any of the eight tracks or a blank one. It checks that the game can take it, then **Fly it** starts it in the emulator, or **Save file** downloads `c1.txt` to `c8.txt` for your radio; in Chrome or Edge, **Send to radio** writes it straight to the radio's SD card (the radio plugged in by USB in USB Storage mode). **Install**, next to it, connects to that card, lists the tracks on it (open one in the editor, copy them either way) and, on the hosted site, installs StickTime on the radio or brings it up to date.
 - **Radio load** estimates the frame time on F2, F4 and H7 radios; **Open .lua** runs any other EdgeTX tool script.
 
 ## Under the hood

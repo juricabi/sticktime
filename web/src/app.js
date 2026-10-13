@@ -860,10 +860,10 @@
   // ---------------------------------------------------------- keyboard
   const held = new Set();
   let exitDown = 0, exitLongSent = false;
-  // form fields keep their keys, and so does the Tracks & Install panel (editor.js): what is typed
-  // there (R to turn a gate, Delete, Enter on a button, the arrows on its tabs) never flies the quad
+  // form fields keep their keys, and so do the Tracks and Install panels (editor.js): what is typed
+  // there (R to turn a gate, Delete, Enter on a button) never flies the quad
   const isField = (t) => t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA'
-    || (t.closest && t.closest('#tracksPanel') !== null));
+    || (t.closest && t.closest('#editor, #radioPanel') !== null));
   function key(name) { if (app.engine) app.engine.key(name); }
   window.addEventListener('keydown', (e) => {
     if (isField(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;

@@ -385,17 +385,17 @@
 
   // ---------------------------------------------------------------- the page
   const el = {};
-  for (const k of ['tracksBtn', 'tracksPanel', 'tabEditor', 'tabRadio', 'tpClose',
+  for (const k of ['tracksBtn', 'edClose', 'radioBtn', 'rpClose',
     'edTemplate', 'edOpen', 'edGateType', 'edAddGate', 'edAddBox', 'edAddWall',
     'edRotL', 'edRotR', 'edDup', 'edDel', 'edUndo', 'edRedo', 'edFit', 'edTrees', 'edMap', 'edMapBox', 'edReadout',
     'edSlot', 'edFly', 'edSave', 'edEmpty', 'edSize', 'edLite', 'edStatus', 'edName', 'edSeed', 'edShuffle', 'edTreesN',
     'edSel', 'edProblems', 'edProbPill', 'edOrder', 'edSend', 'edRadioLine', 'edRadioLineText', 'edRadioLink',
-    // the Radio / Install tab
+    // the Install panel
     'radioPanel', 'rpStatus', 'rpInstWait', 'rpTracksWait', 'rpInstSec', 'rpTracksSec',
     'edRadio', 'edRadioState', 'edConnect', 'edForget', 'edRadioNote', 'edRadioPanel', 'edRadioPath', 'edRadioSlots',
     'edRadioToEmu', 'edEmuToRadio', 'edInstallNote', 'edInstallPanel', 'edInstallHead', 'edEditions', 'edInstallHint',
     'edInstallGo', 'edInstallBar']) el[k] = $(k);
-  const rp = el.radioPanel, tp = el.tracksPanel;
+  const rp = el.radioPanel;
   const cv = el.edMap, ctx = cv.getContext('2d');
   const UP = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3.5 10l4.5-4.5 4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const DOWN = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3.5 6l4.5 4.5 4.5-4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -1411,7 +1411,7 @@
       return;
     }
     status('Flying ' + (name || ed.T.name.trim()) + ' (track ' + t + ', c' + slot + '.txt) in Practice.', 'ok');
-    closePanel(false);
+    closeEditor(false);
     const radio = $('radio');
     if (radio) radio.scrollIntoView({ block: 'center', behavior: reduced() ? 'auto' : 'smooth' });
     // the keys fly the quad again
@@ -1452,9 +1452,9 @@
     try { return window.top === window.self || !!window.top.location.href; } catch (e) { return false; }   // another site's frame
   }
   // dir: what the user picked; at: where that is on the card (the card, SCRIPTS, TOOLS, StickTimeTracks);
-  // panel: the Radio / Install tab is showing; listed: its list of the card's slots is read
+  // panel: the Install panel is open; listed: its list of the card's slots is read
   const radio = { ok: canPick(), state: 'off', dir: null, at: null, busy: false, panel: false, listed: false };
-  // what the Radio / Install tab says (the editor has its own line: status)
+  // what the Install panel says (the editor has its own line: status)
   function rstatus(msg, kind) {
     el.rpStatus.textContent = msg || '';
     el.rpStatus.className = 'ed-status' + (kind ? ' ' + kind : '');
@@ -1527,12 +1527,12 @@
     const has = async (f) => !!(tools && await child(tools, f, 'file'));
     if (await has('StickTime.lua') || await has('StickTimeBW.lua')) return '';
     if (await has('StickTimeLite.lua')) return ' Only StickTime Lite is on this card, and the Lite doesn\'t read custom tracks.';
-    return GAME ? ' StickTime isn\'t on this card yet: the Radio / Install tab puts it there.' : ' StickTime isn\'t on this card yet: copy it to /SCRIPTS/TOOLS/ too.';
+    return GAME ? ' StickTime isn\'t on this card yet: Install puts it there.' : ' StickTime isn\'t on this card yet: copy it to /SCRIPTS/TOOLS/ too.';
   }
 
   function renderRadio() {
     const on = radio.state === 'on', ask = radio.state === 'ask', name = radio.dir ? radio.dir.name : '';
-    // the editor: Send to radio (Connect radio… first), and a line to the Radio / Install tab
+    // the editor: Send to radio (Connect radio… first), and a line to the Install panel
     const bad = ed.probs.length > 0;
     el.edSend.hidden = el.edRadioLine.hidden = !radio.ok;
     el.edSend.textContent = on ? 'Send to radio' : ask ? 'Reconnect radio' : 'Connect radio…';
@@ -1724,69 +1724,53 @@
     const b = e.target.closest('[data-ropen]');
     const n = b ? +b.dataset.ropen : 0, t = radioSlots[n - 1];
     if (typeof t !== 'string') return;
-    openPanel('editor');
+    openEditor();
     openText(t, 'c' + n + '.txt from the radio', n);
   });
 
-  // ---------------------------------------------------------------- the Tracks & Install panel
-  // One panel (the Tracks & Install button), two tabs: the track editor and Radio / Install. The
-  // last tab used is where it opens next time (localStorage fpvsim.tracksTab).
-  const TAB_KEY = 'fpvsim.tracksTab';
-  let tab = 'editor', panelOpen = false;
-  try { if (localStorage.getItem(TAB_KEY) === 'radio') tab = 'radio'; } catch (e) { /* storage blocked */ }
-  function showTab(t, focus) {
-    if (ed.open && t !== 'editor') saveNow();
-    tab = t === 'radio' ? 'radio' : 'editor';
-    try { localStorage.setItem(TAB_KEY, tab); } catch (e) { /* storage blocked */ }
-    const isEd = tab === 'editor';
-    root.hidden = !isEd;
-    rp.hidden = isEd;
-    el.tabEditor.setAttribute('aria-selected', String(isEd));
-    el.tabRadio.setAttribute('aria-selected', String(!isEd));
-    el.tabEditor.tabIndex = isEd ? 0 : -1;
-    el.tabRadio.tabIndex = isEd ? -1 : 0;
-    ed.open = panelOpen && isEd;
-    radio.panel = panelOpen && !isEd;
-    if (ed.open) {
-      renderSlots();
-      selSig = probSig = orderSig = null;           // the editor's side panel afresh
-      resize();
-      refresh();
-      if (focus) cv.focus({ preventScroll: true });
-    } else if (radio.panel) {
-      renderRadio();
-      if (focus) (el.edConnect.hidden ? el.tabRadio : el.edConnect).focus({ preventScroll: true });
-      if (radio.state === 'on') job(refreshRadio);
-    }
-  }
-  function openPanel(t) {
-    const was = panelOpen;
-    panelOpen = true;
-    tp.hidden = false;
+  // ---------------------------------------------------------------- the two panels
+  // Tracks (the track editor) and Install (the radio's SD card), each with its toolbar button, in the
+  // same place above the emulator: opening one closes the other
+  function openEditor() {
+    if (radio.panel) closeRadio(false);
+    ed.open = true;
+    root.hidden = false;
     el.tracksBtn.setAttribute('aria-expanded', 'true');
-    showTab(t || tab, true);
-    if (!was || t) intoView(tp);
+    renderSlots();
+    selSig = probSig = orderSig = null;           // the side panel afresh
+    resize();
+    refresh();
+    intoView(root);
+    cv.focus({ preventScroll: true });
   }
-  function closePanel(focusButton) {
+  function closeEditor(focusButton) {
     if (ed.open) saveNow();
-    panelOpen = ed.open = radio.panel = false;
-    tp.hidden = true;
+    ed.open = false;
+    root.hidden = true;
     el.tracksBtn.setAttribute('aria-expanded', 'false');
     if (focusButton) el.tracksBtn.focus();
   }
-  el.tracksBtn.addEventListener('click', () => (panelOpen ? closePanel(false) : openPanel()));
-  el.tpClose.addEventListener('click', () => closePanel(true));
-  el.tabEditor.addEventListener('click', () => showTab('editor', false));
-  el.tabRadio.addEventListener('click', () => showTab('radio', false));
-  // the tabs as a tab list: the arrows (and Home, End) move between them
-  el.tabEditor.parentNode.addEventListener('keydown', (e) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
-    e.preventDefault();
-    const t = e.key === 'Home' ? 'editor' : e.key === 'End' ? 'radio' : tab === 'editor' ? 'radio' : 'editor';
-    showTab(t, false);
-    (t === 'editor' ? el.tabEditor : el.tabRadio).focus();
-  });
-  el.edRadioLink.addEventListener('click', () => showTab('radio', true));
+  function openRadio() {
+    if (ed.open) closeEditor(false);
+    radio.panel = true;
+    rp.hidden = false;
+    el.radioBtn.setAttribute('aria-expanded', 'true');
+    renderRadio();
+    intoView(rp);
+    (el.edConnect.hidden ? el.rpClose : el.edConnect).focus({ preventScroll: true });
+    if (radio.state === 'on') job(refreshRadio);
+  }
+  function closeRadio(focusButton) {
+    radio.panel = false;
+    rp.hidden = true;
+    el.radioBtn.setAttribute('aria-expanded', 'false');
+    if (focusButton) el.radioBtn.focus();
+  }
+  el.tracksBtn.addEventListener('click', () => (ed.open ? closeEditor(false) : openEditor()));
+  el.edClose.addEventListener('click', () => closeEditor(true));
+  el.radioBtn.addEventListener('click', () => (radio.panel ? closeRadio(false) : openRadio()));
+  el.rpClose.addEventListener('click', () => closeRadio(true));
+  el.edRadioLink.addEventListener('click', openRadio);
   el.edRadioToEmu.addEventListener('click', radioToEmu);
   el.edEmuToRadio.addEventListener('click', emuToRadio);
   // the card picked on an earlier visit: back at once if the browser still allows it, else Reconnect

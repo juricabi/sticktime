@@ -90,7 +90,7 @@ button, select, input { font: inherit; color: inherit; }
 .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 /* groups that wrap as a whole: screen and script, the buttons, sound and music, the .lua pair */
 .ctl-group { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; min-width: 0; }
-#radioSel { width: 195px; max-width: 100%; }
+#radioSel { width: 176px; max-width: 100%; }
 #scriptSel { width: 190px; max-width: 100%; }
 .btn-pair { gap: 0; flex-wrap: nowrap; }
 .btn-pair > .btn:first-child { border-radius: 8px 0 0 8px; }
@@ -113,13 +113,13 @@ select { max-width: 270px; }
   background: none; color: inherit; cursor: pointer; }
 .sound .mute:hover { background: var(--accent-soft); }
 .sound .mute .cross { display: none; }
-.sound input[type="range"] { width: 72px; accent-color: var(--accent); cursor: pointer; }
+.sound input[type="range"] { width: 60px; accent-color: var(--accent); cursor: pointer; }
 .sound output { min-width: 3.2em; text-align: right; font: 500 12px/1 var(--font-mono); color: var(--muted); }
 .sound.snd-off .wave { display: none; }
 .sound.snd-off .cross { display: inline; }
 .sound.snd-off input[type="range"] { accent-color: var(--muted); opacity: .55; }
 .sound.snd-off output { opacity: .7; }
-.music input[type="range"] { width: 56px; }
+.music input[type="range"] { width: 48px; }
 .music.snd-off svg { opacity: .55; }
 .music .songs { position: relative; overflow: hidden; margin-left: 2px; padding: 3px 7px; border-radius: 6px;
   font: 500 12px/1 var(--font-display); color: var(--muted); cursor: pointer; }
@@ -317,23 +317,12 @@ footer.credits a { color: inherit; }
 .ed-rstate.on { color: var(--ok); }
 .ed-rstate.on::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: currentColor; }
 .ed-rnote { margin: 6px 0 0; }
-/* the Tracks & Install panel: two tabs, the track editor and Radio / Install */
-.tp-bar { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; margin: -4px 0 14px; border-bottom: 1px solid var(--line); }
-.tabs { display: flex; gap: 2px; min-width: 0; }
-.tabs [role="tab"] { margin-bottom: -1px; padding: 8px 12px 9px; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--muted);
-  font: 700 13px/1.2 var(--font-display); letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
-.tabs [role="tab"]:hover { color: var(--fg); }
-.tabs [role="tab"][aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); }
-.tp-bar .btn { margin-bottom: 6px; }
-.tp-sub { margin: 0; }
-#radioPanel > .tp-sub { margin-bottom: 18px; }
-.lbl-short { display: none; }
-@media (max-width: 760px) { .lbl-long { display: none; } .lbl-short { display: inline; } }
 .ed-rline { margin: 14px 2px 0; line-height: 1.5; }
 .linkbtn { padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 .linkbtn:hover { color: var(--fg); }
-/* the Radio SD panel: the connection and the game on the left, the tracks on the right */
+/* the Install panel: the connection and the game on the left, the tracks on the right */
 .rp-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 40px; align-items: start; }
+#radioPanel > .ed-head { margin-bottom: 18px; }
 #radioPanel .ed-sec { padding: 18px 0; }
 #radioPanel .ed-sec:first-child { padding-top: 0; }
 #radioPanel .ed-sec h3 { margin-bottom: 12px; }
@@ -438,7 +427,8 @@ footer.credits a { color: inherit; }
     </div>
     <div class="ctl-group">
     <button class="btn" id="restartBtn" type="button" title="Restart the script (R)">Restart</button>
-    <button class="btn" id="tracksBtn" type="button" aria-expanded="false" aria-controls="tracksPanel" title="Make your own tracks, and put StickTime and your tracks on the radio's SD card"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="5" cy="19.5" r="2" fill="currentColor"/><path d="M7.5 19.5h7a3.5 3.5 0 0 0 0-7h-6a3.5 3.5 0 0 1 0-7h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="2.5 2.6"/><path d="M16 9.5V1.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16 2.2h5.5l-1.6 2 1.6 2H16" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg><span class="lbl-long">Tracks &amp; Install</span><span class="lbl-short">Tracks</span></button>
+    <button class="btn" id="tracksBtn" type="button" aria-expanded="false" aria-controls="editor" title="Make your own tracks: the track editor"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="5" cy="19.5" r="2" fill="currentColor"/><path d="M7.5 19.5h7a3.5 3.5 0 0 0 0-7h-6a3.5 3.5 0 0 1 0-7h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="2.5 2.6"/><path d="M16 9.5V1.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16 2.2h5.5l-1.6 2 1.6 2H16" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>Tracks</button>
+    <button class="btn" id="radioBtn" type="button" aria-expanded="false" aria-controls="radioPanel" title="The radio's SD card over USB: install or update StickTime, your tracks on the radio"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 2.5h8.5A1.5 1.5 0 0 1 19 4v16a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 20V6.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 8.5v8M8.8 13.5l3.2 3.2 3.2-3.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Install</button>
     </div>
     <div class="ctl-group">
     <div class="btn sound" id="soundBox" title="Sound volume (wheel: 5% steps)">
@@ -461,20 +451,13 @@ footer.credits a { color: inherit; }
   </div>
 </header>
 
-<section class="card editor tp" id="tracksPanel" hidden aria-label="Tracks and install">
-<div class="tp-bar">
-  <div class="tabs" role="tablist" aria-label="Tracks and install">
-    <button type="button" role="tab" id="tabEditor" aria-selected="true" aria-controls="editor">Track editor</button>
-    <button type="button" role="tab" id="tabRadio" aria-selected="false" aria-controls="radioPanel" tabindex="-1">Radio / Install</button>
-  </div>
-  <button class="btn" id="tpClose" type="button" title="Close (your work is kept)">Close</button>
-</div>
-<div class="tp-pane" id="editor" role="tabpanel" aria-labelledby="tabEditor">
+<section class="card editor" id="editor" hidden aria-labelledby="edTitle">
   <div class="ed-head">
-    <p class="note tp-sub">Your tracks are 9 to 16 in the game.</p>
+    <h2 id="edTitle">Track editor <small>your tracks are 9 to 16 in the game</small></h2>
     <div class="ed-actions">
       <label class="field"><span>Start from</span><select id="edTemplate" aria-label="Start from a built-in track or a blank one"></select></label>
       <label class="btn file-btn" title="Open a track file (c1.txt to c8.txt)">Open file<input type="file" id="edOpen" accept=".txt,text/plain"></label>
+      <button class="btn" id="edClose" type="button" title="Close the editor (your work is kept)">Close</button>
     </div>
   </div>
   <div class="ed-grid">
@@ -511,7 +494,7 @@ footer.credits a { color: inherit; }
         <button class="btn" id="edEmpty" type="button" title="Take this slot's track off the emulator's SD card">Empty slot</button>
         <span class="ed-size" id="edSize"></span>
       </div>
-      <p class="note ed-rline" id="edRadioLine" hidden><span id="edRadioLineText"></span> <button class="linkbtn" id="edRadioLink" type="button">Tracks on the radio, install StickTime: Radio / Install</button></p>
+      <p class="note ed-rline" id="edRadioLine" hidden><span id="edRadioLineText"></span> <button class="linkbtn" id="edRadioLink" type="button">Your tracks on the radio, install StickTime: Install</button></p>
       <p class="note warn ed-lite" id="edLite" hidden></p>
       <p class="ed-status" id="edStatus" role="status" aria-live="polite"></p>
     </div>
@@ -541,7 +524,7 @@ footer.credits a { color: inherit; }
         <summary>How to use on the radio</summary>
         <ol>
           <li><strong>Save file</strong> downloads the track as <code>c1.txt</code> (the slot's number).</li>
-          <li>On the radio's SD card, make the folder <code>/SCRIPTS/TOOLS/StickTimeTracks/</code> and copy the file into it. In Chrome or Edge on a computer, <strong>Send to radio</strong> does both: the radio plugged in by USB, in USB Storage mode (the <strong>Radio / Install</strong> tab also installs the game).</li>
+          <li>On the radio's SD card, make the folder <code>/SCRIPTS/TOOLS/StickTimeTracks/</code> and copy the file into it. In Chrome or Edge on a computer, <strong>Send to radio</strong> does both: the radio plugged in by USB, in USB Storage mode (<strong>Install</strong>, next to Tracks, also installs the game).</li>
           <li>Up to 8 tracks, <code>c1.txt</code> to <code>c8.txt</code>: they come after the 8 built-in ones, as tracks 9 to 16 in the track menu.</li>
           <li>StickTime and StickTime BW read them; StickTime Lite doesn't.</li>
           <li>Best times are kept while the track stays the same: any change to it starts them over.</li>
@@ -549,9 +532,15 @@ footer.credits a { color: inherit; }
       </details>
     </div>
   </div>
-</div>
-<div class="tp-pane" id="radioPanel" role="tabpanel" aria-labelledby="tabRadio" hidden>
-  <p class="note tp-sub">The radio's SD card over USB: install or update StickTime on it, and your tracks on the radio.</p>
+</section>
+
+<section class="card editor rpanel" id="radioPanel" hidden aria-labelledby="rpTitle">
+  <div class="ed-head">
+    <h2 id="rpTitle">Radio &amp; install <small>the radio's SD card over USB: StickTime and your tracks on it</small></h2>
+    <div class="ed-actions">
+      <button class="btn" id="rpClose" type="button" title="Close (the card stays connected)">Close</button>
+    </div>
+  </div>
   <div class="rp-grid">
     <div class="rp-col">
       <section class="ed-sec" aria-labelledby="rpConnH">
@@ -592,7 +581,6 @@ footer.credits a { color: inherit; }
     </section>
   </div>
   <p class="ed-status" id="rpStatus" role="status" aria-live="polite"></p>
-</div>
 </section>
 
 <div class="layout">
@@ -9464,10 +9452,10 @@ const ROBOTO = { r: "d09GMgABAAAAAFV8ABIAAAAAsBgAAFUTAAEAAAAAAAAAAAAAAAAAAAAAAAA
   // ---------------------------------------------------------- keyboard
   const held = new Set();
   let exitDown = 0, exitLongSent = false;
-  // form fields keep their keys, and so does the Tracks & Install panel (editor.js): what is typed
-  // there (R to turn a gate, Delete, Enter on a button, the arrows on its tabs) never flies the quad
+  // form fields keep their keys, and so do the Tracks and Install panels (editor.js): what is typed
+  // there (R to turn a gate, Delete, Enter on a button) never flies the quad
   const isField = (t) => t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA'
-    || (t.closest && t.closest('#tracksPanel') !== null));
+    || (t.closest && t.closest('#editor, #radioPanel') !== null));
   function key(name) { if (app.engine) app.engine.key(name); }
   window.addEventListener('keydown', (e) => {
     if (isField(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
@@ -10336,17 +10324,17 @@ const GAME_FILES = 'sdcard/';
 
   // ---------------------------------------------------------------- the page
   const el = {};
-  for (const k of ['tracksBtn', 'tracksPanel', 'tabEditor', 'tabRadio', 'tpClose',
+  for (const k of ['tracksBtn', 'edClose', 'radioBtn', 'rpClose',
     'edTemplate', 'edOpen', 'edGateType', 'edAddGate', 'edAddBox', 'edAddWall',
     'edRotL', 'edRotR', 'edDup', 'edDel', 'edUndo', 'edRedo', 'edFit', 'edTrees', 'edMap', 'edMapBox', 'edReadout',
     'edSlot', 'edFly', 'edSave', 'edEmpty', 'edSize', 'edLite', 'edStatus', 'edName', 'edSeed', 'edShuffle', 'edTreesN',
     'edSel', 'edProblems', 'edProbPill', 'edOrder', 'edSend', 'edRadioLine', 'edRadioLineText', 'edRadioLink',
-    // the Radio / Install tab
+    // the Install panel
     'radioPanel', 'rpStatus', 'rpInstWait', 'rpTracksWait', 'rpInstSec', 'rpTracksSec',
     'edRadio', 'edRadioState', 'edConnect', 'edForget', 'edRadioNote', 'edRadioPanel', 'edRadioPath', 'edRadioSlots',
     'edRadioToEmu', 'edEmuToRadio', 'edInstallNote', 'edInstallPanel', 'edInstallHead', 'edEditions', 'edInstallHint',
     'edInstallGo', 'edInstallBar']) el[k] = $(k);
-  const rp = el.radioPanel, tp = el.tracksPanel;
+  const rp = el.radioPanel;
   const cv = el.edMap, ctx = cv.getContext('2d');
   const UP = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3.5 10l4.5-4.5 4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const DOWN = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3.5 6l4.5 4.5 4.5-4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -11362,7 +11350,7 @@ const GAME_FILES = 'sdcard/';
       return;
     }
     status('Flying ' + (name || ed.T.name.trim()) + ' (track ' + t + ', c' + slot + '.txt) in Practice.', 'ok');
-    closePanel(false);
+    closeEditor(false);
     const radio = $('radio');
     if (radio) radio.scrollIntoView({ block: 'center', behavior: reduced() ? 'auto' : 'smooth' });
     // the keys fly the quad again
@@ -11403,9 +11391,9 @@ const GAME_FILES = 'sdcard/';
     try { return window.top === window.self || !!window.top.location.href; } catch (e) { return false; }   // another site's frame
   }
   // dir: what the user picked; at: where that is on the card (the card, SCRIPTS, TOOLS, StickTimeTracks);
-  // panel: the Radio / Install tab is showing; listed: its list of the card's slots is read
+  // panel: the Install panel is open; listed: its list of the card's slots is read
   const radio = { ok: canPick(), state: 'off', dir: null, at: null, busy: false, panel: false, listed: false };
-  // what the Radio / Install tab says (the editor has its own line: status)
+  // what the Install panel says (the editor has its own line: status)
   function rstatus(msg, kind) {
     el.rpStatus.textContent = msg || '';
     el.rpStatus.className = 'ed-status' + (kind ? ' ' + kind : '');
@@ -11478,12 +11466,12 @@ const GAME_FILES = 'sdcard/';
     const has = async (f) => !!(tools && await child(tools, f, 'file'));
     if (await has('StickTime.lua') || await has('StickTimeBW.lua')) return '';
     if (await has('StickTimeLite.lua')) return ' Only StickTime Lite is on this card, and the Lite doesn\'t read custom tracks.';
-    return GAME ? ' StickTime isn\'t on this card yet: the Radio / Install tab puts it there.' : ' StickTime isn\'t on this card yet: copy it to /SCRIPTS/TOOLS/ too.';
+    return GAME ? ' StickTime isn\'t on this card yet: Install puts it there.' : ' StickTime isn\'t on this card yet: copy it to /SCRIPTS/TOOLS/ too.';
   }
 
   function renderRadio() {
     const on = radio.state === 'on', ask = radio.state === 'ask', name = radio.dir ? radio.dir.name : '';
-    // the editor: Send to radio (Connect radio… first), and a line to the Radio / Install tab
+    // the editor: Send to radio (Connect radio… first), and a line to the Install panel
     const bad = ed.probs.length > 0;
     el.edSend.hidden = el.edRadioLine.hidden = !radio.ok;
     el.edSend.textContent = on ? 'Send to radio' : ask ? 'Reconnect radio' : 'Connect radio…';
@@ -11675,69 +11663,53 @@ const GAME_FILES = 'sdcard/';
     const b = e.target.closest('[data-ropen]');
     const n = b ? +b.dataset.ropen : 0, t = radioSlots[n - 1];
     if (typeof t !== 'string') return;
-    openPanel('editor');
+    openEditor();
     openText(t, 'c' + n + '.txt from the radio', n);
   });
 
-  // ---------------------------------------------------------------- the Tracks & Install panel
-  // One panel (the Tracks & Install button), two tabs: the track editor and Radio / Install. The
-  // last tab used is where it opens next time (localStorage fpvsim.tracksTab).
-  const TAB_KEY = 'fpvsim.tracksTab';
-  let tab = 'editor', panelOpen = false;
-  try { if (localStorage.getItem(TAB_KEY) === 'radio') tab = 'radio'; } catch (e) { /* storage blocked */ }
-  function showTab(t, focus) {
-    if (ed.open && t !== 'editor') saveNow();
-    tab = t === 'radio' ? 'radio' : 'editor';
-    try { localStorage.setItem(TAB_KEY, tab); } catch (e) { /* storage blocked */ }
-    const isEd = tab === 'editor';
-    root.hidden = !isEd;
-    rp.hidden = isEd;
-    el.tabEditor.setAttribute('aria-selected', String(isEd));
-    el.tabRadio.setAttribute('aria-selected', String(!isEd));
-    el.tabEditor.tabIndex = isEd ? 0 : -1;
-    el.tabRadio.tabIndex = isEd ? -1 : 0;
-    ed.open = panelOpen && isEd;
-    radio.panel = panelOpen && !isEd;
-    if (ed.open) {
-      renderSlots();
-      selSig = probSig = orderSig = null;           // the editor's side panel afresh
-      resize();
-      refresh();
-      if (focus) cv.focus({ preventScroll: true });
-    } else if (radio.panel) {
-      renderRadio();
-      if (focus) (el.edConnect.hidden ? el.tabRadio : el.edConnect).focus({ preventScroll: true });
-      if (radio.state === 'on') job(refreshRadio);
-    }
-  }
-  function openPanel(t) {
-    const was = panelOpen;
-    panelOpen = true;
-    tp.hidden = false;
+  // ---------------------------------------------------------------- the two panels
+  // Tracks (the track editor) and Install (the radio's SD card), each with its toolbar button, in the
+  // same place above the emulator: opening one closes the other
+  function openEditor() {
+    if (radio.panel) closeRadio(false);
+    ed.open = true;
+    root.hidden = false;
     el.tracksBtn.setAttribute('aria-expanded', 'true');
-    showTab(t || tab, true);
-    if (!was || t) intoView(tp);
+    renderSlots();
+    selSig = probSig = orderSig = null;           // the side panel afresh
+    resize();
+    refresh();
+    intoView(root);
+    cv.focus({ preventScroll: true });
   }
-  function closePanel(focusButton) {
+  function closeEditor(focusButton) {
     if (ed.open) saveNow();
-    panelOpen = ed.open = radio.panel = false;
-    tp.hidden = true;
+    ed.open = false;
+    root.hidden = true;
     el.tracksBtn.setAttribute('aria-expanded', 'false');
     if (focusButton) el.tracksBtn.focus();
   }
-  el.tracksBtn.addEventListener('click', () => (panelOpen ? closePanel(false) : openPanel()));
-  el.tpClose.addEventListener('click', () => closePanel(true));
-  el.tabEditor.addEventListener('click', () => showTab('editor', false));
-  el.tabRadio.addEventListener('click', () => showTab('radio', false));
-  // the tabs as a tab list: the arrows (and Home, End) move between them
-  el.tabEditor.parentNode.addEventListener('keydown', (e) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
-    e.preventDefault();
-    const t = e.key === 'Home' ? 'editor' : e.key === 'End' ? 'radio' : tab === 'editor' ? 'radio' : 'editor';
-    showTab(t, false);
-    (t === 'editor' ? el.tabEditor : el.tabRadio).focus();
-  });
-  el.edRadioLink.addEventListener('click', () => showTab('radio', true));
+  function openRadio() {
+    if (ed.open) closeEditor(false);
+    radio.panel = true;
+    rp.hidden = false;
+    el.radioBtn.setAttribute('aria-expanded', 'true');
+    renderRadio();
+    intoView(rp);
+    (el.edConnect.hidden ? el.rpClose : el.edConnect).focus({ preventScroll: true });
+    if (radio.state === 'on') job(refreshRadio);
+  }
+  function closeRadio(focusButton) {
+    radio.panel = false;
+    rp.hidden = true;
+    el.radioBtn.setAttribute('aria-expanded', 'false');
+    if (focusButton) el.radioBtn.focus();
+  }
+  el.tracksBtn.addEventListener('click', () => (ed.open ? closeEditor(false) : openEditor()));
+  el.edClose.addEventListener('click', () => closeEditor(true));
+  el.radioBtn.addEventListener('click', () => (radio.panel ? closeRadio(false) : openRadio()));
+  el.rpClose.addEventListener('click', () => closeRadio(true));
+  el.edRadioLink.addEventListener('click', openRadio);
   el.edRadioToEmu.addEventListener('click', radioToEmu);
   el.edEmuToRadio.addEventListener('click', emuToRadio);
   // the card picked on an earlier visit: back at once if the browser still allows it, else Reconnect
