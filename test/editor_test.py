@@ -119,6 +119,28 @@ def open_file(page, path):
     return page.evaluate(said)
 
 
+# the slots table (Tracks > Open): a row per slot, its cells' text (slot, emulator, copy, radio)
+ROWS = "[...document.querySelectorAll('#edSlotList tbody tr')].map((r) => [...r.cells].map((c) => c.textContent.replace(/\\s+/g, ' ').trim()))"
+
+
+def my_tracks(page):
+    """Tracks > My tracks (opened when it isn't), the radio's slots read: the table's rows"""
+    if page.is_hidden("#editor"):
+        page.click("#tracksBtn")
+    if page.is_hidden("#edMine"):
+        page.click("#edMineBtn")
+    radio_done(page)
+    return page.evaluate(ROWS)
+
+
+def reopen(page):
+    """My tracks closed and opened again: the table drawn afresh (after a file put on a card or the
+    emulator's SD card behind the page's back)"""
+    if page.is_visible("#edMine"):
+        page.click("#edMineBtn")
+    return my_tracks(page)
+
+
 def start_from(page, name):
     """Open: a copy of a built-in track (Tracks and Open opened when they aren't)"""
     if page.is_hidden("#editor"):
@@ -233,8 +255,8 @@ def radio_tests(br, errors):
     note = page.inner_text("#edRadioNote")
     check(page.is_visible("#edConnect") and page.is_hidden("#editor") and "USB Storage" in note and "Eject" in note,
           "radio: the Radio SD panel: Connect radio… and what to do on the radio")
-    check("Connect the radio's SD card" in page.inner_text("#rpTracksWait") and "Connect the radio's SD card" in page.inner_text("#rpInstWait"),
-          "radio: tracks and install wait for the card")
+    check("Connect the radio's SD card" in page.inner_text("#rpInstWait") and page.is_visible("#rpShowTracks"),
+          "radio: install waits for the card; Show your tracks points to the track editor")
 
     # a folder that isn't the card
     page.evaluate(PICK, "Documents")
@@ -248,8 +270,7 @@ def radio_tests(br, errors):
     check(r["state"] == "on" and r["at"] == "card" and page.inner_text("#edRadioState") == "RADIO-SD connected",
           f"radio: the card connected: {page.inner_text('#edRadioState')!r}")
     check(page.evaluate("window.__opts") == {"mode": "readwrite", "id": "sticktime-radio"}, "radio: the picker asked for read and write")
-    check(page.inner_text("#edRadioSlots").count("empty") == 8 and page.is_visible("#edEditions"),
-          "radio: the panel lists the card's 8 slots and the editions at once")
+    check(page.is_visible("#edEditions"), "radio: the panel shows the editions at once")
 
     # the Tracks panel: Send to radio over the same connection
     page.click("#tracksBtn")
@@ -287,31 +308,44 @@ def radio_tests(br, errors):
     start_from(page, "Meadow")
     meadow = page.evaluate("sim.editor.file()")
 
-    # the radio's tracks (the Install panel), one opened in the editor (CR LF on the card)
+    # the radio's tracks: Install's Show your tracks, the slots table (Tracks > Open), one opened in
+    # the editor (CR LF on the card)
     page.evaluate(CARD_WRITE, [TRACKS + "3.txt", saved.replace("\n", "\r\n")])
     page.click("#radioBtn")
     radio_done(page)
-    rows = page.inner_text("#edRadioSlots")
-    check(page.is_hidden("#editor") and "c1 · track 9 · My Bando" in rows and "c3 · track 11 · My Grand Prix" in rows and rows.count("empty") == 6,
-          "radio: the panel lists the card's slots by name")
-    page.click('[data-ropen="3"]')
-    check(page.is_visible("#editor") and page.is_hidden("#radioPanel") and page.input_value("#edName") == "My Grand Prix"
-          and page.input_value("#edSlot") == "3" and page.evaluate("sim.editor.file()") == saved, "radio: Open in editor: the editor on slot 3")
+    page.click("#rpShowTracks")
+    rows = my_tracks(page)
+    check(page.is_hidden("#radioPanel") and page.is_visible("#edMine") and rows[0][3].startswith("My Bando") and rows[2][3].startswith("My Grand Prix")
+          and [r[3] for r in rows].count("") == 0 and sum(r[3] == "—" for r in rows) == 6, f"radio: Show your tracks: the slots table, the radio's by name: {rows[:3]}")
+    page.click("#edGalBtn")
+    page.click('[data-sopen="r3"]')
+    check(page.is_visible("#edMap") and page.is_hidden("#edGallery") and page.input_value("#edName") == "My Grand Prix"
+          and page.input_value("#edSlot") == "3" and page.evaluate("sim.editor.file()") == saved, "radio: Open (the radio's c3): the editor on slot 3")
     # both ways
-    radio_panel(page)
-    page.click("#edRadioToEmu")
+    my_tracks(page)
+    page.click("#edAllFrom")
     radio_done(page)
     check(page.evaluate(f"sim.app.sd.get('{SLOT}1.txt')") == bando and page.evaluate(f"sim.app.sd.get('{SLOT}3.txt')") == saved.replace("\n", "\r\n"),
           "radio: the radio's tracks copied into the emulator's slots")
-    check(page.inner_text("#rpStatus").startswith("Copied c1 and c3 from the radio"), f"radio: {page.inner_text('#rpStatus')!r}")
+    check(page.inner_text("#edMineStatus").startswith("Copied c1 and c3 from the radio"), f"radio: {page.inner_text('#edMineStatus')!r}")
     page.evaluate("(t) => sim.writeSD('/SCRIPTS/TOOLS/StickTimeTracks/c5.txt', t)", meadow)
-    page.click("#edEmuToRadio")
+    rows = reopen(page)
+    check(rows[4][2] == "→" and rows[0][2] == "=", f"radio: a slot that differs gets its copy arrow, the same track '=': {rows[4]}, {rows[0]}")
+    page.click("#edAllTo")
     radio_done(page)
     check(page.evaluate(CARD_FILE, TRACKS + "5.txt") == meadow and page.evaluate(CARD_FILE, TRACKS + "1.txt") == bando,
           "radio: the emulator's tracks sent to the card")
-    check(page.inner_text("#rpStatus").startswith("Sent c5 to the radio."), f"radio: only what changed is written: {page.inner_text('#rpStatus')!r}")
+    check(page.inner_text("#edMineStatus").startswith("Sent c5 to the radio."), f"radio: only what changed is written: {page.inner_text('#edMineStatus')!r}")
+    # one slot across: the radio's c5 removed, then the emulator's c5 copied back with its arrow
+    page.evaluate(CARD_WRITE, [TRACKS + "5.txt", bando])
+    reopen(page)
+    page.once("dialog", lambda dl: dl.accept())
+    page.click('[data-scopy="r5"]')
+    radio_done(page)
+    check(page.evaluate(CARD_FILE, TRACKS + "5.txt") == meadow and page.inner_text("#edMineStatus").startswith("Copied c5 to the radio"),
+          f"radio: → copies one slot to the radio (asked first): {page.inner_text('#edMineStatus')!r}")
     page.mouse.move(0, 0)
-    shot_clip(page, OUT / "radio_tracks.png", "radioPanel")
+    shot_clip(page, OUT / "radio_tracks.png")
 
     # the card remembered on the next visit; Disconnect forgets it
     page.reload()
@@ -539,7 +573,8 @@ def install_tests(br, errors):
     states = page.inner_text("#edEditions")
     check(page.evaluate(PICKED) == ["bw", "lite"] and "will be updated (1.6.5 on the card), removes core.luac" in states
           and "will be updated (1.6.5 on the card), removes t9.txt" in states, f"install: B&W and Lite found and picked, older, what goes named: {states!r}")
-    check("c1 · track 9 · My Loop" in page.inner_text("#edRadioSlots"), "install: the panel lists the card's tracks beside it")
+    check(my_tracks(page)[0][3].startswith("My Loop"), "install: the card's tracks are in Tracks > My tracks")
+    radio_panel(page)
     page.mouse.move(0, 0)
     shot_clip(page, OUT / "radio_panel_light.png", "radioPanel")
     page.emulate_media(color_scheme="dark")
@@ -756,15 +791,16 @@ def slot_tests(br, errors, tmp):
     page.click("#edFly")
     check(not dlg.take(), "slots: the same track into its slot again: no question")
 
-    # Empty slot asks first
-    page.click("#tracksBtn")
+    # Remove (My tracks, the emulator's c1) asks first
+    my_tracks(page)
     dlg.answer = False
-    page.click("#edEmpty")
+    page.click('[data-sdel="e1"]')
     q = dlg.take()
     check(len(q) == 1 and "Remove c1 from the emulator" in q[0] and '"My Bando"' in q[0] and emu(page, 1) == bando, f"slots: Remove (the emulator's) asks first: {q}")
     dlg.answer = True
-    page.click("#edEmpty")
+    page.click('[data-sdel="e1"]')
     check(len(dlg.take()) == 1 and emu(page, 1) is None and "c1 · track 9 · empty" in page.inner_text("#edSlot"), "slots: ... Yes empties it")
+    page.click("#edMineBtn")                                   # (the map again)
 
     # the work in progress, in no slot and no file: Start from and Open file ask first
     click_map(page, 0, 0)                                      # gate 1
@@ -832,19 +868,23 @@ def bad_slot_tests(br, errors):
     connect_card(page, "CARD", {"SCRIPTS/TOOLS/StickTime.lua": "-- the game\n", "SCRIPTS/TOOLS/StickTimeTracks/c1.txt": good,
                                 "SCRIPTS/TOOLS/StickTimeTracks/c2.txt": big, "SCRIPTS/TOOLS/StickTimeTracks/c4.txt": JUNK,
                                 "SCRIPTS/TOOLS/StickTimeTracks/README.txt": "notes\n", "SCRIPTS/TOOLS/StickTimeGhosts/c3.txt": "ghost 1 2 3\n"})
-    rows = page.inner_text("#edRadioSlots")
-    check("c2 · track 10 · too big to be a track" in rows and "c4 · track 12 · can't be read" in rows and "c1 · track 9 · Radio GP" in rows
-          and page.locator("[data-ropen]").count() == 1, f"radio slots: too big and unreadable files marked, only c1 to open: {rows!r}")
-    page.click("#edRadioToEmu")
+    rows = my_tracks(page)
+    page.click("#edGalBtn")
+    opens = page.locator("#edOpenList [data-sopen^='r']").count()
+    my_tracks(page)
+    check(rows[1][3].startswith("too big to be a track") and rows[3][3].startswith("can't be read") and rows[0][3].startswith("Radio GP")
+          and opens == 1, f"radio slots: too big and unreadable files marked, only c1 to open: {rows[:4]}")
+    page.click("#edAllFrom")
     radio_done(page)
-    st = page.inner_text("#rpStatus")
+    st = page.inner_text("#edMineStatus")
     check(emu(page, 1) == good and emu(page, 2) is None and emu(page, 4) is None and "c2 (too big to be a track)" in st and "c4 (can't be read)" in st,
           f"radio slots: only c1 copied into the emulator, the others named: {st!r}")
     page.evaluate(f"sim.writeSD('{SLOT}3.txt', {good2!r})")
     page.evaluate(f"sim.writeSD('{SLOT}6.txt', {JUNK!r})")
-    page.click("#edEmuToRadio")
+    reopen(page)
+    page.click("#edAllTo")
     radio_done(page)
-    st = page.inner_text("#rpStatus")
+    st = page.inner_text("#edMineStatus")
     check(page.evaluate(CARD_FILE, "CARD/SCRIPTS/TOOLS/StickTimeTracks/c3.txt") == good2 and page.evaluate(CARD_FILE, "CARD/SCRIPTS/TOOLS/StickTimeTracks/c6.txt") is None
           and "c6 (can't be read)" in st and st.startswith("Sent c3 to the radio."), f"radio slots: the emulator's unreadable c6 not sent, named: {st!r}")
     # Remove: one slot's file off the card, asked first (No keeps it); the rest of the card untouched
@@ -852,20 +892,20 @@ def bad_slot_tests(br, errors):
     tt = "CARD/SCRIPTS/TOOLS/"
     kept = {p: page.evaluate(CARD_HASH, tt + p) for p in ("StickTime.lua", "StickTimeTracks/c1.txt", "StickTimeTracks/c2.txt", "StickTimeTracks/c4.txt",
                                                          "StickTimeTracks/README.txt", "StickTimeGhosts/c3.txt")}
-    check(page.locator("[data-rdel]").count() == 4, "radio slots: Remove on each filled slot (the unreadable and too big ones too)")
-    page.click('[data-rdel="3"]')
+    check(page.locator("[data-sdel^='r']").count() == 4, "radio slots: Remove on each filled slot (the unreadable and too big ones too)")
+    page.click('[data-sdel="r3"]')
     q = dlg.take()
     check(q == ['Remove "Mine GP" (track 11) from the radio? Its best times stay in the radio\'s save until a different track is put in that slot.']
           and page.evaluate(CARD_FILE, tt + "StickTimeTracks/c3.txt") == good2, f"radio slots: Remove asks first, naming the track; No keeps it: {q}")
     dlg.answer = True
-    page.click('[data-rdel="3"]')
+    page.click('[data-sdel="r3"]')
     radio_done(page)
-    st, rows = page.inner_text("#rpStatus"), page.inner_text("#edRadioSlots")
+    st, rows = page.inner_text("#edMineStatus"), page.evaluate(ROWS)
     check(len(dlg.take()) == 1 and page.evaluate(CARD_LS, tt + "StickTimeTracks") == ["README.txt", "c1.txt", "c2.txt", "c4.txt"]
           and all(page.evaluate(CARD_HASH, tt + p) == h for p, h in kept.items()) and st == "Removed c3.txt from the radio. Restart StickTime on the radio."
-          and "c3 · track 11 · empty" in rows, f"radio slots: Yes removes c3.txt only (the ghost c3 and the rest stay), the list read again: {st!r}")
+          and rows[2][3] == "—", f"radio slots: Yes removes c3.txt only (the ghost c3 and the rest stay), the list read again: {st!r}")
     del kept["StickTimeTracks/c2.txt"]
-    page.click('[data-rdel="2"]')
+    page.click('[data-sdel="r2"]')
     radio_done(page)
     q = dlg.take()
     check(q == ["Remove c2.txt (track 10, a file too big to be a track) from the radio?"]
@@ -875,10 +915,11 @@ def bad_slot_tests(br, errors):
     # the browser's storage full: the copy says it lasts this visit
     page.evaluate(f"sim.removeSD('{SLOT}1.txt')")
     page.evaluate(FULL)
-    page.click("#edRadioToEmu")
+    reopen(page)
+    page.click("#edAllFrom")
     radio_done(page)
-    st = page.inner_text("#rpStatus")
-    check("storage is full" in st and "bad" in page.get_attribute("#rpStatus", "class") and emu(page, 1) == good, f"radio slots: storage full is said: {st!r}")
+    st = page.inner_text("#edMineStatus")
+    check("storage is full" in st and "bad" in page.get_attribute("#edMineStatus", "class") and emu(page, 1) == good, f"radio slots: storage full is said: {st!r}")
     page.evaluate(ROOMY)
     ctx.close()
 

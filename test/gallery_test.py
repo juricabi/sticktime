@@ -81,6 +81,15 @@ def cards(page):
     return page.eval_on_selector_all("#edCards .ed-card strong", "els => els.map(e => e.textContent)")
 
 
+def open_mine(page):
+    """Tracks > My tracks, the radio's slots read"""
+    if page.is_hidden("#editor"):
+        page.click("#tracksBtn")
+    if page.is_hidden("#edMine"):
+        page.click("#edMineBtn")
+    page.wait_for_function("!sim.editor.radio().busy", timeout=10000)
+
+
 def open_gallery(page):
     if page.is_hidden("#editor"):
         page.click("#tracksBtn")
@@ -140,8 +149,7 @@ def tracks_tests(br, errors, tracks):
         check(r["file"] == t["text"] and r["name"] == t["name"] and not r["probs"] and page.is_hidden("#edGallery") and page.is_visible("#edMap"),
               f"{t['file']}: opens as it is, Check OK {r['probs'] if r['probs'] else ''}")
         n = len(asked)
-        open_gallery(page)
-        page.click(f"[data-gfly='{i}']")
+        page.click("#edFly")
         slot = int(page.input_value("#edSlot"))
         info = page.evaluate("sim.test('info')")
         want = i + 1 if i < 8 else slot
@@ -156,26 +164,28 @@ def tracks_tests(br, errors, tracks):
     check(ok and all(card_line(page, i, "ed-in") == "" for i in range(len(tracks)) if i not in held.values()),
           "site: each card says which slot has its track")
     n = len(asked)
-    page.click("[data-gfly='2']")
+    open_gallery(page)
+    page.click("[data-gopen='2']")
+    page.click("#edFly")
     check(int(page.input_value("#edSlot")) == 3 and len(asked) == n and page.evaluate("sim.test('info')")[10] == tracks[2]["name"],
-          "site: Fly it again: from the slot that has it, nothing asked")
+          "site: opened again: on the slot that has it, flown with nothing asked")
 
     # another version of a gallery track in a slot (the same name, a gate moved): Update
     old = tracks[3]["text"].replace(" 1 0 0 ", " 1 5 0 ", 1)
     assert old != tracks[3]["text"]
     page.evaluate(f"sim.writeSD('{SLOT}4.txt', {json.dumps(old)})")
     page.evaluate("sim.boot()")                                    # the game in its menu
-    open_gallery(page)
-    check(page.is_visible("#edGalSync") and "older version of \"" + tracks[3]["name"] + "\"" in page.inner_text("#edGalSync")
-          and card_line(page, 3, "ed-old") == "An older version in c4 in the emulator" and page.is_visible("[data-gsync='3']"),
-          f"site: an older version in c4 is shown: {page.inner_text('#edGalSync')!r}")
+    open_mine(page)
+    check(page.is_visible("#edGalSync") and page.inner_text("#edUpdList").startswith('"' + tracks[3]["name"] + '": an older version in c4 in the emulator')
+          and page.is_visible("[data-gsync='3']"), f"site: My tracks shows the older version in c4: {page.inner_text('#edUpdList')!r}")
     n = len(asked)
     page.click("[data-gsync='3']")
     check(len(asked) == n + 1 and tracks[3]["name"] in asked[-1] and "c4 in the emulator" in asked[-1] and "start over" in asked[-1],
           f"site: Update asks first: {asked[n:]}")
+    st = page.inner_text("#edMineStatus")
+    open_gallery(page)
     check(slot_text(page, 4) == tracks[3]["text"] and page.is_hidden("#edGalSync") and card_line(page, 3, "ed-in") == "In c4 in the emulator"
-          and page.inner_text("#edGalStatus") == "Updated c4 in the emulator.",
-          f"site: Update puts the gallery's version in c4, the game started again: {page.inner_text('#edGalStatus')!r}")
+          and st == "Updated c4 in the emulator.", f"site: Update puts the gallery's version in c4, the game started again: {st!r}")
     ctx.close()
 
 
@@ -213,15 +223,17 @@ def radio_tests(br, errors, tracks):
     page.click("#radioBtn")
     page.click("#edConnect")
     page.wait_for_function("sim.editor.radio().state === 'on' && !sim.editor.radio().busy", timeout=10000)
-    open_gallery(page)
-    page.wait_for_function("!sim.editor.radio().busy && document.querySelector('#edCards .ed-old')", timeout=10000)
-    check(card_line(page, 0, "ed-old") == "An older version in c5 on the radio" and card_line(page, 1, "ed-in") == "In c6 on the radio",
-          f"radio: the cards say what the radio's slots hold: {card_line(page, 0, 'ed-old')!r}, {card_line(page, 1, 'ed-in')!r}")
+    open_mine(page)
+    page.wait_for_function("document.querySelector('#edUpdList li')", timeout=10000)
+    check(page.inner_text("#edUpdList").startswith('"' + tracks[0]["name"] + '": an older version in c5 on the radio'),
+          f"radio: My tracks shows the radio's older version: {page.inner_text('#edUpdList')!r}")
     page.click("[data-gsync='0']")
     page.wait_for_function("!sim.editor.radio().busy", timeout=10000)
+    st = page.inner_text("#edMineStatus")
+    open_gallery(page)
     check(page.evaluate(CARD_FILE, "RADIO/" + T + "5.txt") == tracks[0]["text"] and "c5 on the radio" in asked[-1]
-          and page.inner_text("#edGalStatus").startswith("Updated c5 on the radio") and card_line(page, 0, "ed-in") == "In c5 on the radio",
-          f"radio: Update writes the gallery's version to c5 on the card: {page.inner_text('#edGalStatus')!r}")
+          and st.startswith("Updated c5 on the radio") and card_line(page, 0, "ed-in") == "In c5 on the radio" and card_line(page, 1, "ed-in") == "In c6 on the radio",
+          f"radio: Update writes the gallery's version to c5 on the card; the cards say where they are: {st!r}")
     # the slot list has the radio's slots beside the emulator's
     opts = page.eval_on_selector_all("#edSlot option", "els => els.map(e => e.textContent)")
     check(opts[5] == f"c6 · track 14 · {tracks[1]['name']} (radio only)" and opts[4] == f"c5 · track 13 · {tracks[0]['name']} (radio only)"
@@ -235,28 +247,34 @@ def radio_tests(br, errors, tracks):
     opts = page.eval_on_selector_all("#edSlot option", "els => els.map(e => e.textContent)")
     check(opts[5] == f"c6 · track 14 · {tracks[1]['name']} (emulator and radio)" and page.inner_text("#edEmuHas") == "c6: this track"
           and page.inner_text("#edRadioLineText") == "c6: this track · RADIO", f"radio: flown in c6 here too: {opts[5]!r}")
-    # the slots that differ, and a copy from the radio from the editor
-    check(page.is_visible("#edSyncLine") and page.inner_text("#edSyncText") == "The emulator's slots and the radio's differ: c5."
-          and page.is_visible("#edSyncFrom") and page.is_hidden("#edSyncTo"), f"radio: the editor says where the slots differ: {page.inner_text('#edSyncText')!r}")
-    page.click("#edSyncFrom")
+    # the slots that differ: a line to My tracks, where ← copies the radio's c5 to the emulator
+    check(page.is_visible("#edSyncLine") and page.inner_text("#edSyncText") == "The emulator and the radio hold different tracks in c5."
+          and page.is_visible("#edSyncMine"), f"radio: the editor says where the slots differ: {page.inner_text('#edSyncText')!r}")
+    page.click("#edSyncMine")
     page.wait_for_function("!sim.editor.radio().busy", timeout=10000)
-    check(slot_text(page, 5) == tracks[0]["text"] and page.is_hidden("#edSyncLine") and page.inner_text("#edStatus").startswith("Copied c5 from the radio"),
-          f"radio: Copy the radio's here: c5 copied, nothing differs ({page.inner_text('#edStatus')!r})")
+    page.click('[data-scopy="e5"]')
+    st = page.inner_text("#edMineStatus")
+    page.click("#edMineBtn")
+    check(slot_text(page, 5) == tracks[0]["text"] and page.is_hidden("#edSyncLine") and st.startswith("Copied c5 from the radio to the emulator"),
+          f"radio: ← (My tracks): c5 copied, nothing differs ({st!r})")
     # Send to radio of a track the radio has in another slot: no second copy
     page.select_option("#edSlot", "2")
     page.click("#edSend")
     page.wait_for_function("!sim.editor.radio().busy", timeout=10000)
     check(page.evaluate(CARD_FILE, f"RADIO/{T}2.txt") is None and page.inner_text("#edStatus").startswith("The radio has this track already, in c6"),
           f"radio: Send to radio to c2 of a track the radio has in c6: nothing sent ({page.inner_text('#edStatus')!r})")
-    # the slot list picks where the track goes and never changes it; Open beside a slot's track opens it
+    # the slot list picks where the track goes and never changes it; Open (Your tracks) opens a slot's
     before = page.evaluate("sim.editor.file()")
     page.select_option("#edSlot", "5")
     check(page.evaluate("sim.editor.file()") == before and page.inner_text("#edEmuHas") == f'c5: "{tracks[0]["name"]}"'
-          and page.inner_text("#edRadioLineText") == f'c5: "{tracks[0]["name"]}" · RADIO' and page.is_visible("#edEmuOpen") and page.is_visible("#edRadioOpen"),
-          f"radio: picking c5 keeps the track; the rows say what c5 holds, with Open ({page.inner_text('#edEmuHas')!r})")
-    page.click("#edRadioOpen")
-    check(page.evaluate("sim.editor.file()") == tracks[0]["text"] and int(page.input_value("#edSlot")) == 5 and page.inner_text("#edEmuHas") == "c5: this track"
-          and page.is_hidden("#edEmuOpen") and page.is_hidden("#edRadioOpen"), "radio: Open (the radio's c5) puts its track in the editor")
+          and page.inner_text("#edRadioLineText") == f'c5: "{tracks[0]["name"]}" · RADIO',
+          f"radio: picking c5 keeps the track; the rows say what c5 holds ({page.inner_text('#edEmuHas')!r})")
+    open_gallery(page)
+    mine_rows = page.eval_on_selector_all("#edOpenList li", "els => els.map(e => e.textContent.replace(/\\s+/g, ' ').trim())")  # (c5 name where Open)
+    check(any(r.startswith("c5 " + tracks[0]["name"] + " emulator and radio") for r in mine_rows), f"radio: Open lists the slots' tracks: {mine_rows}")
+    page.click('[data-sopen="e5"]')
+    check(page.evaluate("sim.editor.file()") == tracks[0]["text"] and int(page.input_value("#edSlot")) == 5 and page.inner_text("#edEmuHas") == "c5: this track",
+          "radio: Open (Your tracks, c5) puts its track in the editor")
     page.select_option("#edSlot", "2")
     # a file opened that the radio has: on its slot
     page.click("#edGalBtn")
@@ -323,11 +341,12 @@ def page_tests(br, errors, tracks):
     # Open: new tracks (Blank and the built-in ones), your slots, the gallery, in one place
     page.click("#edGalBtn")
     new = page.eval_on_selector_all("#edNewCards button", "els => els.map(e => e.getAttribute('aria-label'))")
-    rows = page.eval_on_selector_all("#edSlotList tbody tr", "els => els.map(e => e.textContent)")
+    order = page.eval_on_selector_all("#edGallery h4", "els => els.map(e => e.firstChild.textContent.trim())")
     check(new[0] == "Open a blank track" and new[1:] == ["Open a copy of " + t for t in ("Meadow", "Figure 8", "Dive Tower", "Slalom", "Hoop Forest", "Grand Prix", "Bando", "Pro Track")]
-          and len(rows) == 8 and rows[0].startswith("c1 track 9"), f"page: Open has the new tracks and the 8 slots: {new[:2]}, {rows[:1]}")
+          and order == ["Your tracks", "New track", "Gallery"] and page.inner_text("#edOpenList").startswith("No tracks in your slots yet.")
+          and page.is_visible("#edGallery .ed-phead .file-btn"), f"page: Open: your tracks, new tracks, the gallery; a file at the top: {order}")
     page.click("button[aria-label='Open a copy of Slalom']")
-    check(page.is_hidden("#edGallery") and page.input_value("#edName") == "My Slalom" and page.inner_text("#edEditing") == "Editing a local copy of My Slalom: in no slot yet",
+    check(page.is_hidden("#edGallery") and page.input_value("#edName") == "My Slalom" and page.inner_text("#edEditing") == "Editing a local copy of My Slalom (kept in this browser as you edit): in no slot yet",
           f"page: Start from Slalom: a copy in the editor, in no slot yet ({page.inner_text('#edEditing')!r})")
     page.click("#edGalBtn")
     page.click("[data-gopen='1']")

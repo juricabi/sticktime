@@ -53,29 +53,44 @@
   <div class="ed-head">
     <div class="ed-title"><h2 id="edTitle">Track editor</h2><p class="ed-editing" id="edEditing" aria-live="polite"></p></div>
     <div class="ed-actions">
-      <button class="btn" id="edGalBtn" type="button" aria-expanded="false" aria-controls="edGallery" title="Open a track: a new one, one of yours, one from the gallery or a file"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>Open</button>
+      <button class="btn" id="edGalBtn" type="button" aria-expanded="false" aria-controls="edGallery" title="Pick a track to edit: a new one, one of yours, a file or one from the gallery"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>Open</button>
+      <button class="btn" id="edMineBtn" type="button" aria-expanded="false" aria-controls="edMine" title="Your tracks in the emulator and on the radio: remove them, copy them between the two"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="4" cy="6" r="1.4" fill="currentColor"/><circle cx="4" cy="12" r="1.4" fill="currentColor"/><circle cx="4" cy="18" r="1.4" fill="currentColor"/></svg>My tracks</button>
       <button class="btn" id="edClose" type="button" title="Close the editor (your work is kept)">Close</button>
     </div>
   </div>
   <section class="ed-gallery" id="edGallery" hidden aria-labelledby="edGalH">
-    <h3 id="edGalH">Open <small>a new track, one of yours, or one from the gallery: the editor works on a copy of it</small></h3>
+    <div class="ed-phead">
+      <h3 id="edGalH">Open <small>pick a track to edit: the editor works on a copy of it</small></h3>
+      <label class="btn file-btn" title="A track file from your computer (c1.txt to c8.txt)">Open a file…<input type="file" id="edOpen" accept=".txt,text/plain"></label>
+    </div>
     <p class="ed-status" id="edGalStatus" role="status" aria-live="polite"></p>
+    <section class="ed-lsec" aria-labelledby="edOpenMineH">
+      <h4 id="edOpenMineH">Your tracks <small>in the emulator's slots and on the radio</small></h4>
+      <ul class="ed-olist" id="edOpenList"></ul>
+    </section>
     <section class="ed-lsec" aria-labelledby="edNewH">
-      <h4 id="edNewH">New track <small>a blank one, or a copy of a built-in track to change</small></h4>
+      <h4 id="edNewH">New track <small>a blank one, or a copy of a built-in track</small></h4>
       <ul class="ed-cards ed-newcards" id="edNewCards"></ul>
     </section>
-    <section class="ed-lsec" aria-labelledby="edMineH">
-      <h4 id="edMineH">Your tracks <small>what the game plays: slots c1 to c8 are tracks 9 to 16, in the emulator and on the radio</small></h4>
-      <div class="ed-stable" id="edSlotList"></div>
-      <div class="ed-row">
-        <label class="btn file-btn" title="Open a track file (c1.txt to c8.txt)">Open a file…<input type="file" id="edOpen" accept=".txt,text/plain"></label>
-      </div>
-    </section>
     <section class="ed-lsec" aria-labelledby="edGalleryH">
-      <h4 id="edGalleryH">Gallery <small>tracks others made: fly one, or open it to change it or send it to your radio</small></h4>
-      <p class="ed-gsync" id="edGalSync" hidden><span id="edGalSyncText"></span> <button class="btn" id="edGalSyncAll" type="button">Update them</button></p>
+      <h4 id="edGalleryH">Gallery <small>tracks others made</small></h4>
       <ul class="ed-cards" id="edCards"></ul>
       <p class="note ed-galnote">Made a track others should fly? Add it to the gallery with a pull request: <a href="https://github.com/juricabi/sticktime/tree/main/tracks#readme" target="_blank" rel="noopener">tracks/ on GitHub</a> says how.</p>
+    </section>
+  </section>
+  <section class="ed-gallery" id="edMine" hidden aria-labelledby="edMineH">
+    <h3 id="edMineH">My tracks <small>what the game plays: slots c1 to c8 are tracks 9 to 16, in the emulator (this browser) and on the radio</small></h3>
+    <p class="ed-status" id="edMineStatus" role="status" aria-live="polite"></p>
+    <div class="ed-stable" id="edSlotList"></div>
+    <p class="note" id="edMineNote" hidden>This browser can't reach the radio: Save file in the editor, and copy the file to /SCRIPTS/TOOLS/StickTimeTracks/ on its SD card.</p>
+    <div class="ed-row">
+      <button class="btn" id="edAllFrom" type="button" hidden title="Every slot of the radio into the same slot of the emulator">Copy all radio → emulator</button>
+      <button class="btn" id="edAllTo" type="button" hidden title="Every slot of the emulator into the same slot of the radio">Copy all emulator → radio</button>
+    </div>
+    <section class="ed-lsec" id="edGalSync" hidden aria-labelledby="edUpdH">
+      <h4 id="edUpdH">Newer in the gallery <small>a track of the gallery that has changed since you put it in a slot</small></h4>
+      <ul class="ed-olist" id="edUpdList"></ul>
+      <div class="ed-row"><button class="btn" id="edGalSyncAll" type="button">Update all</button></div>
     </section>
   </section>
   <div class="ed-grid" id="edGrid">
@@ -112,18 +127,18 @@
         <div class="ed-dests" role="group" aria-label="Where the track goes">
           <div class="ed-dest">
             <span class="ed-where">Emulator</span>
-            <span class="ed-has"><span id="edEmuHas"></span> <button class="linkbtn" id="edEmuOpen" type="button" hidden>Open</button></span>
+            <span class="ed-has" id="edEmuHas"></span>
             <span class="ed-acts">
               <button class="btn" id="edFly" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 4.5v15l12-7.5z" fill="currentColor"/></svg><span>Send to emulator &amp; fly</span></button>
-              <button class="btn" id="edEmpty" type="button">Remove</button>
+              
             </span>
           </div>
           <div class="ed-dest" id="edRadioLine" hidden>
             <span class="ed-where">Radio</span>
-            <span class="ed-has"><span id="edRadioLineText"></span> <button class="linkbtn" id="edRadioOpen" type="button" hidden>Open</button></span>
+            <span class="ed-has" id="edRadioLineText"></span>
             <span class="ed-acts">
               <button class="btn" id="edSend" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 2.5h8.5A1.5 1.5 0 0 1 19 4v16a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 20V6.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 8.5v8M8.8 13.5l3.2 3.2 3.2-3.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="edSendText">Send to radio</span></button>
-              <button class="btn" id="edRadioDel" type="button" hidden>Remove</button>
+              
             </span>
           </div>
           <div class="ed-dest">
@@ -132,9 +147,7 @@
             <span class="ed-acts"><button class="btn" id="edSave" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 3.5v11M7.5 10.5l4.5 4.5 4.5-4.5M5 19.5h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Save file</span></button></span>
           </div>
         </div>
-        <p class="ed-rsync" id="edSyncLine" hidden><span id="edSyncText"></span>
-          <button class="btn" id="edSyncFrom" type="button">Copy radio → emulator</button>
-          <button class="btn" id="edSyncTo" type="button">Copy emulator → radio</button></p>
+        <p class="ed-rsync" id="edSyncLine" hidden><span id="edSyncText"></span> <button class="btn" id="edSyncMine" type="button">My tracks</button></p>
       </div>
       <p class="note warn ed-lite" id="edLite" hidden></p>
       <p class="ed-status" id="edStatus" role="status" aria-live="polite"></p>
@@ -177,7 +190,7 @@
 
 <section class="card editor rpanel" id="radioPanel" hidden aria-labelledby="rpTitle" tabindex="-1">
   <div class="ed-head">
-    <h2 id="rpTitle">Radio &amp; install <small>the radio's SD card over USB: StickTime and your tracks on it</small></h2>
+    <h2 id="rpTitle">Radio &amp; install <small>the radio's SD card over USB: connect it, install or update StickTime</small></h2>
     <div class="ed-actions">
       <button class="btn" id="rpClose" type="button" title="Close (the card stays connected)">Close</button>
     </div>
@@ -210,16 +223,9 @@
       </section>
     </div>
     <section class="ed-sec rp-tracks" id="rpTracksSec" aria-labelledby="rpTracksH">
-      <h3 id="rpTracksH">Your tracks on the radio</h3>
-      <p class="note" id="rpTracksWait" hidden></p>
-      <div id="edRadioPanel" hidden>
-        <p class="ed-rpath" id="edRadioPath"></p>
-        <ul class="ed-rslots" id="edRadioSlots"></ul>
-        <div class="ed-row">
-          <button class="btn" id="edRadioToEmu" type="button" title="The radio's tracks into the same slots of the emulator">Copy radio → emulator</button>
-          <button class="btn" id="edEmuToRadio" type="button" title="The emulator's tracks into the same slots of the radio">Copy emulator → radio</button>
-        </div>
-      </div>
+      <h3 id="rpTracksH">Your tracks</h3>
+      <p class="note">The radio's tracks are in the track editor, beside the emulator's: open them, remove them or copy them between the two there.</p>
+      <div class="ed-row"><button class="btn" id="rpShowTracks" type="button">Show your tracks</button></div>
     </section>
   </div>
   <p class="ed-status" id="rpStatus" role="status" aria-live="polite"></p>

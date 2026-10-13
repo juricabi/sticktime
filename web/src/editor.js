@@ -289,7 +289,7 @@
     pristine: '', saved: new Set(),
   };
   const V = { x: 0, z: 30, s: 4 };                  // map centre (m) and scale (px per m)
-  const gal = { list: [], open: false, asked: false }; // the gallery: its tracks, shown, the site's list asked for
+  const gal = { list: [], open: false, mine: false, asked: false }; // the gallery's tracks; Open or My tracks shown; the site's list asked for
 
   function withIds(T) {
     const all = T.gates.concat(T.boxes);
@@ -438,15 +438,14 @@
   // ---------------------------------------------------------------- the page
   const el = {};
   for (const k of ['tracksBtn', 'edClose', 'radioBtn', 'rpClose',
-    'edOpen', 'edGalBtn', 'edNewCards', 'edSlotList', 'edEditing', 'edGallery', 'edCards', 'edGrid', 'edGalStatus', 'edGalSync', 'edGalSyncText', 'edGalSyncAll', 'edGateType', 'edAddGate', 'edAddBox', 'edAddWall',
+    'edOpen', 'edGalBtn', 'edMineBtn', 'edMine', 'edMineStatus', 'edMineNote', 'edOpenList', 'edUpdList', 'edSyncMine', 'edNewCards', 'edSlotList', 'edEditing', 'edGallery', 'edCards', 'edGrid', 'edGalStatus', 'edGalSync', 'edGalSyncText', 'edGalSyncAll', 'edGateType', 'edAddGate', 'edAddBox', 'edAddWall',
     'edRotL', 'edRotR', 'edDup', 'edDel', 'edUndo', 'edRedo', 'edFit', 'edTrees', 'edMap', 'edMapBox', 'edReadout',
-    'edSlot', 'edFly', 'edSave', 'edEmpty', 'edSize', 'edLite', 'edStatus', 'edEmuHas', 'edFileHas', 'edRadioDel',
-    'edSyncLine', 'edSyncText', 'edSyncFrom', 'edSyncTo', 'edSendText', 'edEmuOpen', 'edRadioOpen', 'edName', 'edSeed', 'edShuffle', 'edTreesN',
+    'edSlot', 'edFly', 'edSave', 'edSize', 'edLite', 'edStatus', 'edEmuHas', 'edFileHas',
+    'edSyncLine', 'edSyncText', 'edSendText', 'edName', 'edSeed', 'edShuffle', 'edTreesN',
     'edSel', 'edProblems', 'edProbPill', 'edOrder', 'edSend', 'edRadioLine', 'edRadioLineText',
     // the Install panel
-    'radioPanel', 'rpStatus', 'rpInstWait', 'rpTracksWait', 'rpInstSec', 'rpTracksSec',
-    'edRadio', 'edRadioState', 'edConnect', 'edRefresh', 'edForget', 'edRadioNote', 'edRadioPanel', 'edRadioPath', 'edRadioSlots',
-    'edRadioToEmu', 'edEmuToRadio', 'edInstallNote', 'edInstallMore', 'edInstallPanel', 'edInstallHead', 'edEditions', 'edInstallHint',
+    'radioPanel', 'rpStatus', 'rpInstWait', 'rpInstSec', 'rpTracksSec', 'rpShowTracks', 'edAllFrom', 'edAllTo',
+    'edRadio', 'edRadioState', 'edConnect', 'edRefresh', 'edForget', 'edRadioNote', 'edInstallNote', 'edInstallMore', 'edInstallPanel', 'edInstallHead', 'edEditions', 'edInstallHint',
     'edInstallGo', 'edInstallBar']) el[k] = $(k);
   const rp = el.radioPanel;
   const cv = el.edMap, ctx = cv.getContext('2d');
@@ -467,7 +466,7 @@
     const a = document.activeElement;
     let key = null;
     if (a && a !== box && box.contains(a)) {
-      for (const k of ['pick', 'f', 'a', 'prob', 'new', 'sopen', 'connect', 'gfly', 'gopen', 'gsync']) if (a.dataset[k] !== undefined) { key = '[data-' + k + '="' + a.dataset[k] + '"]'; break; }
+      for (const k of ['pick', 'f', 'a', 'prob', 'new', 'sopen', 'sdel', 'scopy', 'connect', 'gfly', 'gopen', 'gsync']) if (a.dataset[k] !== undefined) { key = '[data-' + k + '="' + a.dataset[k] + '"]'; break; }
       if (!key) key = '-';
     }
     rebuild();
@@ -627,12 +626,7 @@
     renderEditing();
     el.edSize.classList.toggle('bad', ed.file.bytes > MAX_BYTES);
     const c = 'c' + ed.slot;
-    const ee = asEntry(emuSlot(ed.slot));
-    el.edEmuHas.textContent = c + ': ' + holds(ee);
-    el.edEmuOpen.hidden = !(ee && !ee.bad && norm(ee.text) !== ed.file.text);
-    el.edEmuOpen.title = 'Open c' + ed.slot + ' of the emulator in the editor';
-    el.edEmpty.disabled = emuSlot(ed.slot) === null;
-    el.edEmpty.title = 'Take ' + c + ' off the emulator\'s SD card';
+    el.edEmuHas.textContent = c + ': ' + holds(asEntry(emuSlot(ed.slot)));
     el.edFileHas.textContent = c + '.txt, to copy to ' + DIR + ' on the radio\'s SD card yourself';
     const s = sim(), a = s && s.app;
     const lite = !!(a && !a.custom && a.script === 'lite');
@@ -663,7 +657,7 @@
       say = earlier.length ? 'changed, not sent yet (' + cs(earlier) + ' has the earlier version)' : 'in no slot yet';
       kind = 'warn';
     }
-    el.edEditing.innerHTML = 'Editing a local copy of <b>' + esc(name) + '</b>: <span class="' + kind + '">' + esc(say) + '</span>';
+    el.edEditing.innerHTML = 'Editing a local copy of <b>' + esc(name) + '</b> (kept in this browser as you edit): <span class="' + kind + '">' + esc(say) + '</span>';
   }
   // what a slot holds (an entry as asEntry has it), said for the editor's track: this track, another
   // version of it (the same name), another track, nothing, or a file the game can't use
@@ -691,6 +685,7 @@
     el.edSlot.value = String(ed.slot);
     if (ed.T) renderFly();
     if (gal.open) renderGallery();
+    if (gal.mine) renderMine();
   }
   function renderButtons() {
     const s = selected(), n = s.all.length, T = ed.T;
@@ -1348,8 +1343,8 @@
     const t = e.target, k = e.key;
     const typing = t && ((t.tagName === 'INPUT' && !/^(checkbox|radio|button|file)$/i.test(t.type)) || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA');
     // the gallery shown: the map's keys are not for it, Escape goes back to the map
-    if (gal.open && !typing) {
-      if (k === 'Escape' && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); showGallery(false); el.edGalBtn.focus(); }
+    if ((gal.open || gal.mine) && !typing) {
+      if (k === 'Escape' && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); const b = gal.open ? el.edGalBtn : el.edMineBtn; showPanel(null); b.focus(); }
       return;
     }
     if (e.ctrlKey || e.metaKey) {
@@ -1508,14 +1503,15 @@
     rd.onerror = () => status('Can\'t read ' + file.name + '.', 'bad');
     rd.readAsText(file);
   });
-  // ---------------------------------------------------------------- the gallery
-  // Tracks others made, from tracks/ in the repo (tools/gallery.py checks them): the page has them
-  // built in (GALLERY, from tools/bundle_web.py), and the hosted site also has tracks/index.json
-  // beside the page, asked for when the gallery opens, so a track added since the page was built
-  // is there too. Each one opens in the editor as it is (its id kept: the same track everywhere).
-  // The slots are kept in step with it: a card says which slots (here, and on the radio once its
-  // slots are read) hold its track, Fly it uses the slot that has it, and a slot with another
-  // version of it (the same name, other numbers: an older one) is brought up to date on request.
+  // ---------------------------------------------------------------- Open and My tracks
+  // Two panels in place of the map, one job each. Open picks a track to edit: a new one (blank, a
+  // copy of a built-in track), one of yours (a slot of the emulator or the radio), a file, or one
+  // from the gallery. My tracks manages the slots, what the game plays: the emulator's and the
+  // radio's side by side, Remove, a copy across, and the gallery's newer versions.
+  // The gallery is tracks/ in the repo (tools/gallery.py checks them): the page has them built in
+  // (GALLERY, from tools/bundle_web.py), and the hosted site also has tracks/index.json beside the
+  // page, asked for when the editor opens, so a track added since the page was built is there too.
+  // A gallery track opens as it is (its id kept: the same track everywhere).
   const GALLERY_AT = typeof GALLERY_FILES === 'string' && GALLERY_FILES && /^https?:$/.test(location.protocol) ? GALLERY_FILES : '';
   // a gallery's list, every entry checked as a track file is (a bad one is left out)
   function galleryOf(g) {
@@ -1544,24 +1540,20 @@
     return { same, old };
   }
   const cs = (a) => andList(a.map((n) => 'c' + n));
-  // where a gallery track goes: the slot that has it, else one with another version of it, else
-  // the editor's slot when it is empty, else the first empty one (else the editor's: flying it asks)
+  // a slot empty in the emulator and (read) on the radio: the editor's when it is, else the first;
+  // else one empty in the emulator; else the editor's (sending to it asks)
   function freeSlot() {
     const free = (i) => emuSlot(i) === null && !(radioRead() && radioSlots[i - 1]);
     if (free(ed.slot)) return ed.slot;
     for (let i = 1; i <= SLOTS; i++) if (free(i)) return i;
-    return ed.slot;
-  }
-  function slotFor(t) {
-    const pe = placesOf(t, emuEntries()), pr = placesOf(t, radioRead() ? radioSlots : []);
-    const at = pe.same[0] || pr.same[0] || pe.old[0] || pr.old[0];
-    if (at) return at;
-    const free = (i) => emuSlot(i) === null && !(radioRead() && radioSlots[i - 1]);
-    if (free(ed.slot)) return ed.slot;
-    for (let i = 1; i <= SLOTS; i++) if (free(i)) return i;
-    if (emuSlot(ed.slot) === null) return ed.slot;
     for (let i = 1; i <= SLOTS; i++) if (emuSlot(i) === null) return i;
     return ed.slot;
+  }
+  // where a gallery track goes: the slot that has it, else one with another version of it, else
+  // an empty one
+  function slotFor(t) {
+    const pe = placesOf(t, emuEntries()), pr = placesOf(t, radioRead() ? radioSlots : []);
+    return pe.same[0] || pr.same[0] || pe.old[0] || pr.old[0] || freeSlot();
   }
   // a small map of a track: its structures, the race, the gates and flags, the start pad
   function thumb(c, T) {
@@ -1601,16 +1593,16 @@
     x.lineCap = 'butt';
     if (pad) { x.fillStyle = C.pad; x.fillRect(X(pad.x) - 2.5, Y(pad.z) - 2.5, 5, 5); }
   }
-  function galStatus(msg, kind) {
-    el.edGalStatus.textContent = msg || '';
-    el.edGalStatus.className = 'ed-status' + (kind ? ' ' + kind : '');
-  }
+  const sayIn = (node) => (msg, kind) => { node.textContent = msg || ''; node.className = 'ed-status' + (kind ? ' ' + kind : ''); };
+  const galStatus = sayIn(el.edGalStatus), mineStatus = sayIn(el.edMineStatus);
   // the gallery tracks that some slot has another version of
   function outdated() {
     const emu = emuEntries(), rad = radioRead() ? radioSlots : [];
     return gal.list.map((t, i) => ({ i, here: placesOf(t, emu).old, radio: placesOf(t, rad).old })).filter((o) => o.here.length || o.radio.length);
   }
-  // New track: Blank and the built-in tracks, with their maps (drawn when Open opens)
+  const inWords = (here, radio) => [here.length ? cs(here) + ' in the emulator' : '', radio.length ? cs(radio) + ' on the radio' : ''].filter(Boolean).join(' and ');
+
+  // ---- Open: New track, Your tracks, the gallery; each with Open and nothing else
   function renderNew() {
     const list = [{ v: 'blank', name: 'Blank', note: 'two gates', T: blankTrack() }].concat(D.tracks.map((t, i) => ({ v: String(i), name: t.name,
       note: t.gates.length + ' gates' + (t.boxes.length ? ', ' + t.boxes.length + ' structures' : ''), T: fromBuiltin(t) })));
@@ -1621,67 +1613,94 @@
     });
     el.edNewCards.querySelectorAll('canvas').forEach((c, i) => thumb(c, list[i].T));
   }
-  // Your tracks: a table of the slots, the emulator's in one column and the radio's in the other
-  // (Connect radio… in its head until the radio's slots are read), each track with Open
-  function renderMine() {
-    const rad = radioRead() ? radioSlots : null, on = radio.state === 'on', name = radio.dir ? cardName(radio.dir) : '';
-    const cell = (e, key, i, same) => '<td>' + (!e ? '<span class="ed-none">—</span>' : e.bad ? '<i class="bad">' + BAD[e.bad] + '</i>'
-      : '<span class="ed-tn">' + esc(nameOf(e.text)) + '</span>' + (same ? ' <i>· same</i>' : norm(e.text) === ed.file.text ? ' <i>(in the editor)</i>'
-        : ' <button class="linkbtn" type="button" data-sopen="' + key + i + '" aria-label="Open c' + i + (key === 'e' ? ' of the emulator' : ' of the radio') + '">Open</button>')) + '</td>';
-    const head = !radio.ok ? '' : rad ? 'Radio <small>' + esc(name) + '</small>'
-      : 'Radio <small>' + (on ? esc(name) + (radio.busy ? ', reading…' : '') : radio.state === 'ask' ? esc(name) + ', to allow again' : 'not connected') + '</small>' +
-        (on ? '' : ' <button class="btn" type="button" data-connect="1"' + (radio.busy ? ' disabled' : '') + '>' + (radio.state === 'ask' ? 'Reconnect radio' : 'Connect radio…') + '</button>');
-    let h = '<table><thead><tr><th scope="col">Slot</th><th scope="col">Emulator</th>' + (radio.ok ? '<th scope="col">' + head + '</th>' : '') + '</tr></thead><tbody>';
+  // your tracks: the emulator's slots and the radio's (one line for a track both have)
+  function renderOpenMine() {
+    const rad = radioRead() ? radioSlots : null, rows = [];
     for (let i = 1; i <= SLOTS; i++) {
       const e = asEntry(emuSlot(i)), r = rad ? rad[i - 1] : null;
-      const same = !!(e && r && !e.bad && !r.bad && norm(e.text) === norm(r.text));
-      h += '<tr><th scope="row">c' + i + ' <small>track ' + (8 + i) + '</small></th>' + cell(e, 'e', i, false) +
-        (radio.ok ? (rad ? cell(r, 'r', i, same) : '<td><span class="ed-none">·</span></td>') : '') + '</tr>';
+      const ok = (x) => x && !x.bad;
+      const same = ok(e) && ok(r) && norm(e.text) === norm(r.text);
+      if (ok(e)) rows.push([i, e, same ? 'emulator and radio' : 'emulator', 'e']);
+      if (ok(r) && !same) rows.push([i, r, 'radio', 'r']);
     }
-    keepFocus(el.edSlotList, () => { el.edSlotList.innerHTML = h + '</tbody></table>'; });
+    const on = radio.state === 'on';
+    keepFocus(el.edOpenList, () => {
+      el.edOpenList.innerHTML = (rows.length ? rows.map(([i, x, where, key]) => '<li><b>c' + i + '</b> <span class="ed-tn">' + esc(nameOf(x.text)) + '</span> <i>' + where + '</i> ' +
+        (norm(x.text) === ed.file.text ? '<em>in the editor</em>'
+          : '<button class="btn" type="button" data-sopen="' + key + i + '" aria-label="Open c' + i + (key === 'e' ? ' of the emulator' : ' of the radio') + '">Open</button>') +
+        '</li>').join('') : '<li class="ed-cnone">No tracks in your slots yet.</li>') +
+        (radio.ok && !rad ? '<li class="ed-cnone">' + (on ? 'Reading the radio…' : 'The radio\'s tracks show here once it is connected. ' +
+          '<button class="btn" type="button" data-connect="1"' + (radio.busy ? ' disabled' : '') + '>' + (radio.state === 'ask' ? 'Reconnect radio' : 'Connect radio…') + '</button>') + '</li>' : '');
+    });
   }
   let galSig = '';
   function renderGallery(force) {
-    renderMine();
+    renderOpenMine();
     if (force) renderNew();
     const emu = emuEntries(), rad = radioRead() ? radioSlots : null;
-    const sig = JSON.stringify([gal.list.map((t) => t.text), emu, rad, radio.busy]);
+    const sig = JSON.stringify([gal.list.map((t) => t.text), emu, rad]);
     if (!force && sig === galSig) return;                  // (the thumbnails stay as they are)
     galSig = sig;
-    const old = outdated();
-    el.edGalSync.hidden = !old.length;
-    if (old.length) {
-      const n = old.reduce((a, o) => a + o.here.length + o.radio.length, 0);
-      el.edGalSyncText.textContent = (n > 1 ? n + ' of your slots hold' : 'A slot of yours holds') + ' an older version of ' +
-        (old.length > 1 ? old.length + ' gallery tracks' : '"' + gal.list[old[0].i].name + '"') + '.';
-      el.edGalSyncAll.disabled = radio.busy;
-    }
     keepFocus(el.edCards, () => {
       el.edCards.innerHTML = gal.list.length ? gal.list.map((t, i) => {
         const ng = t.T.gates.length, nb = t.T.boxes.length;
         const size = ng + ' gates' + (nb ? ', ' + nb + ' structures' : '') + (t.T.trees ? ', ' + t.T.trees + ' trees' : '');
-        const pe = placesOf(t, emu), pr = rad ? placesOf(t, rad) : { same: [], old: [] };
-        const has = [], olds = [];
-        if (pe.same.length) has.push(cs(pe.same) + ' in the emulator');
-        if (pr.same.length) has.push(cs(pr.same) + ' on the radio');
-        if (pe.old.length) olds.push(cs(pe.old) + ' in the emulator');
-        if (pr.old.length) olds.push(cs(pr.old) + ' on the radio');
+        const has = inWords(placesOf(t, emu).same, rad ? placesOf(t, rad).same : []);
         return '<li class="ed-card"><canvas class="ed-thumb" aria-hidden="true"></canvas><div class="ed-cinfo">' +
           '<strong>' + esc(t.name) + '</strong>' + (t.by ? '<span class="ed-by">by ' + esc(t.by) + '</span>' : '') +
           (t.about ? '<p>' + esc(t.about) + '</p>' : '') +
           '<span class="ed-meta">' + size + (t.source ? ' · <a href="' + esc(t.source) + '" target="_blank" rel="noopener noreferrer">source</a>' : '') + '</span>' +
-          (has.length ? '<span class="ed-in">In ' + esc(has.join(', ')) + '</span>' : '') +
-          (olds.length ? '<span class="ed-old">An older version in ' + esc(olds.join(', ')) + '</span>' : '') + '</div>' +
-          '<div class="ed-cbtns"><button class="btn primary" type="button" data-gfly="' + i + '" aria-label="Fly ' + esc(t.name) + '">' +
-          '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M7 4.5v15l12-7.5z" fill="currentColor"/></svg>Fly it</button>' +
-          '<button class="btn" type="button" data-gopen="' + i + '" aria-label="Open ' + esc(t.name) + ' in the editor">Open</button>' +
-          (olds.length ? '<button class="btn" type="button" data-gsync="' + i + '"' + (radio.busy && pr.old.length ? ' disabled' : '') +
-            ' title="Put this version in ' + esc(olds.join(', ')) + '">Update</button>' : '') + '</div></li>';
+          (has ? '<span class="ed-in">In ' + esc(has) + '</span>' : '') + '</div>' +
+          '<div class="ed-cbtns"><button class="btn" type="button" data-gopen="' + i + '" aria-label="Open ' + esc(t.name) + '">Open</button></div></li>';
       }).join('') : '<li class="ed-cnone">No tracks in the gallery yet.</li>';
     });
     ACC = cssVar('--accent', '#ff7f2a');
     el.edCards.querySelectorAll('canvas').forEach((c, i) => thumb(c, gal.list[i].T));
   }
+
+  // ---- My tracks: the slots, the emulator's and the radio's side by side; Remove, copy across,
+  // the gallery's newer versions
+  function renderMine() {
+    const rad = radioRead() ? radioSlots : null, on = radio.state === 'on', name = radio.dir ? cardName(radio.dir) : '';
+    const off = radio.busy ? ' disabled' : '';
+    const of = (key) => (key === 'e' ? ' of the emulator' : ' of the radio');
+    const cell = (e, key, i) => '<td>' + (!e ? '<span class="ed-none">—</span>' : (e.bad ? '<i class="bad">' + BAD[e.bad] + '</i>'
+      : '<span class="ed-tn">' + esc(nameOf(e.text)) + '</span>' + (norm(e.text) === ed.file.text ? ' <i>(in the editor)</i>' : '')) +
+      ' <button class="linkbtn ed-del" type="button" data-sdel="' + key + i + '" aria-label="Remove c' + i + of(key) + '"' + (key === 'r' ? off : '') + '>Remove</button>') + '</td>';
+    const head = !radio.ok ? '' : rad ? 'Radio <small>' + esc(name) + '</small>'
+      : 'Radio <small>' + (on ? esc(name) + (radio.busy ? ', reading…' : '') : radio.state === 'ask' ? esc(name) + ', to allow again' : 'not connected') + '</small>' +
+        (on ? '' : ' <button class="btn" type="button" data-connect="1"' + off + '>' + (radio.state === 'ask' ? 'Reconnect radio' : 'Connect radio…') + '</button>');
+    let h = '<table><thead><tr><th scope="col">Slot</th><th scope="col">Emulator <small>this browser</small></th>' +
+      (radio.ok ? '<th scope="col" class="ed-x"><span class="ed-sr">Copy</span></th><th scope="col">' + head + '</th>' : '') + '</tr></thead><tbody>';
+    let from = 0, to = 0;
+    for (let i = 1; i <= SLOTS; i++) {
+      const e = asEntry(emuSlot(i)), r = rad ? rad[i - 1] : null;
+      const same = !!(e && r && !e.bad && !r.bad && norm(e.text) === norm(r.text));
+      const right = rad && e && !e.bad && !same, left = rad && r && !r.bad && !same;
+      if (right) to++;
+      if (left) from++;
+      const x = !rad ? '' : same ? '<span class="ed-same" title="The same track">=</span>'
+        : (right ? '<button class="btn ed-arrow" type="button" data-scopy="r' + i + '" aria-label="Copy c' + i + ' emulator → radio" title="Copy c' + i + ' of the emulator to the radio"' + off + '>→</button>' : '') +
+          (left ? '<button class="btn ed-arrow" type="button" data-scopy="e' + i + '" aria-label="Copy c' + i + ' radio → emulator" title="Copy c' + i + ' of the radio to the emulator"' + off + '>←</button>' : '');
+      h += '<tr><th scope="row">c' + i + ' <small>track ' + (8 + i) + '</small></th>' + cell(e, 'e', i) +
+        (radio.ok ? '<td class="ed-x">' + x + '</td>' + (rad ? cell(r, 'r', i) : '<td></td>') : '') + '</tr>';
+    }
+    keepFocus(el.edSlotList, () => { el.edSlotList.innerHTML = h + '</tbody></table>'; });
+    el.edAllFrom.hidden = !from;
+    el.edAllTo.hidden = !to;
+    el.edAllFrom.disabled = el.edAllTo.disabled = radio.busy;
+    el.edMineNote.hidden = radio.ok;
+    // the gallery's newer versions
+    const old = outdated();
+    el.edGalSync.hidden = !old.length;
+    el.edGalSyncAll.hidden = old.length < 2;
+    el.edGalSyncAll.disabled = radio.busy;
+    keepFocus(el.edUpdList, () => {
+      el.edUpdList.innerHTML = old.map((o) => '<li><span>"' + esc(gal.list[o.i].name) + '": an older version in ' + esc(inWords(o.here, o.radio)) + '</span>' +
+        '<button class="btn" type="button" data-gsync="' + o.i + '"' + (radio.busy && o.radio.length ? ' disabled' : '') + '>Update</button></li>').join('');
+    });
+  }
+
   // the hosted site's list (once a visit; the built-in one stays when it can't be had)
   async function fetchGallery() {
     if (!GALLERY_AT || gal.asked) return;
@@ -1689,26 +1708,30 @@
     try {
       const r = await fetch(new URL(GALLERY_AT + 'index.json', location.href), { cache: 'no-cache' });
       const list = r.ok ? galleryOf(await r.json()) : [];
-      if (list.length) { gal.list = list; if (gal.open) renderGallery(); }
+      if (list.length) { gal.list = list; if (gal.open) renderGallery(); if (gal.mine) renderMine(); }
     } catch (e) { /* the built-in list */ }
   }
-  function showGallery(on) {
-    gal.open = on;
-    el.edGallery.hidden = !on;
-    el.edGrid.hidden = on;
-    el.edGalBtn.setAttribute('aria-expanded', String(on));
-    if (!on) {
+  // the panel in place of the map: 'open', 'mine' or null (the map)
+  function showPanel(which) {
+    gal.open = which === 'open';
+    gal.mine = which === 'mine';
+    el.edGallery.hidden = !gal.open;
+    el.edMine.hidden = !gal.mine;
+    el.edGrid.hidden = !!which;
+    el.edGalBtn.setAttribute('aria-expanded', String(gal.open));
+    el.edMineBtn.setAttribute('aria-expanded', String(gal.mine));
+    if (!which) {
       resize();
       // (a track picked far down the list: back to the map at once)
       if (root.getBoundingClientRect().top < 0) intoView(root, true);
       return;
     }
-    galStatus('');
-    renderGallery(true);
+    if (gal.open) { galStatus(''); renderGallery(true); } else { mineStatus(''); renderMine(); }
     fetchGallery();
-    // the radio's slots, to say what is on it too
-    if (radio.state === 'on' && !radio.listed) job(listRadio, galStatus);
+    // the radio's slots read afresh (a card changed by hand shows as it is now)
+    if (radio.state === 'on' && !radio.busy) job(listRadio, gal.open ? galStatus : mineStatus);
   }
+  const showGallery = (on) => showPanel(on ? 'open' : null);
   // the slots with another version of these gallery tracks get the gallery's (asked first: their
   // best times start over); on the radio only while a slot still holds the file listed
   function update(which) {
@@ -1720,11 +1743,10 @@
       const t = gal.list[i], pe = placesOf(t, emu).old, pr = placesOf(t, rad).old;
       pe.forEach((n) => here.push([n, t]));
       pr.forEach((n) => there.push([n, t, rad[n - 1].text]));
-      const w = (pe.length ? [cs(pe) + ' in the emulator'] : []).concat(pr.length ? [cs(pr) + ' on the radio'] : []);
-      if (w.length) said.push('"' + t.name + '" in ' + w.join(' and '));
+      if (pe.length || pr.length) said.push('"' + t.name + '" in ' + inWords(pe, pr));
     }
     if (!said.length) return;
-    if (there.length && radio.busy) { galStatus('The radio\'s card is busy: try again in a moment.', 'bad'); return; }
+    if (there.length && radio.busy) { mineStatus('The radio\'s card is busy: try again in a moment.', 'bad'); return; }
     if (!window.confirm('Put the gallery\'s version of ' + andList(said) + '? Their best times and ghosts start over: to the game, a changed track is another track.')) return;
     let kept = true;
     for (const [n, t] of here) kept = s.writeSD(slotPath(n), t.text) !== false && kept;
@@ -1732,7 +1754,7 @@
     const fresh = here.length && freshGame();
     const done = here.length ? 'Updated ' + cs(here.map((h) => h[0])) + ' in the emulator' + (fresh ? '.' : ' (the game reads ' + (here.length > 1 ? 'them' : 'it') +
       ' at its next start: Restart).') + (kept ? '' : ' The browser\'s storage is full: that lasts only this visit.') : '';
-    if (!there.length) { galStatus(done, kept ? 'ok' : 'bad'); renderGallery(); return; }
+    if (!there.length) { mineStatus(done, kept ? 'ok' : 'bad'); return; }
     const gen = radio.gen;
     job(async () => {
       if (gen !== radio.gen) return;
@@ -1744,17 +1766,16 @@
         put.push(n);
       }
       await listRadio();
-      galStatus((done ? done + ' ' : '') + (put.length ? 'Updated ' + cs(put) + ' on the radio: restart StickTime on it.' : '') +
+      mineStatus((done ? done + ' ' : '') + (put.length ? 'Updated ' + cs(put) + ' on the radio: restart StickTime on it.' : '') +
         (moved.length ? ' ' + cs(moved) + ' on the radio changed since it was read: left alone.' : ''), moved.length || !kept ? 'bad' : 'ok');
-    }, galStatus, true);
+    }, mineStatus, true);
   }
-  // a gallery track into the editor as it is, in the slot that is its (then Fly it, Save file,
-  // Send to radio)
-  function fromGallery(i, andFly) {
+  // a gallery track into the editor as it is, in the slot that is its (then the Send buttons)
+  function fromGallery(i) {
     const t = gal.list[i];
     if (!t) return;
     if (!okToReplace('"' + t.name + '" from the gallery')) { (gal.open ? galStatus : status)('Kept your track: "' + t.name + '" not opened.'); return; }
-    showGallery(false);
+    showPanel(null);
     pushUndo();
     load(parseFile(t.text).T, true);
     ed.slot = slotFor(t);
@@ -1763,10 +1784,13 @@
     fit();
     saveSoon();
     status('"' + t.name + '" from the gallery' + (t.by ? ', by ' + t.by : '') + ': ' + slotSays(t.text), 'ok');
-    if (andFly) fly(); else cv.focus({ preventScroll: true });
+    cv.focus({ preventScroll: true });
   }
-  el.edGalBtn.addEventListener('click', () => showGallery(!gal.open));
+  el.edGalBtn.addEventListener('click', () => showPanel(gal.open ? null : 'open'));
+  el.edMineBtn.addEventListener('click', () => showPanel(gal.mine ? null : 'mine'));
   el.edGalSyncAll.addEventListener('click', () => update(outdated().map((o) => o.i)));
+  el.edAllFrom.addEventListener('click', () => radioToEmu(mineStatus));
+  el.edAllTo.addEventListener('click', () => emuToRadio(mineStatus));
   el.edGallery.addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (!b) return;
@@ -1777,8 +1801,17 @@
       const n = clamp(+d.sopen.slice(1) || 1, 1, SLOTS), r = d.sopen[0] === 'r';
       const x = r ? (radioRead() ? radioSlots[n - 1] : null) : asEntry(emuSlot(n));
       if (x && !x.bad) openText(x.text, 'c' + n + (r ? ' on the radio' : ' of the emulator'), n);
-    } else if (d.gfly !== undefined) fromGallery(+d.gfly, true);
-    else if (d.gopen !== undefined) fromGallery(+d.gopen, false);
+    } else if (d.gopen !== undefined) fromGallery(+d.gopen);
+  });
+  el.edMine.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    const d = b.dataset;
+    if (d.connect !== undefined) connect(mineStatus);
+    else if (d.sdel !== undefined) {
+      const n = clamp(+d.sdel.slice(1) || 1, 1, SLOTS);
+      if (d.sdel[0] === 'r') removeFromRadio(n, mineStatus); else removeEmu(n, mineStatus);
+    } else if (d.scopy !== undefined) copySlot(clamp(+d.scopy.slice(1) || 1, 1, SLOTS), d.scopy[0] === 'r', mineStatus);
     else if (d.gsync !== undefined) update([+d.gsync]);
   });
   // The slot list picks where the editor's track goes (the Send buttons, Save file); it never changes
@@ -1788,14 +1821,6 @@
     ed.picked = true;
     renderFly();
     saveSoon();
-  });
-  el.edEmuOpen.addEventListener('click', () => {
-    const t = emuSlot(ed.slot);
-    if (t !== null) openText(t, 'c' + ed.slot + ' of the emulator', ed.slot);
-  });
-  el.edRadioOpen.addEventListener('click', () => {
-    const e = radioRead() ? radioSlots[ed.slot - 1] : null;
-    if (e && !e.bad) openText(e.text, 'c' + ed.slot + ' on the radio', ed.slot);
   });
 
   // Send to emulator & fly: the file into the slot on the emulator's SD card, the game started again (it reads
@@ -1851,16 +1876,41 @@
   }
   el.edFly.addEventListener('click', fly);
   el.edSave.addEventListener('click', saveFile);
-  el.edEmpty.addEventListener('click', () => {
-    const s = sim(), slot = ed.slot, t = emuSlot(slot);
+  function removeEmu(slot, say) {
+    const s = sim(), t = emuSlot(slot);
     if (!s || t === null) return;
     if (!window.confirm('Remove c' + slot + ' from the emulator? ' + what(asEntry(t)).replace(/^a/, 'A') +
       ' goes from its SD card (the radio and a file you saved keep theirs).')) return;
     const kept = s.removeSD(slotPath(slot)) !== false;
     renderSlots();
-    status('Removed c' + slot + ' from the emulator.' + (freshGame() ? '' : ' The game\'s track menu shows it at its next start (Restart).') +
+    say('Removed c' + slot + ' from the emulator.' + (freshGame() ? '' : ' The game\'s track menu shows it at its next start (Restart).') +
       (kept ? '' : ' The browser\'s storage is blocked: the slot comes back at the next visit.'), kept ? 'ok' : 'bad');
-  });
+  }
+  el.edSyncMine.addEventListener('click', () => showPanel('mine'));
+  // one slot copied across: the emulator's to the radio's same slot, or the other way (asked first
+  // when it replaces another track there)
+  function copySlot(n, toRadio, say) {
+    const s = sim(), here = asEntry(emuSlot(n)), there = radioRead() ? radioSlots[n - 1] : null;
+    const from = toRadio ? here : there, to = toRadio ? there : here, where = toRadio ? ' on the radio' : ' in the emulator';
+    if (!s || !from || from.bad) return;
+    if (to && (to.bad || norm(to.text) !== norm(from.text)) && !window.confirm('Replace c' + n + where + ', ' + what(to) + ', with "' + nameOf(from.text) + '"?')) return;
+    if (!toRadio) {
+      const kept = s.writeSD(slotPath(n), from.text) !== false;
+      renderSlots();
+      say('Copied c' + n + ' from the radio to the emulator.' + (freshGame() ? '' : ' The game reads it at its next start (Restart).') +
+        (kept ? '' : ' The browser\'s storage is full: the emulator keeps it only for this visit.'), kept ? 'ok' : 'bad');
+      return;
+    }
+    const gen = radio.gen;
+    job(async () => {
+      if (gen !== radio.gen) return;
+      const dir = await tracksDir(true), now = await readSlot(dir, n);
+      if ((now && now.text) !== (to && to.text)) { say('c' + n + ' on the radio changed since it was read: nothing copied. Look again.', 'bad'); await listRadio(); return; }
+      await writeSlot(dir, n, from.text);
+      await listRadio();
+      say('Copied c' + n + ' to the radio. On the radio: restart StickTime.', 'ok');
+    }, say, true);
+  }
 
   // ---------------------------------------------------------------- the radio's SD card
   // Chrome, Edge and Opera on a computer can read and write a folder the user picks (File System
@@ -1973,26 +2023,16 @@
       : bad ? 'Fix the problems listed under Check first' : 'Write c' + ed.slot + '.txt to the radio\'s SD card (track ' + (8 + ed.slot) + ')';
     el.edRadioLineText.textContent = listed ? 'c' + ed.slot + ': ' + holds(re) + ' · ' + name
       : on ? name + ' connected' + (radio.busy ? ', reading…' : '') : ask ? name + ': allow again' : 'not connected';
-    el.edRadioDel.hidden = !(listed && re);
-    el.edRadioOpen.hidden = !(listed && re && !re.bad && norm(re.text) !== ed.file.text);
-    el.edRadioOpen.title = 'Open c' + ed.slot + ' of the radio in the editor';
-    el.edRadioDel.disabled = radio.busy;
-    el.edRadioDel.title = 'Take c' + ed.slot + ' off the radio\'s SD card';
-    const diff = [], from = [], to = [];
+    const diff = [];
     if (listed) {
       for (let i = 1; i <= SLOTS; i++) {
         const t = emuSlot(i), e = radioSlots[i - 1];
         if ((t === null && !e) || (t !== null && e && !e.bad && norm(t) === norm(e.text))) continue;
         diff.push(i);
-        if (e && !e.bad) from.push(i);
-        if (t !== null && !unreadable(t)) to.push(i);
       }
     }
     el.edSyncLine.hidden = !diff.length;
-    el.edSyncText.textContent = 'The emulator\'s slots and the radio\'s differ: ' + diff.map((i) => 'c' + i).join(', ') + '.';
-    el.edSyncFrom.hidden = !from.length;
-    el.edSyncTo.hidden = !to.length;
-    el.edSyncFrom.disabled = el.edSyncTo.disabled = radio.busy;
+    el.edSyncText.textContent = 'The emulator and the radio hold different tracks in ' + andList(diff.map((i) => 'c' + i)) + '.';
     // the panel: the connection
     el.edRadio.hidden = el.rpTracksSec.hidden = !radio.ok;
     el.edRadioNote.className = 'note ed-rnote' + (radio.ok ? '' : ' warn');
@@ -2012,8 +2052,7 @@
     el.edConnect.hidden = on;
     el.edRefresh.hidden = !on;
     el.edForget.hidden = !(on || ask);
-    el.edConnect.disabled = el.edRefresh.disabled = el.edForget.disabled = el.edRadioToEmu.disabled = el.edEmuToRadio.disabled = radio.busy;
-    el.edRadioSlots.querySelectorAll('button').forEach((b) => { b.disabled = radio.busy; });
+    el.edConnect.disabled = el.edRefresh.disabled = el.edForget.disabled = radio.busy;
     const noTools = radio.at === 'tracks', shown = !!(on && GAME && !noTools && inst.card);
     el.edInstallPanel.hidden = !shown;
     el.rpInstWait.hidden = !GAME || shown;
@@ -2021,11 +2060,6 @@
       : noTools ? 'Connect the card\'s drive (or its SCRIPTS/TOOLS folder) to install the game.'
         : inst.err || (radio.busy ? 'Reading the card…' : 'The game on the card isn\'t read yet: Read again.');
     el.edInstallGo.disabled = radio.busy || !inst.card || !Object.values(inst.pick).some(Boolean);
-    // your tracks on the radio
-    el.edRadioPanel.hidden = !(on && radio.listed);
-    el.rpTracksWait.hidden = on && radio.listed;
-    el.rpTracksWait.textContent = !on ? 'Connect the radio\'s SD card to see the tracks on it.'
-      : radio.busy ? 'Reading the card…' : 'The card\'s tracks aren\'t read yet: Read again.';
   }
   // a radio job: one at a time; a card that went away (unplugged) or lost its permission says so
   // (say: the panel's line, or the editor's for Send to radio; writes: leaving the page asks first)
@@ -2048,6 +2082,7 @@
     } finally {
       radio.busy = radio.writing = false;
       renderRadio();
+      if (ed.T) renderSlots();                         // (the lists' buttons on again)
       if (radio.again) {
         radio.again = false;
         if (radio.panel && radio.state === 'on' && !radio.listed) job(refreshRadio);
@@ -2145,12 +2180,6 @@
   async function listRadio() {
     radioSlots = await readAll();
     radio.listed = true;
-    el.edRadioPath.textContent = 'On ' + cardName(radio.dir) + (STEPS[radio.at].length ? ' · ' + STEPS[radio.at].join('/') : '');
-    el.edRadioSlots.innerHTML = radioSlots.map((e, i) => '<li><span><b>c' + (i + 1) + '</b> · track ' + (i + 9) + ' · ' +
-      (e === null ? '<em>empty</em>' : e.bad ? '<em class="bad">' + BAD[e.bad] + '</em>' : esc(nameOf(e.text))) + '</span>' +
-      (e === null ? '' : '<span class="ed-rbtns">' + (e.bad ? '' : '<button class="btn" type="button" data-ropen="' + (i + 1) + '">Open in editor</button>') +
-        '<button class="btn" type="button" data-rdel="' + (i + 1) + '" title="Remove c' + (i + 1) + '.txt from the radio\'s SD card">Remove</button></span>') +
-      '</li>').join('');
     renderRadio();
     if (ed.T && !ed.picked) {
       const h = homes(ed.file.text);
@@ -2193,7 +2222,7 @@
     const r = parseFile(text);
     if (r.error) { status('Can\'t open ' + what + ': ' + r.error, 'bad'); return; }
     if (!okToReplace('"' + r.T.name + '" (' + what + ')')) { (gal.open ? galStatus : status)('Kept your track: ' + what + ' not opened.'); return; }
-    if (gal.open) showGallery(false);
+    if (gal.open || gal.mine) showPanel(null);
     pushUndo();
     load(r.T, true);
     slot = slot || homeOf(ed.file.text);
@@ -2274,23 +2303,17 @@
     el.edConnect.focus();
   });
   // a radio slot into the track editor, on that slot
-  el.edRadioSlots.addEventListener('click', (e) => {
-    const del = e.target.closest('[data-rdel]');
-    if (del) { removeFromRadio(+del.dataset.rdel); return; }
-    const b = e.target.closest('[data-ropen]');
-    const n = b ? +b.dataset.ropen : 0, t = radioSlots[n - 1];
-    if (!t || t.bad) return;
-    openEditor();
-    openText(t.text, 'c' + n + '.txt from the radio', n);
-  });
+  // Install's Show your tracks: the table of the slots, in the track editor's Open
+  el.rpShowTracks.addEventListener('click', () => { openEditor(); showPanel('mine'); });
 
   // ---------------------------------------------------------------- the two panels
   // Tracks (the track editor) and Install (the radio's SD card), each with its toolbar button, in the
   // same place above the emulator: opening one closes the other
   function openEditor() {
     if (radio.panel) closeRadio(false);
+    if (!ed.open) status('');                          // (what was said last time is old news)
     fetchGallery();
-    if (radio.state === 'on' && !radio.listed && !radio.busy) job(listRadio, status);
+    if (radio.state === 'on' && !radio.busy) job(listRadio, status);                 // (as it is now)
     ed.open = true;
     root.hidden = false;
     el.tracksBtn.setAttribute('aria-expanded', 'true');
@@ -2336,11 +2359,6 @@
     e.preventDefault();
     closeRadio(true);
   });
-  el.edRadioToEmu.addEventListener('click', () => radioToEmu());
-  el.edEmuToRadio.addEventListener('click', () => emuToRadio());
-  el.edSyncFrom.addEventListener('click', () => radioToEmu(status));
-  el.edSyncTo.addEventListener('click', () => emuToRadio(status));
-  el.edRadioDel.addEventListener('click', () => removeFromRadio(ed.slot, status));
   // the card picked on an earlier visit: back at once if the browser still allows it, else Reconnect
   // (a job: Disconnect waits for it)
   function restoreRadio() {
