@@ -64,7 +64,7 @@ local OPTS = {
   { "Wind", "wind", { 0, 1, 2 }, { "Off", "Light", "Strong" } },
   { "Prop wash", "wash", { 0, 1, 2 }, { "Off", "Stock", "Max" } },
   { "Grip", "grip", { 0, 1, 2 }, { "Low", "Medium", "High" } },
-  { "Battery", "batt", { 0, 1, 2 }, { "Off", "Real", "Long" } },
+  { "Battery", "batt", { 0, 1, 3, 2 }, { "Off", "Real", "1.5x", "2x" } },   -- (3: 1.5x, added after 2x)
   { "Vibration", "vib", { 0, 1 }, { "Off", "On" } },
   { "Show FPS", "fps", { 0, 1 }, { "Off", "On" } },
 }
@@ -460,11 +460,11 @@ local R = { laps = {}, n = 0, total = 0, newLap = false, newRace = false, newBes
 -- volts a cell has over 4.2 when full (LiHV). In use (applySettings): cells n, capacity mah (twice
 -- for Long), resistance r (ohm), current f, h. The pack's state: charge s (1 full .. 0 empty), cell
 -- voltage under load v (filtered over about 1 s), current i (A), flight time t and time since it ran
--- empty e (s), warning w (1 below 3.5 V a cell, 2 below 3.3 V), when LOW BATTERY last showed m (ticks)
+-- empty e (s), warning w (1 below 3.5 V a cell, 2 below 3.3 V)
 local BAT = { "4 1300 6 95 0", "4 1500 6 120 0", "3 550 20 28 .15", "1 300 45 11 .15", "2 300 35 14 .15",
-              s = 1, v = 4.2, i = 0, t = 0, e = 0, w = 0, m = 0 }
+              s = 1, v = 4.2, i = 0, t = 0, e = 0, w = 0 }
 BAT.new = function()                                   -- a fresh pack
-  BAT.s, BAT.v, BAT.i, BAT.t, BAT.e, BAT.w, BAT.m = 1, 4.2 + BAT.h, 0, 0, 0, 0, 0
+  BAT.s, BAT.v, BAT.i, BAT.t, BAT.e, BAT.w = 1, 4.2 + BAT.h, 0, 0, 0, 0
 end
 
 local function timeStr(cs)
@@ -1417,7 +1417,7 @@ local function applySettings()
     P[QK[i]] = tonumber(v)
   end
   local n, c, o, f, h = string.match(BAT[S.quad] or BAT[1], "(%S+) (%S+) (%S+) (%S+) (%S+)")   -- the class's pack
-  BAT.n, BAT.mah, BAT.r, BAT.f, BAT.h = tonumber(n), tonumber(c) * (S.batt == 2 and 2 or 1), tonumber(o) * 0.001, tonumber(f), tonumber(h)
+  BAT.n, BAT.mah, BAT.r, BAT.f, BAT.h = tonumber(n), tonumber(c) * (S.batt == 2 and 2 or S.batt == 3 and 1.5 or 1), tonumber(o) * 0.001, tonumber(f), tonumber(h)
   if S.twr > 0 and (S.twr < P.tlo or S.twr > P.thi) then S.twr = 0 end   -- not for this class: Stock
   if S.twr > 0 then P.twr = S.twr end       -- 0: the class's stock power
   if S.wash == 1 then P.wl, P.wv, P.pw = P.wls, P.wvs, P.pws end  -- Stock: the class's own wash
@@ -2107,6 +2107,7 @@ local handleEvent
       -- back at the last gate (Freestyle: where it flew a second ago), the clock running on
       if pausedFrom == COUNT then state = COUNT else
         respawn()
+        BAT.new()                                  -- with a fresh pack
         state, R.ready = READY, gt
       end
     elseif i == 3 then startRace(gmode)

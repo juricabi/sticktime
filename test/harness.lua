@@ -762,7 +762,7 @@ end
 -- 14. battery: Off changes nothing; a fresh pack flies as without it (Betaflight's sag compensation)
 -- and a drained one loses thrust on a punch; it runs down only while flying; at the end of a pack it
 -- warns, limps, then the motors stop and EMPTY ends the flight without counting a crash, with a fresh
--- pack; a hit or a respawn keeps the pack; Long has twice the capacity
+-- pack; a hit keeps the pack, Respawn brings a fresh one; 2x has twice the capacity
 do
   local quad, twr, mode = T.S.quad, T.S.twr, T.S.mode
   T.track(1) T.set("mode", 2) T.set("quad", 1) T.set("twr", 0)
@@ -831,16 +831,17 @@ do
   idleSticks()
   steps(30)
   if state() ~= 6 or T.bat("s") ~= 1 then fail("battery: EMPTY should respawn with a fresh pack (state " .. state() .. ")") end
-  -- a hard hit keeps the pack (and counts), so does the pause menu's Respawn
+  -- a hard hit keeps the pack (and counts); the pause menu's Respawn brings a fresh one
   fly(1)
   T.bat("s", 0.5)
   T.pose(0, 3, 0, 0, 0, 0) T.vel(0, -15, 0)
   steps(30)
-  frame(EVT_VIRTUAL_EXIT) frame(EVT_VIRTUAL_NEXT) frame(EVT_VIRTUAL_ENTER)
   local s1, why1 = T.bat("s")
-  if state() ~= 6 or why1 or select(6, T.race()) ~= 1 or s1 > 0.5 or s1 < 0.49 then
-    fail(string.format("battery: a hit and a respawn should keep the pack (state %d, %s, charge %.3f)", state(), tostring(why1), s1))
+  if state() ~= 4 or why1 or select(6, T.race()) ~= 1 or s1 > 0.5 or s1 < 0.49 then
+    fail(string.format("battery: a hit should keep the pack (state %d, %s, charge %.3f)", state(), tostring(why1), s1))
   end
+  frame(EVT_VIRTUAL_EXIT) frame(EVT_VIRTUAL_NEXT) frame(EVT_VIRTUAL_ENTER)
+  if state() ~= 6 or T.bat("s") ~= 1 then fail(string.format("battery: Respawn should bring a fresh pack (state %d, charge %.3f)", state(), T.bat("s"))) end
   -- the pause and finish screens with the pack's flight time and mAh used
   T.state(4) frame(EVT_VIRTUAL_EXIT) frame(0) frame(EVT_VIRTUAL_EXIT)
   T.state(8) frame(0) frame(0)

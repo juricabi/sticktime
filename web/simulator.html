@@ -1583,7 +1583,7 @@ local OPTS = {
   { "Wind", "wind", { 0, 1, 2 }, { "Off", "Light", "Strong" } },
   { "Prop wash", "wash", { 0, 1, 2 }, { "Off", "Stock", "Max" } },
   { "Grip", "grip", { 0, 1, 2 }, { "Low", "Medium", "High" } },
-  { "Battery", "batt", { 0, 1, 2 }, { "Off", "Real", "Long" } },
+  { "Battery", "batt", { 0, 1, 3, 2 }, { "Off", "Real", "1.5x", "2x" } },   -- (3: 1.5x, added after 2x)
   { "Vibration", "vib", { 0, 1 }, { "Off", "On" } },
   { "Minimap", "map", { 0, 1 }, { "Off", "On" } },
   { "Stick view", "sticks", { 0, 1 }, { "Off", "On" } },
@@ -1999,11 +1999,11 @@ local R = { laps = {}, n = 0, total = 0, newLap = false, newRace = false, newBes
 -- volts a cell has over 4.2 when full (LiHV). In use (applySettings): cells n, capacity mah (twice
 -- for Long), resistance r (ohm), current f, h. The pack's state: charge s (1 full .. 0 empty), cell
 -- voltage under load v (filtered over about 1 s), current i (A), flight time t and time since it ran
--- empty e (s), warning w (1 below 3.5 V a cell, 2 below 3.3 V), when LOW BATTERY last showed m (ticks)
+-- empty e (s), warning w (1 below 3.5 V a cell, 2 below 3.3 V)
 local BAT = { "4 1300 6 95 0", "4 1500 6 120 0", "3 550 20 28 .15", "1 300 45 11 .15", "2 300 35 14 .15",
-              s = 1, v = 4.2, i = 0, t = 0, e = 0, w = 0, m = 0 }
+              s = 1, v = 4.2, i = 0, t = 0, e = 0, w = 0 }
 BAT.new = function()                                   -- a fresh pack
-  BAT.s, BAT.v, BAT.i, BAT.t, BAT.e, BAT.w, BAT.m = 1, 4.2 + BAT.h, 0, 0, 0, 0, 0
+  BAT.s, BAT.v, BAT.i, BAT.t, BAT.e, BAT.w = 1, 4.2 + BAT.h, 0, 0, 0, 0
 end
 BAT.text = function()                                  -- flight time (m:ss) and mAh used
   return fmt("%d:%02d", floor(BAT.t / 60), floor(BAT.t) % 60), floor((1 - BAT.s) * BAT.mah + 0.5) .. "mAh"
@@ -2447,7 +2447,6 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
           beep(660, 150)
         end
       end
-      if w > 0 and BAT.w == 0 and gt - BAT.m > 2000 then BAT.m = gt end   -- LOW BATTERY: at most every 20 s
       BAT.s, BAT.i, BAT.v, BAT.t, BAT.w = s, I, v, t, w
       T = T * k
     end
@@ -3064,7 +3063,7 @@ local function applySettings()
     P[QK[i]] = tonumber(v)
   end
   local n, c, o, f, h = string.match(BAT[S.quad] or BAT[1], "(%S+) (%S+) (%S+) (%S+) (%S+)")   -- the class's pack
-  BAT.n, BAT.mah, BAT.r, BAT.f, BAT.h = tonumber(n), tonumber(c) * (S.batt == 2 and 2 or 1), tonumber(o) * 0.001, tonumber(f), tonumber(h)
+  BAT.n, BAT.mah, BAT.r, BAT.f, BAT.h = tonumber(n), tonumber(c) * (S.batt == 2 and 2 or S.batt == 3 and 1.5 or 1), tonumber(o) * 0.001, tonumber(f), tonumber(h)
   if S.twr > 0 and (S.twr < P.tlo or S.twr > P.thi) then S.twr = 0 end   -- not for this class: Stock
   if S.twr > 0 then P.twr = S.twr end       -- 0: the class's stock power
   if S.wash == 1 then P.wl, P.wv, P.pw = P.wls, P.wvs, P.pws end  -- Stock: the class's own wash
@@ -4415,25 +4414,21 @@ local render, hitTest, pauseHit, initUI
     stickBox(x + s + gap, y, s, rx_, ry_)
   end
 
-  -- the battery (setting), Betaflight OSD style: pack and cell voltage, a charge bar with the flight
-  -- time, current and mAh used. The voltage blinks below 3.5 V a cell. Bottom-left corner at x, y
+  -- the battery (setting) in flight, as on B&W: a battery that empties and the cell voltage; white,
+  -- yellow below 3.5 V a cell, red and blinking below 3.3 V (the pause and finish screens have the
+  -- rest). Bottom-left at x, y
   local function drawBattery(x, y)
-    local bw, bh, s = floor(56 * SC + 6), floor(3 * SC + 3), BAT.s
-    local t, mah = BAT.text()
+    local w = BAT.w
+    if w > 1 and gt % 50 >= 30 then return end
+    local c = w == 0 and C.white or w == 1 and C.accent2 or C.bad
+    local bw, bh = floor(16 * SC + 4), floor(6 * SC + 3)
     y = y - hS
-    txt(x, y, floor(BAT.i + 0.5) .. "A  " .. mah, SMLSIZE + C.white)
-    y = y - hS - 1
     local by = y + floor((hS - bh) / 2)
     fillRect(x, by, bw, bh, C.panel, 6)
-    fillRect(x, by, floor(bw * s + 0.5), bh, s > 0.4 and C.good or s > 0.2 and C.accent2 or C.bad)
-    txt(x + bw + 4, y, t, SMLSIZE + C.white)
-    y = y - hL
-    local w = BAT.w
-    if w == 0 or gt % 50 < 30 then
-      local c, v = w == 0 and C.white or w == 1 and C.accent2 or C.bad, fmt("%.1fV ", BAT.v * BAT.n)
-      txt(x, y, v, MIDSIZE + c)
-      txt(x + (lcd.sizeText and lcd.sizeText(v, MIDSIZE) or floor(66 * SC)), y + (hL - hS) * 0.8, fmt("%.2f", BAT.v), SMLSIZE + c)
-    end
+    lcd.drawRectangle(x, by, bw, bh, c)
+    fillRect(x + bw, by + floor(bh / 4), 2, bh - 2 * floor(bh / 4), c)
+    fillRect(x + 2, by + 2, floor((bw - 4) * BAT.s + 0.5), bh - 4, c)
+    txt(x + bw + 6, y, fmt("%.2fV", BAT.v), SMLSIZE + c)
   end
 
   local function lapText(l)
@@ -4500,8 +4495,11 @@ local render, hitTest, pauseHit, initUI
     fillRect(m, by, bw, bh, C.panel, 6)
     local th = floor(bh * sT)
     fillRect(m, by + bh - th, bw, th, sT > 0.7 and C.bad or C.accent)
-    if S.batt > 0 and state < PAUSED then drawBattery(m, by - m) end   -- (the pause and finish screens have it)
     txt(m + bw + 4, VY + VH - m - hS, floor(py) .. "m", SMLSIZE + C.white)
+    -- the battery right of the altitude (not under the pause and finish boxes, which have it)
+    if S.batt > 0 and state < PAUSED then
+      drawBattery(m + bw + 10 + (lcd.sizeText and lcd.sizeText("000m", SMLSIZE) or floor(30 * SC)), VY + VH - m)
+    end
     if P.angle then txt(m + bw + 4, VY + VH - m - hS * 2, "ANGLE", SMLSIZE + C.cyan) end
     txt(W - m, VY + VH - m - hL, floor(speed * 3.6) .. " km/h", MIDSIZE + RIGHT + C.white)
     if S.wind > 0 then
@@ -4739,11 +4737,6 @@ local render, hitTest, pauseHit, initUI
       end
     elseif state == DONE then
       drawDone()
-    elseif state == FLY and S.batt > 0 and BAT.w > 0 and gt % 50 < 30 then
-      -- battery warnings, blinking under the crosshair: LOW BATTERY for 3 s as it starts, LAND NOW while it lasts
-      local y = CY + hX * 0.6
-      if BAT.w > 1 then txt(CX, y, "LAND NOW", DBLSIZE + CENTER + C.bad)
-      elseif gt - BAT.m < 300 then txt(CX, y, "LOW BATTERY", DBLSIZE + CENTER + C.accent2) end
     end
     if R.msg and state ~= PAUSED and state ~= DONE then
       if gt - R.msgT < 220 then
@@ -4812,6 +4805,7 @@ local handleEvent
       -- back at the last gate (Freestyle: where it flew a second ago), the clock running on
       if pausedFrom == COUNT then state = COUNT else
         respawn()
+        BAT.new()                                  -- with a fresh pack
         state, R.ready = READY, gt
       end
     elseif i == 3 then startRace(gmode)
@@ -5060,7 +5054,7 @@ local OPTS = {
   { "Wind", "wind", { 0, 1, 2 }, { "Off", "Light", "Strong" } },
   { "Prop wash", "wash", { 0, 1, 2 }, { "Off", "Stock", "Max" } },
   { "Grip", "grip", { 0, 1, 2 }, { "Low", "Medium", "High" } },
-  { "Battery", "batt", { 0, 1, 2 }, { "Off", "Real", "Long" } },
+  { "Battery", "batt", { 0, 1, 3, 2 }, { "Off", "Real", "1.5x", "2x" } },   -- (3: 1.5x, added after 2x)
   { "Vibration", "vib", { 0, 1 }, { "Off", "On" } },
   { "Show FPS", "fps", { 0, 1 }, { "Off", "On" } },
 }
@@ -5456,11 +5450,11 @@ local R = { laps = {}, n = 0, total = 0, newLap = false, newRace = false, newBes
 -- volts a cell has over 4.2 when full (LiHV). In use (applySettings): cells n, capacity mah (twice
 -- for Long), resistance r (ohm), current f, h. The pack's state: charge s (1 full .. 0 empty), cell
 -- voltage under load v (filtered over about 1 s), current i (A), flight time t and time since it ran
--- empty e (s), warning w (1 below 3.5 V a cell, 2 below 3.3 V), when LOW BATTERY last showed m (ticks)
+-- empty e (s), warning w (1 below 3.5 V a cell, 2 below 3.3 V)
 local BAT = { "4 1300 6 95 0", "4 1500 6 120 0", "3 550 20 28 .15", "1 300 45 11 .15", "2 300 35 14 .15",
-              s = 1, v = 4.2, i = 0, t = 0, e = 0, w = 0, m = 0 }
+              s = 1, v = 4.2, i = 0, t = 0, e = 0, w = 0 }
 BAT.new = function()                                   -- a fresh pack
-  BAT.s, BAT.v, BAT.i, BAT.t, BAT.e, BAT.w, BAT.m = 1, 4.2 + BAT.h, 0, 0, 0, 0, 0
+  BAT.s, BAT.v, BAT.i, BAT.t, BAT.e, BAT.w = 1, 4.2 + BAT.h, 0, 0, 0, 0
 end
 
 local function timeStr(cs)
@@ -6413,7 +6407,7 @@ local function applySettings()
     P[QK[i]] = tonumber(v)
   end
   local n, c, o, f, h = string.match(BAT[S.quad] or BAT[1], "(%S+) (%S+) (%S+) (%S+) (%S+)")   -- the class's pack
-  BAT.n, BAT.mah, BAT.r, BAT.f, BAT.h = tonumber(n), tonumber(c) * (S.batt == 2 and 2 or 1), tonumber(o) * 0.001, tonumber(f), tonumber(h)
+  BAT.n, BAT.mah, BAT.r, BAT.f, BAT.h = tonumber(n), tonumber(c) * (S.batt == 2 and 2 or S.batt == 3 and 1.5 or 1), tonumber(o) * 0.001, tonumber(f), tonumber(h)
   if S.twr > 0 and (S.twr < P.tlo or S.twr > P.thi) then S.twr = 0 end   -- not for this class: Stock
   if S.twr > 0 then P.twr = S.twr end       -- 0: the class's stock power
   if S.wash == 1 then P.wl, P.wv, P.pw = P.wls, P.wvs, P.pws end  -- Stock: the class's own wash
@@ -7103,6 +7097,7 @@ local handleEvent
       -- back at the last gate (Freestyle: where it flew a second ago), the clock running on
       if pausedFrom == COUNT then state = COUNT else
         respawn()
+        BAT.new()                                  -- with a fresh pack
         state, R.ready = READY, gt
       end
     elseif i == 3 then startRace(gmode)

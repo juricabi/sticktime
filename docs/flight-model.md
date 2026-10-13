@@ -170,7 +170,7 @@ Freestyle a strike ends the combo in progress and its tumble counts as no trick.
 
 ## Battery
 
-The **Battery** setting (Off by default, Real, or Long with twice the capacity) is a model of its
+The **Battery** setting (Off by default, Real, 1.5x or 2x the capacity) is a model of its
 own, not part of the fit. Once a frame it takes the thrust the stick asks for (before the motors'
 lag), with `c = T/Tmax` and the charge `s` (1 full, 0 empty):
 
@@ -193,8 +193,8 @@ top), the battery never makes a lap faster, and the bests stay comparable. The v
 warned about is `v` filtered over about 1 s: below 3.5 V a cell a beep every 2 s, below 3.3 V a
 double beep and LAND (Betaflight's default `vbat_warning_cell_voltage` and `vbat_min_cell_voltage`).
 Under a long punch it dips under them mid-pack, as on a real quad. A second after the motors stop
-the flight ends (EMPTY, not counted as a crash) and the quad respawns with a fresh pack; a crash
-keeps the pack, every start gets a fresh one, and the AI pilots fly without one.
+the flight ends (EMPTY, not counted as a crash) and the quad respawns with a fresh pack; a hit
+keeps the pack, every start and the pause menu's Respawn get a fresh one, and the AI pilots fly without one.
 
 | | Racer 5" | Freestyle 5" | 3" toothpick | Whoop 65mm | Whoop 75mm |
 |---|---|---|---|---|---|
@@ -205,7 +205,7 @@ keeps the pack, every start gets a fresh one, and the AI pilots fly without one.
 | flight on Real, hard / cruise (min) | 1.9 / 4.7 | 1.7 / 3.8 | 2.2 / 4.5 | 1.9 / 2.6 | 1.7 / 3.0 |
 
 Hard is 0.5 s of full throttle and 1.5 s at three times the weight in thrust, over and over; cruise
-is twice the weight (fast forward flight). Long flies twice as long. Sources: Betaflight's battery
+is twice the weight (fast forward flight). 1.5x and 2x fly one and a half and twice as long. Sources: Betaflight's battery
 settings and tuning notes (the warning and minimum cell voltages, sag compensation), published LiPo
 and LiHV discharge curves (rest voltage against charge), and motor and prop bench data (current
 against thrust, each class's full-throttle current).
