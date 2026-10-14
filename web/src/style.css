@@ -393,6 +393,7 @@ footer.credits a { color: inherit; }
 /* the Install panel: the connection and the game on the left, the tracks on the right */
 .rp-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 40px; align-items: start; }
 #radioPanel > .ed-head { margin-bottom: 18px; }
+#rpInstSec .ed-status { margin: 12px 0 0; }
 #radioPanel .ed-sec { padding: 18px 0; }
 #radioPanel .ed-sec:first-child { padding-top: 0; }
 #radioPanel .ed-sec h3 { margin-bottom: 12px; }

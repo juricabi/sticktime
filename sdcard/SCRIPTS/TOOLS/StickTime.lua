@@ -2845,6 +2845,18 @@ local render, hitTest, pauseHit, initUI
     fillRect(x + s * 0.56, y + s * 0.25, s * 0.14, s * 0.5, C.white)
   end
 
+  -- lined up to go through gate i: on its way-in side within 60 deg of its axis and, but for a dive
+  -- gate (dropped into from above, any heading), heading within 60 deg of the way through; for a
+  -- flag, on the side its pole leaves free too (gx, gz: the middle of its pass zone, GHW from the pole)
+  local function linedUp(i)
+    local nx, ny, nz, k = gnx[i], gny[i], gnz[i], gk[i]
+    local wx, wy, wz = AX[i] - px, AY[i] - py, AZ[i] - pz
+    if wx * nx + wy * ny + wz * nz <= 0.5 * sqrt(wx * wx + wy * wy + wz * wz) then return false end
+    if (k == 6 or k == 7) and ((px - gx[i]) * grx[i] + (pz - gz[i]) * grz[i]) * (k == 6 and 1 or -1) + GHW[k] <= 0 then return false end
+    return ny ~= 0 or fx * nx + fz * nz > 0.5 * sqrt(fx * fx + fz * fz)
+  end
+  if STICKTIME_TEST then STICKTIME_TEST.lined = linedUp end
+
   local function nextGateMarker()
     if gmode == 3 or NG == 0 then return end
     local i = nextGate
@@ -2858,7 +2870,7 @@ local render, hitTest, pauseHit, initUI
         local m = 7 * SC
         local bx, by = CX + sx, CY - sy - top
         if by < VY + m * 2 then by = VY + m * 2 end
-        fillTri(bx, by, bx - m, by - m * 1.4, bx + m, by - m * 1.4, C.accent2)
+        fillTri(bx, by, bx - m, by - m * 1.4, bx + m, by - m * 1.4, linedUp(i) and C.good or C.accent2)   -- green: lined up
         return
       end
     end

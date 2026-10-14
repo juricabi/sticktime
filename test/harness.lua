@@ -374,6 +374,49 @@ do
   else print(string.format("dive gate frame: the quad stops on it (%.2f m over the gate)", s[2] - gy5)) end
 end
 
+-- 4b. the next gate's marker turns green when lined up to go through it (the color game): a hoop
+-- from in front, heading through (not turned away, not from behind or the side), a flag, a dive
+-- gate from above
+if GAME_COLOR then
+  local atan2 = math.atan2 or math.atan
+  local function deg(nx, nz) return atan2(nx, nz) * 57.29578 end
+  local function at(i, back, side, up, turn)
+    local _, _, _, nx, ny, nz, _, ax, ay, az = T.gate(i)
+    local rx, rz = nz, -nx
+    T.pose(ax - nx * back + rx * side, ay - ny * back + (up or 0), az - nz * back + rz * side, deg(nx, nz) + (turn or 0), 0, 0)
+    return T.lined(i)
+  end
+  T.track(4)
+  T.start(2)
+  steps(5)
+  local hoop = { at(6, 8, 0), at(6, 8, 0, 0, 40), at(6, 8, 0, 0, 180), at(6, 8, 0, 0, 90), at(6, -8, 0), at(6, 4, 9) }
+  local flag = { at(2, 6, 0), at(2, 6, 0, 0, 180), at(2, -6, 0) }
+  do                                                            -- beyond the pole: the flag's wrong side
+    local fx, _, fz, nx, _, nz, _, ax, ay, az = T.gate(2)
+    T.pose(ax - (fx - ax) * 5 / 3.5 - nx * 6, ay, az - (fz - az) * 5 / 3.5 - nz * 6, deg(nx, nz), 0, 0)
+    flag[4] = T.lined(2)
+  end
+  if not (hoop[1] and hoop[2] and not hoop[3] and not hoop[4] and not hoop[5] and not hoop[6] and flag[1] and not flag[2] and not flag[3] and not flag[4]) then
+    fail("lined up: hoop " .. table.concat({ tostring(hoop[1]), tostring(hoop[2]), tostring(hoop[3]), tostring(hoop[4]), tostring(hoop[5]), tostring(hoop[6]) }, " ") ..
+      ", flag " .. tostring(flag[1]) .. " " .. tostring(flag[2]) .. " " .. tostring(flag[3]) .. " " .. tostring(flag[4]))
+  end
+  T.track(3)
+  T.start(2)
+  steps(5)
+  local gx, gy, gz = T.gate(6)                                  -- the dive gate
+  T.pose(gx, gy + 4, gz, 0, 0, 0)
+  local above = T.lined(6)
+  T.pose(gx, gy + 4, gz, 135, 0, 0)
+  local turned = T.lined(6)
+  T.pose(gx + 8, gy + 1, gz, 0, 0, 0)
+  local side = T.lined(6)
+  T.pose(gx, gy - 3, gz, 0, 0, 0)
+  local below = T.lined(6)
+  if not (above and turned and not side and not below) then
+    fail("lined up: dive gate " .. tostring(above) .. " " .. tostring(turned) .. " " .. tostring(side) .. " " .. tostring(below))
+  else print("next gate marker: green when lined up (hoop, flag on its free side, dive gate; not from behind, the side or turned away)") end
+end
+
 -- 5. flags and hoops: wrong side of a flag does not count, the hoop rim crashes
 T.track(4)
 T.start(2)
