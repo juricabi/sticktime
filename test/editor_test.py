@@ -174,8 +174,7 @@ def offline(ctx, cdn=False):
 
 SITE = "https://sticktime.test/"
 PARENT = "https://another.test/"
-NO_RADIO = ("This browser can't write to the radio's SD card: use Save file and copy it to "
-            "/SCRIPTS/TOOLS/StickTimeTracks/ on the radio.")
+NO_RADIO = "This browser can't reach the radio's SD card: that takes Chrome or Edge on a computer."
 NOT_CARD = "This doesn't look like the radio's SD card: no SCRIPTS folder. Pick the drive the radio shows up as."
 # the card: RADIO-SD/SCRIPTS/TOOLS with StickTime.lua in it, a Documents folder beside it, and
 # the folder picker answering with window.__pick
@@ -273,7 +272,7 @@ def radio_tests(br, errors):
     page.evaluate(PICK, "Documents")
     page.click("#edConnect")
     r = radio_done(page)
-    check(page.inner_text("#rpStatus") == NOT_CARD and r["state"] == "off", "radio: a folder without SCRIPTS is refused, plainly")
+    check(page.inner_text("#rpConnStatus") == NOT_CARD and r["state"] == "off", "radio: a folder without SCRIPTS is refused, plainly (under Connection)")
     # the card
     page.evaluate(PICK, "RADIO-SD")
     page.click("#edConnect")
@@ -380,7 +379,7 @@ def radio_tests(br, errors):
           "radio: ... which says first what to do on the radio")
     page.click("#connectGo")
     radio_done(page)
-    check(page.inner_text("#edSend") == "Send to radio" and page.inner_text("#edStatus").startswith("Radio SD: RADIO-SD connected."),
+    check(page.inner_text("#edSend") == "Send to radio" and page.inner_text("#edStatus").startswith("Connected to RADIO-SD."),
           "radio: ... and connects")
 
     # SCRIPTS/TOOLS or StickTimeTracks picked instead of the drive
@@ -509,7 +508,7 @@ def install_tests(br, errors):
     page.check('#edEditions [data-ed="lite"]')
     page.click("#edInstallGo")
     radio_done(page)
-    check(page.inner_text("#rpStatus") == f"StickTime {version} is on the radio: Color, B&W and Lite. Eject the drive before unplugging it.",
+    check(page.inner_text("#rpStatus") == f"StickTime {version} is on the radio: Color, B&W and Lite. Eject the drive before you unplug the radio.",
           f"install: {page.inner_text('#rpStatus')!r}")
     wrong = [k for k, v in GAME_FILES.items() if page.evaluate(CARD_HASH, T + k) != sha(v)]
     check(not wrong, f"install: every file of the release on the card as published ({len(GAME_FILES)} files){wrong}")
@@ -703,7 +702,7 @@ def panel_tests(br, errors):
     expanded = lambda: (page.get_attribute("#tracksBtn", "aria-expanded"), page.get_attribute("#radioBtn", "aria-expanded"))  # noqa: E731
     page.click("#radioBtn")
     check(page.is_visible("#radioPanel") and page.is_hidden("#editor") and expanded() == ("false", "true")
-          and page.text_content("#rpTitle").startswith("Radio & install"), "panels: Install opens its own panel, its button pressed")
+          and page.text_content("#rpTitle").startswith("Install"), "panels: Install opens its own panel, its button pressed")
     page.click("#tracksBtn")
     check(page.is_visible("#editor") and page.is_hidden("#radioPanel") and expanded() == ("true", "false")
           and page.text_content("#edTitle").startswith("Track editor"), "panels: Tracks opens the editor and closes Install")

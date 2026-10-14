@@ -32,8 +32,8 @@
   --line: #c5ccd4;
   --accent: #f26b10;
   --accent-soft: #fde2cf;
-  --ok: #23885a;
-  --warn: #b77400;
+  --ok: #1d774e;
+  --warn: #996100;
   --bad: #cc3a3a;
   /* physical objects keep their look in both themes */
   --mat: #2b5a4e;
@@ -130,6 +130,7 @@ select { max-width: 270px; }
 .music #songsClear[hidden] { display: none; }
 .file-btn { position: relative; overflow: hidden; }
 .file-btn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.file-btn:has(input:focus-visible), .music .songs:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* ----------------------------------------------------------------- layout */
 .layout { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 18px; padding-top: 16px; align-items: start; }
@@ -268,6 +269,18 @@ kbd { font: 500 11px/1 var(--font-mono); padding: 2px 5px; border-radius: 4px; b
 .meter i { position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; background: var(--accent); }
 .note { font-size: 12px; color: var(--muted); }
 .note.warn { color: var(--warn); }
+/* Ko-fi: the header's Support, the strip under the emulator, the thanks after an install */
+a.btn { color: inherit; text-decoration: none; }
+.btn.kofi { height: 28px; padding: 0 9px; margin-left: 4px; font-size: 12.5px; }
+.btn.kofi svg, .support-cup { color: #ff5e5b; }
+.btn.kofi:hover { border-color: #ff5e5b; }
+.support { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; margin-top: 18px; }
+.support-cup { flex: none; display: grid; }
+.support-text { flex: 1 1 300px; min-width: 0; }
+.support h2 { margin-bottom: 6px; }
+.btn.kofi-go { height: 38px; padding: 0 16px; background: #ff5e5b; border-color: #ff5e5b; color: #1c0c00; font-weight: 600; }
+.btn.kofi-go:hover { background: #ff7471; }
+.rp-thanks a { color: inherit; }
 footer.credits { margin-top: 22px; font-size: 12px; color: var(--muted); max-width: 900px; }
 footer.credits a { color: inherit; }
 
@@ -328,7 +341,7 @@ footer.credits a { color: inherit; }
 .ed-dialog ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 14px; }
 .ed-dialog .note { margin: 12px 0 0; }
 .ed-dialog .ed-row { margin-top: 16px; }
-.ed-rsync { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 12px 0 0; padding: 8px 12px; border: 1px solid var(--warn);
+.editor .ed-rsync { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 12px 0 0; padding: 8px 12px; border: 1px solid var(--warn);
   border-radius: 8px; font-size: 13px; }
 .ed-rsync .btn { height: 30px; padding: 0 12px; font-size: 12.5px; }
 .ed-size { margin-left: auto; font: 500 12px/1.3 var(--font-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -341,7 +354,7 @@ footer.credits a { color: inherit; }
 .ed-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 12px; }
 .ed-card { display: flex; flex-direction: column; min-width: 0; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; background: var(--surface); }
 .ed-thumb { display: block; width: 100%; height: 140px; background: var(--mat); }
-.ed-cinfo { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px 0; flex: 1; min-width: 0; }
+.ed-cinfo { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px 0; flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .ed-cinfo strong { font: 600 15px/1.25 var(--font-display); letter-spacing: .02em; }
 .ed-by { font-size: 12.5px; color: var(--muted); }
 .ed-cinfo p { margin: 4px 0 0; font-size: 13px; line-height: 1.45; }
@@ -413,10 +426,18 @@ footer.credits a { color: inherit; }
 .ed-rnote { margin: 6px 0 0; }
 .linkbtn { padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 .linkbtn:hover { color: var(--fg); }
-/* the Install panel: the connection and the game on the left, the tracks on the right */
+/* the Install panel: the connection on the left, the game on the right, the faster firmware below */
 .rp-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 40px; align-items: start; }
 #radioPanel > .ed-head { margin-bottom: 18px; }
-#rpInstSec .ed-status { margin: 12px 0 0; }
+#rpInstSec .ed-status, #rpConnStatus { margin: 12px 0 0; }
+#rpConnStatus:empty { display: none; }
+.ed-gallery:focus { outline: none; }
+.editor a { color: var(--fg); text-underline-offset: 3px; }
+.editor a:hover { color: var(--accent); }
+@media (pointer: coarse) {
+  .ed-stable .ed-del { padding: 8px 4px; }
+  .ed-arrow { height: 34px; min-width: 40px; }
+}
 #radioPanel .ed-sec { padding: 18px 0; }
 #radioPanel .ed-sec:first-child { padding-top: 0; }
 #radioPanel .ed-sec h3 { margin-bottom: 12px; }
@@ -519,6 +540,7 @@ footer.credits a { color: inherit; }
   .ed-actions { width: 100%; }
   .ed-actions .field { flex: 1 1 100%; }
   .ed-actions .field select { flex: 1; max-width: none; }
+  .ed-stable tbody th small { display: block; margin-left: 0; }
 }
 
 </style>
@@ -527,6 +549,7 @@ footer.credits a { color: inherit; }
   <div class="brand">
     <img class="brand-mark" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CiAgPGRlZnM+CiAgICA8Y2xpcFBhdGggaWQ9InN0LXRpbGUiPjxyZWN0IHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgcng9IjE0Ii8+PC9jbGlwUGF0aD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ic3Qtc2t5IiB4MT0iMCIgeTE9IjAiIHgyPSIwIiB5Mj0iMSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzRhOGZkZCIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzhjYzJmMiIvPgogICAgPC9saW5lYXJHcmFkaWVudD4KICA8L2RlZnM+CiAgPGcgY2xpcC1wYXRoPSJ1cmwoI3N0LXRpbGUpIj4KICAgIDxyZWN0IHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgZmlsbD0idXJsKCNzdC1za3kpIi8+CiAgICA8cGF0aCBkPSJNLTggNDRMNzIgMjYiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLW9wYWNpdHk9Ii43NSIgc3Ryb2tlLXdpZHRoPSI1Ii8+CiAgICA8cGF0aCBkPSJNLTggNDZMNzIgMjhWNzJILThaIiBmaWxsPSIjM2Y4YTM0Ii8+CiAgICA8cGF0aCBkPSJNMTcgNTBWMTlINDdWNTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmYTcyNiIgc3Ryb2tlLXdpZHRoPSI2IiBzdHJva2UtbGluZWpvaW49InJvdW5kIiB0cmFuc2Zvcm09InJvdGF0ZSgtMTIuNyAzMiAzNSkiLz4KICA8L2c+Cjwvc3ZnPgo=" alt="" width="34" height="34">
     <div><h1>StickTime</h1><small>EdgeTX FPV sim · in the browser</small></div>
+    <a class="btn kofi" href="https://ko-fi.com/juricabi" target="_blank" rel="noopener" title="StickTime is free: support it on Ko-fi"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M3 8h14v6a5 5 0 0 1-5 5H8a5 5 0 0 1-5-5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M17 10h1.5a2.5 2.5 0 0 1 0 5H17" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 15.6l-2.5-2.4a1.5 1.5 0 0 1 2.5-1.7 1.5 1.5 0 0 1 2.5 1.7z" fill="currentColor"/><path d="M8 2.5v2.5M12 2.5v2.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Support</span></a>
   </div>
   <div class="controls">
     <div class="ctl-group">
@@ -543,7 +566,7 @@ footer.credits a { color: inherit; }
     <div class="ctl-group">
     <button class="btn" id="restartBtn" type="button" title="Restart the script (R)">Restart</button>
     <button class="btn" id="tracksBtn" type="button" aria-expanded="false" aria-controls="editor" title="Make your own tracks: the track editor"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="5" cy="19.5" r="2" fill="currentColor"/><path d="M7.5 19.5h7a3.5 3.5 0 0 0 0-7h-6a3.5 3.5 0 0 1 0-7h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="2.5 2.6"/><path d="M16 9.5V1.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16 2.2h5.5l-1.6 2 1.6 2H16" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>Tracks</button>
-    <button class="btn" id="radioBtn" type="button" aria-expanded="false" aria-controls="radioPanel" title="The radio's SD card over USB: install or update StickTime, your tracks on the radio"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 2.5h8.5A1.5 1.5 0 0 1 19 4v16a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 20V6.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 8.5v8M8.8 13.5l3.2 3.2 3.2-3.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Install</button>
+    <button class="btn" id="radioBtn" type="button" aria-expanded="false" aria-controls="radioPanel" title="The radio's SD card over USB: install or update StickTime; faster firmware"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 2.5h8.5A1.5 1.5 0 0 1 19 4v16a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 20V6.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 8.5v8M8.8 13.5l3.2 3.2 3.2-3.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Install</button>
     </div>
     <div class="ctl-group">
     <div class="btn sound" id="soundBox" title="Sound volume (wheel: 5% steps)">
@@ -568,9 +591,9 @@ footer.credits a { color: inherit; }
 
 <section class="card editor" id="editor" hidden aria-labelledby="edTitle" tabindex="-1">
   <div class="ed-head">
-    <div class="ed-title"><h2 id="edTitle">Track editor</h2><p class="ed-editing" id="edEditing" aria-live="polite"></p></div>
+    <div class="ed-title"><h2 id="edTitle">Track editor</h2><p class="ed-editing" id="edEditing">Editing a local copy of <b id="edEditName"></b> (<span id="edEditKept">kept in this browser as you edit</span>): <span id="edEditState" aria-live="polite"></span></p></div>
     <div class="ed-actions">
-      <button class="btn" id="edGalBtn" type="button" aria-expanded="false" aria-controls="edGallery" title="Pick a track to edit: a new one, one of yours, a file or one from the gallery"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>Open</button>
+      <button class="btn" id="edGalBtn" type="button" aria-expanded="false" aria-controls="edGallery" title="Pick a track to edit: one of yours, a new one, one from the gallery or a file"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>Open</button>
       <button class="btn" id="edMineBtn" type="button" aria-expanded="false" aria-controls="edMine" title="Your tracks in the emulator and on the radio: remove them, copy them between the two"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="4" cy="6" r="1.4" fill="currentColor"/><circle cx="4" cy="12" r="1.4" fill="currentColor"/><circle cx="4" cy="18" r="1.4" fill="currentColor"/></svg>My tracks</button>
       <button class="btn" id="edClose" type="button" title="Close the editor (your work is kept)">Close</button>
     </div>
@@ -588,9 +611,9 @@ footer.credits a { color: inherit; }
       <button class="btn" id="connectCancel" type="button">Cancel</button>
     </div>
   </dialog>
-  <section class="ed-gallery" id="edGallery" hidden aria-labelledby="edGalH">
+  <section class="ed-gallery" id="edGallery" hidden aria-labelledby="edGalName" tabindex="-1">
     <div class="ed-phead">
-      <h3 id="edGalH">Open <small>pick a track to edit: the editor works on a copy of it</small></h3>
+      <h3 id="edGalH"><span id="edGalName">Open</span> <small>pick a track to edit: the editor works on a copy of it</small></h3>
       <label class="btn file-btn" title="A track file from your computer (c1.txt to c8.txt)">Open a file…<input type="file" id="edOpen" accept=".txt,text/plain"></label>
     </div>
     <p class="ed-status" id="edGalStatus" role="status" aria-live="polite"></p>
@@ -608,17 +631,17 @@ footer.credits a { color: inherit; }
       <p class="note ed-galnote">Made a track others should fly? Add it to the gallery with a pull request: <a href="https://github.com/juricabi/sticktime/tree/main/tracks#readme" target="_blank" rel="noopener">tracks/ on GitHub</a> says how.</p>
     </section>
   </section>
-  <section class="ed-gallery" id="edMine" hidden aria-labelledby="edMineH">
-    <h3 id="edMineH">My tracks <small>what the game plays: slots c1 to c8 are tracks 9 to 16, in the emulator (this browser) and on the radio</small></h3>
+  <section class="ed-gallery" id="edMine" hidden aria-labelledby="edMineName" tabindex="-1">
+    <h3 id="edMineH"><span id="edMineName">My tracks</span> <small>what the game plays: slots c1 to c8 are tracks 9 to 16, in the emulator (this browser) and on the radio</small></h3>
     <p class="ed-status" id="edMineStatus" role="status" aria-live="polite"></p>
     <div class="ed-stable" id="edSlotList"></div>
-    <p class="note" id="edMineNote" hidden>This browser can't reach the radio: Save file in the editor, and copy the file to /SCRIPTS/TOOLS/StickTimeTracks/ on its SD card.</p>
+    <p class="note" id="edMineNote" hidden>This browser can't reach the radio's SD card (that takes Chrome or Edge on a computer): Save file in the editor, then copy the file to /SCRIPTS/TOOLS/StickTimeTracks/ on the card.</p>
     <div class="ed-row">
       <button class="btn" id="edAllFrom" type="button" hidden title="Every slot of the radio into the same slot of the emulator">Copy all radio → emulator</button>
       <button class="btn" id="edAllTo" type="button" hidden title="Every slot of the emulator into the same slot of the radio">Copy all emulator → radio</button>
     </div>
     <section class="ed-lsec" id="edGalSync" hidden aria-labelledby="edUpdH">
-      <h4 id="edUpdH">Newer in the gallery <small>a track of the gallery that has changed since you put it in a slot</small></h4>
+      <h4 id="edUpdH">Another version in the gallery <small>a slot holds a gallery track, but not as the gallery has it now (an update, or your own changes)</small></h4>
       <ul class="ed-olist" id="edUpdList"></ul>
       <div class="ed-row"><button class="btn" id="edGalSyncAll" type="button">Update all</button></div>
     </section>
@@ -708,7 +731,7 @@ footer.credits a { color: inherit; }
       <details class="ed-sec ed-howto">
         <summary>How to use on the radio</summary>
         <ol>
-          <li>Each slot, <code>c1</code> to <code>c8</code>, is the same track number on the emulator and on the radio. <strong>Send to emulator</strong> puts the track in the emulator's slot and <strong>Fly</strong> flies that slot here; <strong>Send to radio</strong> puts it in the radio's; <strong>Save file</strong> downloads it as <code>c1.txt</code> (the slot's number).</li>
+          <li>Each slot, <code>c1</code> to <code>c8</code>, is the same track number on the emulator and on the radio. <strong>Send to emulator</strong> puts the track in the emulator's slot and <strong>Fly c1</strong> flies that slot here; <strong>Send to radio</strong> puts it in the radio's; <strong>Save file</strong> downloads it as <code>c1.txt</code> (the slot's number).</li>
           <li>Copy the file to <code>/SCRIPTS/TOOLS/StickTimeTracks/</code> on the radio's SD card (the folder is in the release zip; make it if it's missing). In Chrome or Edge on a computer, <strong>Send to radio</strong> does it for you: the radio plugged in by USB, in USB Storage mode. On the hosted site, <strong>Install</strong> (next to Tracks) also installs or updates the game. Eject the drive before you unplug the radio, and restart StickTime on it to see a new track.</li>
           <li>Up to 8 tracks, <code>c1.txt</code> to <code>c8.txt</code>: they come after the 8 built-in ones in the track menu, by name (tracks 9 to 16).</li>
           <li>StickTime and StickTime BW read them; StickTime Lite doesn't.</li>
@@ -721,7 +744,7 @@ footer.credits a { color: inherit; }
 
 <section class="card editor rpanel" id="radioPanel" hidden aria-labelledby="rpTitle" tabindex="-1">
   <div class="ed-head">
-    <h2 id="rpTitle">Radio &amp; install <small>the radio's SD card over USB: connect it, install or update StickTime</small></h2>
+    <h2 id="rpTitle">Install <small>the radio's SD card over USB: connect it, install or update StickTime, faster firmware</small></h2>
     <div class="ed-actions">
       <button class="btn" id="rpClose" type="button" title="Close (the card stays connected)">Close</button>
     </div>
@@ -737,11 +760,12 @@ footer.credits a { color: inherit; }
           <button class="btn" id="edForget" type="button" title="Forget this SD card" hidden>Disconnect</button>
         </div>
         <p class="note ed-rnote" id="edRadioNote"></p>
+        <p class="ed-status" id="rpConnStatus" role="status" aria-live="polite"></p>
       </section>
     </div>
     <section class="ed-sec rp-right" id="rpInstSec" aria-labelledby="rpInstH">
       <h3 id="rpInstH">Install / update StickTime</h3>
-      <p class="note" id="edInstallNote" hidden>To put the game itself on the card, copy the SCRIPTS folder of the SD card zip from the <a href="https://github.com/juricabi/sticktime/releases/latest" target="_blank" rel="noopener">latest release</a><span id="edInstallMore">; the emulator at juricabi.github.io/sticktime can install it for you</span>.</p>
+      <p class="note" id="edInstallNote" hidden>To install StickTime, copy the SCRIPTS folder of the SD card zip to the card's top level, from the <a href="https://github.com/juricabi/sticktime/releases/latest" target="_blank" rel="noopener">latest release</a><span id="edInstallMore">; the emulator at juricabi.github.io/sticktime can install it for you</span>.</p>
       <p class="note" id="rpInstWait" hidden></p>
       <div id="edInstallPanel" hidden>
         <p class="ed-rpath" id="edInstallHead"></p>
@@ -753,15 +777,16 @@ footer.credits a { color: inherit; }
         </div>
       </div>
       <p class="ed-status" id="rpStatus" role="status" aria-live="polite"></p>
+      <p class="note rp-thanks" id="rpThanks" hidden>Thanks for flying StickTime! If you'd like to give something back: <a href="https://ko-fi.com/juricabi" target="_blank" rel="noopener">buy me a coffee on Ko-fi</a>.</p>
     </section>
   </div>
   <section class="ed-sec rp-fw" id="rpFwSec" aria-labelledby="rpFwH">
     <h3 id="rpFwH">Faster firmware <small>optional, color radios</small></h3>
-    <p class="note">Stock EdgeTX runs a tool at most every 50 ms (20 fps) and shows each frame a cycle late. The <a href="https://github.com/juricabi/edgetx/releases/tag/fast-lua-20ms" target="_blank" rel="noopener">fast-lua-20ms</a> build (EdgeTX main with StickTime's fast-lua patch) runs Lua tools every 20 ms and shows each frame at once: up to 50 fps on the V12, about 40 ms from stick to screen.</p>
+    <p class="note">Stock EdgeTX runs a tool at most every 50 ms (20 fps) and shows each frame a cycle late. The <a href="https://github.com/juricabi/edgetx/releases/tag/fast-lua-20ms" target="_blank" rel="noopener">fast-lua-20ms</a> build (EdgeTX main with StickTime's fast-lua patch) runs Lua tools every 20 ms and shows each frame at once: up to 50 fps on the HelloRadioSky V12, about 40 ms from stick to screen.</p>
     <ol class="rp-steps">
       <li>Download the firmware for your radio from the <a href="https://github.com/juricabi/edgetx/releases/tag/fast-lua-20ms" target="_blank" rel="noopener">fast-lua-20ms release</a>: <code>tx16s</code> for the TX16S and MkII, <code>tx16smk3</code> for the MK3, and so on.</li>
       <li>Back up your SD card: these are test builds.</li>
-      <li>Flash it like any EdgeTX update: copy it to the SD card's <code>FIRMWARE</code> folder and write it from the bootloader, as <a href="https://manual.edgetx.org/installing-and-updating-edgetx/update-from-an-earlier-version-of-edgetx-using-the-bootloader" target="_blank" rel="noopener">EdgeTX's manual shows</a> (<a href="https://manual.edgetx.org/installing-and-updating-edgetx/updating-your-stm32h7-radio" target="_blank" rel="noopener">STM32H7 radios</a> such as the TX16S MK3 differ).</li>
+      <li>Flash it like any EdgeTX update: copy it to the SD card's <code>FIRMWARE</code> folder and write it from the bootloader, as <a href="https://manual.edgetx.org/installing-and-updating-edgetx/update-from-an-earlier-version-of-edgetx-using-the-bootloader" target="_blank" rel="noopener">EdgeTX's manual shows</a> (the TX16S MK3 and other STM32H7 radios are flashed differently: see <a href="https://manual.edgetx.org/installing-and-updating-edgetx/updating-your-stm32h7-radio" target="_blank" rel="noopener">STM32H7 radios</a>).</li>
     </ol>
     <p class="note">To go back, flash a stock EdgeTX release the same way.</p>
   </section>
@@ -886,6 +911,15 @@ footer.credits a { color: inherit; }
     </div>
   </aside>
 </div>
+
+<aside class="card support" aria-labelledby="supH">
+  <span class="support-cup"><svg viewBox="0 0 24 24" width="34" height="34" aria-hidden="true"><path d="M3 8h14v6a5 5 0 0 1-5 5H8a5 5 0 0 1-5-5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M17 10h1.5a2.5 2.5 0 0 1 0 5H17" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 15.6l-2.5-2.4a1.5 1.5 0 0 1 2.5-1.7 1.5 1.5 0 0 1 2.5 1.7z" fill="currentColor"/><path d="M8 2.5v2.5M12 2.5v2.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+  <div class="support-text">
+    <h2 id="supH">Enjoying StickTime?</h2>
+    <p>It's free and open source, made in my spare time. If it gave you some good stick time, a coffee helps me keep building. Thanks!</p>
+  </div>
+  <a class="btn kofi-go" href="https://ko-fi.com/juricabi" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M3 8h14v6a5 5 0 0 1-5 5H8a5 5 0 0 1-5-5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M17 10h1.5a2.5 2.5 0 0 1 0 5H17" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 15.6l-2.5-2.4a1.5 1.5 0 0 1 2.5-1.7 1.5 1.5 0 0 1 2.5 1.7z" fill="currentColor"/><path d="M8 2.5v2.5M12 2.5v2.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Support on Ko-fi</a>
+</aside>
 
 <footer class="credits">
   Runs the real EdgeTX scripts in a Lua 5.3 VM (fengari, MIT). LCD text uses Roboto (OFL) like color radios, and the public-domain X11 fixed fonts for B&amp;W screens. Idea inspired by <a href="https://github.com/alexeystn/lua-fpv-sim" target="_blank" rel="noopener">lua-fpv-sim</a> by Alexey Stankevich.
@@ -2050,7 +2084,7 @@ do
       elseif k == 4 then
         addPillar(x, z, 0.08, y - iw - GT, 2)
       elseif k == 5 then
-        ay = 1.4
+        ay = y > 1.4 and y or 1.4                               -- a raised ring: its middle
       elseif k == 6 or k == 7 then
         -- (x, z) is the pole; the gate itself is the pass zone beside it
         local s = k == 6 and 1 or -1
@@ -4608,34 +4642,37 @@ local render, hitTest, pauseHit, initUI
 
   -- lined up to go through gate i, as a racer needs it: on its way-in side within 70 deg of its
   -- axis, heading within 70 deg of the way through and pointed at it (within the gate's width as
-  -- seen from here, 25 deg at least: a curved line into it has it off the nose) and, faster than 3 m/s, going within 70 deg of the way through
-  -- (a slide in a turn misses the gate). A dive gate: from above, any heading. A flag is a turn:
-  -- still before it on the side its pole leaves free, any heading (gx, gz: the middle of its pass
-  -- zone, GHW from the pole). wide: once green, yellow again only past 75 deg and a third wider aim
-  -- (no flicker at the edge)
+  -- seen from here, 25 deg at least: a curved line into it has it off the nose) and, faster than
+  -- 3 m/s, going within 70 deg of the way through (a slide in a turn misses the gate). A dive gate:
+  -- from above, any heading. Gate Rush counts a gate either way through, so either side will do.
+  -- A flag is a turn: still before it on the side its pole leaves free, any heading (gx, gz: the
+  -- middle of its pass zone, GHW from the pole). wide: once green, yellow again only past 75 deg,
+  -- the aim a third wider (32 deg at least) and the slide from 4 m/s (no flicker at the edge)
   local function linedUp(i, wide)
     local nx, ny, nz, k = gnx[i], gny[i], gnz[i], gk[i]
     local wx, wy, wz = AX[i] - px, AY[i] - py, AZ[i] - pz
     local d, c = wx * nx + wy * ny + wz * nz, wide and 0.26 or 0.34
     if k == 6 or k == 7 then return d > 0 and ((px - gx[i]) * grx[i] + (pz - gz[i]) * grz[i]) * (k == 6 and 1 or -1) + GHW[k] > 0 end
+    if gmode == 4 and d < 0 then nx, ny, nz, d = -nx, -ny, -nz, -d end
     if d <= c * sqrt(wx * wx + wy * wy + wz * wz) then return false end
     if ny ~= 0 then return true end
     local hl, v2 = sqrt(fx * fx + fz * fz) + 0.001, vx * vx + vz * vz
-    if fx * nx + fz * nz <= c * hl or (v2 >= 9 and vx * nx + vz * nz <= c * sqrt(v2)) then return false end
+    if fx * nx + fz * nz <= c * hl or (v2 >= (wide and 16 or 9) and vx * nx + vz * nz <= c * sqrt(v2)) then return false end
     local bl = sqrt(wx * wx + wz * wz) + 0.01
-    local q = (GHW[k] + 1) * (wide and 1.33 or 1) / bl          -- tan of the aim's half angle
-    local ca = 1 / sqrt(1 + q * q)
-    if ca > 0.906 then ca = 0.906 end                         -- (25 deg)
-    return (fx * wx + fz * wz) > ca * hl * bl
+    local q = (GHW[k] + 1) / bl                               -- tan of the aim's half angle
+    if q < 0.4663 then q = 0.4663 end                         -- (25 deg)
+    if wide then q = q * 1.33 end
+    return (fx * wx + fz * wz) * sqrt(1 + q * q) > hl * bl
   end
-  -- green from 70 deg, yellow again past 75 (no flicker at the edge)
+  -- green from 70 deg, yellow again past 75 (no flicker at the edge); a fresh test once the gate
+  -- has been off the screen
   local mkGate, mkOn = 0, false
   local function markerOn(i)
     mkOn = linedUp(i, mkGate == i and mkOn)
     mkGate = i
     return mkOn
   end
-  if STICKTIME_TEST then STICKTIME_TEST.lined = linedUp end
+  if STICKTIME_TEST then STICKTIME_TEST.lined, STICKTIME_TEST.marker = linedUp, markerOn end
 
   local function nextGateMarker()
     if gmode == 3 or NG == 0 then return end
@@ -4654,6 +4691,7 @@ local render, hitTest, pauseHit, initUI
         return
       end
     end
+    mkOn = false
     local ex, ey = X, -Y
     if Z < 0 and ex * ex + ey * ey < 1 then ex, ey = 0, 1 end
     local l = sqrt(ex * ex + ey * ey) + 0.0001
@@ -5612,7 +5650,7 @@ do
       elseif k == 4 then
         addPillar(x, z, 0.08, y - iw - GT, 2)
       elseif k == 5 then
-        ay = 1.4
+        ay = y > 1.4 and y or 1.4                               -- a raised ring: its middle
       elseif k == 6 or k == 7 then
         -- (x, z) is the pole; the gate itself is the pass zone beside it
         local s = k == 6 and 1 or -1
@@ -7748,7 +7786,7 @@ NG = NG + 1
 local k, a = d[i + 2], d[i + 3] * 0.0174533
 local hx, hz, x, z, y = sin(a), cos(a), d[i], d[i + 1], d[i + 4]
 if y <= 0 then y = GY[k] end
-local ax, ay, az, Ax, Ay, Az = x, k == 5 and 1.4 or y, z, 0, 1, 0
+local ax, ay, az, Ax, Ay, Az = x, (k ~= 5 or y > 1.4) and y or 1.4, z, 0, 1, 0
 if k == 6 or k == 7 then
 local s = k == 6 and 1 or -1
 pillar(x, z, 0.12, 3.4)
@@ -9796,6 +9834,8 @@ const ROBOTO = { r: "d09GMgABAAAAAFV8ABIAAAAAsBgAAFUTAAEAAAAAAAAAAAAAAAAAAAAAAAA
   function key(name) { if (app.engine) app.engine.key(name); }
   window.addEventListener('keydown', (e) => {
     if (isField(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
+    // a button reached with the keyboard keeps Enter and Space (a clicked one doesn't: the game's)
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('button:focus-visible, a:focus-visible, summary:focus-visible')) return;
     const k = e.key;
     const handled = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', 'W', 'A', 'S', 'D', 'Enter', 'Escape', 'Backspace', ' ', 'PageUp', 'PageDown', '+', '-', '='].includes(k);
     if (handled) e.preventDefault();
@@ -10273,7 +10313,7 @@ const ROBOTO = { r: "d09GMgABAAAAAFV8ABIAAAAAsBgAAFUTAAEAAAAAAAAAAAAAAAAAAAAAAAA
 <script>
 const TRACK_DATA = {"tracks":[{"name":"Meadow","seed":11,"trees":9,"gates":[[0,0,1,0,0],[0,30,1,15,0],[14,52,2,55,0],[38,56,1,110,0],[50,40,1,180,0],[36,24,1,190,0],[42,6,2,185,0],[32,-14,1,230,0],[12,-20,1,290,0]],"boxes":[]},{"name":"Figure 8","seed":23,"trees":9,"gates":[[-14,10,1,0,0],[6,46,2,40,0],[18,68,1,0,0],[0,88,1,-90,0],[-18,68,1,180,0],[18,16,1,180,0],[0,-4,1,-90,0]],"boxes":[]},{"name":"Dive Tower","seed":37,"trees":9,"gates":[[0,0,1,0,0],[0,26,2,5,0],[6,50,2,25,10],[22,70,1,75,0],[40,62,4,150,6],[36,40,3,200,0],[30,20,1,210,0],[18,6,1,190,0],[24,-14,2,205,0],[6,-22,1,295,0]],"boxes":[]},{"name":"Slalom","seed":53,"trees":9,"gates":[[0,0,5,0,0],[-2,22,7,0,0],[6,40,6,0,0],[-2,58,7,0,0],[6,76,6,0,0],[2,96,4,0,3],[22,112,2,90,0],[44,100,4,120,3],[48,78,7,180,0],[40,60,6,180,0],[48,42,7,180,0],[44,18,3,200,0],[28,-22,1,-90,0]],"boxes":[]},{"name":"Hoop Forest","seed":61,"trees":18,"gates":[[0,0,1,0,0],[6,22,4,35,2.4],[22,32,4,35,5],[28,52,4,45,3],[48,58,4,115,6],[56,38,2,140,0],[72,28,4,155,2],[70,6,4,220,4],[48,0,3,245,0],[30,-14,4,245,2.2],[12,-18,4,290,3]],"boxes":[]},{"name":"Grand Prix","seed":71,"trees":9,"gates":[[0,0,5,0,0],[0,46,1,5,0],[6,84,2,30,6],[26,100,7,90,0],[36,74,4,150,3],[50,58,1,90,0],[68,78,4,50,3],[92,92,7,120,0],[100,62,3,200,0],[88,30,1,175,0],[104,6,2,190,8],[80,-14,1,255,0],[50,-10,4,260,2.2],[26,-24,1,275,0]],"boxes":[]},{"name":"Bando","seed":83,"trees":9,"gates":[[0,0,1,0,0],[0,34,8,0,1.8],[0,46,8,0,1.8],[20,66,4,60,4],[40,88,3,146,0],[56,64,1,180,0],[43.95,10,8,180,1.3],[22,-16,4,250,2.5]],"boxes":[[-6.225,34,4.025,0.25,0,7,1],[6.225,34,4.025,0.25,0,7,1],[0,34,2.2,0.25,3.6,7,1],[-6.225,46,4.025,0.25,0,7,1],[6.225,46,4.025,0.25,0,7,1],[0,46,2.2,0.25,3.6,7,1],[-10,40,0.25,5.75,0,7,1],[10,36.025,0.25,1.775,0,7,1],[10,43.975,0.25,1.775,0,7,1],[10,40,0.25,2.2,3.6,7,1],[46,64,2,2,0,36,1],[33.6,10,1.25,3,0,2.6,2],[40.5,10,1.25,3,0,2.6,3],[47.4,10,1.25,3,0,2.6,2],[-30,20,3,1.25,0,5.2,3],[-36,50,4,4,0,3,1]]},{"name":"Pro Track","seed":97,"trees":9,"gates":[[0,0,1,0,0],[0,22,2,0,0],[0,44,3,0,0],[8,62,7,90,0],[16,44,4,180,0],[16,22,1,180,0],[24,4,6,90,0],[32,22,1,0,0],[32,46,2,0,0],[32,46,1,180,0],[46,26,4,160,3],[48,4,1,180,0],[46,-14,7,225,0],[24,-22,1,270,0]],"boxes":[]}],"GT":0.28,"FLAGH":3.4,"TREES":18,"GHW":[1.5,1.5,2.0,1.25,2.4,6.0,6.0,2.2],"GHH":[1.0,1.0,2.0,1.25,2.4,30.0,30.0,1.8],"GCY":[1.35,5.5,7.0,2.4,0.0,0.0,0.0,2.0]};
 const GAME_FILES = 'sdcard/';
-const GALLERY = {"tracks":[{"file":"multigp-2017-utt.txt","name":"MultiGP UTT 2017","by":"MultiGP","about":"Universal Time Trial track 1 (2017): five gates in one long loop. MultiGP's layout, scaled 1.7x to the game's gates.","source":"https://www.multigp.com/wp-content/uploads/2017/05/MultiGP-universal-time-trial-track1.pdf","text":"MultiGP UTT 2017\n1 285132 17 0 0 0 1 0 0 0 95.34 1 0 0 -23.84 47.67 1 180 0 -47.67 95.34 1 0 0 -23.84 -23.84 1 90 0\n"},{"file":"multigp-2018-rq.txt","name":"MultiGP RQ 2018","by":"MultiGP, designed by Nelson Aquino","about":"The 2018 Regional Qualifier: eight gates, a split-S gate, a double gate to fly over, a hurdle (a low high gate here) and 11 flags. MultiGP's layout, scaled 1.7x to the game's gates.","source":"https://www.multigp.com/wp-content/uploads/2018/05/MultiGP-2018-regional-qualifier-track-diagram5.pdf","text":"MultiGP RQ 2018\n1 401681 18 0 1.29 0 1 0 0 0 23.8 7 0 0 0 47.6 6 0 0 0 71.4 7 0 0 0 96.49 1 270 0 -25.64 85.14 2 225 3.6 -36.99 59.5 1 180 0 -23.8 35.7 7 211 0 -46.31 35.7 1 0 0 -52.26 35.7 2 180 4 -58.21 35.7 1 0 0 -48.89 71.4 2 0 4 -48.89 71.4 1 180 0 -84.59 35.7 1 180 0 -59.5 11.9 7 150 0 -46.31 0 1 0 0 -71.4 0 6 231 0 -47.6 -36.99 1 90 0 -23.8 -35.7 6 73 0\n"},{"file":"multigp-2019-gq.txt","name":"MultiGP GQ 2019","by":"MultiGP, designed by Nelson Aquino","about":"The 2019 Global Qualifier: two double-gate towers, five gates and five flags, with a figure 8 through the middle tower. MultiGP's layout, scaled 1.7x to the game's gates.","source":"https://www.multigp.com/how-to-set-up-the-2019-global-qualifier-track-accurately/","text":"MultiGP GQ 2019\n1 320151 19 0 -1.55 18.14 1 0 0 -22.28 59.59 2 0 4 -1.55 80.31 1 180 0 -15.54 94.31 7 225 0 -15.54 91.04 1 270 0 -15.54 98.24 1 90 0 -32.64 101.04 1 180 0 -34.46 81.87 7 180 0 -32.64 80.31 1 180 0 -22.28 59.59 1 180 0 -32.64 28.5 2 180 4 -32.64 28.5 1 0 0 -36.27 15.54 6 200 0 -25.91 7.77 6 125 0 -15.54 0 6 79 0\n"},{"file":"multigp-2020-gq.txt","name":"MultiGP GQ 2020","by":"MultiGP, designed by Nelson Aquino","about":"The 2020 Global Qualifier: two split-S towers, a triple-gate weave and five flags. Where the diagram loops back through a tower or the triple, this flies a split-S and a weave. MultiGP's layout, scaled 1.7x to the game's gates.","source":"https://www.multigp.com/2020-multigp-series-global-qualifier-track-diagram/","text":"MultiGP GQ 2020\n1 7238 20 0 -36.1 25.5 1 0 0 -28.9 51 6 0 0 -36.1 76.5 1 0 0 -20.4 100.7 2 90 4 -20.4 100.7 1 270 0 -11.9 85 6 180 0 -2.1 102 2 0 4 -2.1 102 1 180 0 -3.4 85 7 180 0 -11.9 61.81 1 90 0 -11.9 58.2 1 270 0 -11.9 54.6 1 90 0 -4.7 34 1 180 0 -11.9 17 7 180 0 -28.9 8.5 7 0 0\n"},{"file":"multigp-2021-gq.txt","name":"MultiGP GQ 2021","by":"MultiGP, designed by Anthony \"AyyyKayyy\" Knight","about":"The 2021 Global Qualifier: two double gates, six gates, five flags and a hurdle (a high gate here). The power loop at the second double gate is flown as a half loop here: through the bottom, back through the top. MultiGP's layout, scaled 1.7x to the game's gates.","source":"https://www.multigp.com/2021-multigp-series-global-qualifier-track-diagram/","text":"MultiGP GQ 2021\n1 230590 21 0 1.58 20.4 1 0 0 -25.5 52.61 2 270 4 -42.5 75.82 6 315 0 -42.5 78.2 1 270 0 -42.5 91.46 1 90 0 -23.85 76.5 1 180 0 -23.85 76.5 2 0 4 -1.53 76.5 1 180 0 -25.5 52.61 1 270 0 -42.33 54.31 2 270 3 -42.5 51 6 180 0 -42.5 34 6 90 0 -25.5 34 7 180 0 -25.5 18.53 1 270 0 -25.5 10.13 1 270 0 -25.5 0 6 90 0\n"},{"file":"multigp-2022-gq.txt","name":"MultiGP GQ 2022","by":"MultiGP, designed by Anthony \"AyyyKayyy\" Knight","about":"The 2022 Global Qualifier: a double gate (flown bottom first here; the diagram has the top first), eight gates, five flags with tight turns round them and a hurdle (a high gate here). MultiGP's layout, scaled 1.7x to the game's gates.","source":"https://www.multigp.com/2022-multigp-series-global-qualifier-track-diagram-2/","text":"MultiGP GQ 2022\n1 594079 22 0 1.29 33.15 1 0 0 8.33 72.59 7 150 0 13.7 51.85 1 180 0 17.95 51.85 1 180 0 13.7 51.85 2 0 4 13.7 72.59 1 0 0 25.84 85 7 90 0 43.6 82.45 2 90 3 44.54 86.02 6 0 0 42.09 85 1 180 0 42.94 51.85 1 180 0 38.69 51.85 1 180 0 43.52 33.15 6 120 0 45.83 33.15 1 180 0 23.8 11.12 1 270 0 23.8 13.43 7 0 0\n"},{"file":"multigp-2023-gq.txt","name":"MultiGP GQ 2023","by":"MultiGP, designed by Anthony \"AyyyKayyy\" Knight","about":"The 2023 Global Qualifier: three H-gates (a flag on a gate's leg), a triple gate (flown as a weave here: the diagram has two of its gates the same way), two gates in line and a hurdle (a low high gate here). MultiGP's layout, scaled 1.7x to the game's gates.","source":"https://www.multigp.com/wp-content/uploads/2023/03/2023-MultiGP-GQ-track-official-diagram-metric.png","text":"MultiGP GQ 2023\n1 871088 23 0 25.91 1.81 1 90 0 42.49 17.1 6 0 0 42.49 34.37 7 0 0 42.49 36.01 1 90 0 42.49 51.12 6 0 0 42.49 49.48 1 270 0 25.91 68.4 2 0 2.5 44.04 84.98 1 180 0 22.8 70.21 1 270 0 1.81 51.3 1 180 0 5.96 51.3 1 0 0 10.1 51.3 1 180 0 8.29 20.55 7 180 0 8.29 32.39 1 90 0 8.29 18.91 1 275 0\n"},{"file":"multigp-2024-gq-spring.txt","name":"MultiGP GQ 24 Sp","by":"MultiGP, designed by Solace","about":"\"Anole\", the 2024 Spring Global Qualifier: a side-by-side pair, a stacked double gate, a hurdle (a low high gate here) and five flags. MultiGP's layout, scaled 1.7x to the game's gates.","source":"https://www.multigp.com/globalqualifier/gq-2024-spring-track/","text":"MultiGP GQ 24 Sp\n1 657378 24 0 1.78 22.78 1 0 0 8.58 48.11 1 0 0 4.42 48.11 1 0 0 3.31 68.34 1 0 0 30.35 73.61 2 180 4 30.35 73.61 1 180 0 35.27 73.61 2 0 2.4 36.12 89.08 1 0 0 38.93 73.61 7 180 0 39.95 60.18 6 225 0 42.75 60.18 1 180 0 42.75 31.11 1 180 0 41.11 31.11 7 0 0 42.75 31.11 1 180 0 22.78 17.68 6 135 0 37.91 1.78 1 270 0 14.45 7.82 7 290 0\n"},{"file":"multigp-2024-gq-summer.txt","name":"MultiGP GQ 24 Su","by":"MultiGP, designed by Avalt","about":"\"Gecko\", the 2024 Summer Global Qualifier: ten gates with a four-gate diagonal weave, a far double, a hurdle and five flags; one more flag sends the line round the far double. MultiGP's layout, scaled 1.7x to the game's gates.","source":"https://www.multigp.com/globalqualifier/2024-summer-gq-verification/","text":"MultiGP GQ 24 Su\n1 260982 24 0 14.9 17.79 1 310 0 1.81 43.53 1 0 0 14.25 43.53 1 180 0 4.66 43.53 7 40 0 45.08 56.48 1 90 0 44.04 60.11 6 0 0 16.06 78.24 7 345 0 16.06 89.12 7 120 0 16.06 81.09 1 270 0 16.06 85.24 1 90 0 46.89 60.11 1 180 0 43.53 43.53 7 195 0 31.09 26.43 6 176 0 43.8 12.71 1 135 0 40.87 9.78 1 315 0 35.3 4.21 1 135 0 32.37 1.28 1 315 0\n"},{"file":"multigp-2025-gq.txt","name":"MultiGP GQ 2025","by":"MultiGP, designed by Alvaro \"KLG\" Gonzalez","about":"\"Ursa\", the 2025 Spring Global Qualifier: a tower flown top then bottom, a side-by-side pair (its power loop flown as a U-turn here: the first gate the other way), an angled gate, a hurdle and five flags. MultiGP's layout, scaled 1.7x to the game's gates.","source":"https://www.multigp.com/globalqualifier/2025-spring-gq-verification/","text":"MultiGP GQ 2025\n1 502749 25 0 23.32 1.81 1 90 0 40.68 25.91 1 180 0 37.83 25.91 7 270 0 26.17 25.91 1 180 0 21.5 25.91 1 0 0 16.32 54.41 2 0 4 32.9 54.41 1 180 0 30.05 54.41 7 30 0 38.43 86.43 1 320 0 35.64 84.11 6 250 0 27.71 79.86 1 230 0 1.81 88.09 1 0 0 7.51 88.09 1 180 0 4.66 88.09 6 270 0 16.32 54.41 1 180 0 5.18 18.14 6 160 0\n"},{"file":"multigp-2026-cdra.txt","name":"MultiGP CDRA 26","by":"MultiGP","about":"The 2025-26 college (CDRA) qualifier: five gates and three flags; its drawn loops are simplified. MultiGP's layout, scaled 1.7x to the game's gates.","source":"https://www.multigp.com/cdra/track/","text":"MultiGP CDRA 26\n1 453792 26 0 31.35 0 1 0 0 1.81 0 1 0 0 1.81 17.1 1 0 0 4.66 17.1 7 90 0 17.36 8.29 1 180 0 14.51 8.29 7 270 0 14.51 -21.5 1 90 0 14.51 -18.65 6 0 0\n"}]};
+const GALLERY = {"tracks":[{"file":"multigp-2017-utt.txt","name":"MultiGP UTT 2017","by":"MultiGP","about":"Universal Time Trial track 1 (2017): five gates in one long loop. MultiGP's layout, scaled 1.7x to the game's gates.","source":"https://www.multigp.com/wp-content/uploads/2017/05/MultiGP-universal-time-trial-track1.pdf","text":"MultiGP UTT 2017\n1 285132 17 0 0 0 1 0 0 0 95.34 1 0 0 -23.84 47.67 1 180 0 -47.67 95.34 1 0 0 -23.84 -23.84 1 90 0\n"},{"file":"multigp-2018-rq.txt","name":"MultiGP RQ 2018","by":"MultiGP, designed by Nelson Aquino","about":"The 2018 Regional Qualifier: eight gates, a split-S gate, a double gate to fly over, a hurdle (a low high gate here) and 11 flags. MultiGP's layout, scaled 1.7x to the game's gates.","source":"https://www.multigp.com/wp-content/uploads/2018/05/MultiGP-2018-regional-qualifier-track-diagram5.pdf","text":"MultiGP RQ 2018\n1 401681 18 0 1.29 0 1 0 0 0 23.8 7 0 0 0 47.6 6 0 0 0 71.4 7 0 0 0 96.49 1 270 0 -25.64 85.14 2 225 3.6 -36.99 59.5 1 180 0 -23.8 35.7 7 211 0 -46.31 35.7 1 0 0 -52.26 35.7 2 180 4 -58.21 35.7 1 0 0 -48.89 71.4 2 0 4 -48.89 71.4 1 180 0 -84.59 35.7 1 180 0 -59.5 11.9 7 150 0 -46.31 0 1 0 0 -71.4 0 6 231 0 -47.6 -36.99 1 90 0 -23.8 -35.7 6 73 0\n"},{"file":"multigp-2019-gq.txt","name":"MultiGP GQ 2019","by":"MultiGP, designed by Nelson Aquino","about":"The 2019 Global Qualifier: two double-gate towers, five gates and five flags, with a figure 8 through the middle tower. MultiGP's layout, scaled 1.7x to the game's gates.","source":"https://www.multigp.com/how-to-set-up-the-2019-global-qualifier-track-accurately/","text":"MultiGP GQ 2019\n1 320151 19 0 -1.55 18.14 1 0 0 -22.28 59.59 2 0 4 -1.55 80.31 1 180 0 -15.54 94.31 7 225 0 -15.54 91.04 1 270 0 -15.54 98.24 1 90 0 -32.64 101.04 1 180 0 -34.46 81.87 7 180 0 -32.64 80.31 1 180 0 -22.28 59.59 1 180 0 -32.64 28.5 2 180 4 -32.64 28.5 1 0 0 -36.27 15.54 6 200 0 -25.91 7.77 6 125 0 -15.54 0 6 79 0\n"},{"file":"multigp-2020-gq.txt","name":"MultiGP GQ 2020","by":"MultiGP, designed by Nelson Aquino","about":"The 2020 Global Qualifier: two split-S towers, a triple-gate weave and five flags. Where the diagram loops back through a tower or the triple, this flies a split-S and a weave. MultiGP's layout, scaled 1.7x to the game's gates.","source":"https://www.multigp.com/2020-multigp-series-global-qualifier-track-diagram/","text":"MultiGP GQ 2020\n1 7238 20 0 -36.1 25.5 1 0 0 -28.9 51 6 0 0 -36.1 76.5 1 0 0 -20.4 100.7 2 90 4 -20.4 100.7 1 270 0 -11.9 85 6 180 0 -2.1 102 2 0 4 -2.1 102 1 180 0 -3.4 85 7 180 0 -11.9 61.81 1 90 0 -11.9 58.2 1 270 0 -11.9 54.6 1 90 0 -4.7 34 1 180 0 -11.9 17 7 180 0 -28.9 8.5 7 0 0\n"},{"file":"multigp-2021-gq.txt","name":"MultiGP GQ 2021","by":"MultiGP, designed by Anthony \"AyyyKayyy\" Knight","about":"The 2021 Global Qualifier: two double gates, six gates, five flags and a hurdle (a high gate here). The power loop at the second double gate is flown as a half loop here: through the bottom, back through the top. MultiGP's layout, scaled 1.7x to the game's gates.","source":"https://www.multigp.com/2021-multigp-series-global-qualifier-track-diagram/","text":"MultiGP GQ 2021\n1 230590 21 0 1.58 20.4 1 0 0 -25.5 52.61 2 270 4 -42.5 75.82 6 315 0 -42.5 78.2 1 270 0 -42.5 91.46 1 90 0 -23.85 76.5 1 180 0 -23.85 76.5 2 0 4 -1.53 76.5 1 180 0 -25.5 52.61 1 270 0 -42.33 54.31 2 270 3 -42.5 51 6 180 0 -42.5 34 6 90 0 -25.5 34 7 180 0 -25.5 18.53 1 270 0 -25.5 10.13 1 270 0 -25.5 0 6 90 0\n"},{"file":"multigp-2022-gq.txt","name":"MultiGP GQ 2022","by":"MultiGP, designed by Anthony \"AyyyKayyy\" Knight","about":"The 2022 Global Qualifier: a double gate (flown bottom first here; the diagram has the top first), eight gates, five flags with tight turns round them and a hurdle (a high gate here). MultiGP's layout, scaled 1.7x to the game's gates.","source":"https://www.multigp.com/2022-multigp-series-global-qualifier-track-diagram-2/","text":"MultiGP GQ 2022\n1 594079 22 0 1.29 33.15 1 0 0 8.33 72.59 7 150 0 13.7 51.85 1 180 0 17.95 51.85 1 180 0 13.7 51.85 2 0 4 13.7 72.59 1 0 0 25.84 85 7 90 0 43.6 82.45 2 90 3 44.54 86.02 6 0 0 42.09 85 1 180 0 42.94 51.85 1 180 0 38.69 51.85 1 180 0 43.52 33.15 6 120 0 45.83 33.15 1 180 0 23.8 11.12 1 270 0 23.8 13.43 7 0 0\n"},{"file":"multigp-2023-gq.txt","name":"MultiGP GQ 2023","by":"MultiGP, designed by Anthony \"AyyyKayyy\" Knight","about":"The 2023 Global Qualifier: three H-gates (a flag on a gate's leg), a triple gate (flown as a weave here: the diagram has two of its gates the same way), two gates in line and a hurdle (a low high gate here). MultiGP's layout, scaled 1.7x to the game's gates.","source":"https://www.multigp.com/wp-content/uploads/2023/03/2023-MultiGP-GQ-track-official-diagram-metric.png","text":"MultiGP GQ 2023\n1 871088 23 0 25.91 1.81 1 90 0 42.49 17.1 6 0 0 42.49 34.37 7 0 0 42.49 36.01 1 90 0 42.49 51.12 6 0 0 42.49 49.48 1 270 0 25.91 68.4 2 0 2.5 44.04 84.98 1 180 0 22.8 70.21 1 270 0 1.81 51.3 1 180 0 5.96 51.3 1 0 0 10.1 51.3 1 180 0 8.29 20.55 7 180 0 8.29 32.39 1 90 0 8.29 18.91 1 275 0\n"},{"file":"multigp-2024-gq-spring.txt","name":"MultiGP GQ 24 Sp","by":"MultiGP, designed by Solace","about":"\"Anole\", the 2024 Spring Global Qualifier: a side-by-side pair, a stacked double gate, a hurdle (a low high gate here) and five flags. MultiGP's layout, scaled 1.7x to the game's gates.","source":"https://www.multigp.com/globalqualifier/gq-2024-spring-track/","text":"MultiGP GQ 24 Sp\n1 657378 24 0 1.78 22.78 1 0 0 8.58 48.11 1 0 0 4.42 48.11 1 0 0 3.31 68.34 1 0 0 30.35 73.61 2 180 4 30.35 73.61 1 180 0 35.27 73.61 2 0 2.4 36.12 89.08 1 0 0 38.93 73.61 7 180 0 39.95 60.18 6 225 0 42.75 60.18 1 180 0 42.75 31.11 1 180 0 41.11 31.11 7 0 0 42.75 31.11 1 180 0 22.78 17.68 6 135 0 37.91 1.78 1 270 0 14.45 7.82 7 290 0\n"},{"file":"multigp-2024-gq-summer.txt","name":"MultiGP GQ 24 Su","by":"MultiGP, designed by Avalt","about":"\"Gecko\", the 2024 Summer Global Qualifier: ten gates with a four-gate diagonal weave, a far double, a hurdle (a gate here) and five flags; one more flag sends the line round the far double. MultiGP's layout, scaled 1.7x to the game's gates.","source":"https://www.multigp.com/globalqualifier/2024-summer-gq-verification/","text":"MultiGP GQ 24 Su\n1 260982 24 0 14.9 17.79 1 310 0 1.81 43.53 1 0 0 14.25 43.53 1 180 0 4.66 43.53 7 40 0 45.08 56.48 1 90 0 44.04 60.11 6 0 0 16.06 78.24 7 345 0 16.06 89.12 7 120 0 16.06 81.09 1 270 0 16.06 85.24 1 90 0 46.89 60.11 1 180 0 43.53 43.53 7 195 0 31.09 26.43 6 176 0 43.8 12.71 1 135 0 40.87 9.78 1 315 0 35.3 4.21 1 135 0 32.37 1.28 1 315 0\n"},{"file":"multigp-2025-gq.txt","name":"MultiGP GQ 2025","by":"MultiGP, designed by Alvaro \"KLG\" Gonzalez","about":"\"Ursa\", the 2025 Spring Global Qualifier: a tower flown top then bottom, a side-by-side pair (its power loop flown as a U-turn here: the first gate the other way), an angled gate, a hurdle and five flags. MultiGP's layout, scaled 1.7x to the game's gates.","source":"https://www.multigp.com/globalqualifier/2025-spring-gq-verification/","text":"MultiGP GQ 2025\n1 128985 25 0 23.32 1.81 1 90 0 40.68 25.91 1 180 0 37.83 25.91 7 270 0 26.17 25.91 1 180 0 21.5 25.91 1 0 0 16.32 54.41 2 0 4 32.9 54.41 1 180 0 30.05 54.41 7 30 0 38.43 86.43 2 320 2.4 35.64 84.11 6 250 0 27.71 79.86 1 230 0 7.51 88.09 1 0 0 4.66 88.09 6 270 0 1.81 88.09 1 180 0 16.32 54.41 1 180 0 5.18 18.14 6 160 0\n"},{"file":"multigp-2026-cdra.txt","name":"MultiGP CDRA 26","by":"MultiGP","about":"The 2025-26 college (CDRA) qualifier: five gates and three flags. The diagram's loops round the flags at gates 4 and 5 are single turns here. MultiGP's layout, scaled 1.7x to the game's gates.","source":"https://www.multigp.com/wp-content/uploads/2025/08/2026-CDRA-Track-Diagram.pdf","text":"MultiGP CDRA 26\n1 453792 26 0 31.35 0 1 0 0 1.81 0 1 0 0 1.81 17.1 1 0 0 4.66 17.1 7 90 0 17.36 8.29 1 180 0 14.51 8.29 7 270 0 14.51 -21.5 1 90 0 14.51 -18.65 6 0 0\n"}]};
 const GALLERY_FILES = 'tracks/';
 </script>
 <script>
@@ -10407,7 +10447,7 @@ const GALLERY_FILES = 'tracks/';
     } else if (k === 4) {
       legs.push([x, z]);
     } else if (k === 5) {
-      ay = 1.4;
+      ay = y > 1.4 ? y : 1.4;                          // (a raised ring: its middle)
     } else if (k === 6 || k === 7) {
       // (x, z) is the pole; the gate is the pass zone beside it
       const s = k === 6 ? 1 : -1;
@@ -10563,9 +10603,13 @@ const GALLERY_FILES = 'tracks/';
     undo: [], redo: [], nextId: 1, nextGroup: 1,
     slot: 1, showTrees: false, open: false, fitted: false, hadView: false,
     G: [], pad: null, file: null, probs: [], bad: new Set(), trees: null, wind: null,
-    // the track as it came (a template, a file), and what was saved (Save file, Send to radio, Fly
-    // it): replacing a track that is in neither, nor in a slot, asks first
+    // the track as it came (a template, the gallery, a file), and the files saved (Save file):
+    // replacing a track that is in neither, nor in a slot now, asks first
     pristine: '', saved: new Set(),
+    // the versions of this track: as it was opened, and each one sent or saved since; a slot with
+    // one of them has an earlier version of it (Send to emulator replaces that without a question)
+    versions: new Set(),
+    stored: true,                                    // (the work in progress was kept: localStorage)
   };
   const V = { x: 0, z: 30, s: 4 };                  // map centre (m) and scale (px per m)
   const gal = { list: [], open: false, mine: false, asked: false }; // the gallery's tracks; Open or My tracks shown; the site's list asked for
@@ -10675,7 +10719,7 @@ const GALLERY_FILES = 'tracks/';
   const MAX_FILE = 32768;                          // a track file is far smaller: a bigger one isn't read
   // a track file's name, as the game reads it (its first line, 16 characters)
   const nameOf = (t) => (t.replace(/^\s+/, '').split(/[\r\n]/)[0] || '').trim().slice(0, 16) || '(no name)';
-  const norm = (t) => t.replace(/\r\n?/g, '\n');       // (a file with CR LF line ends is the same track)
+  const norm = (t) => t.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');   // (CR LF line ends or a BOM: the same track)
   // the slots that hold this very track: here (the emulator) and on the radio (once its slots are read)
   function homes(text) {
     const here = [], there = [];
@@ -10717,13 +10761,13 @@ const GALLERY_FILES = 'tracks/';
   // ---------------------------------------------------------------- the page
   const el = {};
   for (const k of ['tracksBtn', 'edClose', 'radioBtn', 'rpClose',
-    'edOpen', 'connectDlg', 'connectGo', 'connectCancel', 'edGalBtn', 'edMineBtn', 'edMine', 'edMineStatus', 'edMineNote', 'edOpenList', 'edUpdList', 'edSyncMine', 'edNewCards', 'edSlotList', 'edEditing', 'edGallery', 'edCards', 'edGrid', 'edGalStatus', 'edGalSync', 'edGalSyncText', 'edGalSyncAll', 'edGateType', 'edAddGate', 'edAddBox', 'edAddWall',
+    'edOpen', 'connectDlg', 'connectGo', 'connectCancel', 'edGalBtn', 'edMineBtn', 'edMine', 'edMineStatus', 'edMineNote', 'edOpenList', 'edUpdList', 'edSyncMine', 'edNewCards', 'edSlotList', 'edEditing', 'edEditName', 'edEditKept', 'edEditState', 'edGallery', 'edCards', 'edGrid', 'edGalStatus', 'edGalSync', 'edGalSyncText', 'edGalSyncAll', 'edGateType', 'edAddGate', 'edAddBox', 'edAddWall',
     'edRotL', 'edRotR', 'edDup', 'edDel', 'edUndo', 'edRedo', 'edFit', 'edTrees', 'edMap', 'edMapBox', 'edReadout',
     'edSlot', 'edFly', 'edFlyText', 'edSendEmu', 'edSave', 'edSize', 'edLite', 'edStatus', 'edEmuHas', 'edFileHas',
     'edSyncLine', 'edSyncText', 'edSendText', 'edName', 'edSeed', 'edShuffle', 'edTreesN',
     'edSel', 'edProblems', 'edProbPill', 'edOrder', 'edSend', 'edRadioLine', 'edRadioLineText',
     // the Install panel
-    'radioPanel', 'rpStatus', 'rpInstWait', 'rpInstSec', 'edAllFrom', 'edAllTo',
+    'radioPanel', 'rpStatus', 'rpConnStatus', 'rpThanks', 'rpInstWait', 'rpInstSec', 'edAllFrom', 'edAllTo',
     'edRadio', 'edRadioState', 'edConnect', 'edRefresh', 'edForget', 'edRadioNote', 'edInstallNote', 'edInstallMore', 'edInstallPanel', 'edInstallHead', 'edEditions', 'edInstallHint',
     'edInstallGo', 'edInstallBar']) el[k] = $(k);
   const rp = el.radioPanel;
@@ -10751,7 +10795,8 @@ const GALLERY_FILES = 'tracks/';
     rebuild();
     if (key) {
       const n = key !== '-' && box.querySelector(key);
-      if (n && !n.disabled) n.focus({ preventScroll: true }); else cv.focus({ preventScroll: true });
+      // (else the map, or the panel shown in its place: never the page, where the keys fly the quad)
+      if (n && !n.disabled) n.focus({ preventScroll: true }); else (el.edGrid.hidden ? (gal.mine ? el.edMine : el.edGallery) : cv).focus({ preventScroll: true });
     }
   }
 
@@ -10928,20 +10973,28 @@ const GALLERY_FILES = 'tracks/';
     const both = h.here.filter((i) => h.there.includes(i));
     let say, kind;
     if (h.here.length || h.there.length) {
-      const parts = both.length ? [at(both, 'in the emulator and on the radio')]
-        : [at(h.here, 'in the emulator'), at(h.there, 'on the radio')].filter(Boolean);
+      const only = (l) => l.filter((i) => !both.includes(i));
+      const parts = [at(both, 'in the emulator and on the radio'), at(only(h.here), 'in the emulator'), at(only(h.there), 'on the radio')].filter(Boolean);
       say = 'the same as ' + parts.join(' and ');
       kind = 'ok';
     } else {
-      const low = name.slice(0, 16).toLowerCase(), earlier = [];
+      // a slot with the same name: an earlier version (one this track had), or another track
+      const earlier = [], other = [];
       for (let i = 1; i <= SLOTS; i++) {
-        const t = emuSlot(i), e = radioRead() ? radioSlots[i - 1] : null;
-        if ((t !== null && nameOf(t).toLowerCase() === low) || (e && !e.bad && nameOf(e.text).toLowerCase() === low)) earlier.push(i);
+        const l = [asEntry(emuSlot(i)), radioRead() ? radioSlots[i - 1] : null].filter(stale);
+        if (l.some(ours)) earlier.push(i); else if (l.length) other.push(i);
       }
-      say = earlier.length ? 'changed, not sent yet (' + cs(earlier) + ' has the earlier version)' : 'in no slot yet';
+      const has = (l) => cs(l) + (l.length > 1 ? ' have ' : ' has ');
+      say = earlier.length ? 'changed, not sent yet (' + has(earlier) + 'an earlier version)'
+        : other.length ? 'in no slot yet (' + has(other) + 'another track of this name)' : 'in no slot yet';
       kind = 'warn';
     }
-    el.edEditing.innerHTML = 'Editing a local copy of <b>' + esc(name) + '</b> (kept in this browser as you edit): <span class="' + kind + '">' + esc(say) + '</span>';
+    // (each part written only when it changes: a screen reader says the state, once)
+    const put = (n, t) => { if (n.textContent !== t) n.textContent = t; };
+    put(el.edEditName, name);
+    put(el.edEditKept, ed.stored ? 'kept in this browser as you edit' : 'not kept: this browser\'s storage is full or blocked, Save file keeps it');
+    put(el.edEditState, say);
+    el.edEditState.className = kind;
   }
   // what a slot holds (an entry as asEntry has it), said for the editor's track: this track, another
   // version of it (the same name), another track, nothing, or a file the game can't use
@@ -10953,6 +11006,8 @@ const GALLERY_FILES = 'tracks/';
   }
   // a slot with the edited track's name, other numbers: not what is in the editor (changes not sent)
   const stale = (e) => !!(e && !e.bad && norm(e.text) !== ed.file.text && nameOf(e.text).toLowerCase() === ed.T.name.trim().slice(0, 16).toLowerCase());
+  // a slot's file that is one of the versions this track had (opened, sent or saved from here)
+  const ours = (e) => !!(e && !e.bad && ed.versions.has(norm(e.text)));
   // the slot list: what each slot holds, in the emulator and (connected, its slots read) on the radio
   let slotsHtml = '';
   function renderSlots() {
@@ -11122,22 +11177,25 @@ const GALLERY_FILES = 'tracks/';
     for (const o of s) o.g = g;
     changed();
   }
-  function load(T, infer, unsure) {
+  // kept: the place it came from keeps it (a template, the gallery, a file; not a slot, which can
+  // be emptied); versions: the ones it had before (a stored work in progress), else as it is
+  function load(T, infer, kept = true, versions = null) {
     ed.T = withIds(T);
     ed.picked = false;                                 // (no slot picked for it yet)
     if (infer) inferGroups(ed.T);
     setSel([]);
     ed.hover = null;
-    changed();
-    ed.pristine = unsure ? '' : ed.file.text;          // (a stored work in progress may be unsaved)
+    derive();
+    ed.pristine = kept ? ed.file.text : '';
+    ed.versions = new Set(versions || [ed.file.text]);
+    refresh();
+    saveSoon();
   }
-  // the track would be lost: changed since it came, and in no slot and no saved file (a slot's
+  // the track would be lost: changed since it came, and in no slot now and no saved file (a slot's
   // file with CR LF line ends is the same track)
   function unsaved() {
-    const t = ed.file.text;
-    if (t === ed.pristine || ed.saved.has(t)) return false;
-    for (let i = 1; i <= SLOTS; i++) { const f = emuSlot(i); if (f !== null && f.replace(/\r\n?/g, '\n') === t) return false; }
-    return true;
+    const t = ed.file.text, h = homes(t);
+    return t !== ed.pristine && !ed.saved.has(t) && !h.here.length && !h.there.length;
   }
   function okToReplace(what) {
     return !unsaved() || window.confirm('Replace "' + ed.T.name.trim() + '" with ' + what + '? Your track isn\'t in a slot or a saved file ' +
@@ -11780,13 +11838,14 @@ const GALLERY_FILES = 'tracks/';
     const file = el.edOpen.files && el.edOpen.files[0];
     el.edOpen.value = '';
     if (!file) return;
-    if (file.size > MAX_FILE) { status(file.name + ' is too big for a track file.', 'bad'); return; }
+    const say = () => (gal.open ? galStatus : status);  // (Open a file is in Open: said there)
+    if (file.size > MAX_FILE) { say()(file.name + ' is too big for a track file.', 'bad'); return; }
     const rd = new FileReader();
     rd.onload = () => {
       const m = /^c([1-8])\.txt$/i.exec(file.name);
       openText(String(rd.result), file.name, m ? +m[1] : 0);
     };
-    rd.onerror = () => status('Can\'t read ' + file.name + '.', 'bad');
+    rd.onerror = () => say()('Can\'t read ' + file.name + '.', 'bad');
     rd.readAsText(file);
   });
   // ---------------------------------------------------------------- Open and My tracks
@@ -11890,7 +11949,7 @@ const GALLERY_FILES = 'tracks/';
 
   // ---- Open: New track, Your tracks, the gallery; each with Open and nothing else
   function renderNew() {
-    const list = [{ v: 'blank', name: 'Blank', note: 'two gates', T: blankTrack() }].concat(D.tracks.map((t, i) => ({ v: String(i), name: t.name,
+    const list = [{ v: 'blank', name: 'Blank', note: '2 gates', T: blankTrack() }].concat(D.tracks.map((t, i) => ({ v: String(i), name: t.name,
       note: t.gates.length + ' gates' + (t.boxes.length ? ', ' + t.boxes.length + ' structures' : ''), T: fromBuiltin(t) })));
     keepFocus(el.edNewCards, () => {
       el.edNewCards.innerHTML = list.map((n) => '<li class="ed-card"><canvas class="ed-thumb" aria-hidden="true"></canvas><div class="ed-cinfo">' +
@@ -11950,11 +12009,11 @@ const GALLERY_FILES = 'tracks/';
     const rad = radioRead() ? radioSlots : null, on = radio.state === 'on', name = radio.dir ? cardName(radio.dir) : '';
     const off = radio.busy ? ' disabled' : '';
     const of = (key) => (key === 'e' ? ' of the emulator' : ' of the radio');
-    const cell = (e, key, i) => '<td>' + (!e ? '<span class="ed-none">—</span>' : (e.bad ? '<i class="bad">' + BAD[e.bad] + '</i>'
+    const cell = (e, key, i) => '<td>' + (!e ? '<span class="ed-none" role="img" aria-label="empty">—</span>' : (e.bad ? '<i class="bad">' + BAD[e.bad] + '</i>'
       : '<span class="ed-tn">' + esc(nameOf(e.text)) + '</span>' + (norm(e.text) === ed.file.text ? ' <i>(in the editor)</i>' : '')) +
       ' <button class="linkbtn ed-del" type="button" data-sdel="' + key + i + '" aria-label="Remove c' + i + of(key) + '"' + (key === 'r' ? off : '') + '>Remove</button>') + '</td>';
     const head = !radio.ok ? '' : rad ? 'Radio <small>' + esc(name) + '</small>'
-      : 'Radio <small>' + (on ? esc(name) + (radio.busy ? ', reading…' : '') : radio.state === 'ask' ? esc(name) + ', to allow again' : 'not connected') + '</small>' +
+      : 'Radio <small>' + (on ? esc(name) + (radio.busy ? ', reading…' : '') : radio.state === 'ask' ? esc(name) + ', Reconnect radio to allow access' : 'not connected') + '</small>' +
         (on ? '' : ' <button class="btn" type="button" data-connect="1"' + off + '>' + (radio.state === 'ask' ? 'Reconnect radio' : 'Connect radio…') + '</button>');
     let h = '<table><thead><tr><th scope="col">Slot</th><th scope="col">Emulator <small>this browser</small></th>' +
       (radio.ok ? '<th scope="col" class="ed-x"><span class="ed-sr">Copy</span></th><th scope="col">' + head + '</th>' : '') + '</tr></thead><tbody>';
@@ -11965,9 +12024,9 @@ const GALLERY_FILES = 'tracks/';
       const right = rad && e && !e.bad && !same, left = rad && r && !r.bad && !same;
       if (right) to++;
       if (left) from++;
-      const x = !rad ? '' : same ? '<span class="ed-same" title="The same track">=</span>'
-        : (right ? '<button class="btn ed-arrow" type="button" data-scopy="r' + i + '" aria-label="Copy c' + i + ' emulator → radio" title="Copy c' + i + ' of the emulator to the radio"' + off + '>→</button>' : '') +
-          (left ? '<button class="btn ed-arrow" type="button" data-scopy="e' + i + '" aria-label="Copy c' + i + ' radio → emulator" title="Copy c' + i + ' of the radio to the emulator"' + off + '>←</button>' : '');
+      const x = !rad ? '' : same ? '<span class="ed-same" role="img" aria-label="the same track" title="The same track">=</span>'
+        : (right ? '<button class="btn ed-arrow" type="button" data-scopy="r' + i + '" aria-label="Copy c' + i + ' from the emulator to the radio" title="Copy c' + i + ' of the emulator to the radio"' + off + '>→</button>' : '') +
+          (left ? '<button class="btn ed-arrow" type="button" data-scopy="e' + i + '" aria-label="Copy c' + i + ' from the radio to the emulator" title="Copy c' + i + ' of the radio to the emulator"' + off + '>←</button>' : '');
       h += '<tr><th scope="row">c' + i + ' <small>track ' + (8 + i) + '</small></th>' + cell(e, 'e', i) +
         (radio.ok ? '<td class="ed-x">' + x + '</td>' + (rad ? cell(r, 'r', i) : '<td></td>') : '') + '</tr>';
     }
@@ -11975,14 +12034,16 @@ const GALLERY_FILES = 'tracks/';
     el.edAllFrom.hidden = !from;
     el.edAllTo.hidden = !to;
     el.edAllFrom.disabled = el.edAllTo.disabled = radio.busy;
+    for (const b of [el.edAllFrom, el.edAllTo]) if (b.hidden && document.activeElement === b) el.edMine.focus({ preventScroll: true });
     el.edMineNote.hidden = radio.ok;                  // (this browser can't reach the radio)
     // the gallery's newer versions
     const old = outdated();
     el.edGalSync.hidden = !old.length;
     el.edGalSyncAll.hidden = old.length < 2;
     el.edGalSyncAll.disabled = radio.busy;
+    if (old.length < 2 && document.activeElement === el.edGalSyncAll) el.edMine.focus({ preventScroll: true });
     keepFocus(el.edUpdList, () => {
-      el.edUpdList.innerHTML = old.map((o) => '<li><span>"' + esc(gal.list[o.i].name) + '": an older version in ' + esc(inWords(o.here, o.radio)) + '</span>' +
+      el.edUpdList.innerHTML = old.map((o) => '<li><span>"' + esc(gal.list[o.i].name) + '": another version in ' + esc(inWords(o.here, o.radio)) + '</span>' +
         '<button class="btn" type="button" data-gsync="' + o.i + '"' + (radio.busy && o.radio.length ? ' disabled' : '') + '>Update</button></li>').join('');
     });
   }
@@ -12033,13 +12094,15 @@ const GALLERY_FILES = 'tracks/';
     }
     if (!said.length) return;
     if (there.length && radio.busy) { mineStatus('The radio\'s card is busy: try again in a moment.', 'bad'); return; }
-    if (!window.confirm('Put the gallery\'s version of ' + andList(said) + '? Their best times and ghosts start over: to the game, a changed track is another track.')) return;
+    const one = here.length + there.length === 1;
+    if (!window.confirm('Put the gallery\'s version of ' + andList(said) + ' in place of what is there now? Changes you made to ' + (one ? 'it go, and its best time and ghost start'
+      : 'them go, and their best times and ghosts start') + ' over: to the game, a changed track is another track.')) return;
     let kept = true;
     for (const [n, t] of here) kept = s.writeSD(slotPath(n), t.text) !== false && kept;
     renderSlots();
     const fresh = here.length && freshGame();
     const done = here.length ? 'Updated ' + cs(here.map((h) => h[0])) + ' in the emulator' + (fresh ? '.' : ' (the game reads ' + (here.length > 1 ? 'them' : 'it') +
-      ' at its next start: Restart).') + (kept ? '' : ' The browser\'s storage is full: that lasts only this visit.') : '';
+      ' at its next start: Restart).') + (kept ? '' : ' The browser\'s storage is full or blocked: that lasts only this visit.') : '';
     if (!there.length) { mineStatus(done, kept ? 'ok' : 'bad'); return; }
     const gen = radio.gen;
     job(async () => {
@@ -12086,7 +12149,7 @@ const GALLERY_FILES = 'tracks/';
     else if (d.sopen !== undefined) {
       const n = clamp(+d.sopen.slice(1) || 1, 1, SLOTS), r = d.sopen[0] === 'r';
       const x = r ? (radioRead() ? radioSlots[n - 1] : null) : asEntry(emuSlot(n));
-      if (x && !x.bad) openText(x.text, 'c' + n + (r ? ' on the radio' : ' of the emulator'), n);
+      if (x && !x.bad) openText(x.text, 'c' + n + (r ? ' on the radio' : ' of the emulator'), n, true);
     } else if (d.gopen !== undefined) fromGallery(+d.gopen);
   });
   el.edMine.addEventListener('click', (e) => {
@@ -12101,7 +12164,7 @@ const GALLERY_FILES = 'tracks/';
     else if (d.gsync !== undefined) update([+d.gsync]);
   });
   // The slot list picks where the editor's track goes (the Send buttons, Save file); it never changes
-  // the track. What a slot holds is opened with the Open beside it, in the Emulator or the Radio row.
+  // the track. What a slot holds is opened from Open (Your tracks).
   el.edSlot.addEventListener('change', () => {
     ed.slot = clamp(parseInt(el.edSlot.value, 10) || 1, 1, SLOTS);
     ed.picked = true;
@@ -12116,17 +12179,17 @@ const GALLERY_FILES = 'tracks/';
     const s = sim();
     if (!s) return false;
     const slot = ed.slot, old = asEntry(emuSlot(slot));
-    if (old && (old.bad || norm(old.text) !== ed.file.text) && !stale(old) && !window.confirm('Slot c' + slot + ' of the emulator holds ' + what(old) +
-      '. Replace it with "' + ed.T.name.trim() + '"?')) {
+    if (old && (old.bad || norm(old.text) !== ed.file.text) && !ours(old) && !window.confirm('Slot c' + slot + ' of the emulator holds ' +
+      (stale(old) ? 'another version of "' + nameOf(old.text) + '", not one you sent from here' : what(old)) + '. Replace it with "' + ed.T.name.trim() + '"?')) {
       status('Not sent: c' + slot + ' keeps ' + what(old) + '. Pick another slot.');
       return false;
     }
     const kept = s.writeSD(slotPath(slot), ed.file.text) !== false;
-    ed.saved.add(ed.file.text);
+    ed.versions.add(ed.file.text);
     renderSlots();
     freshGame();                                       // (in its menus the game lists it at once)
     status('Sent to c' + slot + ' in the emulator (track ' + (8 + slot) + '): Fly c' + slot + ' flies it.' + (kept ? ''
-      : ' The browser\'s storage is full: c' + slot + ' lasts only this visit (Save file keeps the track).'), kept ? 'ok' : 'bad');
+      : ' The browser\'s storage is full or blocked: c' + slot + ' lasts only this visit (Save file keeps the track).'), kept ? 'ok' : 'bad');
     return true;
   }
   // Fly: the game started again (it reads the slots when it starts) on the slot as the emulator has
@@ -12174,6 +12237,7 @@ const GALLERY_FILES = 'tracks/';
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 4000);
     ed.saved.add(ed.file.text);
+    ed.versions.add(ed.file.text);
     status('Saved c' + ed.slot + '.txt: copy it to ' + DIR + ' on the radio\'s SD card.', 'ok');
   }
   el.edFly.addEventListener('click', fly);
@@ -12186,7 +12250,7 @@ const GALLERY_FILES = 'tracks/';
       ' goes from its SD card (the radio and a file you saved keep theirs).')) return;
     const kept = s.removeSD(slotPath(slot)) !== false;
     renderSlots();
-    say('Removed c' + slot + ' from the emulator.' + (freshGame() ? '' : ' The game\'s track menu shows it at its next start (Restart).') +
+    say('Removed c' + slot + ' from the emulator.' + (freshGame() ? '' : ' The game\'s track menu drops it at its next start (Restart).') +
       (kept ? '' : ' The browser\'s storage is blocked: the slot comes back at the next visit.'), kept ? 'ok' : 'bad');
   }
   el.edSyncMine.addEventListener('click', () => showPanel('mine'));
@@ -12201,7 +12265,7 @@ const GALLERY_FILES = 'tracks/';
       const kept = s.writeSD(slotPath(n), from.text) !== false;
       renderSlots();
       say('Copied c' + n + ' from the radio to the emulator.' + (freshGame() ? '' : ' The game reads it at its next start (Restart).') +
-        (kept ? '' : ' The browser\'s storage is full: the emulator keeps it only for this visit.'), kept ? 'ok' : 'bad');
+        (kept ? '' : ' The browser\'s storage is full or blocked: the emulator keeps it only for this visit.'), kept ? 'ok' : 'bad');
       return;
     }
     const gen = radio.gen;
@@ -12223,7 +12287,8 @@ const GALLERY_FILES = 'tracks/';
   // one line says to use Save file.
   const HOW_CONNECT = 'Plug the radio in by USB and choose USB Storage (SD) on it, then Connect radio and pick its SD card ' +
     '(the drive). Eject the drive before you unplug the radio.';
-  const NO_RADIO = 'This browser can\'t write to the radio\'s SD card: use Save file and copy it to ' + DIR + ' on the radio.';
+  const NO_RADIO = 'This browser can\'t reach the radio\'s SD card (that takes Chrome or Edge on a computer): Save file, then copy the file to ' + DIR + ' on the card.';
+  const NO_RADIO_PANEL = 'This browser can\'t reach the radio\'s SD card: that takes Chrome or Edge on a computer.';
   const NOT_CARD = 'This doesn\'t look like the radio\'s SD card: no SCRIPTS folder. Pick the drive the radio shows up as.';
   function canPick() {
     if (typeof window.showDirectoryPicker !== 'function') return false;
@@ -12233,10 +12298,17 @@ const GALLERY_FILES = 'tracks/';
   // panel: the Install panel is open; listed: its list of the card's slots is read; writing: the
   // job under way writes to the card; gen: counts Disconnects (a job that outlives its card says nothing)
   const radio = { ok: canPick(), state: 'off', dir: null, at: null, busy: false, writing: false, panel: false, listed: false, gen: 0, again: false };
-  // what the Install panel says (the editor has its own line: status)
+  // what the Install panel says about the install, under its button (the editor has its own line: status)
   function rstatus(msg, kind) {
     el.rpStatus.textContent = msg || '';
     el.rpStatus.className = 'ed-status' + (kind ? ' ' + kind : '');
+  }
+  // and about the connection, under Connection (what the install said before is old news then)
+  function cstatus(msg, kind) {
+    el.rpConnStatus.textContent = msg || '';
+    el.rpConnStatus.className = 'ed-status' + (kind ? ' ' + kind : '');
+    rstatus('');
+    el.rpThanks.hidden = true;
   }
   const STEPS = { card: ['SCRIPTS', 'TOOLS', 'StickTimeTracks'], scripts: ['TOOLS', 'StickTimeTracks'], tools: ['StickTimeTracks'], tracks: [] };
   const kv = {
@@ -12317,8 +12389,8 @@ const GALLERY_FILES = 'tracks/';
 
   function renderRadio() {
     const on = radio.state === 'on', ask = radio.state === 'ask', name = radio.dir ? cardName(radio.dir) : '';
-    // the editor's Radio row: what the radio's slot holds, Send to radio (Connect radio… first), Remove,
-    // and where the emulator's slots and the radio's differ, a copy either way
+    // the editor's Radio row: what the radio's slot holds, Send to radio (Connect radio… first), and
+    // where the emulator's slots and the radio's differ, a line to My tracks
     const bad = !!ed.T && ed.probs.length > 0, listed = on && radio.listed && !!ed.T;
     const re = listed ? radioSlots[ed.slot - 1] : null;
     el.edSend.hidden = el.edRadioLine.hidden = !radio.ok;
@@ -12328,7 +12400,7 @@ const GALLERY_FILES = 'tracks/';
       : bad ? 'Fix the problems listed under Check first' : 'Write c' + ed.slot + '.txt to the radio\'s SD card (track ' + (8 + ed.slot) + ')';
     el.edRadioLineText.classList.toggle('warn', listed && stale(re));
     el.edRadioLineText.textContent = listed ? 'c' + ed.slot + ': ' + holds(re) + ' · ' + name
-      : on ? name + ' connected' + (radio.busy ? ', reading…' : '') : ask ? name + ': allow again' : 'not connected';
+      : on ? name + ' connected' + (radio.busy ? ', reading…' : '') : ask ? name + ': Reconnect radio to allow access' : 'not connected';
     const diff = [];
     if (listed) {
       for (let i = 1; i <= SLOTS; i++) {
@@ -12338,11 +12410,11 @@ const GALLERY_FILES = 'tracks/';
       }
     }
     el.edSyncLine.hidden = !diff.length;
-    el.edSyncText.textContent = 'The emulator and the radio hold different tracks in ' + andList(diff.map((i) => 'c' + i)) + '.';
+    el.edSyncText.textContent = andList(diff.map((i) => 'c' + i)) + (diff.length > 1 ? ' differ' : ' differs') + ' between the emulator and the radio.';
     // the panel: the connection
     el.edRadio.hidden = !radio.ok;
     el.edRadioNote.className = 'note ed-rnote' + (radio.ok ? '' : ' warn');
-    el.edRadioNote.textContent = radio.ok ? HOW_CONNECT : NO_RADIO;
+    el.edRadioNote.textContent = radio.ok ? (on ? 'Eject the drive before you unplug the radio.' : HOW_CONNECT) : NO_RADIO_PANEL;
     // the game itself: from the site's sdcard/ where this browser can write to the card (not offline,
     // not in a hosted artifact), else the release zip
     el.edInstallNote.hidden = !!GAME && radio.ok;
@@ -12351,9 +12423,9 @@ const GALLERY_FILES = 'tracks/';
       el.edInstallPanel.hidden = el.rpInstWait.hidden = true;
       return;
     }
-    el.edRadioState.textContent = on ? name + ' connected' : ask ? name + ': allow again' : 'not connected';
+    el.edRadioState.textContent = on ? name + ' connected' : ask ? name + ': Reconnect radio to allow access' : 'not connected';
     el.edRadioState.classList.toggle('on', on);
-    el.edConnect.textContent = ask ? 'Reconnect' : 'Connect radio…';
+    el.edConnect.textContent = ask ? 'Reconnect radio' : 'Connect radio…';
     el.edConnect.hidden = on;
     el.edRefresh.hidden = !on;
     el.edForget.hidden = !(on || ask);
@@ -12390,7 +12462,7 @@ const GALLERY_FILES = 'tracks/';
       if (ed.T) renderSlots();                         // (the lists' buttons on again)
       if (radio.again) {
         radio.again = false;
-        if (radio.panel && radio.state === 'on' && !radio.listed) job(refreshRadio);
+        if (radio.panel && radio.state === 'on' && !radio.listed) job(refreshRadio, cstatus);
       }
     }
   }
@@ -12414,7 +12486,7 @@ const GALLERY_FILES = 'tracks/';
     try { await kv.set('radio', dir); } catch (e) { /* not kept: Connect radio again next time */ }
     if (gen !== radio.gen) { kv.del('radio').catch(() => { /* nothing kept */ }); return; }
     const where = at === 'card' ? '' : ' (' + ['SCRIPTS', 'SCRIPTS/TOOLS', 'SCRIPTS/TOOLS/StickTimeTracks'][['scripts', 'tools', 'tracks'].indexOf(at)] + ')';
-    if (said) say('Radio SD: ' + cardName(dir) + where + ' connected.' + await installed(), 'ok');
+    if (said) say('Connected to ' + cardName(dir) + where + '.' + await installed(), 'ok');
     if (radio.panel) await refreshRadio();
     else if (ed.open) await listRadio();
   }
@@ -12469,25 +12541,25 @@ const GALLERY_FILES = 'tracks/';
     const slot = ed.slot, text = ed.file.text, name = ed.T.name.trim();
     job(async () => {
       const dir = await tracksDir(true);
-      const old = await readSlot(dir, slot);
-      if (!old || old.text !== text) {
+      const old = await readSlot(dir, slot), same = !!(old && !old.bad && norm(old.text) === text);
+      if (!same) {
         for (let i = 1; i <= SLOTS; i++) {
           const e = i === slot ? null : await readSlot(dir, i);
-          if (e && !e.bad && e.text.replace(/\r\n?/g, '\n') === text) {
+          if (e && !e.bad && norm(e.text) === text) {
             status('The radio has this track already, in c' + i + ' (track ' + (8 + i) + '): nothing sent. To have it in c' + slot +
-              ' instead, Remove c' + i + ' under Install first.');
-            ed.saved.add(text);
+              ' instead, Remove c' + i + ' of the radio in My tracks first.');
+            ed.versions.add(text);
             await listRadio();
             return;
           }
         }
       }
-      if (old && old.text !== text && !window.confirm('Slot c' + slot + ' on the radio holds ' + what(old) + '. Replace it with "' + name + '"?')) {
+      if (old && !same && !window.confirm('Slot c' + slot + ' on the radio holds ' + what(old) + '. Replace it with "' + name + '"?')) {
         status('Nothing sent: c' + slot + '.txt on the radio stays as it was.');
         return;
       }
-      if (!old || old.text !== text) await writeSlot(dir, slot, text);
-      ed.saved.add(text);
+      if (!same) await writeSlot(dir, slot, text);
+      ed.versions.add(text);
       await listRadio();                               // (the lists show what is on the card now)
       status('Sent to the radio as track ' + (8 + slot) + ' (c' + slot + '.txt). On the radio: restart StickTime, the track is in the Track list.', 'ok');
     }, status, true);
@@ -12532,17 +12604,17 @@ const GALLERY_FILES = 'tracks/';
     const h = homes(text), c = 'c' + ed.slot + ' (track ' + (8 + ed.slot) + ')';
     const here = h.here.includes(ed.slot), there = h.there.includes(ed.slot);
     return here && there ? 'it is in ' + c + ' in the emulator and on the radio.' : here ? 'it is in ' + c + ' in the emulator' + (radioRead() ? ', not on the radio.' : '.')
-      : there ? 'it is in ' + c + ' on the radio.' : 'Send to emulator, Send to radio or Save file puts it in ' + c + '.';
+      : there ? 'it is in ' + c + ' on the radio.' : 'Send to emulator or Send to radio puts it in ' + c + '; Save file saves it as c' + ed.slot + '.txt.';
   }
   // a track file into the editor (Open file, a radio slot), checked as the game reads it
-  function openText(text, what, slot) {
+  function openText(text, what, slot, fromSlot) {
     const r = parseFile(text);
-    if (r.error) { status('Can\'t open ' + what + ': ' + r.error, 'bad'); return; }
+    if (r.error) { (gal.open ? galStatus : status)('Can\'t open ' + what + ': ' + r.error, 'bad'); return; }
     if (!okToReplace('"' + r.T.name + '" (' + what + ')')) { (gal.open ? galStatus : status)('Kept your track: ' + what + ' not opened.'); return; }
     if (gal.open || gal.mine) showPanel(null);
     pushUndo();
-    load(r.T, true);
-    slot = slot || homeOf(ed.file.text);
+    load(r.T, true, !fromSlot);                        // (a slot can be emptied: it is looked at as it is then)
+    slot = slot || homeOf(ed.file.text) || freeSlot();
     if (slot) { ed.slot = slot; renderSlots(); renderFly(); }
     fit();
     status('Opened ' + what + ': ' + r.T.gates.length + ' gates, ' + r.T.boxes.length + ' structures.' + (r.note ? ' ' + r.note : ''), r.note ? 'bad' : 'ok');
@@ -12554,7 +12626,7 @@ const GALLERY_FILES = 'tracks/';
     const put = [], lose = [], skip = [];
     from.forEach((f, i) => {
       const t = to[i], c = 'c' + (i + 1);
-      if (!f || (t && t.text === f.text)) return;
+      if (!f || (t && (t.text === f.text || (!t.bad && !f.bad && norm(t.text) === norm(f.text))))) return;   // (CR LF or not: the same track)
       if (f.bad) { skip.push(c + ' (' + BAD[f.bad] + ')'); return; }
       put.push(i + 1);
       if (t) lose.push(c + (t.bad ? ' (' + BAD[t.bad] + ')' : ' "' + nameOf(t.text) + '"'));
@@ -12571,7 +12643,7 @@ const GALLERY_FILES = 'tracks/';
       const rad = await readAll(), p = plan(rad, emuEntries());
       if (!rad.some(Boolean)) { say('No tracks on the radio to copy.'); return; }
       if (p.none) { say('No tracks on the radio the game can read.' + skipped(p), 'bad'); return; }
-      if (p.lose.length && !window.confirm('Replace in the emulator: ' + p.lose.join(', ') + '?')) return;
+      if (p.lose.length && !window.confirm('Replace in the emulator: ' + p.lose.join(', ') + '?')) { say('Nothing copied.'); return; }
       let full = false;
       p.put.forEach((i) => { if (s.writeSD(slotPath(i), rad[i - 1].text) === false) full = true; });
       renderSlots();
@@ -12595,16 +12667,16 @@ const GALLERY_FILES = 'tracks/';
       for (let i = 1; i <= SLOTS; i++) rad.push(await readSlot(dir, i));
       const p = plan(emu, rad);
       if (p.none) { say('No tracks in the emulator\'s slots the game can read.' + skipped(p), 'bad'); return; }
-      if (p.lose.length && !window.confirm('Replace on the radio: ' + p.lose.join(', ') + '?')) return;
+      if (p.lose.length && !window.confirm('Replace on the radio: ' + p.lose.join(', ') + '?')) { say('Nothing copied.'); return; }
       for (const i of p.put) await writeSlot(dir, i, emu[i - 1].text);
       say((p.put.length ? 'Sent ' + slotList(p.put) + ' to the radio. On the radio: restart StickTime, the tracks are in the Track list.'
         : 'The radio already has the emulator\'s tracks.') + skipped(p), 'ok');
       await listRadio();
     }, say, true);
   }
-  el.edConnect.addEventListener('click', () => connect(rstatus));
+  el.edConnect.addEventListener('click', () => connect(cstatus));
   el.edSend.addEventListener('click', sendToRadio);
-  el.edRefresh.addEventListener('click', () => job(refreshRadio));
+  el.edRefresh.addEventListener('click', () => job(refreshRadio, cstatus));
   el.edForget.addEventListener('click', () => {
     if (radio.busy) return;                            // (the button is off then)
     radio.gen++;
@@ -12616,11 +12688,9 @@ const GALLERY_FILES = 'tracks/';
     kv.del('radio').catch(() => { /* nothing kept */ });
     renderRadio();
     renderSlots();
-    rstatus('The radio\'s SD card is forgotten: Connect radio to pick it again.');
+    cstatus('Disconnected: this page forgets the card. Connect radio… picks it again.');
     el.edConnect.focus();
   });
-  // a radio slot into the track editor, on that slot
-  // Install's Show your tracks: the table of the slots, in the track editor's Open
 
   // ---------------------------------------------------------------- the two panels
   // Tracks (the track editor) and Install (the radio's SD card), each with its toolbar button, in the
@@ -12654,8 +12724,8 @@ const GALLERY_FILES = 'tracks/';
     el.radioBtn.setAttribute('aria-expanded', 'true');
     renderRadio();
     intoView(rp);
-    (el.edConnect.hidden ? el.rpClose : el.edConnect).focus({ preventScroll: true });
-    if (radio.state === 'on') { if (radio.busy) radio.again = true; else job(refreshRadio); }   // (after the job under way)
+    (el.edConnect.offsetParent ? el.edConnect : el.rpClose).focus({ preventScroll: true });   // (no Connect: no picker here)
+    if (radio.state === 'on') { if (radio.busy) radio.again = true; else job(refreshRadio, cstatus); }   // (after the job under way)
   }
   function closeRadio(focusButton) {
     radio.panel = false;
@@ -12686,7 +12756,7 @@ const GALLERY_FILES = 'tracks/';
       let p = 'granted';
       try { if (typeof dir.queryPermission === 'function') p = await dir.queryPermission({ mode: 'readwrite' }); } catch (e) { p = 'prompt'; }
       if (p === 'granted') {
-        try { await useCard(dir, false, rstatus); } catch (e) { radio.dir = dir; radio.state = 'ask'; }
+        try { await useCard(dir, false, cstatus); } catch (e) { radio.dir = dir; radio.state = 'ask'; }
       } else {
         radio.dir = dir;
         radio.state = p === 'denied' ? 'off' : 'ask';
@@ -12939,7 +13009,8 @@ const GALLERY_FILES = 'tracks/';
       }
       const list = andList(eds.map((e) => man.editions[e].label));
       rstatus(wrote || removed.length ? 'StickTime ' + man.version + ' is on the radio: ' + list + '.' + (removed.length ? ' Removed ' + andList(removed) + '.' : '') +
-        ' Eject the drive before unplugging it.' : 'StickTime ' + man.version + ' was already on the radio: ' + list + '. Nothing to write.', 'ok');
+        ' Eject the drive before you unplug the radio.' : 'StickTime ' + man.version + ' was already on the radio: ' + list + '. Nothing to write.', 'ok');
+      el.rpThanks.hidden = false;                       // (a good moment to say thanks)
       inst.card = await survey(man);
       renderInstall();
     }, rstatus, true);
@@ -12962,8 +13033,11 @@ const GALLERY_FILES = 'tracks/';
   function saveNow() {
     clearTimeout(saveT);
     try {
-      localStorage.setItem(STORE, JSON.stringify({ v: 1, T: ed.T, slot: ed.slot, trees: ed.showTrees, view: { x: V.x, z: V.z, s: V.s }, saved: !unsaved() }));
-    } catch (e) { /* storage blocked or full: the work stays for this visit */ }
+      const t = ed.file.text;
+      localStorage.setItem(STORE, JSON.stringify({ v: 1, T: ed.T, slot: ed.slot, trees: ed.showTrees, view: { x: V.x, z: V.z, s: V.s },
+        kept: t === ed.pristine || ed.saved.has(t), versions: [...ed.versions].slice(-20) }));
+      if (!ed.stored) { ed.stored = true; renderFly(); }
+    } catch (e) { if (ed.stored) { ed.stored = false; renderFly(); } }   // (blocked or full: it stays for this visit)
   }
   function saveSoon() { clearTimeout(saveT); saveT = setTimeout(saveNow, 400); }
   function restore() {
@@ -12978,7 +13052,10 @@ const GALLERY_FILES = 'tracks/';
       V.x = v.x; V.z = v.z; V.s = clamp(v.s, SMIN, SMAX);
       ed.hadView = true;
     }
-    load(T, false, !o.saved);                         // unsaved work stays so after a reload
+    // unsaved work stays so after a reload (1.7.1 kept "saved": in a slot or a file then)
+    const versions = Array.isArray(o.versions) ? o.versions.filter((s) => typeof s === 'string').slice(-20) : [];
+    const kept = o.kept !== undefined ? !!o.kept : !!o.saved;
+    load(T, false, kept, versions.length || !kept ? versions : null);
     return true;
   }
   window.addEventListener('pagehide', saveNow);

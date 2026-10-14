@@ -875,6 +875,8 @@
   function key(name) { if (app.engine) app.engine.key(name); }
   window.addEventListener('keydown', (e) => {
     if (isField(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
+    // a button reached with the keyboard keeps Enter and Space (a clicked one doesn't: the game's)
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('button:focus-visible, a:focus-visible, summary:focus-visible')) return;
     const k = e.key;
     const handled = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', 'W', 'A', 'S', 'D', 'Enter', 'Escape', 'Backspace', ' ', 'PageUp', 'PageDown', '+', '-', '='].includes(k);
     if (handled) e.preventDefault();

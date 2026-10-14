@@ -10,7 +10,8 @@ tracks/index.json (.github/workflows/pages.yml), so a track merged into the repo
 without a new build of the page.
 
     python tools/gallery.py            check every track (exit status 1 on a problem)
-    python tools/gallery.py <dir>      check, then write <dir>/index.json"""
+    python tools/gallery.py <dir>      check, then write <dir>/index.json (<dir>: the folder to write
+                                       it to, as the site's build does; not tracks/ itself)"""
 import json
 import pathlib
 import re
@@ -19,9 +20,15 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 DIR = ROOT / "tracks"
 FILE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
-# a number as the editor writes it: plain decimal, at most 2 places, no trailing zeros
-NUM = re.compile(r"^-?(0|[1-9]\d*)(\.\d?[1-9])?$")
+# names Windows can't have as a file (git there can't check the repo out with one)
+WIN = re.compile(r"^(con|prn|aux|nul|com[0-9]|lpt[0-9])$")
+# a number as the editor writes it: plain decimal, at most 2 places, no trailing zeros, never -0
+NUM = re.compile(r"^(0|-?[1-9][0-9]*(\.[0-9]?[1-9])?|-?0\.[0-9]?[1-9])$")
 KEYS = {"by": 60, "about": 300, "source": 300}
+# the game's own tracks, and the names the editor gives a new track (Blank, a copy of one of them):
+# the editor takes a slot's track with a gallery track's name for another version of it
+BUILTIN = ("Meadow", "Figure 8", "Dive Tower", "Slalom", "Hoop Forest", "Grand Prix", "Bando", "Pro Track")
+TAKEN = {n.lower() for n in BUILTIN + ("My Track",) + tuple(("My " + n)[:16] for n in BUILTIN)}
 
 
 def fnv1a(s):
@@ -44,8 +51,10 @@ def track_problems(text):
     name, line = lines[0], lines[1]
     if not (1 <= len(name) <= 16) or name != name.strip() or re.search(r"[^\x20-\x7e]|/", name):
         p.append(f"the name {name!r}: 1 to 16 plain letters, digits and punctuation, without '/'")
+    elif name.lower() in TAKEN:
+        p.append(f"the name {name!r} is a built-in track's or the editor's name for a new track: give the track a name of its own")
     tok = line.split(" ")
-    if len(tok) < 4 or tok[0] != "1" or not tok[1].isdigit():
+    if len(tok) < 4 or tok[0] != "1" or not re.fullmatch(r"[1-9][0-9]*", tok[1]):
         return p + ["the numbers line starts with the format (1), the id, the tree seed and the trees"]
     nums = line[len(tok[0]) + len(tok[1]) + 2:]
     if int(tok[1]) != fnv1a(nums) % 999999 + 1:
@@ -75,8 +84,9 @@ def track_problems(text):
             p.append("gate 1 can't be a dive gate")
     for i in range(nb):
         x, z, hx, hz, y0, y1, k = B[i * 7:i * 7 + 7]
-        if not (abs(x) <= 999 and abs(z) <= 999 and 0.05 <= hx <= 200 and 0.05 <= hz <= 200 and 0 <= y0 < y1 <= 300 and k in (1, 2, 3)):
-            p.append(f"structure {i + 1}: within 999 m, half sizes 0.05 to 200, bottom below top, kind 1 to 3")
+        if not (abs(x) <= 999 and abs(z) <= 999 and 0.05 <= hx <= 200 and 0.05 <= hz <= 200 and 0 <= y0 <= 200
+                and 0.1 <= y1 <= 300 and y0 < y1 and k in (1, 2, 3)):
+            p.append(f"structure {i + 1}: within 999 m, half sizes 0.05 to 200, bottom 0 to 200 below top 0.1 to 300, kind 1 to 3")
     return p
 
 
@@ -88,8 +98,11 @@ def info_problems(info):
         v = info.get(k)
         if v is None and k == "by":
             p.append("'by' says who made it")
-        elif v is not None and (not isinstance(v, str) or not v.strip() or len(v) > n or re.search(r"[\x00-\x1f]", v)):
-            p.append(f"{k!r}: one line of text, {n} characters at most")
+        # (control, zero-width and direction characters too: they hide or turn round what the card
+        # shows; the length as the page counts it, in UTF-16 units)
+        elif v is not None and (not isinstance(v, str) or not v.strip() or len(v.encode("utf-16-le")) // 2 > n
+                                or re.search("[\x00-\x1f\x7f-\x9f\u200b-\u200f\u2028-\u202e\u2060-\u2069\ufeff]", v)):
+            p.append(f"{k!r}: one line of plain text, {n} characters at most (leave the key out if there is nothing to say)")
     s = info.get("source")
     if isinstance(s, str) and not re.match(r"^https://[^\s\"'<>]+$", s):
         p.append("'source' is an https:// link")
@@ -105,12 +118,12 @@ def gallery(d=DIR):
             continue
         if f.suffix not in (".txt", ".json"):
             probs.append(f"{f.name}: the gallery takes <name>.txt and <name>.json")
-        elif not FILE.match(f.stem) or len(f.stem) > 40:
+        elif not FILE.match(f.stem) or len(f.stem) > 40 or WIN.match(f.stem):
             probs.append(f"{f.name}: a name of lowercase letters, digits and dashes (40 at most), like my-track.txt")
         elif not f.with_suffix(".json" if f.suffix == ".txt" else ".txt").exists():
             probs.append(f"{f.name}: no {f.stem}{'.json' if f.suffix == '.txt' else '.txt'} beside it")
     for f in files:
-        if f.suffix != ".txt" or not FILE.match(f.stem) or not f.with_suffix(".json").exists():
+        if f.suffix != ".txt" or not FILE.match(f.stem) or WIN.match(f.stem) or not f.with_suffix(".json").exists():
             continue
         try:
             # (a checkout on Windows may have CR LF line ends: the repo has LF, as Save file writes)
@@ -119,7 +132,7 @@ def gallery(d=DIR):
             probs.append(f"{f.name}: not plain text")
             continue
         try:
-            info = json.loads(f.with_suffix(".json").read_text(encoding="utf-8"))
+            info = json.loads(f.with_suffix(".json").read_text(encoding="utf-8-sig"))   # (a BOM is fine)
         except (UnicodeDecodeError, ValueError) as e:
             probs.append(f"{f.stem}.json: not JSON ({e})")
             continue

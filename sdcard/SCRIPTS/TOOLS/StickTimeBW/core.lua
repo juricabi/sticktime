@@ -287,7 +287,7 @@ do
       elseif k == 4 then
         addPillar(x, z, 0.08, y - iw - GT, 2)
       elseif k == 5 then
-        ay = 1.4
+        ay = y > 1.4 and y or 1.4                               -- a raised ring: its middle
       elseif k == 6 or k == 7 then
         -- (x, z) is the pole; the gate itself is the pass zone beside it
         local s = k == 6 and 1 or -1

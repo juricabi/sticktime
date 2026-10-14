@@ -125,7 +125,7 @@ buildTrack = function(t)
     local k, a = d[i + 2], d[i + 3] * 0.0174533
     local hx, hz, x, z, y = sin(a), cos(a), d[i], d[i + 1], d[i + 4]
     if y <= 0 then y = GY[k] end
-    local ax, ay, az, Ax, Ay, Az = x, k == 5 and 1.4 or y, z, 0, 1, 0
+    local ax, ay, az, Ax, Ay, Az = x, (k ~= 5 or y > 1.4) and y or 1.4, z, 0, 1, 0
     if k == 6 or k == 7 then
       -- (x, z) is the pole; the gate itself is the pass zone beside it
       local s = k == 6 and 1 or -1

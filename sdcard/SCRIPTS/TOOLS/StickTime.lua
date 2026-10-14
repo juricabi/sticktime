@@ -289,7 +289,7 @@ do
       elseif k == 4 then
         addPillar(x, z, 0.08, y - iw - GT, 2)
       elseif k == 5 then
-        ay = 1.4
+        ay = y > 1.4 and y or 1.4                               -- a raised ring: its middle
       elseif k == 6 or k == 7 then
         -- (x, z) is the pole; the gate itself is the pass zone beside it
         local s = k == 6 and 1 or -1
@@ -2847,34 +2847,37 @@ local render, hitTest, pauseHit, initUI
 
   -- lined up to go through gate i, as a racer needs it: on its way-in side within 70 deg of its
   -- axis, heading within 70 deg of the way through and pointed at it (within the gate's width as
-  -- seen from here, 25 deg at least: a curved line into it has it off the nose) and, faster than 3 m/s, going within 70 deg of the way through
-  -- (a slide in a turn misses the gate). A dive gate: from above, any heading. A flag is a turn:
-  -- still before it on the side its pole leaves free, any heading (gx, gz: the middle of its pass
-  -- zone, GHW from the pole). wide: once green, yellow again only past 75 deg and a third wider aim
-  -- (no flicker at the edge)
+  -- seen from here, 25 deg at least: a curved line into it has it off the nose) and, faster than
+  -- 3 m/s, going within 70 deg of the way through (a slide in a turn misses the gate). A dive gate:
+  -- from above, any heading. Gate Rush counts a gate either way through, so either side will do.
+  -- A flag is a turn: still before it on the side its pole leaves free, any heading (gx, gz: the
+  -- middle of its pass zone, GHW from the pole). wide: once green, yellow again only past 75 deg,
+  -- the aim a third wider (32 deg at least) and the slide from 4 m/s (no flicker at the edge)
   local function linedUp(i, wide)
     local nx, ny, nz, k = gnx[i], gny[i], gnz[i], gk[i]
     local wx, wy, wz = AX[i] - px, AY[i] - py, AZ[i] - pz
     local d, c = wx * nx + wy * ny + wz * nz, wide and 0.26 or 0.34
     if k == 6 or k == 7 then return d > 0 and ((px - gx[i]) * grx[i] + (pz - gz[i]) * grz[i]) * (k == 6 and 1 or -1) + GHW[k] > 0 end
+    if gmode == 4 and d < 0 then nx, ny, nz, d = -nx, -ny, -nz, -d end
     if d <= c * sqrt(wx * wx + wy * wy + wz * wz) then return false end
     if ny ~= 0 then return true end
     local hl, v2 = sqrt(fx * fx + fz * fz) + 0.001, vx * vx + vz * vz
-    if fx * nx + fz * nz <= c * hl or (v2 >= 9 and vx * nx + vz * nz <= c * sqrt(v2)) then return false end
+    if fx * nx + fz * nz <= c * hl or (v2 >= (wide and 16 or 9) and vx * nx + vz * nz <= c * sqrt(v2)) then return false end
     local bl = sqrt(wx * wx + wz * wz) + 0.01
-    local q = (GHW[k] + 1) * (wide and 1.33 or 1) / bl          -- tan of the aim's half angle
-    local ca = 1 / sqrt(1 + q * q)
-    if ca > 0.906 then ca = 0.906 end                         -- (25 deg)
-    return (fx * wx + fz * wz) > ca * hl * bl
+    local q = (GHW[k] + 1) / bl                               -- tan of the aim's half angle
+    if q < 0.4663 then q = 0.4663 end                         -- (25 deg)
+    if wide then q = q * 1.33 end
+    return (fx * wx + fz * wz) * sqrt(1 + q * q) > hl * bl
   end
-  -- green from 70 deg, yellow again past 75 (no flicker at the edge)
+  -- green from 70 deg, yellow again past 75 (no flicker at the edge); a fresh test once the gate
+  -- has been off the screen
   local mkGate, mkOn = 0, false
   local function markerOn(i)
     mkOn = linedUp(i, mkGate == i and mkOn)
     mkGate = i
     return mkOn
   end
-  if STICKTIME_TEST then STICKTIME_TEST.lined = linedUp end
+  if STICKTIME_TEST then STICKTIME_TEST.lined, STICKTIME_TEST.marker = linedUp, markerOn end
 
   local function nextGateMarker()
     if gmode == 3 or NG == 0 then return end
@@ -2893,6 +2896,7 @@ local render, hitTest, pauseHit, initUI
         return
       end
     end
+    mkOn = false
     local ex, ey = X, -Y
     if Z < 0 and ex * ex + ey * ey < 1 then ex, ey = 0, 1 end
     local l = sqrt(ex * ex + ey * ey) + 0.0001

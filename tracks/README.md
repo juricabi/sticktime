@@ -2,12 +2,12 @@
 
 Tracks for StickTime and StickTime BW that anyone can fly:
 
-- **In the browser:** open the [emulator](https://juricabi.github.io/sticktime/) and go to **Tracks** → **Open**, then **Open** a track of the Gallery. In the editor, **Send to emulator** and **Fly** fly it, and **Send to radio** or **Save file** puts it on your radio.
+- **In the browser:** open the [emulator](https://juricabi.github.io/sticktime/) and go to **Tracks** → **Open**, then **Open** a track of the Gallery. In the editor, **Send to emulator** and **Fly c1** fly it, and **Send to radio** or **Save file** puts it on your radio.
 - **On the radio:** copy a `.txt` file from this folder to `/SCRIPTS/TOOLS/StickTimeTracks/` on the SD card as `c1.txt` … `c8.txt`. These are tracks 9 to 16 in the game. Restart StickTime to see it.
 
 ## Add your track
 
-1. Make the track in the emulator's track editor (**Tracks**). Fly it a few times: the race should flow, and the editor's **Check** should say OK.
+1. Make the track in the emulator's track editor (**Tracks**). Give it a name of its own (not a built-in track's name, and not the editor's "My Track" or "My Meadow" and so on). Fly it a few times: the race should flow, and the editor's **Check** should say OK.
 2. Click **Save file**. Rename the file to a short name of lowercase letters, digits and dashes, like `tracks/backyard-bando.txt`. Don't edit the file by hand: the id on its second line comes from its numbers. If they don't match, open the file in the editor and save it again.
 3. Next to it, add `tracks/backyard-bando.json`:
 
@@ -19,10 +19,12 @@ Tracks for StickTime and StickTime BW that anyone can fly:
    }
    ```
 
-4. Open a pull request with the two files. A check runs on the pull request: `python tools/gallery.py` checks the files, and `python test/gallery_test.py --tracks` has the game build each track in the emulator. Once the pull request is merged, the gallery on the site lists the track within a few minutes.
+   `about` and `source` are optional: leave a key out rather than give it an empty text. `python tools/gallery.py` checks the files the way the pull request's check does.
+
+4. Open a pull request with the two files. A check runs on the pull request: `python tools/gallery.py` checks the files, and `python test/gallery_test.py --tracks` has the game build each track in the emulator. (A first pull request to the repo waits for the maintainer to let the check run.) Once the pull request is merged, the gallery on the site lists the track within a few minutes.
 
 A few rules:
-- The name (the file's first line, 16 characters at most) is what the game's track menu shows, so it must be different from the names already in the gallery.
+- The name (the file's first line, 16 characters at most) is what the game's track menu shows, so it must be different from the names already in the gallery and from the game's own tracks (and the editor's names for a new track: My Track, My Meadow, ...).
 - Send your own work, or the layout of a real track with its source linked.
 
 ## The MultiGP tracks
@@ -36,3 +38,5 @@ The MultiGP qualifier tracks of 2017 to 2026 are built from MultiGP's published 
 - **Order:** the race order and directions come from the diagrams' numbered arrows. Diagrams without numbers were read from MultiGP's flight-path renders.
 
 Every track was flown two laps with the game's autopilot without a hit.
+
+For the maintainer: the check runs the pull request's own copy of `tools/gallery.py` and `test/gallery_test.py`, so look at any change to those (or to `.github/`) in a track's pull request.

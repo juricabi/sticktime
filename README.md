@@ -2,7 +2,7 @@
 
 A real 3D FPV quad simulator that runs **on your radio** as an EdgeTX Lua tool. Race AI pilots, fly freestyle around a bando or chase gates against the clock, with nothing but your radio. Color screens get filled 3D, black & white radios get wireframe 3D, and older B&W radios with little memory get **StickTime Lite**.
 
-**[Play it in your browser](https://juricabi.github.io/sticktime/)** · **[Download for your radio](https://github.com/juricabi/sticktime/releases/latest)** · EdgeTX 2.11 or newer (the color version also runs on older EdgeTX) · free software, GPL-2.0
+**[Play it in your browser](https://juricabi.github.io/sticktime/)** · **[Download for your radio](https://github.com/juricabi/sticktime/releases/latest)** · EdgeTX 2.11 or newer (the color version also runs on older EdgeTX) · free software, GPL-2.0 · **[Support it on Ko-fi](https://ko-fi.com/juricabi)**
 
 | TX16S · race against AI pilots | TX16S · the Bando | TX16S · freestyle |
 |---|---|---|
@@ -103,8 +103,8 @@ Play at **[juricabi.github.io/sticktime](https://juricabi.github.io/sticktime/)*
 
 - Any radio screen or a **PC screen** (1280×720, 1920×1080 at 60 fps); keyboard, on-screen gimbals or your radio as a USB joystick.
 - Synthesized motor sound tuned against real quads, and live-composed music (or your own songs).
-- **Tracks:** the track editor. Lay out gates, hoops, flags, dive gates, structures and walls on a map. **Open** picks a track to edit: one of yours, a new one, a file or one from the gallery of [tracks/](tracks/). The editor works on a copy, and **Send to emulator**, **Send to radio** (Chrome/Edge, radio in USB Storage mode) or **Save file** puts it in a slot, and **Fly** flies the emulator's slot. **My tracks** shows the emulator's and the radio's slots side by side: remove a track, or copy it from one to the other. Made a good one? [Add it](tracks/README.md#add-your-track) with a pull request.
-- **Install:** connect the radio's SD card to install or update StickTime and manage the tracks on it (hosted site only).
+- **Tracks:** the track editor. Lay out gates, hoops, flags, dive gates, structures and walls on a map. **Open** picks a track to edit: one of yours, a new one, a file or one from the gallery of [tracks/](tracks/). The editor works on a copy: **To slot** picks c1 to c8, **Send to emulator** or **Send to radio** (Chrome/Edge, radio in USB Storage mode) puts it in that slot, **Fly c1** flies the emulator's slot, and **Save file** downloads it as `c1.txt`. **My tracks** shows the emulator's and the radio's slots side by side: remove a track, or copy it from one to the other. Made a good one? [Add it](tracks/README.md#add-your-track) with a pull request.
+- **Install:** connect the radio's SD card (Chrome or Edge on a computer) to install or update StickTime (hosted site only), and where to get the faster firmware. The tracks on the radio are under **Tracks** → **My tracks**.
 - **Radio load** estimates the frame time on F2, F4 and H7 radios; **Open .lua** runs any EdgeTX tool script.
 
 ## Under the hood
@@ -198,6 +198,12 @@ tools/build_etxlua.sh && tools/build_etxhost.sh && python3 build.py && python3 t
 test/run_all.sh
 ```
 </details>
+
+## Support
+
+StickTime is free and made in my spare time. If you enjoy it, you can buy me a coffee:
+
+[![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/juricabi)
 
 ## Credits and license
 

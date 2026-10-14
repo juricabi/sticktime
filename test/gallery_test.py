@@ -27,6 +27,15 @@ SITE = "https://sticktime.test/"
 fails = []
 
 
+def other_version(text):
+    """the same track with another tree count: another version of it (the same name, other numbers
+    and so its own id), whatever its gates are"""
+    name, line = text.split("\n")[:2]
+    seed, trees, rest = line.split(" ", 4)[2:]
+    nums = f"{seed} {(int(trees) + 1) % 31} {rest}"
+    return f"{name}\n1 {gallery.fnv1a(nums) % 999999 + 1} {nums}\n"
+
+
 def check(ok, what):
     print(("ok    " if ok else "FAIL  ") + what)
     if not ok:
@@ -38,6 +47,8 @@ def checker_tests():
     good = (ROOT / "tracks" / "multigp-2020-gq.txt").read_bytes().replace(b"\r\n", b"\n").decode()
     check(gallery.track_problems(good) == [], "checker: a track as Save file writes it passes")
     name, line = good.split("\n")[:2]
+    def other_id(nums):                 # (the numbers with the id the editor gives them)
+        return name + "\n1 " + str(gallery.fnv1a(nums) % 999999 + 1) + " " + nums + "\n"
     bad = {
         "the id": name + "\n1 12345 " + line.split(" ", 2)[2] + "\n",
         "a name too long": "A name far too long here\n" + line + "\n",
@@ -47,12 +58,17 @@ def checker_tests():
         "no numbers line": name + "\n",
         "gate type 9": name + "\n" + line.replace(" 1 0 0 ", " 9 0 0 ", 1) + "\n",
         "one gate": name + "\n1 1 20 0 0 0 1 0 0\n",
+        "a built-in track's name": "Slalom\n" + line + "\n",
+        "the editor's name for a new track": "My Track\n" + line + "\n",
+        "-0": other_id(line.split(" ", 2)[2].replace(" 25.5 ", " -0 ", 1)),
     }
+    assert " 25.5 " in line                    # (the cases above change that number)
     for what, text in bad.items():
         check(gallery.track_problems(text) != [], f"checker: refuses {what}")
     check(gallery.info_problems({"by": "Me"}) == [], "checker: 'by' alone is enough")
     for what, info in {"no by": {"about": "x"}, "another key": {"by": "Me", "url": "x"}, "an http source": {"by": "Me", "source": "http://x.org"},
-                       "a long by": {"by": "x" * 61}, "a line break": {"by": "Me", "about": "a\nb"}, "a list": ["Me"]}.items():
+                       "a long by": {"by": "x" * 61}, "a line break": {"by": "Me", "about": "a\nb"}, "a list": ["Me"],
+                       "a direction mark": {"by": "Me\u202e"}, "an empty about": {"by": "Me", "about": ""}}.items():
         check(gallery.info_problems(info) != [], f"checker: refuses {what}")
     with tempfile.TemporaryDirectory() as tmp:
         d = pathlib.Path(tmp)
@@ -153,13 +169,15 @@ def tracks_tests(br, errors, tracks):
     names = [t["name"] for t in tracks]
     page.wait_for_function(f"document.querySelectorAll('#edCards .ed-card').length === {len(names)}", timeout=10000)
     check(cards(page) == names, f"site: the gallery lists tracks/ ({len(names)} tracks) in file order")
-    held = {}
+    held, nf = {}, len(fails)
     for i, t in enumerate(tracks):
         open_gallery(page)
         page.click(f"[data-gopen='{i}']")
         r = page.evaluate("({ file: sim.editor.file(), probs: sim.editor.problems(), name: document.getElementById('edName').value })")
         check(r["file"] == t["text"] and r["name"] == t["name"] and not r["probs"] and page.is_hidden("#edGallery") and page.is_visible("#edMap"),
               f"{t['file']}: opens as it is, Check OK {r['probs'] if r['probs'] else ''}")
+        if len(fails) > nf:
+            break                       # (a track the editor doesn't take as it is can't be sent)
         n = len(asked)
         send_fly(page)
         slot = int(page.input_value("#edSlot"))
@@ -170,6 +188,9 @@ def tracks_tests(br, errors, tracks):
               and (len(replaced) == (1 if i >= 8 else 0)),
               f"{t['file']}: Fly it: in c{slot} (track {8 + slot}), the game builds \"{info[10]}\" and flies it" + (f"; asked {replaced}" if i >= 8 else ""))
         held[slot] = i
+    if len(fails) > nf:
+        ctx.close()
+        return
     check(all("from the gallery" not in a for a in asked), "site: opening a gallery track over another gallery track asks nothing")
     open_gallery(page)
     ok = all(card_line(page, i, "ed-in") == f"In c{n} in the emulator" for n, i in held.items())
@@ -183,12 +204,11 @@ def tracks_tests(br, errors, tracks):
           "site: opened again: on the slot that has it, flown with nothing asked")
 
     # another version of a gallery track in a slot (the same name, a gate moved): Update
-    old = tracks[3]["text"].replace(" 1 0 0 ", " 1 5 0 ", 1)
-    assert old != tracks[3]["text"]
+    old = other_version(tracks[3]["text"])
     page.evaluate(f"sim.writeSD('{SLOT}4.txt', {json.dumps(old)})")
     page.evaluate("sim.boot()")                                    # the game in its menu
     open_mine(page)
-    check(page.is_visible("#edGalSync") and page.inner_text("#edUpdList").startswith('"' + tracks[3]["name"] + '": an older version in c4 in the emulator')
+    check(page.is_visible("#edGalSync") and page.inner_text("#edUpdList").startswith('"' + tracks[3]["name"] + '": another version in c4 in the emulator')
           and page.is_visible("[data-gsync='3']"), f"site: My tracks shows the older version in c4: {page.inner_text('#edUpdList')!r}")
     n = len(asked)
     page.click("[data-gsync='3']")
@@ -230,14 +250,14 @@ def radio_tests(br, errors, tracks):
     page.goto(SITE + "simulator.html")
     wait_sim(page)
     T = "SCRIPTS/TOOLS/StickTimeTracks/c"
-    old = tracks[0]["text"].replace(" 1 0 0 ", " 1 5 0 ", 1)
+    old = other_version(tracks[0]["text"])
     page.evaluate(MAKE_CARD, ["RADIO", {"SCRIPTS/TOOLS/StickTime.lua": "-- the game\n", T + "5.txt": old.replace("\n", "\r\n"), T + "6.txt": tracks[1]["text"]}])
     page.click("#radioBtn")
     page.click("#edConnect")
     page.wait_for_function("sim.editor.radio().state === 'on' && !sim.editor.radio().busy", timeout=10000)
     open_mine(page)
     page.wait_for_function("document.querySelector('#edUpdList li')", timeout=10000)
-    check(page.inner_text("#edUpdList").startswith('"' + tracks[0]["name"] + '": an older version in c5 on the radio'),
+    check(page.inner_text("#edUpdList").startswith('"' + tracks[0]["name"] + '": another version in c5 on the radio'),
           f"radio: My tracks shows the radio's older version: {page.inner_text('#edUpdList')!r}")
     page.click("[data-gsync='0']")
     page.wait_for_function("!sim.editor.radio().busy", timeout=10000)
@@ -260,7 +280,7 @@ def radio_tests(br, errors, tracks):
     check(opts[5] == f"c6 · track 14 · {tracks[1]['name']} (emulator and radio)" and page.inner_text("#edEmuHas") == "c6: this track"
           and page.inner_text("#edRadioLineText") == "c6: this track · RADIO", f"radio: flown in c6 here too: {opts[5]!r}")
     # the slots that differ: a line to My tracks, where ← copies the radio's c5 to the emulator
-    check(page.is_visible("#edSyncLine") and page.inner_text("#edSyncText") == "The emulator and the radio hold different tracks in c5."
+    check(page.is_visible("#edSyncLine") and page.inner_text("#edSyncText") == "c5 differs between the emulator and the radio."
           and page.is_visible("#edSyncMine"), f"radio: the editor says where the slots differ: {page.inner_text('#edSyncText')!r}")
     page.click("#edSyncMine")
     page.wait_for_function("!sim.editor.radio().busy", timeout=10000)
@@ -333,7 +353,7 @@ def page_tests(br, errors, tracks):
     check(page.is_visible("#edGallery") and page.is_hidden("#edMap") and page.get_attribute("#edGalBtn", "aria-expanded") == "true",
           "page: Gallery shows the gallery in place of the map")
     bundled = page.evaluate("GALLERY.tracks.map(t => t.name)")
-    check(cards(page) == bundled and bundled == [t["name"] for t in built], f"page (file://): the built-in list, as tracks/ has it ({len(bundled)})")
+    check(cards(page) == bundled and bundled == [t["name"] for t in built], f"page (file://): the built-in list, as tracks/ has it ({len(bundled)}; after a change to tracks/, python tools/bundle_web.py)")
     links = page.eval_on_selector_all("#edCards a", "els => els.map(e => [e.href, e.target, e.rel])")
     check(len(links) == sum(1 for t in built if t.get("source")) and all(h.startswith("https://") and tg == "_blank" and "noopener" in r for h, tg, r in links),
           "page: source links open apart (https only)")

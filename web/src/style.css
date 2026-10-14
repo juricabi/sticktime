@@ -9,8 +9,8 @@
   --line: #c5ccd4;
   --accent: #f26b10;
   --accent-soft: #fde2cf;
-  --ok: #23885a;
-  --warn: #b77400;
+  --ok: #1d774e;
+  --warn: #996100;
   --bad: #cc3a3a;
   /* physical objects keep their look in both themes */
   --mat: #2b5a4e;
@@ -107,6 +107,7 @@ select { max-width: 270px; }
 .music #songsClear[hidden] { display: none; }
 .file-btn { position: relative; overflow: hidden; }
 .file-btn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.file-btn:has(input:focus-visible), .music .songs:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* ----------------------------------------------------------------- layout */
 .layout { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 18px; padding-top: 16px; align-items: start; }
@@ -245,6 +246,18 @@ kbd { font: 500 11px/1 var(--font-mono); padding: 2px 5px; border-radius: 4px; b
 .meter i { position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; background: var(--accent); }
 .note { font-size: 12px; color: var(--muted); }
 .note.warn { color: var(--warn); }
+/* Ko-fi: the header's Support, the strip under the emulator, the thanks after an install */
+a.btn { color: inherit; text-decoration: none; }
+.btn.kofi { height: 28px; padding: 0 9px; margin-left: 4px; font-size: 12.5px; }
+.btn.kofi svg, .support-cup { color: #ff5e5b; }
+.btn.kofi:hover { border-color: #ff5e5b; }
+.support { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; margin-top: 18px; }
+.support-cup { flex: none; display: grid; }
+.support-text { flex: 1 1 300px; min-width: 0; }
+.support h2 { margin-bottom: 6px; }
+.btn.kofi-go { height: 38px; padding: 0 16px; background: #ff5e5b; border-color: #ff5e5b; color: #1c0c00; font-weight: 600; }
+.btn.kofi-go:hover { background: #ff7471; }
+.rp-thanks a { color: inherit; }
 footer.credits { margin-top: 22px; font-size: 12px; color: var(--muted); max-width: 900px; }
 footer.credits a { color: inherit; }
 
@@ -305,7 +318,7 @@ footer.credits a { color: inherit; }
 .ed-dialog ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 14px; }
 .ed-dialog .note { margin: 12px 0 0; }
 .ed-dialog .ed-row { margin-top: 16px; }
-.ed-rsync { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 12px 0 0; padding: 8px 12px; border: 1px solid var(--warn);
+.editor .ed-rsync { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 12px 0 0; padding: 8px 12px; border: 1px solid var(--warn);
   border-radius: 8px; font-size: 13px; }
 .ed-rsync .btn { height: 30px; padding: 0 12px; font-size: 12.5px; }
 .ed-size { margin-left: auto; font: 500 12px/1.3 var(--font-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -318,7 +331,7 @@ footer.credits a { color: inherit; }
 .ed-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 12px; }
 .ed-card { display: flex; flex-direction: column; min-width: 0; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; background: var(--surface); }
 .ed-thumb { display: block; width: 100%; height: 140px; background: var(--mat); }
-.ed-cinfo { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px 0; flex: 1; min-width: 0; }
+.ed-cinfo { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px 0; flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .ed-cinfo strong { font: 600 15px/1.25 var(--font-display); letter-spacing: .02em; }
 .ed-by { font-size: 12.5px; color: var(--muted); }
 .ed-cinfo p { margin: 4px 0 0; font-size: 13px; line-height: 1.45; }
@@ -390,10 +403,18 @@ footer.credits a { color: inherit; }
 .ed-rnote { margin: 6px 0 0; }
 .linkbtn { padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 .linkbtn:hover { color: var(--fg); }
-/* the Install panel: the connection and the game on the left, the tracks on the right */
+/* the Install panel: the connection on the left, the game on the right, the faster firmware below */
 .rp-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 40px; align-items: start; }
 #radioPanel > .ed-head { margin-bottom: 18px; }
-#rpInstSec .ed-status { margin: 12px 0 0; }
+#rpInstSec .ed-status, #rpConnStatus { margin: 12px 0 0; }
+#rpConnStatus:empty { display: none; }
+.ed-gallery:focus { outline: none; }
+.editor a { color: var(--fg); text-underline-offset: 3px; }
+.editor a:hover { color: var(--accent); }
+@media (pointer: coarse) {
+  .ed-stable .ed-del { padding: 8px 4px; }
+  .ed-arrow { height: 34px; min-width: 40px; }
+}
 #radioPanel .ed-sec { padding: 18px 0; }
 #radioPanel .ed-sec:first-child { padding-top: 0; }
 #radioPanel .ed-sec h3 { margin-bottom: 12px; }
@@ -496,4 +517,5 @@ footer.credits a { color: inherit; }
   .ed-actions { width: 100%; }
   .ed-actions .field { flex: 1 1 100%; }
   .ed-actions .field select { flex: 1; max-width: none; }
+  .ed-stable tbody th small { display: block; margin-left: 0; }
 }

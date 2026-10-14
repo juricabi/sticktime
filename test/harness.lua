@@ -376,8 +376,9 @@ end
 
 -- 4b. the next gate's marker turns green when lined up to go through it (the color game): a hoop
 -- from in front within 70 deg, heading within 70 deg of the way through and pointed at it (not
--- turned away, not beside it heading past, not from behind or far to the side); a flag before it
--- on its free side, any heading; a dive gate from above
+-- turned away, not beside it heading past, not from behind or far to the side, not sliding past);
+-- once green, a little more before yellow again; Gate Rush from either side; a flag before it on
+-- its free side, any heading; a dive gate from above
 if GAME_COLOR then
   local atan2 = math.atan2 or math.atan
   local function deg(nx, nz) return atan2(nx, nz) * 57.29578 end
@@ -401,6 +402,42 @@ if GAME_COLOR then
     fail("lined up: hoop " .. table.concat({ tostring(hoop[1]), tostring(hoop[2]), tostring(hoop[3]), tostring(hoop[4]), tostring(hoop[5]), tostring(hoop[6]), tostring(hoop[7]) }, " ") ..
       ", flag " .. tostring(flag[1]) .. " " .. tostring(flag[2]) .. " " .. tostring(flag[3]) .. " " .. tostring(flag[4]))
   end
+  -- what the cases above leave open: the heading (63 deg off the axis, the nose 83 deg off the way
+  -- through though only 20 deg off the gate), the cone (72 deg off the axis, the nose between: 60
+  -- deg off the way through, 12 off the gate), the aim far out (20 m, the nose 30 deg off), a slide
+  -- (6 m/s sideways: yellow; 2 m/s: green), and once green (wide) the aim a third wider (28 deg at
+  -- 20 m, 40 at 3 m), the cone to 75 deg and the slide from 4 m/s while the narrow test says yellow
+  do
+    local _, _, _, nx, _, nz = T.gate(6)
+    local more = { at(6, 4, 8, 0, -83.4), at(6, 3.25, 10, 0, -60), at(6, 20, 0, 0, 30) }
+    at(6, 8, 0) T.vel(nz * 6, 0, -nx * 6) more[4] = T.lined(6)
+    T.vel(nz * 2, 0, -nx * 2) more[5] = T.lined(6)
+    T.vel(nz * 3.5, 0, -nx * 3.5) more[11], more[12] = T.lined(6), T.lined(6, true)
+    T.vel(0, 0, 0)
+    at(6, 20, 0, 0, 28) more[6] = T.lined(6) more[7] = T.lined(6, true)
+    at(6, 3, 0, 0, 40) more[8] = T.lined(6) more[9] = T.lined(6, true)
+    at(6, 3.25, 10, 0, -60) more[10] = T.lined(6, true)
+    if more[1] or more[2] or more[3] or more[4] or not more[5] or more[6] or not more[7] or more[8] or not more[9] or not more[10] or more[11] or not more[12] then
+      local t = {}
+      for n = 1, 12 do t[n] = tostring(more[n]) end
+      fail("lined up: heading, cone, aim, slide, wide " .. table.concat(t, " "))
+    end
+    -- the marker keeps green to 32 deg off the nose (20 m out), and yellow again needs 25
+    at(6, 20, 0) local m1 = T.marker(6)
+    at(6, 20, 0, 0, 28) local m2 = T.marker(6)
+    at(6, 20, 0, 0, 34) local m3 = T.marker(6)
+    at(6, 20, 0, 0, 28) local m4 = T.marker(6)
+    if not (m1 and m2 and not m3 and not m4) then
+      fail("next gate marker hysteresis " .. tostring(m1) .. " " .. tostring(m2) .. " " .. tostring(m3) .. " " .. tostring(m4))
+    end
+  end
+  -- Gate Rush counts a gate flown through either way: from behind, turned round, it is green too
+  T.start(4)
+  steps(2)
+  local rush = at(6, -8, 0, 0, 180)
+  T.start(2)
+  steps(2)
+  if not rush then fail("lined up: Gate Rush, a hoop from behind") end
   T.track(3)
   T.start(2)
   steps(5)
