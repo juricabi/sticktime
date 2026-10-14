@@ -246,11 +246,9 @@ kbd { font: 500 11px/1 var(--font-mono); padding: 2px 5px; border-radius: 4px; b
 .meter i { position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; background: var(--accent); }
 .note { font-size: 12px; color: var(--muted); }
 .note.warn { color: var(--warn); }
-/* Ko-fi: the header's Support, the strip under the emulator, the thanks after an install */
+/* Ko-fi: the strip under the emulator, the thanks after an install */
 a.btn { color: inherit; text-decoration: none; }
-.btn.kofi { height: 28px; padding: 0 9px; margin-left: 4px; font-size: 12.5px; }
-.btn.kofi svg, .support-cup { color: #ff5e5b; }
-.btn.kofi:hover { border-color: #ff5e5b; }
+.support-cup { color: #ff5e5b; }
 .support { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; margin-top: 18px; }
 .support-cup { flex: none; display: grid; }
 .support-text { flex: 1 1 300px; min-width: 0; }
