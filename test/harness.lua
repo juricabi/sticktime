@@ -375,8 +375,9 @@ do
 end
 
 -- 4b. the next gate's marker turns green when lined up to go through it (the color game): a hoop
--- from in front within 70 deg, heading within 70 deg of the way through (not turned away, not from
--- behind or far to the side); a flag before it on its free side, any heading; a dive gate from above
+-- from in front within 70 deg, heading within 70 deg of the way through and pointed at it (not
+-- turned away, not beside it heading past, not from behind or far to the side); a flag before it
+-- on its free side, any heading; a dive gate from above
 if GAME_COLOR then
   local atan2 = math.atan2 or math.atan
   local function deg(nx, nz) return atan2(nx, nz) * 57.29578 end
@@ -389,15 +390,15 @@ if GAME_COLOR then
   T.track(4)
   T.start(2)
   steps(5)
-  local hoop = { at(6, 8, 0, 0, 65), at(6, 4, 8), at(6, 8, 0, 0, 180), at(6, 8, 0, 0, 80), at(6, -8, 0), at(6, 3, 9) }
+  local hoop = { at(6, 8, 0, 0, 10), at(6, 4, 8, 0, -63.4), at(6, 8, 0, 0, 180), at(6, 8, 0, 0, 40), at(6, -8, 0), at(6, 3, 9), at(6, 4, 8) }
   local flag = { at(2, 6, 0), at(2, 6, 0, 0, 120), at(2, -6, 0) }
   do                                                            -- beyond the pole: the flag's wrong side
     local fx, _, fz, nx, _, nz, _, ax, ay, az = T.gate(2)
     T.pose(ax - (fx - ax) * 5 / 3.5 - nx * 6, ay, az - (fz - az) * 5 / 3.5 - nz * 6, deg(nx, nz), 0, 0)
     flag[4] = T.lined(2)
   end
-  if not (hoop[1] and hoop[2] and not hoop[3] and not hoop[4] and not hoop[5] and not hoop[6] and flag[1] and flag[2] and not flag[3] and not flag[4]) then
-    fail("lined up: hoop " .. table.concat({ tostring(hoop[1]), tostring(hoop[2]), tostring(hoop[3]), tostring(hoop[4]), tostring(hoop[5]), tostring(hoop[6]) }, " ") ..
+  if not (hoop[1] and hoop[2] and not hoop[3] and not hoop[4] and not hoop[5] and not hoop[6] and not hoop[7] and flag[1] and flag[2] and not flag[3] and not flag[4]) then
+    fail("lined up: hoop " .. table.concat({ tostring(hoop[1]), tostring(hoop[2]), tostring(hoop[3]), tostring(hoop[4]), tostring(hoop[5]), tostring(hoop[6]), tostring(hoop[7]) }, " ") ..
       ", flag " .. tostring(flag[1]) .. " " .. tostring(flag[2]) .. " " .. tostring(flag[3]) .. " " .. tostring(flag[4]))
   end
   T.track(3)
@@ -414,7 +415,33 @@ if GAME_COLOR then
   local below = T.lined(6)
   if not (above and turned and not side and not below) then
     fail("lined up: dive gate " .. tostring(above) .. " " .. tostring(turned) .. " " .. tostring(side) .. " " .. tostring(below))
-  else print("next gate marker: green when lined up (hoop within 70 deg, flag on its free side, dive gate; not from behind, far to the side or turned away)") end
+  else print("next gate marker: green when lined up and pointed at it (hoop, flag on its free side, dive gate; not from behind, far to the side, beside it or turned away)") end
+  -- flown along the racing line at 15 m/s, every gate of the eight tracks is green on its final
+  -- approach (the last fifth of the leg into it)
+  local late = {}
+  for t = 1, 8 do
+    T.track(t)
+    T.start(2)
+    steps(2)
+    local ng = T.ng()
+    for j = 1, ng do
+      local i = (j - 2) % ng + 1
+      for q = 16, 19 do
+        local s = q / 20
+        local x, y, z = T.line(i, s)
+        local x0, _, z0 = T.line(i, s - 0.01)
+        local x1, _, z1 = T.line(i, s + 0.01)
+        local tx, tz = x1 - x0, z1 - z0
+        local l = math.sqrt(tx * tx + tz * tz) + 1e-6
+        T.pose(x, y, z, deg(tx, tz), 0, 0)
+        T.vel(tx / l * 15, 0, tz / l * 15)
+        if not T.lined(j) then late[#late + 1] = t .. ":" .. j .. "@" .. s break end
+      end
+    end
+  end
+  T.vel(0, 0, 0)
+  if #late > 0 then fail("next gate marker not green on the racing line's final approach: " .. table.concat(late, " "))
+  else print("next gate marker: green on every final approach of the racing line, all eight tracks") end
 end
 
 -- 5. flags and hoops: wrong side of a flag does not count, the hoop rim crashes
