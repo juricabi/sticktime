@@ -440,7 +440,7 @@
   for (const k of ['tracksBtn', 'edClose', 'radioBtn', 'rpClose',
     'edOpen', 'connectDlg', 'connectGo', 'connectCancel', 'edGalBtn', 'edMineBtn', 'edMine', 'edMineStatus', 'edMineNote', 'edOpenList', 'edUpdList', 'edSyncMine', 'edNewCards', 'edSlotList', 'edEditing', 'edGallery', 'edCards', 'edGrid', 'edGalStatus', 'edGalSync', 'edGalSyncText', 'edGalSyncAll', 'edGateType', 'edAddGate', 'edAddBox', 'edAddWall',
     'edRotL', 'edRotR', 'edDup', 'edDel', 'edUndo', 'edRedo', 'edFit', 'edTrees', 'edMap', 'edMapBox', 'edReadout',
-    'edSlot', 'edFly', 'edFlyText', 'edSendEmu', 'edSave', 'edSize', 'edLite', 'edStatus', 'edEmuHas', 'edFileHas',
+    'edSlot', 'edFly', 'edSendEmu', 'edSave', 'edSize', 'edLite', 'edStatus', 'edEmuHas', 'edFileHas',
     'edSyncLine', 'edSyncText', 'edSendText', 'edName', 'edSeed', 'edShuffle', 'edTreesN',
     'edSel', 'edProblems', 'edProbPill', 'edOrder', 'edSend', 'edRadioLine', 'edRadioLineText',
     // the Install panel
@@ -621,7 +621,6 @@
     el.edSendEmu.disabled = bad;
     el.edSave.disabled = bad;
     el.edSendEmu.title = bad ? 'Fix the problems listed under Check first' : 'Put it in slot c' + ed.slot + ' of the emulator\'s SD card (track ' + (8 + ed.slot) + ')';
-    el.edFlyText.textContent = 'Fly c' + ed.slot;
     el.edFly.disabled = !inSlot || !!inSlot.bad;
     el.edFly.title = !inSlot ? 'c' + ed.slot + ' of the emulator is empty: Send to emulator first' : inSlot.bad ? 'c' + ed.slot + ' of the emulator can\'t be read'
       : 'Fly c' + ed.slot + ' of the emulator in Practice (track ' + (8 + ed.slot) + '), as it is there';
@@ -1846,7 +1845,7 @@
     ed.saved.add(ed.file.text);
     renderSlots();
     freshGame();                                       // (in its menus the game lists it at once)
-    status('Sent to c' + slot + ' in the emulator (track ' + (8 + slot) + '): Fly c' + slot + ' flies it.' + (kept ? ''
+    status('Sent to c' + slot + ' in the emulator (track ' + (8 + slot) + '): Fly flies it.' + (kept ? ''
       : ' The browser\'s storage is full: c' + slot + ' lasts only this visit (Save file keeps the track).'), kept ? 'ok' : 'bad');
     return true;
   }
@@ -1859,7 +1858,7 @@
     if (!cur || cur.bad) { status('c' + slot + ' of the emulator ' + (cur ? 'can\'t be read' : 'is empty') + ': Send to emulator first.', 'bad'); return; }
     if (stale(cur) && !window.confirm('c' + slot + ' in the emulator has "' + nameOf(cur.text) + '", but not the version you are editing: your changes aren\'t sent. ' +
       'Fly c' + slot + ' as it is?\n\n(Send to emulator first to fly your changes.)')) {
-      status('Not flown: Send to emulator puts your changes in c' + slot + ', then Fly c' + slot + '.');
+      status('Not flown: Send to emulator puts your changes in c' + slot + ', then Fly.');
       return;
     }
     // StickTime Lite (and any other script) doesn't read custom tracks: back to the screen's own

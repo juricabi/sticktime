@@ -641,7 +641,7 @@ footer.credits a { color: inherit; }
             <span class="ed-has" id="edEmuHas"></span>
             <span class="ed-acts">
               <button class="btn" id="edSendEmu" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 21h8M12 8v5M9.5 10.5l2.5 2.5 2.5-2.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Send to emulator</span></button>
-              <button class="btn primary" id="edFly" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 4.5v15l12-7.5z" fill="currentColor"/></svg><span id="edFlyText">Fly c1</span></button>
+              <button class="btn primary" id="edFly" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 4.5v15l12-7.5z" fill="currentColor"/></svg><span>Fly</span></button>
               
             </span>
           </div>
@@ -10655,7 +10655,7 @@ const GALLERY_FILES = '';
   for (const k of ['tracksBtn', 'edClose', 'radioBtn', 'rpClose',
     'edOpen', 'connectDlg', 'connectGo', 'connectCancel', 'edGalBtn', 'edMineBtn', 'edMine', 'edMineStatus', 'edMineNote', 'edOpenList', 'edUpdList', 'edSyncMine', 'edNewCards', 'edSlotList', 'edEditing', 'edGallery', 'edCards', 'edGrid', 'edGalStatus', 'edGalSync', 'edGalSyncText', 'edGalSyncAll', 'edGateType', 'edAddGate', 'edAddBox', 'edAddWall',
     'edRotL', 'edRotR', 'edDup', 'edDel', 'edUndo', 'edRedo', 'edFit', 'edTrees', 'edMap', 'edMapBox', 'edReadout',
-    'edSlot', 'edFly', 'edFlyText', 'edSendEmu', 'edSave', 'edSize', 'edLite', 'edStatus', 'edEmuHas', 'edFileHas',
+    'edSlot', 'edFly', 'edSendEmu', 'edSave', 'edSize', 'edLite', 'edStatus', 'edEmuHas', 'edFileHas',
     'edSyncLine', 'edSyncText', 'edSendText', 'edName', 'edSeed', 'edShuffle', 'edTreesN',
     'edSel', 'edProblems', 'edProbPill', 'edOrder', 'edSend', 'edRadioLine', 'edRadioLineText',
     // the Install panel
@@ -10836,7 +10836,6 @@ const GALLERY_FILES = '';
     el.edSendEmu.disabled = bad;
     el.edSave.disabled = bad;
     el.edSendEmu.title = bad ? 'Fix the problems listed under Check first' : 'Put it in slot c' + ed.slot + ' of the emulator\'s SD card (track ' + (8 + ed.slot) + ')';
-    el.edFlyText.textContent = 'Fly c' + ed.slot;
     el.edFly.disabled = !inSlot || !!inSlot.bad;
     el.edFly.title = !inSlot ? 'c' + ed.slot + ' of the emulator is empty: Send to emulator first' : inSlot.bad ? 'c' + ed.slot + ' of the emulator can\'t be read'
       : 'Fly c' + ed.slot + ' of the emulator in Practice (track ' + (8 + ed.slot) + '), as it is there';
@@ -12061,7 +12060,7 @@ const GALLERY_FILES = '';
     ed.saved.add(ed.file.text);
     renderSlots();
     freshGame();                                       // (in its menus the game lists it at once)
-    status('Sent to c' + slot + ' in the emulator (track ' + (8 + slot) + '): Fly c' + slot + ' flies it.' + (kept ? ''
+    status('Sent to c' + slot + ' in the emulator (track ' + (8 + slot) + '): Fly flies it.' + (kept ? ''
       : ' The browser\'s storage is full: c' + slot + ' lasts only this visit (Save file keeps the track).'), kept ? 'ok' : 'bad');
     return true;
   }
@@ -12074,7 +12073,7 @@ const GALLERY_FILES = '';
     if (!cur || cur.bad) { status('c' + slot + ' of the emulator ' + (cur ? 'can\'t be read' : 'is empty') + ': Send to emulator first.', 'bad'); return; }
     if (stale(cur) && !window.confirm('c' + slot + ' in the emulator has "' + nameOf(cur.text) + '", but not the version you are editing: your changes aren\'t sent. ' +
       'Fly c' + slot + ' as it is?\n\n(Send to emulator first to fly your changes.)')) {
-      status('Not flown: Send to emulator puts your changes in c' + slot + ', then Fly c' + slot + '.');
+      status('Not flown: Send to emulator puts your changes in c' + slot + ', then Fly.');
       return;
     }
     // StickTime Lite (and any other script) doesn't read custom tracks: back to the screen's own
