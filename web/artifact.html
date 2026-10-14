@@ -408,6 +408,11 @@ footer.credits a { color: inherit; }
   #radioPanel .rp-grid > .rp-right { border-top: 1px solid var(--line); padding-top: 18px; }
 }
 #rpInstSec .ed-row { margin-top: 12px; }
+#radioPanel .rp-fw { margin-top: 6px; border-top: 1px solid var(--line); padding-bottom: 0; }
+#radioPanel .rp-fw h3 { justify-content: flex-start; align-items: baseline; }
+#radioPanel .rp-fw h3 small { font: 400 13px/1.3 var(--font-body); letter-spacing: 0; text-transform: none; color: var(--muted); margin-left: 8px; }
+.rp-steps { margin: 10px 0 0; padding-left: 20px; display: grid; gap: 5px; font-size: 13px; color: var(--muted); line-height: 1.5; }
+.rp-steps code { font: 500 12px/1.4 var(--font-mono); padding: 1px 4px; border-radius: 4px; background: var(--surface-2); }
 .ed-rpath { margin: 0 0 6px; font: 500 12px/1.3 var(--font-mono); color: var(--muted); overflow-wrap: anywhere; }
 .ed-rslots { list-style: none; margin: 0; padding: 0; font-size: 13px; }
 .ed-rslots li { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 34px; border-bottom: 1px dashed var(--line); }
@@ -730,6 +735,16 @@ footer.credits a { color: inherit; }
       </div>
     </section>
   </div>
+  <section class="ed-sec rp-fw" id="rpFwSec" aria-labelledby="rpFwH">
+    <h3 id="rpFwH">Faster firmware <small>optional, color radios</small></h3>
+    <p class="note">Stock EdgeTX runs a tool at most every 50 ms (20 fps) and shows each frame a cycle late. The <a href="https://github.com/juricabi/edgetx/releases/tag/fast-lua-20ms" target="_blank" rel="noopener">fast-lua-20ms</a> build (EdgeTX main with StickTime's fast-lua patch) runs Lua tools every 20 ms and shows each frame at once: up to 50 fps on the V12, about 40 ms from stick to screen.</p>
+    <ol class="rp-steps">
+      <li>Download the firmware for your radio from the <a href="https://github.com/juricabi/edgetx/releases/tag/fast-lua-20ms" target="_blank" rel="noopener">fast-lua-20ms release</a>: <code>tx16s</code> for the TX16S and MkII, <code>tx16smk3</code> for the MK3, and so on.</li>
+      <li>Back up your SD card: these are test builds.</li>
+      <li>Flash it like any EdgeTX update: copy it to the SD card's <code>FIRMWARE</code> folder and write it from the bootloader, as <a href="https://manual.edgetx.org/installing-and-updating-edgetx/update-from-an-earlier-version-of-edgetx-using-the-bootloader" target="_blank" rel="noopener">EdgeTX's manual shows</a> (<a href="https://manual.edgetx.org/installing-and-updating-edgetx/updating-your-stm32h7-radio" target="_blank" rel="noopener">STM32H7 radios</a> such as the TX16S MK3 differ).</li>
+    </ol>
+    <p class="note">To go back, flash a stock EdgeTX release the same way.</p>
+  </section>
   <p class="ed-status" id="rpStatus" role="status" aria-live="polite"></p>
 </section>
 

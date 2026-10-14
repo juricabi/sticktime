@@ -237,6 +237,16 @@
       </div>
     </section>
   </div>
+  <section class="ed-sec rp-fw" id="rpFwSec" aria-labelledby="rpFwH">
+    <h3 id="rpFwH">Faster firmware <small>optional, color radios</small></h3>
+    <p class="note">Stock EdgeTX runs a tool at most every 50 ms (20 fps) and shows each frame a cycle late. The <a href="https://github.com/juricabi/edgetx/releases/tag/fast-lua-20ms" target="_blank" rel="noopener">fast-lua-20ms</a> build (EdgeTX main with StickTime's fast-lua patch) runs Lua tools every 20 ms and shows each frame at once: up to 50 fps on the V12, about 40 ms from stick to screen.</p>
+    <ol class="rp-steps">
+      <li>Download the firmware for your radio from the <a href="https://github.com/juricabi/edgetx/releases/tag/fast-lua-20ms" target="_blank" rel="noopener">fast-lua-20ms release</a>: <code>tx16s</code> for the TX16S and MkII, <code>tx16smk3</code> for the MK3, and so on.</li>
+      <li>Back up your SD card: these are test builds.</li>
+      <li>Flash it like any EdgeTX update: copy it to the SD card's <code>FIRMWARE</code> folder and write it from the bootloader, as <a href="https://manual.edgetx.org/installing-and-updating-edgetx/update-from-an-earlier-version-of-edgetx-using-the-bootloader" target="_blank" rel="noopener">EdgeTX's manual shows</a> (<a href="https://manual.edgetx.org/installing-and-updating-edgetx/updating-your-stm32h7-radio" target="_blank" rel="noopener">STM32H7 radios</a> such as the TX16S MK3 differ).</li>
+    </ol>
+    <p class="note">To go back, flash a stock EdgeTX release the same way.</p>
+  </section>
   <p class="ed-status" id="rpStatus" role="status" aria-live="polite"></p>
 </section>
 
