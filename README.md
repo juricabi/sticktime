@@ -201,7 +201,7 @@ test/run_all.sh
 
 ## Support
 
-StickTime is free and made in my spare time. If you enjoy it, you can buy me a coffee:
+StickTime is free and made in my spare time. If you like it, you can buy me a coffee:
 
 [![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/juricabi)
 
