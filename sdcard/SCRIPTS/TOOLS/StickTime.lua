@@ -2845,15 +2845,17 @@ local render, hitTest, pauseHit, initUI
     fillRect(x + s * 0.56, y + s * 0.25, s * 0.14, s * 0.5, C.white)
   end
 
-  -- lined up to go through gate i: on its way-in side within 60 deg of its axis and, but for a dive
-  -- gate (dropped into from above, any heading), heading within 60 deg of the way through; for a
-  -- flag, on the side its pole leaves free too (gx, gz: the middle of its pass zone, GHW from the pole)
+  -- lined up to go through gate i: on its way-in side within 70 deg of its axis and, but for a dive
+  -- gate (dropped into from above, any heading), heading within 70 deg of the way through. A flag is
+  -- a turn: still before it and on the side its pole leaves free, any heading (gx, gz: the middle
+  -- of its pass zone, GHW from the pole)
   local function linedUp(i)
     local nx, ny, nz, k = gnx[i], gny[i], gnz[i], gk[i]
     local wx, wy, wz = AX[i] - px, AY[i] - py, AZ[i] - pz
-    if wx * nx + wy * ny + wz * nz <= 0.5 * sqrt(wx * wx + wy * wy + wz * wz) then return false end
-    if (k == 6 or k == 7) and ((px - gx[i]) * grx[i] + (pz - gz[i]) * grz[i]) * (k == 6 and 1 or -1) + GHW[k] <= 0 then return false end
-    return ny ~= 0 or fx * nx + fz * nz > 0.5 * sqrt(fx * fx + fz * fz)
+    local d = wx * nx + wy * ny + wz * nz
+    if k == 6 or k == 7 then return d > 0 and ((px - gx[i]) * grx[i] + (pz - gz[i]) * grz[i]) * (k == 6 and 1 or -1) + GHW[k] > 0 end
+    if d <= 0.34 * sqrt(wx * wx + wy * wy + wz * wz) then return false end
+    return ny ~= 0 or fx * nx + fz * nz > 0.34 * sqrt(fx * fx + fz * fz)
   end
   if STICKTIME_TEST then STICKTIME_TEST.lined = linedUp end
 
