@@ -27,6 +27,17 @@ SITE = "https://sticktime.test/"
 fails = []
 
 
+def id_of(text):
+    return int(text.split("\n")[1].split(" ")[1])
+
+
+def with_earlier(tracks, i, text):
+    """the site's index.json with text as an earlier version of track i (its id in was)"""
+    shown = [dict(t) for t in tracks]
+    shown[i]["was"] = shown[i].get("was", []) + [id_of(text)]
+    return gallery.index(shown).encode()
+
+
 def other_version(text):
     """the same track with another tree count: another version of it (the same name, other numbers
     and so its own id), whatever its gates are"""
@@ -158,7 +169,8 @@ def tracks_tests(br, errors, tracks):
     empty slot while there is one (then the editor's slot, asked first); the cards say which slots
     have them; flown again from the slot that has it"""
     ctx = br.new_context(viewport={"width": 1400, "height": 1000})
-    served(ctx, gallery.index(tracks).encode())
+    old = other_version(tracks[3]["text"])                         # (an earlier version of track 4, below)
+    served(ctx, with_earlier(tracks, 3, old))
     page = ctx.new_page()
     page.on("pageerror", lambda e: errors.append(str(e)))
     asked = []
@@ -203,12 +215,11 @@ def tracks_tests(br, errors, tracks):
     check(int(page.input_value("#edSlot")) == 3 and len(asked) == n and page.evaluate("sim.test('info')")[10] == tracks[2]["name"],
           "site: opened again: on the slot that has it, flown with nothing asked")
 
-    # another version of a gallery track in a slot (the same name, a gate moved): Update
-    old = other_version(tracks[3]["text"])
+    # an earlier version of a gallery track in a slot (its id in the index's was): Update
     page.evaluate(f"sim.writeSD('{SLOT}4.txt', {json.dumps(old)})")
     page.evaluate("sim.boot()")                                    # the game in its menu
     open_mine(page)
-    check(page.is_visible("#edGalSync") and page.inner_text("#edUpdList").startswith('"' + tracks[3]["name"] + '": another version in c4 in the emulator')
+    check(page.is_visible("#edGalSync") and page.inner_text("#edUpdList").startswith('"' + tracks[3]["name"] + '": an older version in c4 in the emulator')
           and page.is_visible("[data-gsync='3']"), f"site: My tracks shows the older version in c4: {page.inner_text('#edUpdList')!r}")
     n = len(asked)
     page.click("[data-gsync='3']")
@@ -218,6 +229,10 @@ def tracks_tests(br, errors, tracks):
     open_gallery(page)
     check(slot_text(page, 4) == tracks[3]["text"] and page.is_hidden("#edGalSync") and card_line(page, 3, "ed-in") == "In c4 in the emulator"
           and st == "Updated c4 in the emulator.", f"site: Update puts the gallery's version in c4, the game started again: {st!r}")
+    # the same name but not an earlier version (a track you changed yourself): no Update
+    page.evaluate(f"sim.writeSD('{SLOT}4.txt', {json.dumps(other_version(old))})")
+    open_mine(page)
+    check(page.is_hidden("#edGalSync"), "site: a track of the same name that isn't an earlier version is never offered an update")
     ctx.close()
 
 
@@ -242,7 +257,8 @@ CARD_FILE = """async (path) => { try { let d = await navigator.storage.getDirect
 def radio_tests(br, errors, tracks):
     """the radio's slots in the cards; Update on the radio; Send to radio doesn't make a second copy"""
     ctx = br.new_context(viewport={"width": 1400, "height": 1000})
-    served(ctx, gallery.index(tracks).encode())
+    old = other_version(tracks[0]["text"])                         # (an earlier version of track 1)
+    served(ctx, with_earlier(tracks, 0, old))
     page = ctx.new_page()
     page.on("pageerror", lambda e: errors.append(str(e)))
     asked = []
@@ -250,14 +266,13 @@ def radio_tests(br, errors, tracks):
     page.goto(SITE + "simulator.html")
     wait_sim(page)
     T = "SCRIPTS/TOOLS/StickTimeTracks/c"
-    old = other_version(tracks[0]["text"])
     page.evaluate(MAKE_CARD, ["RADIO", {"SCRIPTS/TOOLS/StickTime.lua": "-- the game\n", T + "5.txt": old.replace("\n", "\r\n"), T + "6.txt": tracks[1]["text"]}])
     page.click("#radioBtn")
     page.click("#edConnect")
     page.wait_for_function("sim.editor.radio().state === 'on' && !sim.editor.radio().busy", timeout=10000)
     open_mine(page)
     page.wait_for_function("document.querySelector('#edUpdList li')", timeout=10000)
-    check(page.inner_text("#edUpdList").startswith('"' + tracks[0]["name"] + '": another version in c5 on the radio'),
+    check(page.inner_text("#edUpdList").startswith('"' + tracks[0]["name"] + '": an older version in c5 on the radio'),
           f"radio: My tracks shows the radio's older version: {page.inner_text('#edUpdList')!r}")
     page.click("[data-gsync='0']")
     page.wait_for_function("!sim.editor.radio().busy", timeout=10000)

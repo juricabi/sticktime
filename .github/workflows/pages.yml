@@ -40,6 +40,8 @@ jobs:
     steps:
       - name: Check out the repo
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0              # (tools/gallery.py reads each track's earlier ids from the history)
 
       - name: Put the site together
         run: |

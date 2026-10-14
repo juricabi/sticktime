@@ -417,13 +417,16 @@
     return typeof t === 'string' ? t : null;
   };
   // a slot's file: null (none), else { text, bad }: bad says why the game and the editor can't use it
-  // ('big': too big to be read at all, text null; 'parse': the editor's checks reject it)
-  const BAD = { big: 'too big to be a track', parse: 'can\'t be read' };
-  const asEntry = (t) => (t === null ? null : { text: t, bad: unreadable(t) ? 'parse' : '' });
+  // ('big': too big to be read at all, text null; 'long': longer than the 1000 bytes the game reads
+  // of it; 'parse': the editor's checks reject it)
+  const BAD = { big: 'too big to be a track', long: 'too long for the game', parse: 'can\'t be read' };
+  const badOf = (t) => (new TextEncoder().encode(t).length > 1000 ? 'long' : unreadable(t) ? 'parse' : '');
+  const asEntry = (t) => (t === null ? null : { text: t, bad: badOf(t) });
   // a slot's file in a question: "its name", or what is wrong with it
-  const what = (e) => (e.bad === 'big' ? 'a file too big to be a track' : e.bad ? 'a file that can\'t be read' : '"' + nameOf(e.text) + '"');
-  // what a slot's file is called in the lists: its name, or that it can't be read
-  const slotText = (t) => (unreadable(t) ? BAD.parse : nameOf(t));
+  const what = (e) => (e.bad === 'big' ? 'a file too big to be a track' : e.bad === 'long' ? 'a file too long for the game'
+    : e.bad ? 'a file that can\'t be read' : '"' + nameOf(e.text) + '"');
+  // what a slot's file is called in the lists: its name, or what is wrong with it
+  const slotText = (t) => { const b = badOf(t); return b ? BAD[b] : nameOf(t); };
   const slotName = (n) => { const t = emuSlot(n); return t === null ? null : slotText(t); };
 
   // The game reads the slots' names when it starts: when they change (a copy from the radio, Empty
@@ -1549,22 +1552,26 @@
       if (r.error) continue;
       const src = str(t.source, 300);
       out.push({ T: r.T, text: t.text.replace(/\r\n?/g, '\n'), name: r.T.name, by: str(t.by, 60), about: str(t.about, 300),
-        source: /^https:\/\/[^\s"'<>]+$/.test(src) ? src : '' });
+        source: /^https:\/\/[^\s"'<>]+$/.test(src) ? src : '',
+        was: Array.isArray(t.was) ? t.was.filter((v) => Number.isInteger(v) && v > 0).slice(0, 100) : [] });
     }
     return out;
   }
   gal.list = galleryOf(typeof GALLERY === 'object' ? GALLERY : null);
   // the slots (entries as asEntry has them, c1 first) that hold a gallery track: same, the very
-  // file (CR LF line ends or not); old, another version of it
+  // file (CR LF line ends or not); old, an earlier version of it (its id in the gallery's was:
+  // the ids the track had before, from the repo's history)
   function placesOf(t, slots) {
-    const same = [], old = [], name = t.name.toLowerCase();
+    const same = [], old = [], was = t.was || [];
     slots.forEach((e, i) => {
       if (!e || e.bad || typeof e.text !== 'string') return;
-      if (e.text.replace(/\r\n?/g, '\n') === t.text) same.push(i + 1);
-      else if (nameOf(e.text).toLowerCase() === name) old.push(i + 1);
+      if (norm(e.text) === t.text) same.push(i + 1);
+      else if (was.includes(idOf(e.text))) old.push(i + 1);
     });
     return { same, old };
   }
+  // a track file's id (its second line: 1 <id> ...), 0 if it has none
+  const idOf = (t) => { const m = /^[^\n]*\n\s*1\s+(\d+)/.exec(norm(t)); return m ? +m[1] : 0; };
   const cs = (a) => andList(a.map((n) => 'c' + n));
   // a slot empty in the emulator and (read) on the radio: the editor's when it is, else the first;
   // else one empty in the emulator; else the editor's (sending to it asks)
@@ -1724,7 +1731,7 @@
     el.edGalSyncAll.disabled = radio.busy;
     if (old.length < 2 && document.activeElement === el.edGalSyncAll) el.edMine.focus({ preventScroll: true });
     keepFocus(el.edUpdList, () => {
-      el.edUpdList.innerHTML = old.map((o) => '<li><span>"' + esc(gal.list[o.i].name) + '": another version in ' + esc(inWords(o.here, o.radio)) + '</span>' +
+      el.edUpdList.innerHTML = old.map((o) => '<li><span>"' + esc(gal.list[o.i].name) + '": an older version in ' + esc(inWords(o.here, o.radio)) + '</span>' +
         '<button class="btn" type="button" data-gsync="' + o.i + '"' + (radio.busy && o.radio.length ? ' disabled' : '') + '>Update</button></li>').join('');
     });
   }
@@ -1776,8 +1783,8 @@
     if (!said.length) return;
     if (there.length && radio.busy) { mineStatus('The radio\'s card is busy: try again in a moment.', 'bad'); return; }
     const one = here.length + there.length === 1;
-    if (!window.confirm('Put the gallery\'s version of ' + andList(said) + ' in place of what is there now? Changes you made to ' + (one ? 'it go, and its best time and ghost start'
-      : 'them go, and their best times and ghosts start') + ' over: to the game, a changed track is another track.')) return;
+    if (!window.confirm('Put the gallery\'s new version of ' + andList(said) + ' in place of the older one? ' + (one ? 'Its best time and ghost start'
+      : 'Their best times and ghosts start') + ' over: to the game, a changed track is another track.')) return;
     let kept = true;
     for (const [n, t] of here) kept = s.writeSD(slotPath(n), t.text) !== false && kept;
     renderSlots();
@@ -1860,6 +1867,13 @@
     const s = sim();
     if (!s) return false;
     const slot = ed.slot, old = asEntry(emuSlot(slot));
+    // never a second copy of a track the emulator has in another slot (as Send to radio)
+    const twin = homes(ed.file.text).here.find((i) => i !== slot);
+    if (twin && !(old && !old.bad && norm(old.text) === ed.file.text)) {
+      status('The emulator has this track already, in c' + twin + ' (track ' + (8 + twin) + '): nothing sent. To have it in c' + slot +
+        ' instead, Remove c' + twin + ' of the emulator in My tracks first.');
+      return false;
+    }
     if (old && (old.bad || norm(old.text) !== ed.file.text) && !ours(old) && !window.confirm('Slot c' + slot + ' of the emulator holds ' +
       (stale(old) ? 'another version of "' + nameOf(old.text) + '", not one you sent from here' : what(old)) + '. Replace it with "' + ed.T.name.trim() + '"?')) {
       status('Not sent: c' + slot + ' keeps ' + what(old) + '. Pick another slot.');

@@ -15,6 +15,7 @@ without a new build of the page.
 import json
 import pathlib
 import re
+import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -109,8 +110,30 @@ def info_problems(info):
     return p
 
 
+def earlier_ids(f, now):
+    """the ids a track had before, from its file's git history (renames followed), newest first: a
+    slot holding one of them has an older version of it (none outside a git checkout)"""
+    try:
+        log = subprocess.run(["git", "log", "--follow", "--format=%H", "--name-only", "--", f.name],
+                             cwd=f.parent, capture_output=True, text=True, check=True).stdout.split()
+    except (OSError, subprocess.CalledProcessError):
+        return []
+    ids = []
+    top = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=f.parent, capture_output=True, text=True).stdout.strip()
+    for sha, path in zip(log[::2], log[1::2]):
+        try:
+            text = subprocess.run(["git", "show", f"{sha}:{path}"], cwd=top, capture_output=True, check=True).stdout
+        except (OSError, subprocess.CalledProcessError):
+            continue
+        tok = text.decode("utf-8", "replace").replace("\r\n", "\n").split("\n")[1:2]
+        tok = tok[0].split(" ") if tok else []
+        if len(tok) > 1 and re.fullmatch(r"[1-9][0-9]*", tok[1]) and int(tok[1]) != now and int(tok[1]) not in ids:
+            ids.append(int(tok[1]))
+    return ids
+
+
 def gallery(d=DIR):
-    """(tracks, problems): the tracks in file order, each {file, name, by, about, source, text}"""
+    """(tracks, problems): the tracks in file order, each {file, name, by, about, source, text, was}"""
     tracks, probs = [], []
     files = sorted(d.glob("*")) if d.is_dir() else []
     for f in files:
@@ -144,6 +167,9 @@ def gallery(d=DIR):
                 if info.get(k):
                     t[k] = info[k].strip()
             t["text"] = text
+            was = earlier_ids(f, int(text.split("\n")[1].split(" ")[1]))
+            if was:
+                t["was"] = was                 # (the editor offers Update to a slot with one of these)
             tracks.append(t)
     seen = {}
     for t in tracks:
