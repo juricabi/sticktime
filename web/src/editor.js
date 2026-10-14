@@ -2391,6 +2391,7 @@
   // Tracks (the track editor) and Install (the radio's SD card), each with its toolbar button, in the
   // same place above the emulator: opening one closes the other
   function openEditor() {
+    const swap = radio.panel ? window.scrollY : undefined;
     if (radio.panel) closeRadio(false);
     if (!ed.open) status('');                          // (what was said last time is old news)
     fetchGallery();
@@ -2402,7 +2403,7 @@
     selSig = probSig = orderSig = null;           // the side panel afresh
     resize();
     refresh();
-    intoView(root);
+    intoView(root, false, swap);
     cv.focus({ preventScroll: true });
   }
   function closeEditor(focusButton) {
@@ -2413,12 +2414,13 @@
     if (focusButton) el.tracksBtn.focus();
   }
   function openRadio() {
+    const swap = ed.open ? window.scrollY : undefined;
     if (ed.open) closeEditor(false);
     radio.panel = true;
     rp.hidden = false;
     el.radioBtn.setAttribute('aria-expanded', 'true');
     renderRadio();
-    intoView(rp);
+    intoView(rp, false, swap);
     (el.edConnect.offsetParent ? el.edConnect : el.rpClose).focus({ preventScroll: true });   // (no Connect: no picker here)
     if (radio.state === 'on') { if (radio.busy) radio.again = true; else job(refreshRadio, cstatus); }   // (after the job under way)
   }
@@ -2717,8 +2719,11 @@
   el.edInstallGo.addEventListener('click', installGame);
 
   const reduced = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  // a panel's top just under the sticky header
-  function intoView(node, now) {
+  // a panel's top just under the sticky header. from: where the page was when one panel took the other's
+  // place (the browser's scroll anchoring keeps the emulator below still, so the page would jump by the
+  // panels' difference in height and slide back: the new panel opens in place instead)
+  function intoView(node, now, from) {
+    if (from !== undefined && window.scrollY !== from) window.scrollTo(0, from);
     const head = document.querySelector('.top');
     const y = node.getBoundingClientRect().top + window.scrollY - (head ? head.offsetHeight : 0) - 10;
     window.scrollTo({ top: Math.max(0, y), behavior: now || reduced() ? 'auto' : 'smooth' });
