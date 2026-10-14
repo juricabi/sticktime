@@ -1,6 +1,6 @@
 local toolName = "TNS|StickTime|TNE"
 --[[ ======================================================================
-  StickTime v1.7.1  -  a real 3D FPV quad simulator that runs on your radio
+  StickTime v1.7.2  -  a real 3D FPV quad simulator that runs on your radio
   Color version - every EdgeTX color radio (480x272, 480x320, 320x480, 320x240, 800x480)
 
   Install : copy this file to /SCRIPTS/TOOLS/ on the radio SD card and
@@ -2845,29 +2845,32 @@ local render, hitTest, pauseHit, initUI
     fillRect(x + s * 0.56, y + s * 0.25, s * 0.14, s * 0.5, C.white)
   end
 
-  -- lined up to go through gate i, as a racer needs it: on its way-in side within 70 deg of its
-  -- axis, heading within 70 deg of the way through and pointed at it (within the gate's width as
-  -- seen from here, 25 deg at least: a curved line into it has it off the nose) and, faster than
-  -- 3 m/s, going within 70 deg of the way through (a slide in a turn misses the gate). A dive gate:
-  -- from above, any heading. Gate Rush counts a gate either way through, so either side will do.
-  -- A flag is a turn: still before it on the side its pole leaves free, any heading (gx, gz: the
-  -- middle of its pass zone, GHW from the pole). wide: once green, yellow again only past 75 deg,
-  -- the aim a third wider (32 deg at least) and the slide from 4 m/s (no flicker at the edge)
+  -- a good place to enter gate i from, so its marker shows where to come in from before you aim (a
+  -- guide on a track you're learning; yellow: go round): on its way-in side within 70 deg of its
+  -- axis, whichever way you head, or from a steeper angle on that side heading straight into its
+  -- opening (+1 m). A dive gate: from above. Gate Rush counts a gate either way through, so either
+  -- side will do. A flag is a turn: still before it and on the side its pole leaves free, or heading
+  -- to pass on that side (a slalom comes in from the other side: gx, gz the middle of its pass zone,
+  -- GHW from the pole). wide: once green, yellow again only past 75 deg and 1.5 m (no flicker)
   local function linedUp(i, wide)
     local nx, ny, nz, k = gnx[i], gny[i], gnz[i], gk[i]
     local wx, wy, wz = AX[i] - px, AY[i] - py, AZ[i] - pz
     local d, c = wx * nx + wy * ny + wz * nz, wide and 0.26 or 0.34
-    if k == 6 or k == 7 then return d > 0 and ((px - gx[i]) * grx[i] + (pz - gz[i]) * grz[i]) * (k == 6 and 1 or -1) + GHW[k] > 0 end
-    if gmode == 4 and d < 0 then nx, ny, nz, d = -nx, -ny, -nz, -d end
-    if d <= c * sqrt(wx * wx + wy * wy + wz * wz) then return false end
-    if ny ~= 0 then return true end
-    local hl, v2 = sqrt(fx * fx + fz * fz) + 0.001, vx * vx + vz * vz
-    if fx * nx + fz * nz <= c * hl or (v2 >= (wide and 16 or 9) and vx * nx + vz * nz <= c * sqrt(v2)) then return false end
-    local bl = sqrt(wx * wx + wz * wz) + 0.01
-    local q = (GHW[k] + 1) / bl                               -- tan of the aim's half angle
-    if q < 0.4663 then q = 0.4663 end                         -- (25 deg)
-    if wide then q = q * 1.33 end
-    return (fx * wx + fz * wz) * sqrt(1 + q * q) > hl * bl
+    local hl = sqrt(fx * fx + fz * fz) + 0.001
+    local fn, fr = (fx * nx + fz * nz) / hl, (fx * grx[i] + fz * grz[i]) / hl
+    if k == 6 or k == 7 then
+      if d <= 0 then return false end
+      local s = k == 6 and 1 or -1
+      local side = ((px - gx[i]) * grx[i] + (pz - gz[i]) * grz[i]) * s + GHW[k]      -- metres out from the pole
+      local m = wide and 1 or 0
+      return side > -m or (fn > 0.17 and side + fr * s * d / fn > -0.5 - m)
+    end
+    if gmode == 4 and d < 0 then nx, ny, nz, d, fn = -nx, -ny, -nz, -d, -fn end
+    if d <= 0 then return false end
+    if d > c * sqrt(wx * wx + wy * wy + wz * wz) then return true end
+    if ny ~= 0 or fn <= 0.17 then return false end
+    local side = -(wx * grx[i] + wz * grz[i]) + fr * d / fn                  -- where straight on meets its plane
+    return (side < 0 and -side or side) < GHW[k] + (wide and 1.5 or 1)
   end
   -- green from 70 deg, yellow again past 75 (no flicker at the edge); a fresh test once the gate
   -- has been off the screen

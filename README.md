@@ -35,7 +35,7 @@ Download `StickTime-<version>-sdcard.zip` from the [latest release](https://gith
 - **Medals:** Gold, Silver and Bronze are the Hard, Medium and Easy AI's lap at the Power you fly; shown in the menu, the Practice OSD and the results.
 - **Hits:** the quad stops against what it hits and flies on. A hard hit edge-on is a prop strike: half a second of tumbling to fly out of. Upside down on the ground: **turtle mode**, roll or pitch to flip back. **Pause → Respawn** puts you at the last gate.
 - **Battery** (Off, Real, 1.5x, 2x): each class's real pack sags and runs down (about 2 min of hard racing on a 5"); a fresh pack flies exactly like no battery. Beeps and a yellow/red battery below 3.5 / 3.3 V a cell, then EMPTY and a fresh pack. Respawn also brings a fresh pack.
-- **Also:** wind with gusts, prop wash (Off, Stock, Max), Grip (rotor drag), vibration on hits and laps. On color screens the marker over the next gate turns green when you're lined up to fly through it: on its way-in side, heading the way through and the gate ahead of your nose (a dive gate: above it; a flag: before it, on the side you pass it).
+- **Also:** wind with gusts, prop wash (Off, Stock, Max), Grip (rotor drag), vibration on hits and laps. On color screens the marker over the next gate shows where to come in from, a guide on a track you're learning: green on its way-in side (within 70° of its axis) or heading straight into it, yellow when you need to go round (a dive gate: green above it; a flag: before it, on or heading to the side you pass it).
 - **Saving:** bests and the ghost are saved the moment you set them, so switching the radio off keeps them. (A lap that sets a new ghost writes a 5 KB file, which can pause the radio for a moment; races never write a ghost.)
 
 | What each edition has | Color | BW | Lite |
@@ -51,7 +51,7 @@ Download `StickTime-<version>-sdcard.zip` from the [latest release](https://gith
 | Your own tracks 9-16 | yes | yes | no |
 | Ghost | yes | no (not enough memory on B&W radios) | no |
 | Minimap, stick view, touch | yes | no | no |
-| The next gate's marker turns green when you're lined up to fly through it | yes | no | no |
+| The next gate's marker turns green where you can come in from | yes | no | no |
 
 | Files in `/SCRIPTS/TOOLS/` | |
 |---|---|

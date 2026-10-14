@@ -374,11 +374,11 @@ do
   else print(string.format("dive gate frame: the quad stops on it (%.2f m over the gate)", s[2] - gy5)) end
 end
 
--- 4b. the next gate's marker turns green when lined up to go through it (the color game): a hoop
--- from in front within 70 deg, heading within 70 deg of the way through and pointed at it (not
--- turned away, not beside it heading past, not from behind or far to the side, not sliding past);
--- once green, a little more before yellow again; Gate Rush from either side; a flag before it on
--- its free side, any heading; a dive gate from above
+-- 4b. the next gate's marker turns green where you can come in from (the color game, a guide on a
+-- track you're learning): a hoop from in front within 70 deg of its axis, any heading, or from a
+-- steeper angle heading straight into it (not from behind, not far to the side heading past); once
+-- green, a little more before yellow again; Gate Rush from either side; a flag before it on its free
+-- side, any heading, or heading to pass on that side; a dive gate from above
 if GAME_COLOR then
   local atan2 = math.atan2 or math.atan
   local function deg(nx, nz) return atan2(nx, nz) * 57.29578 end
@@ -391,42 +391,40 @@ if GAME_COLOR then
   T.track(4)
   T.start(2)
   steps(5)
-  local hoop = { at(6, 8, 0, 0, 10), at(6, 4, 8, 0, -63.4), at(6, 8, 0, 0, 180), at(6, 8, 0, 0, 40), at(6, -8, 0), at(6, 3, 9), at(6, 4, 8) }
+  -- in front turned 65; beside within the cone; in front turned round (still the place to come in
+  -- from); behind; behind facing it; far to the side heading past; far to the side but aimed at it
+  -- (72 deg off its axis); far to the side heading 45
+  local hoop = { at(6, 8, 0, 0, 65), at(6, 4, 8), at(6, 8, 0, 0, 180), at(6, -8, 0), at(6, -8, 0, 0, 180), at(6, 3, 9),
+                 at(6, 3, 9, 0, -71.57), at(6, 3, 9, 0, -45) }
   local flag = { at(2, 6, 0), at(2, 6, 0, 0, 120), at(2, -6, 0) }
-  do                                                            -- beyond the pole: the flag's wrong side
-    local fx, _, fz, nx, _, nz, _, ax, ay, az = T.gate(2)
-    T.pose(ax - (fx - ax) * 5 / 3.5 - nx * 6, ay, az - (fz - az) * 5 / 3.5 - nz * 6, deg(nx, nz), 0, 0)
-    flag[4] = T.lined(2)
-  end
-  if not (hoop[1] and hoop[2] and not hoop[3] and not hoop[4] and not hoop[5] and not hoop[6] and not hoop[7] and flag[1] and flag[2] and not flag[3] and not flag[4]) then
-    fail("lined up: hoop " .. table.concat({ tostring(hoop[1]), tostring(hoop[2]), tostring(hoop[3]), tostring(hoop[4]), tostring(hoop[5]), tostring(hoop[6]), tostring(hoop[7]) }, " ") ..
-      ", flag " .. tostring(flag[1]) .. " " .. tostring(flag[2]) .. " " .. tostring(flag[3]) .. " " .. tostring(flag[4]))
-  end
-  -- what the cases above leave open: the heading (63 deg off the axis, the nose 83 deg off the way
-  -- through though only 20 deg off the gate), the cone (72 deg off the axis, the nose between: 60
-  -- deg off the way through, 12 off the gate), the aim far out (20 m, the nose 30 deg off), a slide
-  -- (6 m/s sideways: yellow; 2 m/s: green), and once green (wide) the aim a third wider (28 deg at
-  -- 20 m, 40 at 3 m), the cone to 75 deg and the slide from 4 m/s while the narrow test says yellow
   do
-    local _, _, _, nx, _, nz = T.gate(6)
-    local more = { at(6, 4, 8, 0, -83.4), at(6, 3.25, 10, 0, -60), at(6, 20, 0, 0, 30) }
-    at(6, 8, 0) T.vel(nz * 6, 0, -nx * 6) more[4] = T.lined(6)
-    T.vel(nz * 2, 0, -nx * 2) more[5] = T.lined(6)
-    T.vel(nz * 3.5, 0, -nx * 3.5) more[11], more[12] = T.lined(6), T.lined(6, true)
-    T.vel(0, 0, 0)
-    at(6, 20, 0, 0, 28) more[6] = T.lined(6) more[7] = T.lined(6, true)
-    at(6, 3, 0, 0, 40) more[8] = T.lined(6) more[9] = T.lined(6, true)
-    at(6, 3.25, 10, 0, -60) more[10] = T.lined(6, true)
-    if more[1] or more[2] or more[3] or more[4] or not more[5] or more[6] or not more[7] or more[8] or not more[9] or not more[10] or more[11] or not more[12] then
-      local t = {}
-      for n = 1, 12 do t[n] = tostring(more[n]) end
-      fail("lined up: heading, cone, aim, slide, wide " .. table.concat(t, " "))
-    end
-    -- the marker keeps green to 32 deg off the nose (20 m out), and yellow again needs 25
-    at(6, 20, 0) local m1 = T.marker(6)
-    at(6, 20, 0, 0, 28) local m2 = T.marker(6)
-    at(6, 20, 0, 0, 34) local m3 = T.marker(6)
-    at(6, 20, 0, 0, 28) local m4 = T.marker(6)
+    local fx, _, fz, nx, _, nz, _, ax, ay, az = T.gate(2)
+    local ux, uz = (fx - ax) / 3.5, (fz - az) / 3.5                -- a metre out from the pole
+    local px, pz = ax - ux * 2.5, az - uz * 2.5                     -- the pole
+    -- 5 m beyond the pole (its wrong side) heading the way through: it would miss the flag
+    T.pose(px - ux * 5 - nx * 6, ay, pz - uz * 5 - nz * 6, deg(nx, nz), 0, 0)
+    flag[4] = T.lined(2)
+    -- 3 m beyond the pole, 8 m before it, heading to pass 2.5 m out on its free side (a slalom)
+    local qx, qz = px - ux * 3 - nx * 8, pz - uz * 3 - nz * 8
+    T.pose(qx, ay, qz, deg(ax - qx, az - qz), 0, 0)
+    flag[5] = T.lined(2)
+  end
+  local want = { true, true, true, false, false, false, true, false }
+  local ok = flag[1] and flag[2] and not flag[3] and not flag[4] and flag[5]
+  for n = 1, #want do ok = ok and hoop[n] == want[n] end
+  if not ok then
+    local t = {}
+    for n = 1, #hoop do t[n] = tostring(hoop[n]) end
+    fail("lined up: hoop " .. table.concat(t, " ") .. ", flag " .. tostring(flag[1]) .. " " .. tostring(flag[2]) .. " " ..
+      tostring(flag[3]) .. " " .. tostring(flag[4]) .. " " .. tostring(flag[5]))
+  end
+  -- once green it holds to 75 deg off its axis (72: green only after green), yellow again past it
+  do
+    local function off(a) return at(6, 10 * math.cos(math.rad(a)), 10 * math.sin(math.rad(a))) end
+    off(65) local m1 = T.marker(6)
+    off(72) local m2 = T.marker(6)
+    off(78) local m3 = T.marker(6)
+    off(72) local m4 = T.marker(6)
     if not (m1 and m2 and not m3 and not m4) then
       fail("next gate marker hysteresis " .. tostring(m1) .. " " .. tostring(m2) .. " " .. tostring(m3) .. " " .. tostring(m4))
     end
@@ -452,9 +450,9 @@ if GAME_COLOR then
   local below = T.lined(6)
   if not (above and turned and not side and not below) then
     fail("lined up: dive gate " .. tostring(above) .. " " .. tostring(turned) .. " " .. tostring(side) .. " " .. tostring(below))
-  else print("next gate marker: green when lined up and pointed at it (hoop, flag on its free side, dive gate; not from behind, far to the side, beside it or turned away)") end
-  -- flown along the racing line at 15 m/s, every gate of the eight tracks is green on its final
-  -- approach (the last fifth of the leg into it)
+  else print("next gate marker: green where you can come in from (hoop within 70 deg, a steep line into it, flag on or heading to its free side, dive gate; not from behind or far to the side heading past)") end
+  -- flown along the racing line at 15 m/s, every gate and flag of the eight tracks is green early: over
+  -- at least the last third of the leg into it (a guide, not a last-moment check)
   local late = {}
   for t = 1, 8 do
     T.track(t)
@@ -463,7 +461,7 @@ if GAME_COLOR then
     local ng = T.ng()
     for j = 1, ng do
       local i = (j - 2) % ng + 1
-      for q = 16, 19 do
+      for q = 13, 19 do
         local s = q / 20
         local x, y, z = T.line(i, s)
         local x0, _, z0 = T.line(i, s - 0.01)
@@ -477,8 +475,8 @@ if GAME_COLOR then
     end
   end
   T.vel(0, 0, 0)
-  if #late > 0 then fail("next gate marker not green on the racing line's final approach: " .. table.concat(late, " "))
-  else print("next gate marker: green on every final approach of the racing line, all eight tracks") end
+  if #late > 0 then fail("next gate marker not green over the last third of the racing line's leg: " .. table.concat(late, " "))
+  else print("next gate marker: green over at least the last third of every leg of the racing line, all eight tracks") end
 end
 
 -- 5. flags and hoops: wrong side of a flag does not count, the hoop rim crashes
