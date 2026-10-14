@@ -369,8 +369,8 @@ def page_tests(br, errors, tracks):
           f"page: Start from Slalom: a copy in the editor, in no slot yet ({page.inner_text('#edEditing')!r})")
     # Send to emulator, then a change: the Emulator row says c1 hasn't it, and Fly asks before flying c1 as it is
     page.click("#edSendEmu")
-    check(page.inner_text("#edEmuHas") == "c1: this track" and page.is_enabled("#edFly") and page.inner_text("#edFly") == "Fly"
-          and page.inner_text("#edStatus").startswith("Sent to c1 in the emulator"), f"page: Send to emulator: c1 has it, Fly on ({page.inner_text('#edStatus')!r})")
+    check(page.inner_text("#edEmuHas") == "c1: this track" and page.is_enabled("#edFly") and page.inner_text("#edFly") == "Fly c1"
+          and page.inner_text("#edStatus").startswith("Sent to c1 in the emulator"), f"page: Send to emulator: c1 has it, Fly c1 on ({page.inner_text('#edStatus')!r})")
     page.locator("#edTreesN").fill("5")
     page.locator("#edTreesN").press("Tab")
     asked = []
