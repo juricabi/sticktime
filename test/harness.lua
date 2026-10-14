@@ -378,7 +378,7 @@ end
 -- track you're learning): a hoop from in front within 70 deg of its axis, any heading, or from a
 -- steeper angle heading straight into it (not from behind, not far to the side heading past); once
 -- green, a little more before yellow again; Gate Rush from either side; a flag before it on its free
--- side, any heading, or heading to pass on that side; a dive gate from above
+-- side, any heading, or heading to pass on that side; a dive gate anywhere above it (a shallow swoop too)
 if GAME_COLOR then
   local atan2 = math.atan2 or math.atan
   local function deg(nx, nz) return atan2(nx, nz) * 57.29578 end
@@ -445,11 +445,13 @@ if GAME_COLOR then
   T.pose(gx, gy + 4, gz, 135, 0, 0)
   local turned = T.lined(6)
   T.pose(gx + 8, gy + 1, gz, 0, 0, 0)
-  local side = T.lined(6)
+  local shallow = T.lined(6)                                    -- a shallow swoop: low and to the side
+  T.pose(gx + 8, gy + 0.2, gz, 0, 0, 0)
+  local level = T.lined(6)
   T.pose(gx, gy - 3, gz, 0, 0, 0)
   local below = T.lined(6)
-  if not (above and turned and not side and not below) then
-    fail("lined up: dive gate " .. tostring(above) .. " " .. tostring(turned) .. " " .. tostring(side) .. " " .. tostring(below))
+  if not (above and turned and shallow and not level and not below) then
+    fail("lined up: dive gate " .. tostring(above) .. " " .. tostring(turned) .. " " .. tostring(shallow) .. " " .. tostring(level) .. " " .. tostring(below))
   else print("next gate marker: green where you can come in from (hoop within 70 deg, a steep line into it, flag on or heading to its free side, dive gate; not from behind or far to the side heading past)") end
   -- flown along the racing line at 15 m/s, every gate and flag of the eight tracks is green early: over
   -- at least the last third of the leg into it (a guide, not a last-moment check)

@@ -4612,10 +4612,11 @@ local render, hitTest, pauseHit, initUI
   -- a good place to enter gate i from, so its marker shows where to come in from before you aim (a
   -- guide on a track you're learning; yellow: go round): on its way-in side within 70 deg of its
   -- axis, whichever way you head, or from a steeper angle on that side heading straight into its
-  -- opening (+1 m). A dive gate: from above. Gate Rush counts a gate either way through, so either
-  -- side will do. A flag is a turn: still before it and on the side its pole leaves free, or heading
-  -- to pass on that side (a slalom comes in from the other side: gx, gz the middle of its pass zone,
-  -- GHW from the pole). wide: once green, yellow again only past 75 deg and 1.5 m (no flicker)
+  -- opening (+1 m). A dive gate: anywhere above it (a shallow swoop drops in too). Gate Rush counts
+  -- a gate either way through, so either side will do. A flag is a turn: still before it and on the
+  -- side its pole leaves free, or heading to pass on that side (a slalom comes in from the other
+  -- side: gx, gz the middle of its pass zone, GHW from the pole). wide: once green, yellow again
+  -- only past 75 deg, 1.5 m or level with a dive gate (no flicker)
   local function linedUp(i, wide)
     local nx, ny, nz, k = gnx[i], gny[i], gnz[i], gk[i]
     local wx, wy, wz = AX[i] - px, AY[i] - py, AZ[i] - pz
@@ -4630,9 +4631,10 @@ local render, hitTest, pauseHit, initUI
       return side > -m or (fn > 0.17 and side + fr * s * d / fn > -0.5 - m)
     end
     if gmode == 4 and d < 0 then nx, ny, nz, d, fn = -nx, -ny, -nz, -d, -fn end
+    if ny ~= 0 then return d > (wide and 0.1 or 0.4) end                     -- a dive gate: from above
     if d <= 0 then return false end
     if d > c * sqrt(wx * wx + wy * wy + wz * wz) then return true end
-    if ny ~= 0 or fn <= 0.17 then return false end
+    if fn <= 0.17 then return false end
     local side = -(wx * grx[i] + wz * grz[i]) + fr * d / fn                  -- where straight on meets its plane
     return (side < 0 and -side or side) < GHW[k] + (wide and 1.5 or 1)
   end
