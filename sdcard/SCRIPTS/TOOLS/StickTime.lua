@@ -134,9 +134,10 @@ local TRACKS = {
 -- editor makes them; StickTime and StickTime BW read the same files, the Lite doesn't). A name line,
 -- then the numbers: the format, an id (bests start over when it changes), tree seed, trees (9: as
 -- many as most tracks), the gates (x z type yaw height), "/", the structures (x z half-x half-z
--- bottom top kind). Format 1: up to 24 gates, 16 structures and 1000 bytes, for every edition.
--- Format 2, a bigger track: up to 48 gates, 64 structures and 6000 bytes, for this edition only
--- (StickTime BW has no memory for it and lists format 1 only, as earlier versions do). They are
+-- bottom top kind). Format 1: up to 24 gates, 16 structures and 1000 bytes, read by StickTime and
+-- StickTime BW. Format 2, a bigger track: up to 48 gates, 64 structures and 6000 bytes, for this
+-- edition only (StickTime BW has no memory for it and lists format 1 only, as earlier versions do;
+-- this edition reads either to format 2's limits, the editor writes format 1 only within its). They are
 -- tracks 9-16 whether or not the slots before them are filled; only the name and id are read here
 local NB0, NT = #TRACKS, #TRACKS + 8
 local CUSTOM = "/SCRIPTS/TOOLS/StickTimeTracks/c"
@@ -308,9 +309,7 @@ do
       if k == 3 then d, y0, y1 = ih + GT, 0, y + GT
       elseif k == 2 then y0 = 0
       elseif k == 4 then y0, y1 = 0, y + iw + GT
-      elseif k == 5 then                             -- an arch has no stand: raised, it floats
-        y0, y1 = y - iw - GT, y + iw + GT
-        if y0 < 0 then y0 = 0 end
+      elseif k == 5 then y0, y1 = y, y + iw + GT    -- an arch: the upper half of a ring, no stand (raised, it floats)
       elseif k == 8 then w, d, y0, y1 = iw, 0, y - ih, y + ih end
       local bx, bz = x, z
       if k == 6 or k == 7 then

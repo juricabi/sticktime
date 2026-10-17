@@ -87,7 +87,7 @@
     const cut = rest.indexOf('/');
     const head = (cut < 0 ? rest : rest.slice(0, cut)).split(/\s+/).filter(Boolean);
     const tail = cut < 0 ? [] : rest.slice(cut + 1).split(/\s+/).filter(Boolean);
-    if (head.length < 4) return { error: 'after the name come the format (1), an id, the tree seed and the trees.' };
+    if (head.length < 4) return { error: 'after the name come the format (1 or 2), an id, the tree seed and the trees.' };
     if (head[0] !== '1' && head[0] !== '2') return { error: 'it is format ' + head[0].slice(0, 12) + ': the editor reads formats 1 and 2.' };
     const bad = head.concat(tail).find((v) => !NUM.test(v));
     if (bad !== undefined) return { error: '"' + bad.slice(0, 24) + '" is not a number.' };
@@ -148,7 +148,7 @@
     if (k === 3) { d = ih + GT; y0 = 0; y1 = y + GT; }
     else if (k === 2) y0 = 0;
     else if (k === 4) { y0 = 0; y1 = y + iw + GT; }
-    else if (k === 5) { y0 = Math.max(0, y - iw - GT); y1 = y + iw + GT; }   // (no stand: a raised arch floats)
+    else if (k === 5) { y0 = y; y1 = y + iw + GT; }   // (the upper half of a ring, no stand: a raised arch floats)
     else if (k === 8) { w = iw; d = 0; y0 = y - ih; y1 = y + ih; }
     let bx = x, bz = z;
     if (k === 6 || k === 7) {
@@ -633,15 +633,23 @@
       '<button type="button" class="ed-mini" data-move="' + i + ',1"' + (i === n - 1 ? ' disabled' : '') + ' aria-label="Gate ' + (i + 1) + ' later" title="Later">' + DOWN + '</button></li>').join(''); });
   }
 
+  // the game Fly runs: Auto is the radio's own (Fly switches the Lite and any other script to Auto)
+  function flyGame(a) {
+    const sc = a.custom || a.script === 'lite' ? 'auto' : a.script;
+    return sc === 'auto' ? (a.radio && a.radio.color ? 'color' : 'bw') : sc;
+  }
+  const BW_BIG = 'StickTime BW doesn\'t list bigger tracks: pick a color radio (or the StickTime script) to fly it';
   function renderFly() {
     const bad = ed.probs.length > 0, inSlot = asEntry(emuSlot(ed.slot));
     el.edSendEmu.disabled = bad;
     el.edSave.disabled = bad;
     el.edSendEmu.title = bad ? 'Fix the problems listed under Check first' : 'Put it in slot c' + ed.slot + ' of the emulator\'s SD card (track ' + (8 + ed.slot) + ')';
     el.edFlyText.textContent = 'Fly c' + ed.slot;
-    el.edFly.disabled = !inSlot || !!inSlot.bad;
+    const s = sim(), a = s && s.app;
+    const bwBig = !!(inSlot && !inSlot.bad && a && formatOf(inSlot.text) === 2 && flyGame(a) === 'bw');
+    el.edFly.disabled = !inSlot || !!inSlot.bad || bwBig;
     el.edFly.title = !inSlot ? 'c' + ed.slot + ' of the emulator is empty: Send to emulator first' : inSlot.bad ? 'c' + ed.slot + ' of the emulator can\'t be read'
-      : 'Fly c' + ed.slot + ' of the emulator in Practice (track ' + (8 + ed.slot) + '), as it is there';
+      : bwBig ? BW_BIG : 'Fly c' + ed.slot + ' of the emulator in Practice (track ' + (8 + ed.slot) + '), as it is there';
     el.edSave.title = bad ? 'Fix the problems listed under Check first' : 'Download c' + ed.slot + '.txt for the radio\'s SD card';
     const big = ed.file.format === 2;
     el.edSize.textContent = 'c' + ed.slot + '.txt · ' + ed.file.bytes + ' of ' + (big ? MAX_BYTES : F1_BYTES) + ' bytes · id ' + ed.file.id +
@@ -655,11 +663,10 @@
     el.edEmuHas.textContent = c + ': ' + holds(inSlot);
     el.edEmuHas.classList.toggle('warn', stale(inSlot));
     el.edFileHas.textContent = c + '.txt, to copy to ' + DIR + ' on the radio\'s SD card yourself';
-    const s = sim(), a = s && s.app;
     const lite = !!(a && !a.custom && a.script === 'lite');
-    el.edLite.hidden = !(lite || (a && a.custom));
-    el.edLite.textContent = lite
-      ? 'StickTime Lite doesn\'t read custom tracks (its radios have no memory to spare): Fly switches the script to Auto.'
+    el.edLite.hidden = !(bwBig || lite || (a && a.custom));
+    el.edLite.textContent = bwBig ? BW_BIG + '.'
+      : lite ? 'StickTime Lite doesn\'t read custom tracks (its radios have no memory to spare): Fly switches the script to Auto.'
       : a && a.custom ? a.custom.name + ' is running: Fly switches back to StickTime.' : '';
     renderRadio();
   }
@@ -1434,7 +1441,7 @@
   tool(el.edRedo, redo);
   el.edFit.addEventListener('click', fit);
   // the note about StickTime Lite follows the header's script picker (app.js handles it first)
-  for (const id of ['scriptSel', 'fileIn']) {
+  for (const id of ['scriptSel', 'radioSel', 'fileIn']) {
     const s = $(id);
     if (s) s.addEventListener('change', () => setTimeout(() => { if (ed.open) renderFly(); }, 300));
   }
@@ -1815,11 +1822,12 @@
         const now = dir && await readSlot(dir, n);
         if (!now || now.text !== was) { moved.push(n); continue; }
         await writeSlot(dir, n, t.text);
-        put.push(n);
+        put.push([n, t.text]);
       }
       await listRadio();
-      mineStatus((done ? done + ' ' : '') + (put.length ? 'Updated ' + cs(put) + ' on the radio: restart StickTime on it.' : '') +
-        (moved.length ? ' ' + cs(moved) + ' on the radio changed since it was read: left alone.' : ''), moved.length || !kept ? 'bad' : 'ok');
+      const note = await bigNote(put.map((x) => x[1]));
+      mineStatus((done ? done + ' ' : '') + (put.length ? 'Updated ' + cs(put.map((x) => x[0])) + ' on the radio: restart StickTime on it.' : '') +
+        (moved.length ? ' ' + cs(moved) + ' on the radio changed since it was read: left alone.' : '') + note, moved.length || !kept || note ? 'bad' : 'ok');
     }, mineStatus, true);
   }
   // a gallery track into the editor as it is, in the slot that is its (then the Send buttons)
@@ -1898,7 +1906,8 @@
     ed.versions.add(ed.file.text);
     renderSlots();
     freshGame();                                       // (in its menus the game lists it at once)
-    status('Sent to c' + slot + ' in the emulator (track ' + (8 + slot) + '): Fly c' + slot + ' flies it.' + (kept ? ''
+    status('Sent to c' + slot + ' in the emulator (track ' + (8 + slot) + '): ' + (ed.file.format === 2 && flyGame(s.app) === 'bw' ? BW_BIG + '.'
+      : 'Fly c' + slot + ' flies it.') + (kept ? ''
       : ' The browser\'s storage is full or blocked: c' + slot + ' lasts only this visit (Save file keeps the track).'), kept ? 'ok' : 'bad');
     return true;
   }
@@ -1914,6 +1923,7 @@
       status('Not flown: Send to emulator puts your changes in c' + slot + ', then Fly c' + slot + '.');
       return;
     }
+    if (formatOf(cur.text) === 2 && flyGame(s.app) === 'bw') { status(BW_BIG + '.', 'bad'); return; }
     // StickTime Lite (and any other script) doesn't read custom tracks: back to the screen's own
     if (s.app.custom || s.app.script === 'lite') s.script('auto'); else s.boot();
     s.pause(false);
@@ -1985,7 +1995,8 @@
       if ((now && now.text) !== (to && to.text)) { say('c' + n + ' on the radio changed since it was read: nothing copied. Look again.', 'bad'); await listRadio(); return; }
       await writeSlot(dir, n, from.text);
       await listRadio();
-      say('Copied c' + n + ' to the radio. On the radio: restart StickTime.', 'ok');
+      const note = await bigNote([from.text]);
+      say('Copied c' + n + ' to the radio.' + (note || ' On the radio: restart StickTime.'), note ? 'bad' : 'ok');
     }, say, true);
   }
 
@@ -2256,8 +2267,9 @@
         for (let i = 1; i <= SLOTS; i++) {
           const e = i === slot ? null : await readSlot(dir, i);
           if (e && !e.bad && norm(e.text) === text) {
+            const note = await bigNote([text]);
             status('The radio has this track already, in c' + i + ' (track ' + (8 + i) + '): nothing sent. To have it in c' + slot +
-              ' instead, Remove c' + i + ' of the radio in My tracks first.');
+              ' instead, Remove c' + i + ' of the radio in My tracks first.' + note, note ? 'bad' : undefined);
             ed.versions.add(text);
             await listRadio();
             return;
@@ -2271,11 +2283,8 @@
       if (!same) await writeSlot(dir, slot, text);
       ed.versions.add(text);
       await listRadio();                               // (the lists show what is on the card now)
-      // a bigger track on a card whose StickTime won't list it
-      const v = ed.file.format === 2 ? await colorVersion() : null;
-      const big = v === '' ? ' But it is a bigger track: only StickTime on a color radio lists it, and this card has none.'
-        : v && cmpVer(v, BIG_FROM) < 0 ? ' But it is a bigger track: StickTime ' + v + ' on the card doesn\'t list it, ' + BIG_FROM + ' and later do (Install updates it).' : '';
-      status('Sent to the radio as track ' + (8 + slot) + ' (c' + slot + '.txt). On the radio: restart StickTime, the track is in the Track list.' + big, big ? 'bad' : 'ok');
+      const note = await bigNote([text]);
+      status('Sent to the radio as track ' + (8 + slot) + ' (c' + slot + '.txt).' + (note || ' On the radio: restart StickTime, the track is in the Track list.'), note ? 'bad' : 'ok');
     }, status, true);
   }
   let radioSlots = [];
@@ -2383,8 +2392,9 @@
       if (p.none) { say('No tracks in the emulator\'s slots the game can read.' + skipped(p), 'bad'); return; }
       if (p.lose.length && !window.confirm('Replace on the radio: ' + p.lose.join(', ') + '?')) { say('Nothing copied.'); return; }
       for (const i of p.put) await writeSlot(dir, i, emu[i - 1].text);
-      say((p.put.length ? 'Sent ' + slotList(p.put) + ' to the radio. On the radio: restart StickTime, the tracks are in the Track list.'
-        : 'The radio already has the emulator\'s tracks.') + skipped(p), 'ok');
+      const note = await bigNote(p.put.map((i) => emu[i - 1].text));
+      say((p.put.length ? 'Sent ' + slotList(p.put) + ' to the radio.' + (note || ' On the radio: restart StickTime, the tracks are in the Track list.')
+        : 'The radio already has the emulator\'s tracks.') + skipped(p), note ? 'bad' : 'ok');
       await listRadio();
     }, say, true);
   }
@@ -2553,6 +2563,17 @@
     return man;
   }
   const toolsDir = (create) => walk(STEPS[radio.at].slice(0, -1), create);
+  // what to say when the radio's StickTime won't list a bigger track among these ('' when it will,
+  // or when there is no telling)
+  async function bigNote(texts) {
+    const big = texts.filter((t) => typeof t === 'string' && formatOf(t) === 2);
+    if (!big.length) return '';
+    const v = await colorVersion(), one = big.length === 1, it = one ? 'it' : 'them';
+    const which = ' ' + andList(big.map((t) => '"' + nameOf(t) + '"')) + (one ? ' is a bigger track: ' : ' are bigger tracks: ');
+    if (v === '') return which + 'only StickTime ' + BIG_FROM + ' or later on a color radio lists ' + it + ', and this card has no StickTime for color radios.';
+    if (v && cmpVer(v, BIG_FROM) < 0) return which + 'StickTime ' + v + ' on the card doesn\'t list ' + it + ', ' + BIG_FROM + ' and later do.' + (GAME ? ' Install updates it.' : '');
+    return '';
+  }
   // the color game's version on the card: '' without one, null when there is no telling (only its
   // tracks folder connected, a header without a version)
   async function colorVersion() {

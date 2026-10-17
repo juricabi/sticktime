@@ -86,6 +86,19 @@ def checker_tests():
     for what, text in {"format 2 for a track that fits format 1": with_boxes(5, 2), "format 1 with 17 structures": with_boxes(17, 1),
                        "65 structures": with_boxes(65, 2), "format 3": with_boxes(20, 3)}.items():
         check(gallery.track_problems(text) != [], f"checker: refuses {what}")
+    # 24 gates and 16 structures over 999 bytes (2 decimals each): format 2 by its size alone
+    def long16(fmt):
+        more = (" ".join(nums.split(" ")[:2]) + "".join(f" {10 * i}.25 -10.25 1 0 2.25" for i in range(24)) + " /" +
+                "".join(f" -{200 + 10 * i}.25 -10.25 1.25 1.25 0.25 13.25 1" for i in range(16)))
+        return name + f"\n{fmt} " + str(gallery.fnv1a(more) % 999999 + 1) + " " + more + "\n"
+    assert 999 < len(long16(2).encode()) <= 5999
+    check(gallery.track_problems(long16(2)) == [], f"checker: a format 2 track of 16 structures and {len(long16(2).encode())} bytes passes")
+    check(gallery.track_problems(long16(1)) != [], "checker: refuses format 1 over 999 bytes")
+    def gates(n):
+        more = " ".join(nums.split(" ")[:2]) + "".join(f" {10 * i} 0 1 0 0" for i in range(n))
+        return name + "\n2 " + str(gallery.fnv1a(more) % 999999 + 1) + " " + more + "\n"
+    check(gallery.track_problems(gates(48)) == [], "checker: 48 gates pass (format 2)")
+    check(any("49 gates" in m for m in gallery.track_problems(gates(49))), "checker: refuses 49 gates")
     check(gallery.info_problems({"by": "Me"}) == [], "checker: 'by' alone is enough")
     for what, info in {"no by": {"about": "x"}, "another key": {"by": "Me", "url": "x"}, "an http source": {"by": "Me", "source": "http://x.org"},
                        "a long by": {"by": "x" * 61}, "a line break": {"by": "Me", "about": "a\nb"}, "a list": ["Me"],

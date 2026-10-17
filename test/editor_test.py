@@ -396,14 +396,22 @@ def radio_tests(br, errors):
     radio_done(page)
     big = page.evaluate("sim.editor.file()")
     msg = page.inner_text("#edStatus")
+    note = ' "My Bando" is a bigger track: StickTime 1.7.2 on the card doesn\'t list it, 1.8.0 and later do. Install updates it.'
     check(big.split("\n")[1].startswith("2 ") and page.evaluate(CARD_FILE, TRACKS + "6.txt") == big
-          and msg.endswith("But it is a bigger track: StickTime 1.7.2 on the card doesn't list it, 1.8.0 and later do (Install updates it).")
+          and msg == "Sent to the radio as track 14 (c6.txt)." + note
           and "bad" in page.get_attribute("#edStatus", "class"), f"radio: a bigger track sent to StickTime 1.7.2 says it needs 1.8.0: {msg!r}")
+    page.select_option("#edSlot", "7")
+    page.click("#edSend")
+    radio_done(page)
+    msg = page.inner_text("#edStatus")
+    check(msg.startswith("The radio has this track already, in c6") and msg.endswith(note) and page.evaluate(CARD_FILE, TRACKS + "7.txt") is None,
+          f"radio: ... and says so again when the radio has it already: {msg!r}")
+    page.select_option("#edSlot", "6")
     page.evaluate(CARD_WRITE, [game, "local toolName = \"TNS|StickTime|TNE\"\n--[[\n  StickTime v1.8.0  -  a real 3D FPV quad simulator\n"])
     page.click("#edSend")
     radio_done(page)
-    check(page.inner_text("#edStatus") == "Sent to the radio as track 14 (c6.txt). On the radio: restart StickTime, the track is in the Track list.",
-          "radio: ... and to StickTime 1.8.0, nothing more")
+    check(page.inner_text("#edStatus") == "Sent to the radio as track 14 (c6.txt). On the radio: restart StickTime, the track is in the Track list."
+          and "ok" in page.get_attribute("#edStatus", "class"), "radio: ... and to StickTime 1.8.0, nothing more")
     page.evaluate(CARD_WRITE, [game, "-- the game\n"])
 
     # SCRIPTS/TOOLS or StickTimeTracks picked instead of the drive
@@ -1148,7 +1156,22 @@ def main():
         info = page.evaluate("sim.test('info')")
         check(page.evaluate("sim.app.radio.color") is False and info[0] == 12 and info[10] == "My Hoop Forest"
               and page.evaluate("sim.test('get')")[18] == len(TEMPLATES["Hoop Forest"]["gates"]), "StickTime BW on a TX12: Hoop Forest flown as track 12")
+        # a bigger track there: sent, but no Fly (StickTime BW doesn't list it), and the editor says why
+        page.click("#tracksBtn")
+        start_from(page, "Bando")
+        page.click("#edAddBox")
+        for f, v in (("x", "-90"), ("z", "-90")):
+            page.fill(f'#edSel [data-f="{f}"]', v)
+            page.press(f'#edSel [data-f="{f}"]', "Tab")
+        page.select_option("#edSlot", "5")
+        page.click("#edSendEmu")
+        sent = page.inner_text("#edStatus")
+        check(page.evaluate("sim.editor.file()").split("\n")[1].startswith("2 ") and "StickTime BW doesn't list bigger tracks" in sent
+              and page.is_disabled("#edFly") and page.is_visible("#edLite") and "StickTime BW doesn't list bigger tracks" in page.inner_text("#edLite"),
+              f"a bigger track on a TX12: sent, Fly off, the editor says StickTime BW doesn't list it: {sent!r}")
         page.evaluate("sim.radio('tx16s')")
+        page.wait_for_function("!document.querySelector('#edFly').disabled", timeout=5000)
+        check(page.is_hidden("#edLite"), "... and on a TX16S Fly is back")
 
         # ---- screenshots: desktop (light and dark), phone width
         page.click("#tracksBtn")

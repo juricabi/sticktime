@@ -989,14 +989,15 @@ do
   SD[CT .. "1.txt"] = "Test Loop\n1 4242 7 9  0 0 1 0 0  0 40 1 0 0  30 60 4 90 3  40 20 1 180 0 / 20 30 3 3 0 4 2\n"
   SD[CT .. "3.txt"] = "Hoops\r\n1 77 3 18  0 0 4 0 2.5  20 30 4 45 2  0 60 4 180 3\r\n"
   SD[CT .. "5.txt"] = "Broken\n3 1 1 9 0 0 1 0 0\n"                       -- a format this version can't read
-  -- format 2: 30 gates on a circle, 20 structures in a row
+  -- format 2 (over 1000 bytes): 49 gates on a circle and 65 structures in a row, one more of each
+  -- than the game takes (it builds 48 and 64)
   local big = { "Big One\n2 4321 5 9" }
-  for i = 0, 29 do
-    local a = i * 12
-    big[#big + 1] = string.format(" %d %d 1 %d 0", floor(70 * math.sin(math.rad(a)) + 0.5), floor(70 * math.cos(math.rad(a)) + 0.5), (a + 90) % 360)
+  for i = 0, 48 do
+    local a = i * 360 / 49
+    big[#big + 1] = string.format(" %d %d 1 %d 0", floor(90 * math.sin(math.rad(a)) + 0.5), floor(90 * math.cos(math.rad(a)) + 0.5), floor(a + 90.5) % 360)
   end
   big[#big + 1] = " /"
-  for i = 0, 19 do big[#big + 1] = string.format(" %d 120 1 1 0 3 1", -95 + i * 10) end
+  for i = 0, 64 do big[#big + 1] = string.format(" %d 140 1 1 0 3 1", -320 + i * 10) end
   SD[CT .. "6.txt"] = table.concat(big) .. "\n"
   -- made by hand: a blank first line, a gate type and a structure kind the game doesn't have
   SD[CT .. "2.txt"] = "\nOdd File\n1 55 3 9  0 0 1 0 0  30 0 9 0 0 / 10 10 1 1 0 2 7\n"
@@ -1032,9 +1033,21 @@ do
   if GAME_COLOR then
     L.track(14)
     local name14, nb14, ng14 = select(11, L.info()), select(10, L.info()), select(19, L.get())
-    if name14 ~= "Big One" or ng14 ~= 30 or nb14 ~= 20 then
-      fail(string.format("custom tracks: the format 2 track should be 'Big One' with 30 gates and 20 structures (%s, %s, %s)", tostring(name14), tostring(ng14), tostring(nb14)))
+    if #SD[CT .. "6.txt"] <= 1000 or name14 ~= "Big One" or ng14 ~= 48 or nb14 ~= 64 then
+      fail(string.format("custom tracks: the format 2 track (%d bytes) should be 'Big One' with 48 gates and 64 structures (%s, %s, %s)",
+        #SD[CT .. "6.txt"], tostring(name14), tostring(ng14), tostring(nb14)))
     end
+    -- flown: a race with AI pilots on it
+    L.set("ai", 2) L.start(1)
+    sticks.thr = 300
+    for _ = 1, 200 do
+      clock = clock + 50
+      local ok, e = pcall(inst.run, 0)
+      if not ok then fail("custom tracks: run error on the format 2 track " .. tostring(e)) break end
+    end
+    local st = select(16, L.get())
+    if st ~= 4 and st ~= 5 and st ~= 6 then fail("custom tracks: the race on the format 2 track isn't flying (state " .. tostring(st) .. ")") end
+    idleSticks()
   end
   -- fly it: a race with AI pilots on the custom track
   L.track(9) L.set("ai", 2) L.start(1)
@@ -1048,7 +1061,7 @@ do
   if st ~= 4 and st ~= 5 and st ~= 6 then fail("custom tracks: the race on track 9 isn't flying (state " .. tostring(st) .. ")") end
   idleSticks()
   print(string.format("custom tracks: 9 '%s' and 11 '%s' listed (c5 left out, c6 %s), bests kept for the same id, race running", name, name11,
-    GAME_COLOR and "a format 2 track of 30 gates and 20 structures" or "format 2: left out"))
+    GAME_COLOR and "a format 2 track of 48 gates and 64 structures, flown" or "format 2: left out"))
   for i = 1, 8 do SD[CT .. i .. ".txt"] = nil end
 end
 
