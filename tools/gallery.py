@@ -39,13 +39,22 @@ def fnv1a(s):
     return h
 
 
+# format 1, for every edition: gates, structures, bytes at most; format 2, a bigger track, for the
+# color edition only (StickTime BW and earlier versions list format 1 only): the editor writes it
+# only for a track that doesn't fit format 1
+F1 = (24, 16, 999)
+F2 = (48, 64, 5999)
+
+
 def track_problems(text):
     """what is wrong with a track file, as the editor's Save file writes it: the name (16 plain
-    characters), then 1 <id> <seed> <trees> <gates: x z type yaw height> [/ <structures: x z half-x
-    half-z bottom top kind>], the id the FNV-1a of the numbers after it, at most 999 bytes"""
+    characters), then the format (1, or 2 when it doesn't fit 1) <id> <seed> <trees> <gates: x z
+    type yaw height> [/ <structures: x z half-x half-z bottom top kind>], the id the FNV-1a of the
+    numbers after it, at most 999 bytes (format 1) or 5999 (format 2)"""
     p = []
-    if len(text.encode()) > 999:
-        p.append(f"{len(text.encode())} bytes: 999 at most")
+    most = F2[2] if text.split("\n")[1:2] and text.split("\n")[1].startswith("2 ") else F1[2]
+    if len(text.encode()) > most:
+        p.append(f"{len(text.encode())} bytes: {most} at most")
     lines = text.split("\n")
     if "\r" in text or len(lines) != 3 or lines[2] != "":
         return p + ["a name line and a numbers line, as the editor's Save file writes them"]
@@ -55,8 +64,8 @@ def track_problems(text):
     elif name.lower() in TAKEN:
         p.append(f"the name {name!r} is a built-in track's or the editor's name for a new track: give the track a name of its own")
     tok = line.split(" ")
-    if len(tok) < 4 or tok[0] != "1" or not re.fullmatch(r"[1-9][0-9]*", tok[1]):
-        return p + ["the numbers line starts with the format (1), the id, the tree seed and the trees"]
+    if len(tok) < 4 or tok[0] not in ("1", "2") or not re.fullmatch(r"[1-9][0-9]*", tok[1]):
+        return p + ["the numbers line starts with the format (1 or 2), the id, the tree seed and the trees"]
     nums = line[len(tok[0]) + len(tok[1]) + 2:]
     if int(tok[1]) != fnv1a(nums) % 999999 + 1:
         p.append(f"the id {tok[1]} isn't the one the editor gives these numbers ({fnv1a(nums) % 999999 + 1}): "
@@ -73,10 +82,15 @@ def track_problems(text):
     if len(G) % 5 or len(B) % 7:
         return p + ["gates are 5 numbers each, structures 7"]
     ng, nb = len(G) // 5, len(B) // 7
-    if not 2 <= ng <= 24:
-        p.append(f"{ng} gates: 2 to 24")
-    if nb > 16:
-        p.append(f"{nb} structures: 16 at most")
+    if not 2 <= ng <= F2[0]:
+        p.append(f"{ng} gates: 2 to {F2[0]}")
+    if nb > F2[1]:
+        p.append(f"{nb} structures: {F2[1]} at most")
+    fits = ng <= F1[0] and nb <= F1[1] and len(text.encode()) <= F1[2]
+    if tok[0] == "1" and not fits:
+        p.append(f"more than {F1[0]} gates, {F1[1]} structures or {F1[2]} bytes is format 2: save the track from the editor again")
+    elif tok[0] == "2" and fits:
+        p.append("it fits format 1 (every edition): save the track from the editor again")
     for i in range(ng):
         x, z, k, yaw, h = G[i * 5:i * 5 + 5]
         if not (abs(x) <= 999 and abs(z) <= 999 and k in range(1, 9) and yaw in range(360) and 0 <= h <= 100):

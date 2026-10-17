@@ -1027,7 +1027,13 @@ def main():
         # ---- the checks
         start_from(page, "Bando")
         check(page.evaluate("sim.editor.problems()") == [], "the Bando passes the checks (16 structures, walls touching)")
-        check(page.is_disabled("#edAddBox") and page.is_disabled("#edAddWall"), "no more structures than 16")
+        check(page.evaluate("sim.editor.file()").split("\n")[1].startswith("1 ") and "color radios" not in page.inner_text("#edSize"),
+              "16 structures: format 1, every edition's")
+        page.click("#edAddBox")
+        check(page.evaluate("sim.editor.file()").split("\n")[1].startswith("2 ") and "color radios" in page.inner_text("#edSize"),
+              f"a 17th: a bigger track, format 2, color radios ({page.inner_text('#edSize')!r})")
+        page.click("#edUndo")
+        check(page.evaluate("sim.editor.file()").split("\n")[1].startswith("1 "), "and format 1 again without it")
         click_map(page, -36, 50)                                 # structure 16, onto the blue container
         page.fill('#edSel [data-f="x"]', "-30")
         page.press('#edSel [data-f="x"]', "Tab")

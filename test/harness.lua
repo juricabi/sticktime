@@ -982,12 +982,22 @@ do
 end
 
 -- 10. custom tracks: StickTimeTracks/c1-c8.txt are tracks 9-16 (empty slots skipped); a slot's
--- bests start over when a different track (another id) is put in it; a broken file is left out
+-- bests start over when a different track (another id) is put in it; a broken file is left out; a
+-- bigger track (format 2: more than 24 gates or 16 structures) is the color game's only
 do
   local CT = "/SCRIPTS/TOOLS/StickTimeTracks/c"
   SD[CT .. "1.txt"] = "Test Loop\n1 4242 7 9  0 0 1 0 0  0 40 1 0 0  30 60 4 90 3  40 20 1 180 0 / 20 30 3 3 0 4 2\n"
   SD[CT .. "3.txt"] = "Hoops\r\n1 77 3 18  0 0 4 0 2.5  20 30 4 45 2  0 60 4 180 3\r\n"
-  SD[CT .. "5.txt"] = "Broken\n2 1 1 9 0 0 1 0 0\n"                       -- a format this version can't read
+  SD[CT .. "5.txt"] = "Broken\n3 1 1 9 0 0 1 0 0\n"                       -- a format this version can't read
+  -- format 2: 30 gates on a circle, 20 structures in a row
+  local big = { "Big One\n2 4321 5 9" }
+  for i = 0, 29 do
+    local a = i * 12
+    big[#big + 1] = string.format(" %d %d 1 %d 0", floor(70 * math.sin(math.rad(a)) + 0.5), floor(70 * math.cos(math.rad(a)) + 0.5), (a + 90) % 360)
+  end
+  big[#big + 1] = " /"
+  for i = 0, 19 do big[#big + 1] = string.format(" %d 120 1 1 0 3 1", -95 + i * 10) end
+  SD[CT .. "6.txt"] = table.concat(big) .. "\n"
   -- made by hand: a blank first line, a gate type and a structure kind the game doesn't have
   SD[CT .. "2.txt"] = "\nOdd File\n1 55 3 9  0 0 1 0 0  30 0 9 0 0 / 10 10 1 1 0 2 7\n"
   local inst
@@ -998,7 +1008,7 @@ do
     inst.init()
     local L = STICKTIME_TEST
     local nt = L.info()
-    if nt ~= 11 then fail("custom tracks: the last track should be 11 (c3), is " .. tostring(nt)) end
+    if nt ~= (GAME_COLOR and 14 or 11) then fail("custom tracks: the last track should be " .. (GAME_COLOR and "14 (c6, format 2)" or "11 (c3)") .. ", is " .. tostring(nt)) end
     if L.S.track ~= 1 then fail("custom tracks: a save pointing at an empty slot should fall back to track 1") end
     if L.best(9) ~= c[2] then fail(string.format("custom tracks: track 9's best lap should be %d (saved id %d), is %s", c[2], c[1], tostring(L.best(9)))) end
     if L.best(11) ~= 0 then fail("custom tracks: track 11's best was saved without its id, it should start over") end
@@ -1019,6 +1029,13 @@ do
   L.track(11)
   local name11 = select(11, L.info())
   if name11 ~= "Hoops" then fail("custom tracks: track 11 (CRLF file) should be 'Hoops', is " .. tostring(name11)) end
+  if GAME_COLOR then
+    L.track(14)
+    local name14, nb14, ng14 = select(11, L.info()), select(10, L.info()), select(19, L.get())
+    if name14 ~= "Big One" or ng14 ~= 30 or nb14 ~= 20 then
+      fail(string.format("custom tracks: the format 2 track should be 'Big One' with 30 gates and 20 structures (%s, %s, %s)", tostring(name14), tostring(ng14), tostring(nb14)))
+    end
+  end
   -- fly it: a race with AI pilots on the custom track
   L.track(9) L.set("ai", 2) L.start(1)
   sticks.thr = 300
@@ -1030,7 +1047,8 @@ do
   local st = select(16, L.get())
   if st ~= 4 and st ~= 5 and st ~= 6 then fail("custom tracks: the race on track 9 isn't flying (state " .. tostring(st) .. ")") end
   idleSticks()
-  print(string.format("custom tracks: 9 '%s' and 11 '%s' listed (c5 left out), bests kept for the same id, race running", name, name11))
+  print(string.format("custom tracks: 9 '%s' and 11 '%s' listed (c5 left out, c6 %s), bests kept for the same id, race running", name, name11,
+    GAME_COLOR and "a format 2 track of 30 gates and 20 structures" or "format 2: left out"))
   for i = 1, 8 do SD[CT .. i .. ".txt"] = nil end
 end
 

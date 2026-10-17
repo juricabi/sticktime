@@ -142,11 +142,23 @@ local TRACKS = {
                        32,22,1,0,0, 32,46,2,0,0, 32,46,1,180,0, 46,26,4,160,3, 48,4,1,180,0, 46,-14,7,225,0,
                        24,-22,1,270,0 } },
 }
+--#if COLOR
+-- custom tracks: StickTimeTracks/c1.txt .. c8.txt on the SD card (the browser emulator's track
+-- editor makes them; StickTime and StickTime BW read the same files, the Lite doesn't). A name line,
+-- then the numbers: the format, an id (bests start over when it changes), tree seed, trees (9: as
+-- many as most tracks), the gates (x z type yaw height), "/", the structures (x z half-x half-z
+-- bottom top kind). Format 1: up to 24 gates, 16 structures and 1000 bytes, for every edition.
+-- Format 2, a bigger track: up to 48 gates, 64 structures and 6000 bytes, for this edition only
+-- (StickTime BW has no memory for it and lists format 1 only, as earlier versions do). They are
+-- tracks 9-16 whether or not the slots before them are filled; only the name and id are read here
+--#endif
+--#if BW
 -- custom tracks: StickTimeTracks/c1.txt .. c8.txt on the SD card (the browser emulator's track
 -- editor makes them; StickTime and StickTime BW read the same files, the Lite doesn't). A name line, then the numbers: format 1,
 -- an id (bests start over when it changes), tree seed, trees (9: as many as most tracks), the gates
 -- (x z type yaw height), "/", the structures (x z half-x half-z bottom top kind). They are tracks
 -- 9-16 whether or not the slots before them are filled; only the name and id are read here
+--#endif
 local NB0, NT = #TRACKS, #TRACKS + 8
 local CUSTOM = "/SCRIPTS/TOOLS/StickTimeTracks/c"
 for i = 1, 8 do
@@ -155,7 +167,12 @@ for i = 1, 8 do
     local s = io.read(f, 60)
     io.close(f)
     local name, ver, id = string.match(s or "", "^%s*([^\r\n]+)[\r\n]+%s*(%d+)%s+(%d+)")
+--#if COLOR
+    if name and (ver == "1" or ver == "2") then TRACKS[NB0 + i] = { string.sub(name, 1, 16), file = i, id = tonumber(id) } end
+--#endif
+--#if BW
     if name and ver == "1" then TRACKS[NB0 + i] = { string.sub(name, 1, 16), file = i, id = tonumber(id) } end
+--#endif
   end
 end
 collectgarbage()                                       -- (the files and strings: a B&W heap is tight)
@@ -238,7 +255,12 @@ do
     if T.file then
       -- a custom track: read its numbers now (and let them go once it is built)
       local f = io.open(CUSTOM .. T.file .. ".txt", "r")
+--#if COLOR
+      local s = f and io.read(f, 6000) or ""           -- (format 2's most)
+--#endif
+--#if BW
       local s = f and io.read(f, 1000) or ""
+--#endif
       if f then io.close(f) end
       local g, b = string.match(string.match(s, "^%s*[^\r\n]*[\r\n]+(.*)") or "", "([^/]*)/?(.*)")
       local n, d = 0, {}
@@ -246,14 +268,24 @@ do
         n = n + 1
         if n == 3 then T[2] = tonumber(v) or 1
         elseif n == 4 then T[5] = (tonumber(v) or 9) / 9
+--#if COLOR
+        elseif n > 4 and n <= 244 then d[n - 4] = tonumber(v) or 0 end   -- at most 48 gates
+--#endif
+--#if BW
         elseif n > 4 and n <= 124 then d[n - 4] = tonumber(v) or 0 end   -- at most 24 gates
+--#endif
       end
       local tr = T[5] or 1                             -- 0-30 trees
       if tr < 0 then tr = 0 elseif tr > 30 / 9 then tr = 30 / 9 end
       T[5] = tr
       T[3], T[4] = d, {}
       for v in string.gmatch(b or "", "%S+") do
+--#if COLOR
+        if #T[4] < 448 then T[4][#T[4] + 1] = tonumber(v) or 0 end   -- at most 64 structures
+--#endif
+--#if BW
         if #T[4] < 112 then T[4][#T[4] + 1] = tonumber(v) or 0 end   -- at most 16 structures
+--#endif
       end
       -- gates in fives with a known type, structures in sevens with a known kind (a file made by hand)
       local ok, bd = #d >= 10 and #d % 5 == 0, T[4]
@@ -323,7 +355,10 @@ do
       local w, d, y0, y1 = iw + GT, 0.2, y - ih - GT, y + ih + GT
       if k == 3 then d, y0, y1 = ih + GT, 0, y + GT
       elseif k == 2 then y0 = 0
-      elseif k == 4 or k == 5 then y0, y1 = 0, y + iw + GT
+      elseif k == 4 then y0, y1 = 0, y + iw + GT
+      elseif k == 5 then                             -- an arch has no stand: raised, it floats
+        y0, y1 = y - iw - GT, y + iw + GT
+        if y0 < 0 then y0 = 0 end
       elseif k == 8 then w, d, y0, y1 = iw, 0, y - ih, y + ih end
       local bx, bz = x, z
       if k == 6 or k == 7 then
@@ -1658,8 +1693,12 @@ do
   local CL, HD, NE, NX = {}, {}, {}, {}               -- rule candidates, rule lists, not drawn
 
   -- Rules only for pairs with a structure in them that overlap on screen. A plane between
-  -- their boxes (along x, then z, then y) with the camera on one side puts the other object
-  -- behind: rule 1 draws i before j, -1 after, 0 none (they cannot overlap on screen).
+  -- their boxes (along x, z or y) with the camera on one side puts the other object behind:
+  -- rule 1 draws i before j, -1 after, 0 none. Every axis they are apart along must agree. The
+  -- camera in the gap along one puts them on both sides of it there (no line of sight goes
+  -- through both), and two planes that put different ones behind keep each from hiding the
+  -- other: no rule then. Such a rule would only say which of two far apart things comes first,
+  -- and with others (a far tower, a gate, the floors of a building) it can close a cycle.
   -- Touching faces count as separated (2 cm tolerance: radio Lua uses 32-bit floats).
   -- Boxes that intersect (a tree's box touching a wall): the farther one first.
   -- depth order (far to near) of the n objects into DO: an insertion sort fed with last frame's
@@ -1734,18 +1773,26 @@ do
         local j = CL[k]
         if p0 < sx1[j] and sx0[j] < p1 and q0 < sy1[j] and sy0[j] < q1 then
           local mj = ordN[j]
-          local v, b0, b1 = 0, X0[mj], X1[mj]
+          -- x, then z, then y: each axis they are apart along gives its rule, and they must agree
+          -- (9: not apart along any yet; a 0 needs no more axes)
+          local v, w, b0, b1 = 9, 9, X0[mj], X1[mj]
           if a1 <= b0 + 0.02 then v = cx >= b0 and 1 or cx <= a1 and -1 or 0
-          elseif b1 <= a0 + 0.02 then v = cx >= a0 and -1 or cx <= b1 and 1 or 0
-          else
+          elseif b1 <= a0 + 0.02 then v = cx >= a0 and -1 or cx <= b1 and 1 or 0 end
+          if v ~= 0 then
             b0, b1 = Z0[mj], Z1[mj]
-            if c1 <= b0 + 0.02 then v = cz >= b0 and 1 or cz <= c1 and -1 or 0
-            elseif b1 <= c0 + 0.02 then v = cz >= c0 and -1 or cz <= b1 and 1 or 0
-            else
-              b0, b1 = Y0[mj], Y1[mj]
-              if e1 <= b0 + 0.02 then v = cy >= b0 and 1 or cy <= e1 and -1 or 0
-              elseif b1 <= e0 + 0.02 then v = cy >= e0 and -1 or cy <= b1 and 1 or 0
-              else v = ordZ[i] > ordZ[j] and 1 or -1 end
+            if c1 <= b0 + 0.02 then w = cz >= b0 and 1 or cz <= c1 and -1 or 0
+            elseif b1 <= c0 + 0.02 then w = cz >= c0 and -1 or cz <= b1 and 1 or 0 end
+            if w ~= 9 then
+              if v == 9 then v = w elseif w ~= v then v = 0 end
+            end
+            if v ~= 0 then
+              b0, b1, w = Y0[mj], Y1[mj], 9
+              if e1 <= b0 + 0.02 then w = cy >= b0 and 1 or cy <= e1 and -1 or 0
+              elseif b1 <= e0 + 0.02 then w = cy >= e0 and -1 or cy <= b1 and 1 or 0 end
+              if w ~= 9 then
+                if v == 9 then v = w elseif w ~= v then v = 0 end
+              end
+              if v == 9 then v = ordZ[i] > ordZ[j] and 1 or -1 end   -- (apart along none)
             end
           end
           if v > 0 then
@@ -1815,6 +1862,9 @@ do
       local k = gk[i]
       OCX[n], OCY[n], OCZ[n], OID[n] = gx[i], gy[i], gz[i], i
       ORAD[n] = GSH[k] == 3 and 9 or (k == 2 or k == 3) and 7 or 4
+      -- legs and stands go down to the ground: a raised gate's sphere reaches it (a custom track's
+      -- dive gate from a roof, 20 m up)
+      if (k == 2 or k == 3 or k == 4) and gy[i] + 3 > ORAD[n] then ORAD[n] = gy[i] + 3 end
       SB.x0[n], SB.x1[n], SB.y0[n], SB.y1[n], SB.z0[n], SB.z1[n] = GB.x0[i], GB.x1[i], GB.y0[i], GB.y1[i], GB.z0[i], GB.z1[i]
     end
     for i = 1, NP do

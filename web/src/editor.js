@@ -18,7 +18,10 @@
   const GCY = [0, ...D.GCY];                        // centre height when the file says 0
   const TYPES = ['', 'Gate', 'High gate', 'Dive gate', 'Hoop', 'Arch', 'Flag, pass right', 'Flag, pass left', 'Gap in a wall'];
   const KINDS = ['', 'Concrete', 'Red container', 'Blue container'];
-  const MAX_GATES = 24, MAX_BOXES = 16, MAX_BYTES = 999, SLOTS = 8;
+  // format 1, for every edition: 24 gates, 16 structures, 999 bytes (StickTime BW reads 1000); format 2,
+  // a bigger track, for the color edition only (StickTime BW and earlier versions list format 1 only)
+  const MAX_GATES = 48, MAX_BOXES = 64, MAX_BYTES = 5999, SLOTS = 8;
+  const F1_GATES = 24, F1_BOXES = 16, F1_BYTES = 999;
   const TOL = 0.02;          // faces this close count as touching (the game's draw-order rule)
   const GRID = 0.5;          // drags snap to it; Alt drags to the cm
   const DIR = '/SCRIPTS/TOOLS/StickTimeTracks/';
@@ -62,12 +65,15 @@
     }
     return s;
   }
-  // name, then: format 1, the id (FNV-1a of everything after it, mod 999999, + 1), the numbers
+  // name, then: the format, the id (FNV-1a of the numbers after it, mod 999999, + 1), the numbers.
+  // Format 1 while the track fits every edition, else 2
   function fileOf(T) {
     const nums = numbersOf(T);
     const id = fnv1a(nums) % 999999 + 1;
-    const text = T.name.trim() + '\n1 ' + id + ' ' + nums + '\n';
-    return { text, id, bytes: new TextEncoder().encode(text).length };
+    const text1 = T.name.trim() + '\n1 ' + id + ' ' + nums + '\n';
+    const bytes = new TextEncoder().encode(text1).length;
+    const format = T.gates.length > F1_GATES || T.boxes.length > F1_BOXES || bytes > F1_BYTES ? 2 : 1;
+    return { text: format === 1 ? text1 : T.name.trim() + '\n2 ' + id + ' ' + nums + '\n', id, bytes, format };
   }
 
   const NUM = /^[-+]?(\d+\.?\d*|\.\d+)$/;
@@ -82,7 +88,7 @@
     const head = (cut < 0 ? rest : rest.slice(0, cut)).split(/\s+/).filter(Boolean);
     const tail = cut < 0 ? [] : rest.slice(cut + 1).split(/\s+/).filter(Boolean);
     if (head.length < 4) return { error: 'after the name come the format (1), an id, the tree seed and the trees.' };
-    if (head[0] !== '1') return { error: 'it is format ' + head[0].slice(0, 12) + ': the editor reads format 1.' };
+    if (head[0] !== '1' && head[0] !== '2') return { error: 'it is format ' + head[0].slice(0, 12) + ': the editor reads formats 1 and 2.' };
     const bad = head.concat(tail).find((v) => !NUM.test(v));
     if (bad !== undefined) return { error: '"' + bad.slice(0, 24) + '" is not a number.' };
     const g = head.slice(4).map(Number), b = tail.map(Number);
@@ -100,7 +106,8 @@
       T.boxes.push(boxOf(b[i], b[i + 1], b[i + 2], b[i + 3], b[i + 4], b[i + 5], k));
     }
     const notes = [];
-    if (new TextEncoder().encode(s).length > 1000) notes.push('The game reads only the first 1000 bytes of a track file: make it smaller.');
+    const most = head[0] === '2' ? 6000 : 1000;
+    if (new TextEncoder().encode(s).length > most) notes.push('The game reads only the first ' + most + ' bytes of a track file: make it smaller.');
     // numbers the editor writes otherwise (rounded, kept in range, another format): a new id
     if (head.slice(2).concat(cut < 0 ? [] : ['/'].concat(tail)).join(' ') !== numbersOf(T)) {
       notes.push('Some values were adjusted to what the editor writes (rounded or kept in range): saving gives the track a new id, so its best times on the radio start over.');
@@ -140,7 +147,8 @@
     let w = iw + GT, d = 0.2, y0 = y - ih - GT, y1 = y + ih + GT;
     if (k === 3) { d = ih + GT; y0 = 0; y1 = y + GT; }
     else if (k === 2) y0 = 0;
-    else if (k === 4 || k === 5) { y0 = 0; y1 = y + iw + GT; }
+    else if (k === 4) { y0 = 0; y1 = y + iw + GT; }
+    else if (k === 5) { y0 = Math.max(0, y - iw - GT); y1 = y + iw + GT; }   // (no stand: a raised arch floats)
     else if (k === 8) { w = iw; d = 0; y0 = y - ih; y1 = y + ih; }
     let bx = x, bz = z;
     if (k === 6 || k === 7) {
@@ -417,10 +425,11 @@
     return typeof t === 'string' ? t : null;
   };
   // a slot's file: null (none), else { text, bad }: bad says why the game and the editor can't use it
-  // ('big': too big to be read at all, text null; 'long': longer than the 1000 bytes the game reads
-  // of it; 'parse': the editor's checks reject it)
+  // ('big': too big to be read at all, text null; 'long': longer than the game reads of it, 1000
+  // bytes of format 1, 6000 of format 2; 'parse': the editor's checks reject it)
   const BAD = { big: 'too big to be a track', long: 'too long for the game', parse: 'can\'t be read' };
-  const badOf = (t) => (new TextEncoder().encode(t).length > 1000 ? 'long' : unreadable(t) ? 'parse' : '');
+  const formatOf = (t) => (/^[^\n]*\n\s*2\s/.test(String(t).replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n')) ? 2 : 1);
+  const badOf = (t) => (new TextEncoder().encode(t).length > (formatOf(t) === 2 ? 6000 : 1000) ? 'long' : unreadable(t) ? 'parse' : '');
   const asEntry = (t) => (t === null ? null : { text: t, bad: badOf(t) });
   // a slot's file in a question: "its name", or what is wrong with it
   const what = (e) => (e.bad === 'big' ? 'a file too big to be a track' : e.bad === 'long' ? 'a file too long for the game'
@@ -634,7 +643,12 @@
     el.edFly.title = !inSlot ? 'c' + ed.slot + ' of the emulator is empty: Send to emulator first' : inSlot.bad ? 'c' + ed.slot + ' of the emulator can\'t be read'
       : 'Fly c' + ed.slot + ' of the emulator in Practice (track ' + (8 + ed.slot) + '), as it is there';
     el.edSave.title = bad ? 'Fix the problems listed under Check first' : 'Download c' + ed.slot + '.txt for the radio\'s SD card';
-    el.edSize.textContent = 'c' + ed.slot + '.txt · ' + ed.file.bytes + ' of ' + MAX_BYTES + ' bytes · id ' + ed.file.id;
+    const big = ed.file.format === 2;
+    el.edSize.textContent = 'c' + ed.slot + '.txt · ' + ed.file.bytes + ' of ' + (big ? MAX_BYTES : F1_BYTES) + ' bytes · id ' + ed.file.id +
+      (big ? ' · a bigger track: color radios' : '');
+    el.edSize.title = big ? 'More than ' + F1_GATES + ' gates, ' + F1_BOXES + ' structures or ' + F1_BYTES + ' bytes: StickTime on color radios flies it ' +
+      '(this version and later); StickTime BW, the Lite and earlier versions don\'t list it. Many structures in view at once slow a radio down: ' +
+      'Radio load shows how much.' : '';
     renderEditing();
     el.edSize.classList.toggle('bad', ed.file.bytes > MAX_BYTES);
     const c = 'c' + ed.slot;
@@ -1677,7 +1691,8 @@
     keepFocus(el.edCards, () => {
       el.edCards.innerHTML = gal.list.length ? gal.list.map((t, i) => {
         const ng = t.T.gates.length, nb = t.T.boxes.length;
-        const size = ng + ' gates' + (nb ? ', ' + nb + ' structures' : '') + (t.T.trees ? ', ' + t.T.trees + ' trees' : '');
+        const size = ng + ' gates' + (nb ? ', ' + nb + ' structures' : '') + (t.T.trees ? ', ' + t.T.trees + ' trees' : '') +
+          (formatOf(t.text) === 2 ? ' · color radios' : '');
         const has = inWords(placesOf(t, emu).same, rad ? placesOf(t, rad).same : []);
         return '<li class="ed-card"><canvas class="ed-thumb" aria-hidden="true"></canvas><div class="ed-cinfo">' +
           '<strong>' + esc(t.name) + '</strong>' + (t.by ? '<span class="ed-by">by ' + esc(t.by) + '</span>' : '') +

@@ -76,6 +76,16 @@ def checker_tests():
     assert " 25.5 " in line                    # (the cases above change that number)
     for what, text in bad.items():
         check(gallery.track_problems(text) != [], f"checker: refuses {what}")
+    # format 2, a bigger track (the color edition's): only for one that doesn't fit format 1
+    nums = line.split(" ", 2)[2]
+    def with_boxes(n, fmt):
+        more = nums + (" /" if " / " not in nums else "") + "".join(f" {200 + 10 * i} 0 1 1 0 3 1" for i in range(n))
+        return name + f"\n{fmt} " + str(gallery.fnv1a(more) % 999999 + 1) + " " + more + "\n"
+    assert " / " not in nums                   # (the cases below add the structures)
+    check(gallery.track_problems(with_boxes(20, 2)) == [], "checker: a format 2 track of 20 structures passes")
+    for what, text in {"format 2 for a track that fits format 1": with_boxes(5, 2), "format 1 with 17 structures": with_boxes(17, 1),
+                       "65 structures": with_boxes(65, 2), "format 3": with_boxes(20, 3)}.items():
+        check(gallery.track_problems(text) != [], f"checker: refuses {what}")
     check(gallery.info_problems({"by": "Me"}) == [], "checker: 'by' alone is enough")
     for what, info in {"no by": {"about": "x"}, "another key": {"by": "Me", "url": "x"}, "an http source": {"by": "Me", "source": "http://x.org"},
                        "a long by": {"by": "x" * 61}, "a line break": {"by": "Me", "about": "a\nb"}, "a list": ["Me"],
