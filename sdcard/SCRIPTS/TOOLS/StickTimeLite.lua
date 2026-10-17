@@ -1,6 +1,6 @@
 local toolName = "TNS|StickTime Lite|TNE"
 --[[ ======================================================================
-  StickTime Lite v1.7.2  -  loader for black & white radios
+  StickTime Lite v1.8.0  -  loader for black & white radios
 
   The game itself is in /SCRIPTS/TOOLS/StickTimeLite/ (copy that whole folder too):
   game.luac, the game precompiled for EdgeTX 2.11 and newer, and core.lua,

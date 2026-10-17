@@ -382,6 +382,30 @@ def radio_tests(br, errors):
     check(page.inner_text("#edSend") == "Send to radio" and page.inner_text("#edStatus").startswith("Connected to RADIO-SD."),
           "radio: ... and connects")
 
+    # a bigger track (a 17th structure) to a card with StickTime 1.7.2: sent, and it says that one won't list it
+    game = "RADIO-SD/SCRIPTS/TOOLS/StickTime.lua"
+    page.evaluate(CARD_WRITE, [game, "local toolName = \"TNS|StickTime|TNE\"\n--[[\n  StickTime v1.7.2  -  a real 3D FPV quad simulator\n"])
+    start_from(page, "Bando")
+    page.click("#edAddBox")                                     # (selected: put where nothing is)
+    for f, v in (("x", "-90"), ("z", "-90")):
+        page.fill(f'#edSel [data-f="{f}"]', v)
+        page.press(f'#edSel [data-f="{f}"]', "Tab")
+    check(page.evaluate("sim.editor.problems()") == [], f"radio: the Bando with a 17th structure passes the checks: {page.evaluate('sim.editor.problems()')}")
+    page.select_option("#edSlot", "6")
+    page.click("#edSend")
+    radio_done(page)
+    big = page.evaluate("sim.editor.file()")
+    msg = page.inner_text("#edStatus")
+    check(big.split("\n")[1].startswith("2 ") and page.evaluate(CARD_FILE, TRACKS + "6.txt") == big
+          and msg.endswith("But it is a bigger track: StickTime 1.7.2 on the card doesn't list it, 1.8.0 and later do (Install updates it).")
+          and "bad" in page.get_attribute("#edStatus", "class"), f"radio: a bigger track sent to StickTime 1.7.2 says it needs 1.8.0: {msg!r}")
+    page.evaluate(CARD_WRITE, [game, "local toolName = \"TNS|StickTime|TNE\"\n--[[\n  StickTime v1.8.0  -  a real 3D FPV quad simulator\n"])
+    page.click("#edSend")
+    radio_done(page)
+    check(page.inner_text("#edStatus") == "Sent to the radio as track 14 (c6.txt). On the radio: restart StickTime, the track is in the Track list.",
+          "radio: ... and to StickTime 1.8.0, nothing more")
+    page.evaluate(CARD_WRITE, [game, "-- the game\n"])
+
     # SCRIPTS/TOOLS or StickTimeTracks picked instead of the drive
     # (another track each time: the radio has the first one in c2 already, and Send to radio makes no second copy)
     for path, slot, track in (("RADIO-SD/SCRIPTS/TOOLS", "2", "Slalom"), ("RADIO-SD/SCRIPTS/TOOLS/StickTimeTracks", "4", "Hoop Forest")):

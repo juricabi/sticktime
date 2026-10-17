@@ -19,9 +19,9 @@
   const TYPES = ['', 'Gate', 'High gate', 'Dive gate', 'Hoop', 'Arch', 'Flag, pass right', 'Flag, pass left', 'Gap in a wall'];
   const KINDS = ['', 'Concrete', 'Red container', 'Blue container'];
   // format 1, for every edition: 24 gates, 16 structures, 999 bytes (StickTime BW reads 1000); format 2,
-  // a bigger track, for the color edition only (StickTime BW and earlier versions list format 1 only)
+  // a bigger track, for the color edition from BIG_FROM on (StickTime BW and earlier versions list format 1 only)
   const MAX_GATES = 48, MAX_BOXES = 64, MAX_BYTES = 5999, SLOTS = 8;
-  const F1_GATES = 24, F1_BOXES = 16, F1_BYTES = 999;
+  const F1_GATES = 24, F1_BOXES = 16, F1_BYTES = 999, BIG_FROM = '1.8.0';
   const TOL = 0.02;          // faces this close count as touching (the game's draw-order rule)
   const GRID = 0.5;          // drags snap to it; Alt drags to the cm
   const DIR = '/SCRIPTS/TOOLS/StickTimeTracks/';
@@ -647,7 +647,7 @@
     el.edSize.textContent = 'c' + ed.slot + '.txt · ' + ed.file.bytes + ' of ' + (big ? MAX_BYTES : F1_BYTES) + ' bytes · id ' + ed.file.id +
       (big ? ' · a bigger track: color radios' : '');
     el.edSize.title = big ? 'More than ' + F1_GATES + ' gates, ' + F1_BOXES + ' structures or ' + F1_BYTES + ' bytes: StickTime on color radios flies it ' +
-      '(this version and later); StickTime BW, the Lite and earlier versions don\'t list it. Many structures in view at once slow a radio down: ' +
+      '(' + BIG_FROM + ' and later); StickTime BW, the Lite and earlier versions don\'t list it. Many structures in view at once slow a radio down: ' +
       'Radio load shows how much.' : '';
     renderEditing();
     el.edSize.classList.toggle('bad', ed.file.bytes > MAX_BYTES);
@@ -1584,8 +1584,8 @@
     });
     return { same, old };
   }
-  // a track file's id (its second line: 1 <id> ...), 0 if it has none
-  const idOf = (t) => { const m = /^[^\n]*\n\s*1\s+(\d+)/.exec(norm(t)); return m ? +m[1] : 0; };
+  // a track file's id (its second line: <format 1 or 2> <id> ...), 0 if it has none
+  const idOf = (t) => { const m = /^[^\n]*\n\s*[12]\s+(\d+)/.exec(norm(t)); return m ? +m[1] : 0; };
   const cs = (a) => andList(a.map((n) => 'c' + n));
   // a slot empty in the emulator and (read) on the radio: the editor's when it is, else the first;
   // else one empty in the emulator; else the editor's (sending to it asks)
@@ -2271,7 +2271,11 @@
       if (!same) await writeSlot(dir, slot, text);
       ed.versions.add(text);
       await listRadio();                               // (the lists show what is on the card now)
-      status('Sent to the radio as track ' + (8 + slot) + ' (c' + slot + '.txt). On the radio: restart StickTime, the track is in the Track list.', 'ok');
+      // a bigger track on a card whose StickTime won't list it
+      const v = ed.file.format === 2 ? await colorVersion() : null;
+      const big = v === '' ? ' But it is a bigger track: only StickTime on a color radio lists it, and this card has none.'
+        : v && cmpVer(v, BIG_FROM) < 0 ? ' But it is a bigger track: StickTime ' + v + ' on the card doesn\'t list it, ' + BIG_FROM + ' and later do (Install updates it).' : '';
+      status('Sent to the radio as track ' + (8 + slot) + ' (c' + slot + '.txt). On the radio: restart StickTime, the track is in the Track list.' + big, big ? 'bad' : 'ok');
     }, status, true);
   }
   let radioSlots = [];
@@ -2549,6 +2553,15 @@
     return man;
   }
   const toolsDir = (create) => walk(STEPS[radio.at].slice(0, -1), create);
+  // the color game's version on the card: '' without one, null when there is no telling (only its
+  // tracks folder connected, a header without a version)
+  async function colorVersion() {
+    if (radio.at === 'tracks') return null;
+    const tools = await toolsDir(false), f = tools && await fileAt(tools, 'StickTime.lua');
+    if (!f) return '';
+    const m = /StickTime v(\d+(?:\.\d+)+)/.exec(await (await f.getFile()).slice(0, 600).text());
+    return m ? m[1] : null;
+  }
   async function fileAt(dir, path, create) {
     const p = path.split('/');
     for (const s of p.slice(0, -1)) if (!(dir = await child(dir, s, 'directory', create))) return null;

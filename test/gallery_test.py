@@ -42,9 +42,9 @@ def other_version(text):
     """the same track with another tree count: another version of it (the same name, other numbers
     and so its own id), whatever its gates are"""
     name, line = text.split("\n")[:2]
-    seed, trees, rest = line.split(" ", 4)[2:]
+    fmt, _, seed, trees, rest = line.split(" ", 4)
     nums = f"{seed} {(int(trees) + 1) % 31} {rest}"
-    return f"{name}\n1 {gallery.fnv1a(nums) % 999999 + 1} {nums}\n"
+    return f"{name}\n{fmt} {gallery.fnv1a(nums) % 999999 + 1} {nums}\n"
 
 
 def check(ok, what):
