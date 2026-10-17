@@ -1062,6 +1062,27 @@ do
   idleSticks()
   print(string.format("custom tracks: 9 '%s' and 11 '%s' listed (c5 left out, c6 %s), bests kept for the same id, race running", name, name11,
     GAME_COLOR and "a format 2 track of 48 gates and 64 structures, flown" or "format 2: left out"))
+  -- made by hand: a gate type and a structure kind a hair over a whole number (4.004, 2.005) are
+  -- that type and kind, built and drawn (they used to stop the game: no such table entry)
+  idleSticks()
+  SD[CT .. "4.txt"] = "Near Whole\n1 77 1 9  0 0 1 0 0  0 30 4.004 0 0 / 20 20 2 2 0 3 2.005\n"
+  STICKTIME_TEST = {}
+  inst = chunk()
+  local okb, eb = pcall(inst.init)                     -- (the save's track is 12: built at the start)
+  L = STICKTIME_TEST
+  if okb then okb, eb = pcall(L.track, 12) end
+  local k4 = okb and select(7, L.gate(2))
+  if not okb or k4 ~= 4 or select(10, L.info()) ~= 1 then
+    fail("custom tracks: a gate type 4.004 and a structure kind 2.005 should build as a hoop and a container (" .. tostring(eb or k4) .. ")")
+  else
+    L.start(2) L.state(4) L.pose(20, 2, 5, 0, 0, 0)
+    for _ = 1, 5 do
+      clock = clock + 50
+      local ok, e = pcall(inst.run, 0)
+      if not ok then fail("custom tracks: drawing a structure of kind 2.005 " .. tostring(e)) break end
+    end
+    idleSticks()
+  end
   for i = 1, 8 do SD[CT .. i .. ".txt"] = nil end
 end
 

@@ -288,15 +288,16 @@ do
         if #T[4] < 112 then T[4][#T[4] + 1] = tonumber(v) or 0 end   -- at most 16 structures
 --#endif
       end
-      -- gates in fives with a known type, structures in sevens with a known kind (a file made by hand)
+      -- gates in fives with a known type, structures in sevens with a known kind (a file made by hand;
+      -- a type or kind a hair over a whole number, 4.004, is that number: the tables are keyed by it)
       local ok, bd = #d >= 10 and #d % 5 == 0, T[4]
       for i = 3, #d, 5 do
-        if d[i] < 1 or d[i] > 8 or d[i] - floor(d[i]) > 0.01 then ok = false end
+        if d[i] < 1 or d[i] > 8 or d[i] - floor(d[i]) > 0.01 then ok = false else d[i] = floor(d[i]) end
       end
       if not ok then T[3] = { 0, 0, 1, 0, 0, 0, 30, 1, 0, 0 } end   -- unreadable: two gates in a line
       ok = #bd % 7 == 0
       for i = 7, #bd, 7 do
-        if bd[i] < 1 or bd[i] > 3 or bd[i] - floor(bd[i]) > 0.01 then ok = false end
+        if bd[i] < 1 or bd[i] > 3 or bd[i] - floor(bd[i]) > 0.01 then ok = false else bd[i] = floor(bd[i]) end
       end
       if not ok then T[4] = {} end
     end
