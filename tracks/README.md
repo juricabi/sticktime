@@ -1,6 +1,6 @@
 # Track gallery
 
-Tracks for StickTime and StickTime BW that anyone can fly:
+Tracks for StickTime and StickTime BW that anyone can fly. A bigger track (its card says *color radios*) needs StickTime 1.8.0 or later on a color radio: StickTime BW doesn't list it.
 
 - **In the browser:** open the [emulator](https://juricabi.github.io/sticktime/) and go to **Tracks** → **Open**, then **Open** a track of the Gallery. In the editor, **Send to emulator** and **Fly c1** fly it, and **Send to radio** or **Save file** puts it on your radio.
 - **On the radio:** copy a `.txt` file from this folder to `/SCRIPTS/TOOLS/StickTimeTracks/` on the SD card as `c1.txt` … `c8.txt`. These are tracks 9 to 16 in the game. Restart StickTime to see it.
@@ -26,7 +26,7 @@ Tracks for StickTime and StickTime BW that anyone can fly:
 A few rules:
 - The name (the file's first line, 16 characters at most) is what the game's track menu shows, so it must be different from the names already in the gallery and from the game's own tracks (and the editor's names for a new track: My Track, My Meadow, ...).
 - Send your own work, or the layout of a real track with its source linked.
-- A track with more than 24 gates, 16 structures or 999 bytes is a bigger track (format 2, up to 48 gates, 64 structures and 5999 bytes): only StickTime 1.8.0 and later on color radios flies it, not StickTime BW or earlier versions. Keep it light enough for a TX16S: fly it in the emulator with **Radio load** on that radio, and keep the busy views near 50 ms.
+- A track with more than 24 gates, 16 structures or 999 bytes is a bigger track (format 2: up to 48 gates, 64 structures and 5999 bytes). Only StickTime 1.8.0 or later on a color radio flies it; StickTime BW and older versions don't list it. Keep it light enough for a TX16S: fly it in the emulator on the TX16S with **Radio load** on, and keep the busiest views near 50 ms.
 
 ## The MultiGP tracks
 

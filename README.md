@@ -21,7 +21,7 @@ Download `StickTime-<version>-sdcard.zip` from the [latest release](https://gith
 | Older B&W, STM32F2 (TX12 MkI, X7, X9D, X9D+, X9 Lite, X-Lite, T12, T8, ...) | `StickTimeLite.lua`, `StickTimeLite/` | 2.11 (their last) |
 
 - **Updating:** replace the `StickTimeBW` folder whole; replace `StickTimeLite` but keep its `data.txt` (your Lite saves). Install does both for you.
-- **Your own tracks** go in `StickTimeTracks/` as `c1.txt` to `c8.txt` (tracks 9-16, color and BW). Restart the game after adding one. The [track gallery](tracks/) has more to fly, the MultiGP qualifier tracks of 2017 to 2026 among them.
+- **Your own tracks** go in `StickTimeTracks/` as `c1.txt` to `c8.txt` (tracks 9-16, color and BW; a bigger track needs StickTime 1.8.0 or later on a color radio). Restart the game after adding one. The [track gallery](tracks/) has more to fly, the MultiGP qualifier tracks of 2017 to 2026 among them.
 - The B&W versions need EdgeTX 2.11 ("Needs EdgeTX 2.11 or newer" on older). They also run on color radios, in B&W style.
 
 > **Safety:** the radio keeps transmitting your sticks while the sim runs. Unplug the quad's battery or switch the RF module off first.
@@ -30,7 +30,7 @@ Download `StickTime-<version>-sdcard.zip` from the [latest release](https://gith
 
 - **Flight model:** each quad class fitted to a detailed per-prop model (within 0.2-0.5 m/s in steady flight): Betaflight-style throttle curves, thrust loss climbing, translational lift, a cushion when you drop, ground effect, frame downforce, the airmode mixer in flips, 6 ms motors, 80 Hz physics. Details in [docs/flight-model.md](docs/flight-model.md).
 - **Quads:** Racer 5", Freestyle 5", 3" toothpick, Whoop 65mm, Whoop 75mm; Power Stock or the range quads of their kind have; Acro or Angle. **Rates:** Betaflight Actual (Soft, Normal, Fast or Custom, in Betaflight's own steps).
-- **Tracks:** Meadow, Figure 8, Dive Tower, Slalom, Hoop Forest, Grand Prix, the Bando (an open-roof ruin with a 36 m tower) and Pro Track, with gates, high gates, dive gates, hoops, arches, flags and gaps in walls; plus 8 of your own from the emulator's track editor or the [track gallery](tracks/): up to 24 gates and 16 structures for every edition, or a bigger track of up to 48 gates and 64 structures for color radios (1.8.0 and later).
+- **Tracks:** Meadow, Figure 8, Dive Tower, Slalom, Hoop Forest, Grand Prix, the Bando (an open-roof ruin with a 36 m tower) and Pro Track, with gates, high gates, dive gates, hoops, arches, flags and gaps in walls; plus 8 of your own from the emulator's track editor or the [track gallery](tracks/): up to 24 gates and 16 structures on color and B&W radios, or up to 48 gates and 64 structures on color radios (StickTime 1.8.0 and later).
 - **Modes:** **Race** up to 3 AI pilots (Easy, Medium, Hard) · **Practice** against your best, with a **ghost** of your fastest lap (color edition) · **Freestyle** tricks and combos · **Gate Rush** against the clock.
 - **Medals:** Gold, Silver and Bronze are the Hard, Medium and Easy AI's lap at the Power you fly; shown in the menu, the Practice OSD and the results.
 - **Hits:** the quad stops against what it hits and flies on. A hard hit edge-on is a prop strike: half a second of tumbling to fly out of. Upside down on the ground: **turtle mode**, roll or pitch to flip back. **Pause → Respawn** puts you at the last gate.
@@ -49,7 +49,7 @@ Download `StickTime-<version>-sdcard.zip` from the [latest release](https://gith
 | Medals | yes (menu, Practice OSD, results) | yes (Practice OSD, results; menu only on 212×64) | no |
 | Battery | yes (battery icon and cell voltage; flight time, mAh and pack voltage when paused) | yes (cell voltage and gauge, LAND below 3.3 V; flight time and mAh when paused) | no |
 | Your own tracks 9-16 | yes | yes | no |
-| Bigger own tracks (up to 48 gates, 64 structures) | yes | no (24 gates, 16 structures) | no |
+| Bigger tracks of your own (up to 48 gates, 64 structures) | yes | no (24 gates, 16 structures) | no |
 | Ghost | yes | no (not enough memory on B&W radios) | no |
 | Minimap, stick view, touch | yes | no | no |
 | The next gate's marker turns green where you can come in from | yes | no | no |
@@ -104,7 +104,7 @@ Play at **[juricabi.github.io/sticktime](https://juricabi.github.io/sticktime/)*
 
 - Any radio screen or a **PC screen** (1280×720, 1920×1080 at 60 fps); keyboard, on-screen gimbals or your radio as a USB joystick.
 - Synthesized motor sound tuned against real quads, and live-composed music (or your own songs).
-- **Tracks:** the track editor. Lay out gates, hoops, flags, dive gates, structures and walls on a map. **Open** picks a track to edit: one of yours, a new one, a file or one from the gallery of [tracks/](tracks/). The editor works on a copy: **To slot** picks c1 to c8, **Send to emulator** or **Send to radio** (Chrome/Edge, radio in USB Storage mode) puts it in that slot, **Fly c1** flies the emulator's slot, and **Save file** downloads it as `c1.txt`. A track with more than 24 gates, 16 structures or 999 bytes is saved as a bigger track (format 2) that only StickTime 1.8.0 and later on color radios flies; many structures in view at once slow a radio down, so watch **Radio load**. **My tracks** shows the emulator's and the radio's slots side by side: remove a track, or copy it from one to the other. Made a good one? [Add it](tracks/README.md#add-your-track) with a pull request.
+- **Tracks:** the track editor. Lay out gates, hoops, flags, dive gates, structures and walls on a map. **Open** picks a track to edit: one of yours, a new one, a file or one from the gallery of [tracks/](tracks/). The editor works on a copy: **To slot** picks c1 to c8, **Send to emulator** or **Send to radio** (Chrome/Edge, radio in USB Storage mode) puts it in that slot, **Fly c1** flies the emulator's slot, and **Save file** downloads it as `c1.txt`. A track with more than 24 gates, 16 structures or 999 bytes is saved as a bigger track (format 2). Only StickTime 1.8.0 or later on a color radio flies it. Many structures in view at once slow a radio down, so check **Radio load**. **My tracks** shows the emulator's and the radio's slots side by side: remove a track, or copy it from one to the other. Made a good one? [Add it](tracks/README.md#add-your-track) with a pull request.
 - **Install:** connect the radio's SD card (Chrome or Edge on a computer) to install or update StickTime (hosted site only), and where to get the faster firmware. The tracks on the radio are under **Tracks** → **My tracks**.
 - **Radio load** estimates the frame time on F2, F4 and H7 radios; **Open .lua** runs any EdgeTX tool script.
 

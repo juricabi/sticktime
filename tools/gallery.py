@@ -90,7 +90,7 @@ def track_problems(text):
     if tok[0] == "1" and not fits:
         p.append(f"more than {F1[0]} gates, {F1[1]} structures or {F1[2]} bytes is format 2: save the track from the editor again")
     elif tok[0] == "2" and fits:
-        p.append("it fits format 1 (every edition): save the track from the editor again")
+        p.append("it fits format 1 (color and B&W radios): save the track from the editor again")
     for i in range(ng):
         x, z, k, yaw, h = G[i * 5:i * 5 + 5]
         if not (abs(x) <= 999 and abs(z) <= 999 and k in range(1, 9) and yaw in range(360) and 0 <= h <= 100):

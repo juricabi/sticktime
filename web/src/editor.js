@@ -647,7 +647,7 @@
     el.edSize.textContent = 'c' + ed.slot + '.txt · ' + ed.file.bytes + ' of ' + (big ? MAX_BYTES : F1_BYTES) + ' bytes · id ' + ed.file.id +
       (big ? ' · a bigger track: color radios' : '');
     el.edSize.title = big ? 'More than ' + F1_GATES + ' gates, ' + F1_BOXES + ' structures or ' + F1_BYTES + ' bytes: StickTime on color radios flies it ' +
-      '(' + BIG_FROM + ' and later); StickTime BW, the Lite and earlier versions don\'t list it. Many structures in view at once slow a radio down: ' +
+      '(' + BIG_FROM + ' and later); StickTime BW and versions before ' + BIG_FROM + ' don\'t list it. Many structures in view at once slow a radio down: ' +
       'Radio load shows how much.' : '';
     renderEditing();
     el.edSize.classList.toggle('bad', ed.file.bytes > MAX_BYTES);
