@@ -36,6 +36,7 @@ Download `StickTime-<version>-sdcard.zip` from the [latest release](https://gith
 - **Hits:** the quad stops against what it hits and flies on. A hard hit edge-on is a prop strike: half a second of tumbling to fly out of. Upside down on the ground: **turtle mode**, roll or pitch to flip back. **Pause → Respawn** puts you at the last gate.
 - **Battery** (Off, Real, 1.5x, 2x): each class's real pack sags and runs down (about 2 min of hard racing on a 5"); a fresh pack flies exactly like no battery. Beeps and a yellow/red battery below 3.5 / 3.3 V a cell, then EMPTY and a fresh pack. Respawn also brings a fresh pack.
 - **Also:** wind with gusts, prop wash (Off, Stock, Max), Grip (rotor drag), vibration on hits and laps. On color screens the marker over the next gate shows where to come in from, a guide on a track you're learning: green on its way-in side (within 70° of its axis) or heading straight into it, yellow when you need to go round (a dive gate: green above it; a flag: before it, on or heading to the side you pass it).
+- **Colors** (color screens): Classic, or a natural sky that fades into the haze at the horizon over duller grass, with calmer object and text colors: **Summer**, **Evening** or **Overcast**. Kinder to the eyes in FPV goggles, and clean on analog video (it carries detail in brightness, not color). **Auto** is Classic on a radio and Summer on [StickTime Pi](https://github.com/juricabi/sticktime-pi)'s analog video output.
 - **Saving:** bests and the ghost are saved the moment you set them, so switching the radio off keeps them. (A lap that sets a new ghost writes a 5 KB file, which can pause the radio for a moment; races never write a ghost.)
 
 | What each edition has | Color | BW | Lite |
@@ -52,6 +53,7 @@ Download `StickTime-<version>-sdcard.zip` from the [latest release](https://gith
 | Bigger tracks of your own (up to 48 gates, 64 structures) | yes | no (24 gates, 16 structures) | no |
 | Ghost | yes | no (not enough memory on B&W radios) | no |
 | Minimap, stick view, touch | yes | no | no |
+| Colors: Classic, Summer, Evening, Overcast | yes | no (B&W) | no (B&W) |
 | The next gate's marker turns green where you can come in from | yes | no | no |
 
 | Files in `/SCRIPTS/TOOLS/` | |
@@ -95,7 +97,7 @@ On the HelloRadioSky V12 and the Flysky PA01 (320×240 SPI screens) frames also 
 
 The mixer task (sticks, mixes, RF, telemetry) keeps its higher priority and is not touched. `tools/build_firmware.sh v12` clones EdgeTX `main`, applies the patch and builds one radio's firmware (any target from EdgeTX's `tools/build-common.sh`, ARM GCC 14.2 on the `PATH`). The same changes are on the `fast-lua-20ms` branch of [juricabi/edgetx](https://github.com/juricabi/edgetx/tree/fast-lua-20ms), whose CI publishes the prerelease.
 
-The script is ready for any frame rate: physics runs in 80 Hz substeps on the measured frame time (the tests fly every track at 50, 20 and 16 ms per frame, and lap times agree within a few tenths), the 10 ms `getTime()` steps are smoothed, and the camera is drawn ahead by the measured display delay. To set that delay by hand, set the global `STICKTIME_LAT` in seconds (`0` turns the prediction off).
+The script is ready for any frame rate: physics runs in 80 Hz substeps on the measured frame time (the tests fly every track at 50, 20 and 16 ms per frame, and lap times agree within a few tenths), the 10 ms `getTime()` steps are smoothed, and the camera is drawn ahead by the measured display delay. To set that delay by hand, set the global `STICKTIME_LAT` in seconds (`0` turns the prediction off). A host that knows when each frame reaches its display (StickTime Pi) sets `STICKTIME_DT` before each `run()` to that interval in ms, and the color game steps the simulation by it: from 10 ms ticks, 60 Hz frames step 0.6 ms unevenly on average and at times 3 ms (the tests check the steps stay within 0.25 ms). `STICKTIME_AV = true` says the picture goes to analog video: the HUD text gets a black outline instead of the drop shadow, and Colors Auto is Summer.
 </details>
 
 ## Browser emulator
@@ -131,7 +133,7 @@ The Lite runs on a heap down to 60.5 KB, so about 3 KB of an X9D+ stays free (th
 - **Fills.** Sky and ground are one rectangle plus one thin wedge triangle at any roll. Walls and structures are two filled triangles per face, filled row by row in C by the firmware. Upright bars and hoop segments are 1 px "ruled" lines. Faces cut by the near plane go through a polygon clipper.
 - **Lua side.** World data lives in arrays of numbers, hot values in locals and upvalues, no tables are made per frame, and collisions use a per-frame broad phase. Far gates switch to an outline and far hoops to six segments.
 - **Draw order.** Depth order alone fails with long walls, so for each pair that overlaps on screen and involves a structure, the script finds a plane separating their bounding boxes and draws the far side first, then sorts topologically. A ray-cast test over hundreds of camera poses at the Bando finds no pair out of order.
-- **Per frame:** about 15–65k Lua VM instructions on color screens and 7–28k on B&W. The emulator estimates 15–17 ms on a TX16S-class radio on open tracks and 27–35 ms in the busiest Bando views, and 4–11 ms for the Lite on an STM32F2 with no FPU, all inside the 50 ms budget.
+- **Per frame:** about 15–65k Lua VM instructions on color screens and 7–28k on B&W. The emulator estimates 15–17 ms on a TX16S-class radio on open tracks and 27–35 ms in the busiest Bando views, and 4–11 ms for the Lite on an STM32F2 with no FPU, all inside the 50 ms budget. The natural Colors draw their sky as about 60 more lines: the emulator estimates 4–5 ms more a frame on a TX16S in the Bando.
 - **Latency.** Color screens show each frame one UI cycle after it is drawn, so the camera is drawn where the quad will be when the frame appears, and a third of that ahead in its turn; more would make a fast roll overshoot when the stick centers.
 </details>
 

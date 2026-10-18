@@ -107,6 +107,12 @@ function lcd.drawNumber(x, y, v, f) stat.calls = stat.calls + 1 num(x, "num x") 
 function lcd.sizeText(s, f) return #s * 9, (f and f >= 0x500) and 37 or 19 end
 function lcd.RGB(r, g, b) return ((floor(r) * 0 + 1) * 0x10000) + 0x8000 end
 STICKTIME_TEST = {}
+-- AV=1: the picture goes to analog video (StickTime Pi's composite output: outlined text, Auto
+-- colors = Summer); HOST_DT=1: the host gives each frame's display interval (STICKTIME_DT);
+-- COLORS=n: Settings > Colors for the flights (0 Auto, 1 Classic, 2 Summer, 3 Evening, 4 Overcast)
+local function env(k) return os.getenv and os.getenv(k) end
+if env("AV") then STICKTIME_AV = true end
+local HOST_DT, COLORS = env("HOST_DT") ~= nil, tonumber(env("COLORS") or "")
 -- the B&W game's files, as color.lua loads them (the source: the 32-bit core.luac is for radios).
 -- As on EdgeTX, a third argument (env) leaves the chunk with no globals at all: api_general.cpp
 -- clears the stack before it reads the argument.
@@ -163,11 +169,22 @@ end
 local FRAME_MS = tonumber(os.getenv and os.getenv("FRAME_MS") or "") or 50
 local FPS = math.floor(1000 / FRAME_MS + 0.5)
 local maxInstr, sumInstr, frames, maxRows, sumRows = 0, 0.0, 0, 0, 0.0   -- float sums: 32-bit ints overflow on long runs
+-- in flight, how far the simulation steps each frame against the frame interval (ms)
+local step = { n = 0, sq = 0.0, max = 0.0, off = 0 }
 local function frame(ev, touch)
   clock = clock + FRAME_MS
+  if HOST_DT then STICKTIME_DT = FRAME_MS end
   stat.lines, stat.tris, stat.rows = 0, 0, 0
+  local p0, s0 = GAME_COLOR and T.clock(), select(16, T.get())
   local ok, r, n = pcall(counted, script.run, ev or 0, touch)
   if not ok then fail("run error: " .. tostring(r)) return 0 end
+  if p0 and s0 == 4 and select(16, T.get()) == 4 then
+    local d = (T.clock() - p0) * 10 - FRAME_MS
+    if d < 0 then d = -d end
+    step.n, step.sq = step.n + 1, step.sq + d * d
+    if d > step.max then step.max = d end
+    if d > 0.25 then step.off = step.off + 1 end
+  end
   frames = frames + 1
   sumInstr = sumInstr + n * 1.0
   if n > maxInstr then maxInstr = n end
@@ -239,7 +256,7 @@ local function idleSticks() sticks.ail, sticks.ele, sticks.rud, sticks.thr = 0, 
 
 -- ------------------------------------------------------------ scenarios
 -- 1. menus: walk every item, open settings, change every option both ways
-local OPTN = GAME_COLOR and 24 or 21
+local OPTN = GAME_COLOR and 25 or 21
 steps(20)
 for i = 1, 9 do frame(EVT_VIRTUAL_NEXT) frame(0) end
 for i = 1, 9 do frame(EVT_VIRTUAL_PREV) frame(0) end
@@ -257,6 +274,8 @@ end
 if T.S.rates ~= 4 then fail("editing a rate value should switch to custom rates (rates " .. T.S.rates .. ")") end
 frame(EVT_VIRTUAL_ENTER)   -- on 'Back'
 if state() ~= 1 then fail("settings exit did not return to menu, state " .. state()) end
+if GAME_COLOR and T.S.colors ~= 0 then fail("Colors should be back at Auto after the settings walk (" .. T.S.colors .. ")") end
+if COLORS then T.set("colors", COLORS) end
 -- track cycling via edit mode on item 5 (focus is back on Settings, item 6)
 frame(EVT_VIRTUAL_PREV)
 frame(EVT_VIRTUAL_ENTER) frame(EVT_VIRTUAL_INC) frame(EVT_VIRTUAL_INC) frame(EVT_VIRTUAL_INC) frame(EVT_VIRTUAL_ENTER)
@@ -1090,6 +1109,12 @@ collectgarbage()
 print(string.format("%s %s %dx%d  frames %d  instr/frame (incl. mock lcd) avg %d max %d  tri rows avg %d max %d  rejected lines %d",
   _VERSION, kind, W, H, frames, math.floor(sumInstr / frames), maxInstr, math.floor(sumRows / frames), maxRows, stat.rejected))
 print(string.format("memory: script loaded+init %.1f KB, now %.1f KB", memInit - mem0, collectgarbage("count") - mem0))
+if step.n > 0 then
+  print(string.format("simulation steps in flight%s: %d frames, off the %.3f ms frame by rms %.3f ms, max %.3f ms, %d by more than 0.25 ms",
+    HOST_DT and " (STICKTIME_DT)" or "", step.n, FRAME_MS, math.sqrt(step.sq / step.n), step.max, step.off))
+  -- with the host's interval the steps are even, but for the odd resync after a stall
+  if HOST_DT and step.off > step.n / 200 then fail("STICKTIME_DT: " .. step.off .. " uneven simulation steps of " .. step.n) end
+end
 for _, r in ipairs(results) do
   print(string.format("track %d %-12s finished=%s laps=%d total=%.2fs lap1=%.2f lap2=%.2f crashes=%d place %d/%d, AI finished %d (sim %.0fs)",
     r.track, r.name, tostring(r.done), r.laps, (r.total or 0) / 100, (r.lap1 or 0) / 100, (r.lap2 or 0) / 100, r.crashes or -1,
