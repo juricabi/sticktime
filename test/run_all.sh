@@ -29,18 +29,17 @@ for ms in 20 16; do
   [ "$(echo "$out" | tail -1)" = "ALL OK" ] || fail=1
 done
 # StickTime Pi: analog video (outlined text, Auto colors = Summer) with the host's frame interval
-# (STICKTIME_DT; the simulation must step evenly): NTSC at 640x480, PAL at 768x576 in Evening.
-# And Overcast on a radio screen at 16 ms
-for v in "16.683 640 480 0 AV" "20 768 576 3 AV" "16.683 480 272 4 -"; do
-  set -- $v
-  if [ "$5" = "AV" ]; then
-    out=$(FRAME_MS=$1 HOST_DT=1 AV=1 COLORS=$4 $LUA53 harness.lua "$S/StickTime.lua" color $2 $3 2>&1)
-  else
-    out=$(FRAME_MS=$1 COLORS=$4 $LUA53 harness.lua "$S/StickTime.lua" color $2 $3 2>&1)
-  fi
-  echo "$(echo "$out" | grep -E "^Lua " | sed "s/frames/@$1 ms colors $4 $5  frames/") | $(echo "$out" | tail -1)"
-  [ "$(echo "$out" | tail -1)" = "ALL OK" ] || fail=1
-done
+# (STICKTIME_DT; the simulation must step evenly): NTSC at 640x480 after 23 hours of uptime (the
+# clock at 2^23 ticks: no room for a fraction in a 32-bit float), PAL at 768x576 in Evening, and
+# NTSC on Lua 5.2. And Overcast on a radio screen at 16 ms
+pi() {
+  echo "$(echo "$1" | grep -E "^Lua " | sed "s/frames/$2  frames/") | $(echo "$1" | tail -1)"
+  [ "$(echo "$1" | tail -1)" = "ALL OK" ] || fail=1
+}
+pi "$(FRAME_MS=16.683 HOST_DT=1 AV=1 COLORS=0 LONG=8388608 $LUA53 harness.lua "$S/StickTime.lua" color 640 480 2>&1)" "@16.683 ms AV, 23 h"
+pi "$(FRAME_MS=20 HOST_DT=1 AV=1 COLORS=3 $LUA53 harness.lua "$S/StickTime.lua" color 768 576 2>&1)" "@20 ms AV, Evening"
+pi "$(FRAME_MS=16.683 HOST_DT=1 AV=1 COLORS=0 python3 run52.py "$S/StickTime.lua" color 640 480 2>&1)" "@16.683 ms AV"
+pi "$(FRAME_MS=16.683 COLORS=4 $LUA53 harness.lua "$S/StickTime.lua" color 480 272 2>&1)" "@16.683 ms Overcast"
 # draw order of the Bando's walls, tower and containers (ray-cast check over random camera poses)
 for v in "480 272" "320 480" "800 480"; do
   set -- $v
