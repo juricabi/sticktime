@@ -3750,9 +3750,10 @@ local AV = STICKTIME_AV == true
       for k = 0, 7 do hazeS[k + 1] = mixc(HAZE, sky, k / 8) end
       for k = 0, 3 do hazeG[k + 1] = mixc(L.gh, grass, k / 4) end
     end
-    -- the minimap's structures: C.dim as it was blended over the minimap's panel, over the sky
-    -- (landscape) or over the instrument panel (portrait)
-    C.mapBox = PORTRAIT and RGB(99, 105, 117) or RGB(114, 133, 159)
+    -- the minimap's structures: C.dim as it would blend (opacity 7) over the minimap's panel (the
+    -- same) over the sky (landscape) or over the instrument panel (portrait)
+    local a, b = 136 / 255, PORTRAIT and { 22, 26, 36 } or sky
+    C.mapBox = mixc({ b[1] + (14 - b[1]) * a, b[2] + (18 - b[2]) * a, b[3] + (28 - b[3]) * a }, { 170, 178, 192 }, a)
     ramp(fGate, pick({ 236, 238, 244 }, { 186, 190, 196 }), 0.8)
     ramp(fGateE, { 40, 44, 56 }, 0.85)
     ramp(fNext, pick({ 255, 120, 0 }, { 250, 206, 84 }), 0.6)
@@ -3997,9 +3998,14 @@ local AV = STICKTIME_AV == true
   end
 
   -- lines along the horizon (hx0, hy0)-(hx1, hy1), steps k = k0..k1 of (sx, sy) away from it,
-  -- the colors cols[1..nc] spread over n steps
+  -- the colors cols[1..nc] spread over n steps; only the steps whose line crosses the view
   local function bands(hx0, hy0, hx1, hy1, sx, sy, k0, k1, cols, nc, n)
-    for k = k0, k1 do
+    local s, c0, c1, v0, v1 = sy, hy0, hy1, VY, VY + VH - 1
+    if sy == 0 then s, c0, c1, v0, v1 = sx, hx0, hx1, VX, VX + VW - 1 end
+    if c0 > c1 then c0, c1 = c1, c0 end
+    local lo, hi = v0 - c1, v1 - c0
+    if s < 0 then lo, hi = c0 - v1, c1 - v0 end
+    for k = lo > k0 and floor(lo) or k0, hi < k1 and floor(hi) + 1 or k1 do
       ln(hx0 + sx * k, hy0 + sy * k, hx1 + sx * k, hy1 + sy * k, cols[floor((k - k0) * nc / n) + 1])
     end
   end
@@ -5379,7 +5385,12 @@ local function init()
     TEST.bat = function(k, v) if v then BAT[k] = v end return BAT[k], R.why end   -- a battery value; the crash's why
     TEST.box = function(b) return BX.x0[b], BX.x1[b], BX.y0[b], BX.y1[b], BX.z0[b], BX.z1[b] end
     TEST.S = S
-    TEST.clock = function() return R.pt, gt, R.fi end   -- simulation time and the clock (ticks)
+    -- the simulation time and the clock (ticks), the frame interval, the host-timed offset; t: the
+    -- clock jumps to t ticks (hours of uptime)
+    TEST.clock = function(t)
+      if t then R.pt, gt = R.pt - gt + t, t end
+      return R.pt, gt, R.fi, R.po
+    end
     TEST.order = function()
       if TEST.fillBounds then TEST.fillBounds() end
       return nOrd, ordP, ordI, TEST.bounds, kpx, kpy, kpz
@@ -5404,19 +5415,26 @@ local function run(event, touch)
   if pt > gt + 1 then pt = gt + 1 elseif pt < gt - 1 then pt = gt - 1 end
   -- a host that knows when each frame reaches the display (StickTime Pi) gives that interval in
   -- ms: steps exactly as far apart as the frames (from 10 ms ticks, 60 Hz steps are 0.6 ms off
-  -- on average, at times 3 ms), pulled gently towards the clock (it lags real time by half a tick)
-  local hd = STICKTIME_DT
+  -- on average, at times 3 ms). The simulation time is kept as an offset from the clock (which
+  -- lags real time by half a tick on average) and pulled gently towards it: a float of hours of
+  -- ticks would have no room left for the fraction (EdgeTX's floats are 32-bit)
+  local hd, hdts = STICKTIME_DT, nil
   if type(hd) == "number" and hd > 0 then
-    pt = R.pt
+    local o = R.po or 0.5
+    hdts = 0
     if not paused then
-      pt = pt + hd * 0.1
-      local e = gt + 0.5 - pt
-      if e > 2 or e < -2 then pt = gt else pt = pt + e * 0.01 end
+      local o2 = o + hd * 0.1 - dtk
+      local e = 0.5 - o2
+      if e > 2 or e < -2 then o2 = 0.5 else o2 = o2 + e * 0.01 end
+      hdts = (o2 - o + dtk) * 0.01
+      o = o2
     end
+    R.po, pt = o, gt + o
   end
   local dts = (pt - R.pt) * 0.01
   if dts < 0 then dts = 0 end
   R.pt = pt
+  if hdts then dts = hdts > 0 and hdts or 0 end
   readSticks()
   if handleEvent(event or 0, touch) ~= 0 then return 1 end
   update(dts)
@@ -7733,7 +7751,12 @@ local function init()
     TEST.bat = function(k, v) if v then BAT[k] = v end return BAT[k], R.why end   -- a battery value; the crash's why
     TEST.box = function(b) return BX.x0[b], BX.x1[b], BX.y0[b], BX.y1[b], BX.z0[b], BX.z1[b] end
     TEST.S = S
-    TEST.clock = function() return R.pt, gt, R.fi end   -- simulation time and the clock (ticks)
+    -- the simulation time and the clock (ticks), the frame interval, the host-timed offset; t: the
+    -- clock jumps to t ticks (hours of uptime)
+    TEST.clock = function(t)
+      if t then R.pt, gt = R.pt - gt + t, t end
+      return R.pt, gt, R.fi, R.po
+    end
     TEST.order = function()
       if TEST.fillBounds then TEST.fillBounds() end
       return nOrd, ordP, ordI, TEST.bounds, kpx, kpy, kpz

@@ -109,10 +109,11 @@ function lcd.RGB(r, g, b) return ((floor(r) * 0 + 1) * 0x10000) + 0x8000 end
 STICKTIME_TEST = {}
 -- AV=1: the picture goes to analog video (StickTime Pi's composite output: outlined text, Auto
 -- colors = Summer); HOST_DT=1: the host gives each frame's display interval (STICKTIME_DT);
--- COLORS=n: Settings > Colors for the flights (0 Auto, 1 Classic, 2 Summer, 3 Evening, 4 Overcast)
+-- COLORS=n: Settings > Colors for the flights (0 Auto, 1 Classic, 2 Summer, 3 Evening, 4 Overcast);
+-- LONG=t: the game's clock starts at t ticks, as after hours of uptime (with HOST_DT)
 local function env(k) return os.getenv and os.getenv(k) end
 if env("AV") then STICKTIME_AV = true end
-local HOST_DT, COLORS = env("HOST_DT") ~= nil, tonumber(env("COLORS") or "")
+local HOST_DT, COLORS, LONG = env("HOST_DT") ~= nil, tonumber(env("COLORS") or ""), tonumber(env("LONG") or "")
 -- the B&W game's files, as color.lua loads them (the source: the 32-bit core.luac is for radios).
 -- As on EdgeTX, a third argument (env) leaves the chunk with no globals at all: api_general.cpp
 -- clears the stack before it reads the argument.
@@ -154,6 +155,7 @@ do
   end
 end
 T.set("twr", 6)                                  -- the tests below fly at 6:1, the default
+if GAME_COLOR and LONG then T.clock(LONG) end
 local NT = T.info()
 
 local instr = 0
@@ -175,11 +177,15 @@ local function frame(ev, touch)
   clock = clock + FRAME_MS
   if HOST_DT then STICKTIME_DT = FRAME_MS end
   stat.lines, stat.tris, stat.rows = 0, 0, 0
-  local p0, s0 = GAME_COLOR and T.clock(), select(16, T.get())
+  local p0, g0, o0, s0, _
+  if GAME_COLOR then p0, g0, _, o0 = T.clock() end
+  s0 = select(16, T.get())
   local ok, r, n = pcall(counted, script.run, ev or 0, touch)
   if not ok then fail("run error: " .. tostring(r)) return 0 end
   if p0 and s0 == 4 and select(16, T.get()) == 4 then
-    local d = (T.clock() - p0) * 10 - FRAME_MS
+    -- (host-timed: the clock's ticks and the offset from them, exact; else the simulation time)
+    local p1, g1, _, o1 = T.clock()
+    local d = (o0 and o1 and (g1 - g0) + (o1 - o0) or p1 - p0) * 10 - FRAME_MS
     if d < 0 then d = -d end
     step.n, step.sq = step.n + 1, step.sq + d * d
     if d > step.max then step.max = d end
