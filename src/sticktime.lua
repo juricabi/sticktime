@@ -49,6 +49,9 @@ local focus, scroll, editing = 1, 0, false     -- menus: focused row, list scrol
 local S = { track = 1, quad = 1, twr = 0, mode = 1, rates = 2, rc = 100, rm = 600, re = 50, yc = 100, ym = 500, ye = 40,
             tilt = @TILT@, fov = @FOV@, laps = 3, ai = 2, skill = 2, ghost = 1, wind = 0, wash = 0, grip = 1, batt = 0, vib = 1,
             map = 1, sticks = 0, fps = 0 }
+--#if COLOR
+S.colors = 0          -- 0 Auto (Summer on analog video, else Classic), 1 Classic, 2 Summer, 3 Evening, 4 Overcast
+--#endif
 -- rows: label, key, then either a value list (+ names, suffix) or nil, nil, suffix, min, max, step
 local OPTS = {
   { "Quad", "quad", { 1, 2, 3, 4, 5 }, { 'Racer 5"', 'Freestyle 5"', '3" toothpick', 'Whoop 65mm', 'Whoop 75mm' } },
@@ -75,6 +78,7 @@ local OPTS = {
   { "Battery", "batt", { 0, 1, 3, 2 }, { "Off", "Real", "1.5x", "2x" } },   -- (3: 1.5x, added after 2x)
   { "Vibration", "vib", { 0, 1 }, { "Off", "On" } },
 --#if COLOR
+  { "Colors", "colors", { 0, 1, 2, 3, 4 }, { "Auto", "Classic", "Summer", "Evening", "Overcast" } },
   { "Minimap", "map", { 0, 1 }, { "Off", "On" } },
   { "Stick view", "sticks", { 0, 1 }, { "Off", "On" } },
 --#endif
@@ -2032,6 +2036,9 @@ local C = {}            -- colors (color radios) / grey levels (B&W)
 local render3D, initGfx
 
 --#if COLOR
+-- the picture goes to analog video (StickTime Pi's composite output to a VTX and FPV goggles)
+local AV = STICKTIME_AV == true
+
 -- ============================================================ COLOR GFX
 ;(function()
   local RGB = lcd.RGB
@@ -2040,8 +2047,23 @@ local render3D, initGfx
   for j = 1, 12 do RCOS[j], RSIN[j] = cos(j * 0.5235988), sin(j * 0.5235988) end
   local XL, YL = W - 1, H - 1
   local MT, NMT = {}, 0
-  local HAZE = { 214, 230, 242 }
+  local HAZE = { 0, 0, 0 }                -- the haze at the horizon: far things fade into it
   local HZN = floor(10 * SC + 0.5)        -- haze band height (px)
+  -- Settings > Colors: sky, haze at the horizon, grass, far grass, grid near and far, mountains,
+  -- snow. Classic is bright; Summer, Evening and Overcast have a natural sky that fades into the
+  -- haze and duller grass, and calmer object and text colors: kinder to the eyes in FPV goggles,
+  -- and analog video carries detail in brightness, not color
+  local LOOKS = {
+    { sky = { 92, 156, 226 }, haze = { 214, 230, 242 }, grass = { 84, 140, 62 }, gh = { 150, 182, 140 },
+      grid = { 66, 118, 50 }, gridF = { 76, 130, 58 }, mtn = { 128, 150, 182 }, snow = { 232, 238, 246 } },
+    { sky = { 70, 112, 164 }, haze = { 160, 176, 190 }, grass = { 78, 104, 52 }, gh = { 124, 138, 128 },
+      grid = { 68, 92, 44 }, gridF = { 72, 97, 48 }, mtn = { 108, 122, 140 }, snow = { 196, 202, 210 } },
+    { sky = { 78, 104, 148 }, haze = { 186, 172, 154 }, grass = { 90, 98, 50 }, gh = { 136, 130, 110 },
+      grid = { 78, 86, 42 }, gridF = { 83, 91, 46 }, mtn = { 112, 110, 128 }, snow = { 204, 196, 190 } },
+    { sky = { 124, 134, 146 }, haze = { 160, 166, 172 }, grass = { 70, 94, 54 }, gh = { 116, 126, 118 },
+      grid = { 61, 83, 47 }, gridF = { 65, 88, 50 }, mtn = { 110, 118, 126 }, snow = { 184, 188, 192 } },
+  }
+  local look, NAT = 0, false              -- the S.colors the colors were made for; a natural look
   local cSky, cGround, cGridN, cGridF, cMtn, cSnow, cPad, cPad2
   local hazeS, hazeG = {}, {}
   local fGate, fGateE, fNext, fNextE, fNextG, fTree, fTreeH, fTrunk, fPole, fFlag, fBoxE = {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}
@@ -2057,37 +2079,62 @@ local render3D, initGfx
   end
 
   initGfx = function()
-    local sky, grass = { 92, 156, 226 }, { 84, 140, 62 }
+    look = S.colors
+    local L = LOOKS[look == 0 and (AV and 2 or 1) or look] or LOOKS[1]
+    NAT = L ~= LOOKS[1]
+    local function pick(classic, natural) return NAT and natural or classic end
+    local sky, grass = L.sky, L.grass
+    HAZE[1], HAZE[2], HAZE[3] = L.haze[1], L.haze[2], L.haze[3]
     cSky, cGround = RGB(sky[1], sky[2], sky[3]), RGB(grass[1], grass[2], grass[3])
-    cGridN, cGridF = RGB(66, 118, 50), RGB(76, 130, 58)
-    cMtn, cSnow = RGB(128, 150, 182), RGB(232, 238, 246)
-    cPad, cPad2 = RGB(255, 140, 20), RGB(250, 250, 250)
-    C.white, C.black, C.accent, C.accent2 = RGB(255, 255, 255), RGB(0, 0, 0), RGB(255, 138, 0), RGB(255, 214, 64)
-    C.good, C.bad, C.red, C.cyan = RGB(96, 232, 120), RGB(255, 96, 96), RGB(230, 30, 40), RGB(80, 220, 255)
-    C.panel, C.panelBG, C.dim = RGB(14, 18, 28), RGB(22, 26, 36), RGB(170, 178, 192)
+    cGridN, cGridF = RGB(L.grid[1], L.grid[2], L.grid[3]), RGB(L.gridF[1], L.gridF[2], L.gridF[3])
+    cMtn, cSnow = RGB(L.mtn[1], L.mtn[2], L.mtn[3]), RGB(L.snow[1], L.snow[2], L.snow[3])
+    C.black, C.panel, C.panelBG, C.dim = RGB(0, 0, 0), RGB(14, 18, 28), RGB(22, 26, 36), RGB(170, 178, 192)
+    if NAT then
+      -- the next gate the brightest thing in view, other gates a light grey; no white at full
+      -- brightness, no strong red or blue (they smear and crawl on analog video)
+      cPad, cPad2 = RGB(230, 140, 40), RGB(200, 200, 200)
+      C.white, C.accent, C.accent2 = RGB(235, 235, 235), RGB(240, 150, 30), RGB(240, 210, 90)
+      C.good, C.bad, C.red, C.cyan = RGB(90, 200, 100), RGB(240, 100, 100), RGB(170, 50, 50), RGB(100, 210, 235)
+      C.ai = { RGB(250, 120, 110), RGB(110, 170, 255), RGB(210, 140, 255), RGB(220, 226, 236) }
+      C.med = { RGB(230, 160, 100), RGB(208, 214, 224), RGB(240, 200, 80) }
+      -- 16 haze bands, thinning fast just above the horizon (an ease-out to the sky's color)
+      for k = 0, 15 do
+        local u = 1 - k / 15
+        hazeS[k + 1] = mixc(HAZE, sky, 1 - u * u)
+      end
+      for k = 0, 7 do
+        local u = 1 - k / 8
+        hazeG[k + 1] = mixc(L.gh, grass, 1 - u * u)
+      end
+    else
+      cPad, cPad2 = RGB(255, 140, 20), RGB(250, 250, 250)
+      C.white, C.accent, C.accent2 = RGB(255, 255, 255), RGB(255, 138, 0), RGB(255, 214, 64)
+      C.good, C.bad, C.red, C.cyan = RGB(96, 232, 120), RGB(255, 96, 96), RGB(230, 30, 40), RGB(80, 220, 255)
+      C.ai = { RGB(255, 72, 72), RGB(64, 150, 255), RGB(200, 96, 255), RGB(230, 240, 255) }   -- 4: the ghost
+      C.med = { RGB(224, 140, 70), RGB(208, 216, 228), RGB(255, 200, 40) }   -- bronze, silver, gold
+      for k = 0, 7 do hazeS[k + 1] = mixc(HAZE, sky, k / 8) end
+      for k = 0, 3 do hazeG[k + 1] = mixc(L.gh, grass, k / 4) end
+    end
     -- the minimap's structures: C.dim as it was blended over the minimap's panel, over the sky
     -- (landscape) or over the instrument panel (portrait)
     C.mapBox = PORTRAIT and RGB(99, 105, 117) or RGB(114, 133, 159)
-    C.ai = { RGB(255, 72, 72), RGB(64, 150, 255), RGB(200, 96, 255), RGB(230, 240, 255) }   -- 4: the ghost
-    C.med = { RGB(224, 140, 70), RGB(208, 216, 228), RGB(255, 200, 40) }   -- bronze, silver, gold
-    for k = 0, 7 do hazeS[k + 1] = mixc(HAZE, sky, k / 8) end
-    for k = 0, 3 do hazeG[k + 1] = mixc({ 150, 182, 140 }, grass, k / 4) end
-    ramp(fGate, { 236, 238, 244 }, 0.8)
+    ramp(fGate, pick({ 236, 238, 244 }, { 186, 190, 196 }), 0.8)
     ramp(fGateE, { 40, 44, 56 }, 0.85)
-    ramp(fNext, { 255, 120, 0 }, 0.6)
+    ramp(fNext, pick({ 255, 120, 0 }, { 250, 206, 84 }), 0.6)
     ramp(fNextE, { 90, 30, 0 }, 0.7)
-    ramp(fNextG, { 255, 236, 90 }, 0.5)
-    ramp(fTree, { 34, 92, 46 }, 0.85)
-    ramp(fTreeH, { 62, 128, 60 }, 0.85)
-    ramp(fTrunk, { 96, 64, 40 }, 0.85)
+    ramp(fNextG, pick({ 255, 236, 90 }, { 240, 220, 110 }), 0.5)
+    ramp(fTree, pick({ 34, 92, 46 }, { 30, 60, 34 }), 0.85)
+    ramp(fTreeH, pick({ 62, 128, 60 }, { 50, 84, 44 }), 0.85)
+    ramp(fTrunk, pick({ 96, 64, 40 }, { 78, 58, 40 }), 0.85)
     ramp(fPole, { 70, 72, 82 }, 0.85)
-    ramp(fFlag, { 226, 40, 48 }, 0.7)
+    ramp(fFlag, pick({ 226, 40, 48 }, { 200, 60, 60 }), 0.7)
     ramp(fBoxE, { 52, 52, 58 }, 0.85)
     -- structures: concrete, red and blue containers; top, x and z faces shaded
-    local KC, SH = { { 168, 164, 156 }, { 172, 60, 44 }, { 50, 92, 156 } }, { 1.2, 0.92, 0.72 }
+    local KC = pick({ { 168, 164, 156 }, { 172, 60, 44 }, { 50, 92, 156 } }, { { 150, 146, 140 }, { 150, 64, 52 }, { 56, 84, 128 } })
+    local SH = { 1.2, 0.92, 0.72 }
     for k = 1, 3 do
       for s = 1, 3 do
-        local c, m, t = KC[k], SH[s], {}
+        local c, m, t = KC[k], SH[s], fBox[k * 3 + s - 3] or {}
         ramp(t, { c[1] * m < 255 and c[1] * m or 255, c[2] * m < 255 and c[2] * m or 255, c[3] * m < 255 and c[3] * m or 255 }, 0.85)
         fBox[k * 3 + s - 3] = t
       end
@@ -2314,6 +2361,14 @@ local render3D, initGfx
     end
   end
 
+  -- lines along the horizon (hx0, hy0)-(hx1, hy1), steps k = k0..k1 of (sx, sy) away from it,
+  -- the colors cols[1..nc] spread over n steps
+  local function bands(hx0, hy0, hx1, hy1, sx, sy, k0, k1, cols, nc, n)
+    for k = k0, k1 do
+      ln(hx0 + sx * k, hy0 + sy * k, hx1 + sx * k, hy1 + sy * k, cols[floor((k - k0) * nc / n) + 1])
+    end
+  end
+
   -- sky, ground and the mountains between them, every pixel painted about once: lcd.clear()
   -- paints the larger of sky and ground (and comes first in the frame, so firmware that keeps
   -- the last frame need not copy it), then only the other side is filled. The ground goes
@@ -2333,35 +2388,43 @@ local render3D, initGfx
       f = (CX + (((y0 + y1) * 0.5 - CY) * b - c) / a - x0) / VW
       if a < 0 then f = 1 - f end
     end
+    -- the horizon across the view, and whole-pixel steps from it into the sky: straight up or
+    -- down (sideways when rolled past 45 deg), so bands of lines a step apart leave no gaps
+    local hx0, hy0, hx1, hy1, sx, sy
+    if A <= B then
+      if B >= 1e-5 then
+        hx0, hy0, hx1, hy1 = x0, CY + (c + (x0 - CX) * a) / b, x1, CY + (c + (x1 - CX) * a) / b
+        sx, sy = 0, b > 0 and -1 or 1
+      end
+    else
+      hx0, hy0, hx1, hy1 = CX + ((y0 - CY) * b - c) / a, y0, CX + ((y1 - CY) * b - c) / a, y1
+      sx, sy = a > 0 and 1 or -1, 0
+    end
+    -- natural looks: the sky fades from the haze at the horizon to its color ~18 deg up,
+    -- under the mountains
+    local ns = (NAT and hx0) and floor(F * 0.325 + 0.5) or 0
     if f > 0.5 then
       lcd.clear(cGround)
       fillSide(-a, -b, -c, cSky)
+      if ns > 0 then bands(hx0, hy0, hx1, hy1, sx, sy, 0, ns - 1, hazeS, 16, ns) end
       drawMountains()
       fillSide(a, b, c, cGround, 2)
     else
       lcd.clear(cSky)
+      if ns > 0 then bands(hx0, hy0, hx1, hy1, sx, sy, 0, ns - 1, hazeS, 16, ns) end
       drawMountains()
       fillSide(a, b, c, cGround)
     end
-    local hx0, hy0, hx1, hy1
-    if A <= B then
-      if B < 1e-5 then return end
-      hx0, hy0, hx1, hy1 = x0, CY + (c + (x0 - CX) * a) / b, x1, CY + (c + (x1 - CX) * a) / b
+    if not hx0 then return end
+    -- atmospheric haze: soft bands hugging the horizon, over the mountains' bases, and the far
+    -- ground fading into it
+    if NAT then
+      local n, ng = floor(HZN / 2), floor(F * 0.105 + 0.5)
+      bands(hx0, hy0, hx1, hy1, sx, sy, 0, n < ns and n or ns - 1, hazeS, 16, ns)
+      bands(hx0, hy0, hx1, hy1, -sx, -sy, 1, ng, hazeG, 8, ng)
     else
-      hx0, hy0, hx1, hy1 = CX + ((y0 - CY) * b - c) / a, y0, CX + ((y1 - CY) * b - c) / a, y1
-    end
-    -- atmospheric haze: soft bands hugging the horizon
-    local l = sqrt(a * a + b * b)
-    local nx, ny = a / l, -b / l
-    -- unit steps along the horizon normal (Chebyshev) so the bands have no gaps
-    local m = (nx < 0 and -nx or nx) > (ny < 0 and -ny or ny) and (nx < 0 and -nx or nx) or (ny < 0 and -ny or ny)
-    nx, ny = nx / m, ny / m
-    local n = HZN
-    for k = 0, n - 1 do
-      ln(hx0 + nx * k, hy0 + ny * k, hx1 + nx * k, hy1 + ny * k, hazeS[floor(k * 8 / n) + 1])
-    end
-    for k = 1, floor(n / 2) do
-      ln(hx0 - nx * k, hy0 - ny * k, hx1 - nx * k, hy1 - ny * k, hazeG[floor((k - 1) * 8 / n) + 1])
+      bands(hx0, hy0, hx1, hy1, sx, sy, 0, HZN - 1, hazeS, 8, HZN)
+      bands(hx0, hy0, hx1, hy1, -sx, -sy, 1, floor(HZN / 2), hazeG, 8, HZN)
     end
   end
 
@@ -2771,6 +2834,7 @@ local render3D, initGfx
   end
 
   render3D = function()
+    if S.colors ~= look then initGfx() end
     drawGround()
     drawGrid()
     drawPad()
@@ -3232,8 +3296,17 @@ local render, hitTest, pauseHit, initUI
     if hS == 0 then hS, hM, hL, hX = floor(14 * SC + 0.5), floor(20 * SC + 0.5), floor(28 * SC + 0.5), floor(40 * SC + 0.5) end
   end
 
+  -- on analog video a black outline (Betaflight OSD style, heavier to the lower right) keeps the
+  -- text readable over any background after the composite signal smears it; else a drop shadow
+  local OUTL = { -1, -1, 1, -1, -1, 1, 1, 1, 0, -1, 0, 1, -1, 0, 1, 0, 2, 1, 1, 2, 2, 2 }
   local function txt(x, y, s, f)
-    drawText(x, y, s, f + SHADOWED)
+    if AV then
+      local k = f % 32768 + C.black       -- the size and alignment flags, in black
+      for i = 1, #OUTL, 2 do drawText(x + OUTL[i], y + OUTL[i + 1], s, k) end
+      drawText(x, y, s, f)
+    else
+      drawText(x, y, s, f + SHADOWED)
+    end
   end
 
   local function panel(x, y, w, h)
@@ -4118,6 +4191,7 @@ local function init()
     TEST.bat = function(k, v) if v then BAT[k] = v end return BAT[k], R.why end   -- a battery value; the crash's why
     TEST.box = function(b) return BX.x0[b], BX.x1[b], BX.y0[b], BX.y1[b], BX.z0[b], BX.z1[b] end
     TEST.S = S
+    TEST.clock = function() return R.pt, gt, R.fi end   -- simulation time and the clock (ticks)
     TEST.order = function()
       if TEST.fillBounds then TEST.fillBounds() end
       return nOrd, ordP, ordI, TEST.bounds, kpx, kpy, kpz
@@ -4141,6 +4215,20 @@ local function run(event, touch)
   -- simulation time advances by the smoothed interval, kept within a tick of the clock
   local pt = R.pt + (paused and 0 or R.fi)
   if pt > gt + 1 then pt = gt + 1 elseif pt < gt - 1 then pt = gt - 1 end
+--#if COLOR
+  -- a host that knows when each frame reaches the display (StickTime Pi) gives that interval in
+  -- ms: steps exactly as far apart as the frames (from 10 ms ticks, 60 Hz steps are 0.6 ms off
+  -- on average, at times 3 ms), pulled gently towards the clock (it lags real time by half a tick)
+  local hd = STICKTIME_DT
+  if type(hd) == "number" and hd > 0 then
+    pt = R.pt
+    if not paused then
+      pt = pt + hd * 0.1
+      local e = gt + 0.5 - pt
+      if e > 2 or e < -2 then pt = gt else pt = pt + e * 0.01 end
+    end
+  end
+--#endif
   local dts = (pt - R.pt) * 0.01
   if dts < 0 then dts = 0 end
   R.pt = pt
