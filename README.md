@@ -10,6 +10,15 @@ A real 3D FPV quad simulator that runs **on your radio** as an EdgeTX Lua tool. 
 | **TX16S MK3 (800×480) · tower and dive gate** | **TX12 MkII (128×64) · StickTime BW** | **X9D (212×64 grey) · StickTime Lite** |
 | ![TX16S MK3](docs/mk3-bando.png) | ![TX12](docs/tx12-race.png) | ![Lite on X9D](docs/lite-x9d.png) |
 
+## In your goggles: StickTime Pi
+
+No radio screen needed: **[StickTime Pi](https://github.com/juricabi/sticktime-pi)** runs this same game on a
+Raspberry Pi and sends the picture to your **analog FPV goggles** through a 5.8 GHz VTX (or over HDMI), while your
+radio flies it as an ExpressLRS / Crossfire WiFi joystick, over USB or Bluetooth. A flashable SD card image, a
+web page for the settings, VTX control over SmartAudio or Tramp, and the same tracks and editor as here.
+
+![StickTime Pi: a Raspberry Pi with a VTX in a printed case, the game on an analog FPV monitor, an EdgeTX radio](docs/sticktime-pi.jpg)
+
 ## Install
 
 Download `StickTime-<version>-sdcard.zip` from the [latest release](https://github.com/juricabi/sticktime/releases/latest), copy what your radio needs from its `SCRIPTS/TOOLS/` to `/SCRIPTS/TOOLS/` on the SD card, and start it from **SYS → Tools**. Or let the [emulator](https://juricabi.github.io/sticktime/) do it (Chrome or Edge on a computer, the radio plugged in by USB in USB Storage mode): **Install** → **Connect radio** → **Install / update**; it also updates an older version and leaves your saves, tracks and ghosts alone.
