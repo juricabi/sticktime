@@ -2087,12 +2087,14 @@ do
         SB.x0[n], SB.x1[n], SB.y0[n], SB.y1[n], SB.z0[n], SB.z1[n] = qx[i] - r, qx[i] + r, 0, k == 10 and 2.45 or h, qz[i] - r, qz[i] + r
       end
     end
-    -- the rails in pieces of up to 12 m (the draw order needs short ones), ids 3000 + piece
+    -- the rails in pieces (the draw order needs short ones, each costs a little to order and
+    -- draw): banners of up to 12 m, fences, nets and tape 16 m, a power line's wires high up
+    -- 36 m; ids 3000 + piece
     SCN.pi, SCN.p0, SCN.p1 = SCN.pi or {}, SCN.p0 or {}, SCN.p1 or {}
     local np = 0
     for i = 1, SCN.nr do
       local ax, az, bx, bz, k, h = SCN.rx1[i], SCN.rz1[i], SCN.rx2[i], SCN.rz2[i], SCN.rk[i], SCN.rh[i]
-      local m = floor(sqrt((bx - ax) * (bx - ax) + (bz - az) * (bz - az)) / 12) + 1
+      local m = floor(sqrt((bx - ax) * (bx - ax) + (bz - az) * (bz - az)) / (k == 4 and 36 or k == 5 and 12 or 16)) + 1
       local e, y0, y1 = k == 4 and 2.4 or 0.1, k == 5 and h - 0.9 or 0, k == 4 and h + 2.2 or h + 0.1
       for j = 1, m do
         local t0, t1 = (j - 1) / m, j / m
@@ -2383,7 +2385,7 @@ local AV = STICKTIME_AV == true
       return s / 30269
     end
     s, NCL = 11, 0
-    local nc_ = ({ 7, 6, 6, 10, 0 })[li] or 0
+    local nc_ = ({ 4, 3, 3, 5, 0 })[li] or 0
     local lo, hi = li == 4 and 3 or li == 3 and 4 or 7, li == 4 and 12 or li == 3 and 16 or 24
     for _ = 1, nc_ do
       local a = rn() * 6.2832
@@ -3795,20 +3797,22 @@ local render, hitTest, pauseHit, initUI
     for b = 1, BX.n do
       fillRect(ox + BX.x0[b] * s, oz - BX.z1[b] * s, (BX.x1[b] - BX.x0[b]) * s + 1, (BX.z1[b] - BX.z0[b]) * s + 1, C.mapBox)
     end
-    -- the ponds (their bounds) and the rails, within the map (the scenery can reach past the
-    -- track's bounds the map is fitted to)
+    -- the ponds (ellipses of 12 corners) and the rails, within the map (the scenery can reach
+    -- past the track's bounds the map is fitted to)
     local x1, y1 = x + w - 1, y + h - 1
     for i = 1, SCN.nd do
       if SCN.dk[i] == 5 then
-        local ux, uz, vx, vz = SCN.dux[i], SCN.duz[i], SCN.dvx[i], SCN.dvz[i]
-        local ex, ez = (ux < 0 and -ux or ux) + (vx < 0 and -vx or vx), (uz < 0 and -uz or uz) + (vz < 0 and -vz or vz)
-        local a, b = ox + (SCN.dx[i] - ex) * s, oz - (SCN.dz[i] + ez) * s
-        local c, d = a + ex * 2 * s + 1, b + ez * 2 * s + 1
-        if a < x then a = x end
-        if b < y then b = y end
-        if c > x1 then c = x1 end
-        if d > y1 then d = y1 end
-        if c > a and d > b then fillRect(a, b, c - a, d - b, C.mapWater) end
+        local cx, cy = ox + SCN.dx[i] * s, oz - SCN.dz[i] * s
+        local ux, uy, vx, vy = SCN.dux[i] * s, -SCN.duz[i] * s, SCN.dvx[i] * s, -SCN.dvz[i] * s
+        cx, cy = cx < x and x or cx > x1 and x1 or cx, cy < y and y or cy > y1 and y1 or cy
+        local ax, ay
+        for j = 0, 12 do
+          local c_, s_ = cos(j * 0.5236), sin(j * 0.5236)
+          local px_, py_ = cx + ux * c_ + vx * s_, cy + uy * c_ + vy * s_
+          px_, py_ = px_ < x and x or px_ > x1 and x1 or px_, py_ < y and y or py_ > y1 and y1 or py_
+          if ax then fillTri(cx, cy, ax, ay, px_, py_, C.mapWater) end
+          ax, ay = px_, py_
+        end
       end
     end
     for i = 1, SCN.nr do

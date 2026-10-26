@@ -2198,7 +2198,8 @@ local line2
   end
 
   -- mountains on the horizon: a ridge at infinity every 10 deg, the 13 around the way the camera
-  -- faces (its azimuth as in the color edition's tree line), dotted
+  -- faces (the horizon in view is never more than 55 deg to a side of it; its azimuth from
+  -- atan(t) ~ t * (0.7854 + 0.273 * (1 - t)), within 0.3 deg), dotted
   local function drawRidge()
     local ax_, az_ = kfx < 0 and -kfx or kfx, kfz < 0 and -kfz or kfz
     if ax_ + az_ < 0.05 then return end
