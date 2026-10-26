@@ -109,7 +109,7 @@ function lcd.RGB(r, g, b) return ((floor(r) * 0 + 1) * 0x10000) + 0x8000 end
 STICKTIME_TEST = {}
 -- AV=1: the picture goes to analog video (StickTime Pi's composite output: outlined text, Auto
 -- colors = Summer); HOST_DT=1: the host gives each frame's display interval (STICKTIME_DT);
--- COLORS=n: Settings > Colors for the flights (0 Auto, 1 Classic, 2 Summer, 3 Evening, 4 Overcast);
+-- COLORS=n: Settings > Colors for the flights (0 Auto, 1 Classic, 2 Summer, 3 Evening, 4 Overcast, 5 Night);
 -- LONG=t: the game's clock starts at t ticks, as after hours of uptime (with HOST_DT)
 local function env(k) return os.getenv and os.getenv(k) end
 if env("AV") then STICKTIME_AV = true end
@@ -1120,7 +1120,7 @@ do
   local CT = "/SCRIPTS/TOOLS/StickTimeTracks/c"
   SD[CT .. "1.txt"] = "Scenery Test\n3 7 3 0  0 0 1 0 0  0 60 1 0 0 / 30 30 2 2 0 3 5 / 10 20 4 0  -10 20 9 0  12 40 6 0" ..
     " / -20 0 -20 60 1 2  20 50 50 50 4 12  -30 70 30 70 5 2.2 / 0 30 4 0.1 0 4  40 0 6 5 0 5\n"
-  SD[CT .. "2.txt"] = "Big Scenery\n4 8 3 0  0 0 1 0 0  0 40 1 0 0 / / 5 5 4 0 / / 20 20 10 10 0 2\n"   -- color only
+  SD[CT .. "4.txt"] = "Big Scenery\n4 8 3 0  0 0 1 0 0  0 40 1 0 0 / / 5 5 4 0 / / 20 20 10 10 0 2\n"   -- color only: the last
   SD[CT .. "3.txt"] = "Bad Props\n3 9 3 0  0 0 1 0 0  0 40 1 0 0 / / 5 5 11 0 / -10 10 10 10 1 0 / 20 20 3 3 0 6\n"
   STICKTIME_TEST = {}
   local inst = chunk()
@@ -1141,7 +1141,10 @@ do
     end
     return n
   end
-  if L.info() ~= 11 then fail("scenery: the last track should be 11 (c3), is " .. tostring(L.info())) end
+  -- (c4, format 4, is the last track on color radios; StickTime BW leaves it out, and c3 is its last)
+  if L.info() ~= (GAME_COLOR and 12 or 11) then
+    fail("scenery: the last track should be " .. (GAME_COLOR and "12 (c4, format 4)" or "11 (c3: format 4 left out)") .. ", is " .. tostring(L.info()))
+  end
   if not GAME_COLOR then
     L.track(9)
     local x0, x1 = L.box(1)
@@ -1166,7 +1169,7 @@ do
       props(), props(10), props(11), SCN.nr, SCN.nd, tostring(SCN.dk[1]), tostring(select(10, L.info()))))
   end
   -- (the pond comes first: decals are drawn in layers)
-  L.track(10)
+  L.track(12)
   _, _, _, _, _, _, SCN = L.scenery()
   if props() ~= 3 or SCN.nd ~= 1 or SCN.nr ~= 0 then fail("scenery: format 4 track built wrong (" .. props() .. " props, " .. SCN.nd .. " decals)") end
   L.track(11)
@@ -1282,4 +1285,6 @@ for _, r in ipairs(results) do
     r.pos, r.nai + 1, r.aiDone, r.secs))
 end
 print("saved: " .. string.gsub(tostring(saved), "\n", ""))
+-- (again: the sections after the first check draw the scenery, Night and Sky detail too)
+if stat.rejected > 0 then fail(stat.rejected .. " lines in all would be rejected by the firmware") end
 print(fails == 0 and "ALL OK" or (fails .. " FAILURES"))

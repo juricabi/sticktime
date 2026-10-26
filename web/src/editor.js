@@ -415,6 +415,7 @@
       const L = railLen(r);
       if (!railOk(r)) add(RKINDS[r.k] + ' (rail ' + (i + 1) + ') has no length: its ends are under half a metre apart.', [r.id]);
       else if (L > RAIL_MAX) add(RKINDS[r.k] + ' (rail ' + (i + 1) + ') is ' + Math.round(L) + ' m long: ' + RAIL_MAX + ' at most.', [r.id]);
+      else if (pad && segDist2(pad.x, pad.z, r.x1, r.z1, r.x2, r.z2) < 2.6 * 2.6) add(RKINDS[r.k] + ' (rail ' + (i + 1) + ') runs over the start pad.', [r.id]);
     });
     if (pad && G.length) {
       const g1 = G[0];
@@ -427,8 +428,10 @@
     }
     if (G.length >= 2 && (np || nr)) {
       // the racing line's pieces with their heights: the AI's curve and the straight lines between
-      // the aim points (the autopilot of the tests, the trees' rule)
+      // the aim points (the autopilot of the tests, the trees' rule), and the climb from the start
+      // pad to gate 1 (the AI pilots and the take-off fly it)
       const L = lineOf(G, 8), N = G.length, segs = [];
+      if (pad) segs.push([pad.x, 0.15, pad.z, G[0].ax, G[0].ay, G[0].az]);
       for (let i = 0; i < N; i++) {
         const nx = G[(i + 1) % N];
         segs.push([G[i].ax, G[i].ay, G[i].az, nx.ax, nx.ay, nx.az]);
@@ -444,18 +447,22 @@
       });
       // a rail where the line passes within 3 m of its solid part across, at a height within 1.5 m of
       // it (the game's railNear: fences and nets from the ground to their top, a banner's cloth 0.9 m
-      // down from it, race tape a line, a power line's wires 2 m either side sagging 3% of the span
-      // and its earth wire 2 m above the middle), or of the posts and pylons at its ends
+      // down from it, race tape a line, a power line's wires 2 m either side sagging 3% of the span,
+      // at most 3 m and a quarter of its height, and its earth wire 2 m above the middle), or of the
+      // posts and pylons at its ends. (Points far outside a rail's box are skipped first: this runs
+      // on every move of a drag)
       const pts = [];
       for (const [ax, ay, az, bx, by, bz] of segs) {
         const n = Math.ceil(Math.hypot(bx - ax, bz - az) / 0.5) || 1;
         for (let q = 0; q < n; q++) pts.push([ax + (bx - ax) * q / n, ay + (by - ay) * q / n, az + (bz - az) * q / n]);
       }
       const hits = (r) => {
-        const h = railH(r), L = railLen(r), ex = (r.x2 - r.x1) / L, ez = (r.z2 - r.z1) / L, sag = Math.min(L * 0.03, 3);
+        const h = railH(r), L = railLen(r), ex = (r.x2 - r.x1) / L, ez = (r.z2 - r.z1) / L, sag = Math.min(L * 0.03, 3, h * 0.25);
+        const bx0 = Math.min(r.x1, r.x2) - 6, bx1 = Math.max(r.x1, r.x2) + 6, bz0 = Math.min(r.z1, r.z2) - 6, bz1 = Math.max(r.z1, r.z2) + 6;
         const wires = r.k === 4 ? [[-2, 0], [2, 0], [0, 2]] : [[0, 0]];
         const lo = r.k === 5 ? h - 0.9 : r.k === 3 || r.k === 4 ? h : 0;
         for (const [x, y, z] of pts) {
+          if (x < bx0 || x > bx1 || z < bz0 || z > bz1) continue;
           const along = (x - r.x1) * ex + (z - r.z1) * ez, s = (x - r.x1) * ez - (z - r.z1) * ex;
           const past = along < 0 ? -along : along > L ? along - L : 0, t = clamp(along / L, 0, 1);
           const w = r.k === 4 ? h - sag * 4 * t * (1 - t) : 0;
@@ -875,7 +882,7 @@
         } else if (f.kind === 'rail') {
           field('x1', dec(it.x1)); field('z1', dec(it.z1)); field('x2', dec(it.x2)); field('z2', dec(it.z2)); field('h', dec(it.h));
           note = 'From one end to the other, ' + dec(railLen(it)) + ' m. Height 0 is the kind\'s own: ' + dec(RH[it.k]) + ' m' +
-            (it.k === 4 ? ' to the wires (2 m either side, the earth wire 2 m higher; they sag 3% of the span), pylons at the ends: fly under it for an UNDER.'
+            (it.k === 4 ? ' to the wires (2 m either side, the earth wire 2 m higher; they sag 3% of the span, at most 3 m and a quarter of the height), pylons at the ends: fly under it for an UNDER.'
               : it.k === 5 ? ' to its top, the cloth 0.9 m deep between two posts: fly under it for an UNDER.' : it.k === 3 ? ', a line between two posts.' : ', solid from the ground.') +
             ' Drag the square handles to move an end.';
         } else {
@@ -1481,7 +1488,7 @@
       ctx.fillStyle = '#fff6d0'; ctx.fillRect(X - l, Y - 1.5, 2 * l, 3);
       dot(X, Y, Math.max(0.15 * S, 2.2), C.prop[7], '#1c1e24');
     } else if (k === 8) {
-      const s = Math.max(1.5 * S, 5);
+      const s = Math.max(1.5 * h / 2.6 * S, 5);            // (the game's canopy grows with the height)
       ctx.fillStyle = C.prop[8]; ctx.fillRect(X - s, Y - s, 2 * s, 2 * s);
       ctx.strokeStyle = '#2458cc'; ctx.lineWidth = 2; ctx.strokeRect(X - s + 1, Y - s + 1, 2 * s - 2, 2 * s - 2);
     } else if (k === 9) {
@@ -1730,9 +1737,11 @@
     }
     for (let i = T.gates.length - 1; i >= 0; i--) if (hitGate(i, x, z, tol)) return { id: T.gates[i].id };
     // then what stands on the ground (props, rails), the structures, the decals under everything
+    // (as drawn: a leafy tree's crown, the tent's square canopy, the windsock's sock downwind)
     for (let i = T.props.length - 1; i >= 0; i--) {
-      const p = T.props[i], r = Math.max(p.k === 8 ? 1.5 : p.k <= 2 ? propH(p) * 0.24 : propR(p), 4 / V.s);
-      if (Math.hypot(x - p.x, z - p.z) <= r + tol) return { id: p.id };
+      const p = T.props[i], r = Math.max(p.k === 1 ? propH(p) * 0.24 : p.k === 2 ? propH(p) * 0.34 : propR(p), 4 / V.s);
+      if (p.k === 8 ? Math.max(Math.abs(x - p.x), Math.abs(z - p.z)) <= 1.5 * propH(p) / 2.6 + tol : Math.hypot(x - p.x, z - p.z) <= r + tol) return { id: p.id };
+      if (p.k === 9 && segDist2(x, z, p.x, p.z, p.x + ed.wind.x * 1.4, p.z + ed.wind.z * 1.4) <= (Math.max(0.3, 4 / V.s) + tol) ** 2) return { id: p.id };
     }
     for (let i = T.rails.length - 1; i >= 0; i--) {
       const r = T.rails[i];

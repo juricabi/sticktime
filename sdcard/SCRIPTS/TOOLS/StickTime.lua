@@ -154,7 +154,7 @@ local TRACKS = {
 -- structures, 32 props, 12 rails, 8 decals and 1600 bytes, listed by both editions (StickTime BW
 -- builds its gates and structures, it has no memory for the scenery); format 4 up to 48
 -- gates, 64 structures, 128 props, 32 rails, 32 decals and 10000 bytes, this edition only (it reads
--- 1 and 3 to 2 and 4's limits). Earlier versions don't list them. They are tracks 9-16 whether or
+-- 1 and 3 to 2 and 4's counts, a format 1 file to 6000 bytes and a format 3 one to 1600). Earlier versions don't list them. They are tracks 9-16 whether or
 -- not the slots before them are filled; only the name, format and id are read here
 local NB0, NT = #TRACKS, #TRACKS + 8
 local CUSTOM = "/SCRIPTS/TOOLS/StickTimeTracks/c"
@@ -472,16 +472,20 @@ do
     if sc then
       local sp, sr, sd = string.match(sc, "([^/]*)/?([^/]*)/?(.*)")
       local p, r = section(sp, 4, 3, 10, 128), section(sr, 6, 5, 5, 32)
+      -- (positions within 999 m, rails up to 200 m, decals' sizes 0.05-200 m, as the editor keeps
+      -- them: a hand-made file's huge or infinite numbers are left out)
       for i = 1, #p, 4 do
-        local k, h = p[i + 2], p[i + 3]
+        local x, z, k, h = p[i], p[i + 1], p[i + 2], p[i + 3]
         if h <= 0 then h = PH[k] elseif h > 40 then h = 40 end
         local q = h * PR[k]
-        addPillar(p[i], p[i + 1], q > 0.08 and q or 0.08, h, k == 1 and 1 or k + 2)
+        if x >= -999 and x <= 999 and z >= -999 and z <= 999 then addPillar(x, z, q > 0.08 and q or 0.08, h, k == 1 and 1 or k + 2) end
       end
       for i = 1, #r, 6 do
         local ax, az, bx, bz, k, h = r[i], r[i + 1], r[i + 2], r[i + 3], r[i + 4], r[i + 5]
         if h <= 0 then h = RH[k] elseif h > 40 then h = 40 end
-        if (bx - ax) * (bx - ax) + (bz - az) * (bz - az) > 0.25 then
+        local l2 = (bx - ax) * (bx - ax) + (bz - az) * (bz - az)
+        if l2 > 0.25 and l2 <= 40000 and ax >= -999 and ax <= 999 and az >= -999 and az <= 999 and bx >= -999 and bx <= 999
+           and bz >= -999 and bz <= 999 then
           local n = SCN.nr + 1
           SCN.nr = n
           SCN.rx1[n], SCN.rz1[n], SCN.rx2[n], SCN.rz2[n], SCN.rk[n], SCN.rh[n] = ax, az, bx, bz, k, h
@@ -498,7 +502,8 @@ do
       p = section(sd, 6, 6, 6, 32)
       for i = 1, #p, 6 do
         local x, z, la, wb, w, k = p[i], p[i + 1], p[i + 2], p[i + 3], p[i + 4] * 0.0174533, p[i + 5]
-        if la > 0 and wb > 0 then
+        if la >= 0.05 and la <= 200 and wb >= 0.05 and wb <= 200 and x >= -999 and x <= 999 and z >= -999 and z <= 999
+           and w >= -7 and w <= 7 then
           -- in layers: ponds and sand, then gravel and dirt, tarmac, painted lines
           local L = k > 4 and 1 or k == 2 and 3 or k == 4 and 4 or 2
           local n = SCN.nd + 1
@@ -1103,6 +1108,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
   local function crash(why)
     if state == DONE then respawn() return end
     state, tState, R.why = CRASHED, gt, why
+    if why == "SPLASH" then R.ax = nil end           -- (Freestyle: back at the pad, not over the water)
     R.flush()
     if not why then R.crashes = R.crashes + 1 end
     if gmode == 3 then
@@ -2151,9 +2157,9 @@ do
         -- a prop: how far it reaches out (a leafy crown, the tent's canopy, the windsock's sock)
         n = n + 1
         local h = qh[i]
-        local r = k == 4 and h * 0.36 or k == 10 and 1.55 or k == 11 and 1.6 or k == 9 and 0.7 or qr[i] + 0.05
+        local r = k == 4 and h * 0.36 or k == 10 and h * 0.6 or k == 11 and 1.6 or k == 9 and 0.7 or qr[i] + 0.05
         OCX[n], OCY[n], OCZ[n], ORAD[n], OID[n] = qx[i], h * 0.5, qz[i], h * 0.5 + r, -i
-        SB.x0[n], SB.x1[n], SB.y0[n], SB.y1[n], SB.z0[n], SB.z1[n] = qx[i] - r, qx[i] + r, 0, k == 10 and 2.45 or h, qz[i] - r, qz[i] + r
+        SB.x0[n], SB.x1[n], SB.y0[n], SB.y1[n], SB.z0[n], SB.z1[n] = qx[i] - r, qx[i] + r, 0, k == 10 and h * 0.95 or h, qz[i] - r, qz[i] + r
       end
     end
     -- the rails in pieces (the draw order needs short ones, each costs a little to order and
@@ -2164,9 +2170,10 @@ do
     for i = 1, SCN.nr do
       local ax, az, bx, bz, k, h = SCN.rx1[i], SCN.rz1[i], SCN.rx2[i], SCN.rz2[i], SCN.rk[i], SCN.rh[i]
       local m = floor(sqrt((bx - ax) * (bx - ax) + (bz - az) * (bz - az)) / (k == 4 and 36 or k == 5 and 12 or 16)) + 1
-      local e, y0, y1 = k == 4 and 2.4 or 0.1, k == 5 and h - 0.9 or 0, k == 4 and h + 2.2 or h + 0.1
+      local e, y1 = k == 4 and 2.4 or 0.1, k == 4 and h + 2.2 or h + 0.1
       for j = 1, m do
         local t0, t1 = (j - 1) / m, j / m
+        local y0 = (k == 5 and j > 1 and j < m) and h - 0.9 or 0   -- (a banner's end pieces: its posts)
         np = np + 1
         SCN.pi[np], SCN.p0[np], SCN.p1[np] = i, t0, t1
         local x0, z0, x1, z1 = ax + (bx - ax) * t0, az + (bz - az) * t0, ax + (bx - ax) * t1, az + (bz - az) * t1
@@ -2608,6 +2615,36 @@ local AV = STICKTIME_AV == true
     end
   end
 
+  -- a flat polygon of n corners in P3x, P3y, P3z (camera space): clipped by the near plane,
+  -- projected, filled
+  local function poly3(n, col)
+    local m = 0
+    local jx, jy, jz = P3x[n], P3y[n], P3z[n]
+    for i = 1, n do
+      local ix, iy, iz = P3x[i], P3y[i], P3z[i]
+      if (iz >= NEAR) ~= (jz >= NEAR) then
+        local t, s = (NEAR - jz) / (iz - jz), F / NEAR
+        m = m + 1
+        fxs[m], fys[m] = CX + (jx + (ix - jx) * t) * s, CY - (jy + (iy - jy) * t) * s
+      end
+      if iz >= NEAR then
+        local s = F / iz
+        m = m + 1
+        fxs[m], fys[m] = CX + ix * s, CY - iy * s
+      end
+      jx, jy, jz = ix, iy, iz
+    end
+    if m < 3 then return end
+    local x0, x1, y0, y1 = fxs[1], fxs[1], fys[1], fys[1]
+    for i = 2, m do
+      local x, y = fxs[i], fys[i]
+      if x < x0 then x0 = x elseif x > x1 then x1 = x end
+      if y < y0 then y0 = y elseif y > y1 then y1 = y end
+    end
+    if x1 < VX or x0 > VX + VW or y1 < VY or y0 > VY + VH then return end
+    fillPoly(m, col)
+  end
+
   local function drawMountains()
     for i = 1, NMT, 9 do
       local ax, ay, az = MT[i], MT[i + 1], MT[i + 2]
@@ -2630,18 +2667,16 @@ local AV = STICKTIME_AV == true
   end
 
   -- a polygon of m directions at infinity (t[n + 1] on), seen with the camera turned by the
-  -- right, up and forward vectors' x and z given (their y are the camera's): filled when all
-  -- its corners are ahead
+  -- right, up and forward vectors' x and z given (their y are the camera's): as points in camera
+  -- space, cut where it passes the near plane (a straight cut between two directions stays on the
+  -- great circle's image) and filled
   local function skyPoly(t, n, m, col, rx_, rz_, ux_, uz_, fx_, fz_)
     for j = 1, m do
       local o = n + j * 3 - 3
       local x, y, z = t[o + 1], t[o + 2], t[o + 3]
-      local Z = x * fx_ + y * kfy + z * fz_
-      if Z < 0.3 then return end
-      local s = F / Z
-      fxs[j], fys[j] = CX + (x * rx_ + y * kry + z * rz_) * s, CY - (x * ux_ + y * kuy + z * uz_) * s
+      P3x[j], P3y[j], P3z[j] = x * rx_ + y * kry + z * rz_, x * ux_ + y * kuy + z * uz_, x * fx_ + y * kfy + z * fz_
     end
-    fillPoly(m, col)
+    poly3(m, col)
   end
 
   -- Sky detail: the stars, the sun or moon, then the clouds, drifting round slowly (1.4 deg a minute)
@@ -2664,7 +2699,7 @@ local AV = STICKTIME_AV == true
       local c, s = cos(a), sin(a)
       local rx_, rz_, ux_, uz_, fx_, fz_ = krx * c - krz * s, krx * s + krz * c, kux * c - kuz * s, kux * s + kuz * c,
         kfx * c - kfz * s, kfx * s + kfz * c
-      local tx = tanH * 1.2 + 0.4
+      local tx = tanH * 1.2 + 0.6
       for n = 0, NCL - 1, 33 do
         -- (the cloud's middle: ahead and not far to a side, or none of it is in view)
         local x, y, z = CLD[n + 1], CLD[n + 2], CLD[n + 3]
@@ -2946,36 +2981,6 @@ local AV = STICKTIME_AV == true
       ln(ax, ay, bx, by, e1)
       ln(cx, cy, dx, dy, e2)
     end
-  end
-
-  -- a flat polygon of n corners in P3x, P3y, P3z (camera space): clipped by the near plane,
-  -- projected, filled
-  local function poly3(n, col)
-    local m = 0
-    local jx, jy, jz = P3x[n], P3y[n], P3z[n]
-    for i = 1, n do
-      local ix, iy, iz = P3x[i], P3y[i], P3z[i]
-      if (iz >= NEAR) ~= (jz >= NEAR) then
-        local t, s = (NEAR - jz) / (iz - jz), F / NEAR
-        m = m + 1
-        fxs[m], fys[m] = CX + (jx + (ix - jx) * t) * s, CY - (jy + (iy - jy) * t) * s
-      end
-      if iz >= NEAR then
-        local s = F / iz
-        m = m + 1
-        fxs[m], fys[m] = CX + ix * s, CY - iy * s
-      end
-      jx, jy, jz = ix, iy, iz
-    end
-    if m < 3 then return end
-    local x0, x1, y0, y1 = fxs[1], fxs[1], fys[1], fys[1]
-    for i = 2, m do
-      local x, y = fxs[i], fys[i]
-      if x < x0 then x0 = x elseif x > x1 then x1 = x end
-      if y < y0 then y0 = y elseif y > y1 then y1 = y end
-    end
-    if x1 < VX or x0 > VX + VW or y1 < VY or y0 > VY + VH then return end
-    fillPoly(m, col)
   end
 
   -- flat face given as corner a plus edges u, v (camera space), filled and outlined (ecol)
@@ -3274,19 +3279,22 @@ local AV = STICKTIME_AV == true
     if x1 < XL and x2 < XL and y1 < YL and y2 < YL then drawLine(x1, y1, x2, y2, SOLID, col) else ln(x1, y1, x2, y2, col) end
   end
 
-  -- the pilots' tent: a canopy on four legs, 3 m square (the faces turned to the camera)
+  -- the pilots' tent: a canopy on four legs, 3 m square at the default 2.6 m height and growing
+  -- with it, as its collision does (the faces turned to the camera; from under the canopy the
+  -- legs are in front of it)
   local function drawTent(i, fi)
-    local x, z = qx[i], qz[i]
-    local pc = fPole[fi]
+    local x, z, e = qx[i], qz[i], qh[i] / 2.6
+    local pc, cs, a, y0 = fPole[fi], FC.tentS[fi], 1.5 * e, 2.05 * e
+    local under = kpy < y0
+    if under then boxFaces(x - a, x + a, y0, 2.4 * e, z - a, z + a, cs, cs, FC.tentT[fi], FC.tentB[fi], nil) end
     for sx = -1, 1, 2 do
       for sz = -1, 1, 2 do
-        local dx, dy, dz = x + sx * 1.45 - kpx, -kpy, z + sz * 1.45 - kpz
+        local dx, dy, dz = x + sx * 1.45 * e - kpx, -kpy, z + sz * 1.45 * e - kpz
         local X, Y, Z = dx * krx + dy * kry + dz * krz, dx * kux + dy * kuy + dz * kuz, dx * kfx + dy * kfy + dz * kfz
-        line3(X, Y, Z, X + kry * 2.05, Y + kuy * 2.05, Z + kfy * 2.05, pc)
+        line3(X, Y, Z, X + kry * y0, Y + kuy * y0, Z + kfy * y0, pc)
       end
     end
-    local cs = FC.tentS[fi]
-    boxFaces(x - 1.5, x + 1.5, 2.05, 2.4, z - 1.5, z + 1.5, cs, cs, FC.tentT[fi], FC.tentB[fi], nil)
+    if not under then boxFaces(x - a, x + a, y0, 2.4 * e, z - a, z + a, cs, cs, FC.tentT[fi], FC.tentB[fi], nil) end
   end
 
   -- the windsock: a pole, the sock from just under its top downwind, striped orange and white;
@@ -3413,26 +3421,39 @@ local AV = STICKTIME_AV == true
         ln2(px_ - nx * g, py_ - ny * g, px_ + nx * g, py_ + ny * g, FC.white[fi])
       end
     elseif k == 9 then
-      -- light mast: a pole, the lamps at the top
+      -- light mast: a pole as thick as it collides, the lamps at the top
       local mc = FC.mast[fi]
-      ln2(x0, y0, x1, y1, mc)
-      if l > 60 then ln2(x0 + nx, y0 + ny, x1 + nx, y1 + ny, mc) end
+      local wt = F * qr[i] / tZ
+      w = F * qr[i] / bZ
+      if w > 1.5 then
+        tri(x0 + nx * w, y0 + ny * w, x1 + nx * wt, y1 + ny * wt, x1 - nx * wt, y1 - ny * wt, mc)
+        tri(x0 + nx * w, y0 + ny * w, x1 - nx * wt, y1 - ny * wt, x0 - nx * w, y0 - ny * w, mc)
+      else
+        ln2(x0, y0, x1, y1, mc)
+      end
       local a, b = F * 0.65 / tZ, F * 0.2 / tZ
       local cx, cy = x1 - ux_ * b, y1 - uy_ * b
       local lc = FC.lamp[fi]
       tri(cx - nx * a - ux_ * b, cy - ny * a - uy_ * b, cx + nx * a - ux_ * b, cy + ny * a - uy_ * b, cx + nx * a + ux_ * b, cy + ny * a + uy_ * b, lc)
       tri(cx - nx * a - ux_ * b, cy - ny * a - uy_ * b, cx + nx * a + ux_ * b, cy + ny * a + uy_ * b, cx - nx * a + ux_ * b, cy - ny * a + uy_ * b, lc)
     else
-      -- post
+      -- post: as thick as it collides
       local pc = fPole[fi]
-      ln2(x0, y0, x1, y1, pc)
-      if w > 1 then ln2(x0 + nx, y0 + ny, x1 + nx, y1 + ny, pc) end
+      local wt = F * qr[i] / tZ
+      w = F * qr[i] / bZ
+      if w > 1.5 then
+        tri(x0 + nx * w, y0 + ny * w, x1 + nx * wt, y1 + ny * wt, x1 - nx * wt, y1 - ny * wt, pc)
+        tri(x0 + nx * w, y0 + ny * w, x1 - nx * wt, y1 - ny * wt, x0 - nx * w, y0 - ny * w, pc)
+      else
+        ln2(x0, y0, x1, y1, pc)
+      end
     end
   end
 
   -- a rail's piece from t0 to t1 of it (SCN.pi, p0, p1: made with the draw list): fences and nets
   -- with their posts, race tape in red and white dashes, the power lines' wires sagging between
   -- their pylons, banners
+  local FW = { 0.12, 0.55, 1 }                          -- a fence's three wires (shares of its height)
   local function drawRail(p, z)
     local i, t0, t1 = SCN.pi[p], SCN.p0[p], SCN.p1[p]
     local k, h = SCN.rk[i], SCN.rh[i]
@@ -3463,7 +3484,7 @@ local AV = STICKTIME_AV == true
       if t1 >= 1 then line3(sX + eX, sY + eY, sZ + eZ, sX + eX + kry * h, sY + eY + kuy * h, sZ + eZ + kfy * h, k == 1 and col or fPole[fi]) end
       local nl = z > 60 and 1 or (k == 1 and 3 or 4)
       for j = 1, nl do
-        local y = h * (nl == 1 and 1 or (k == 1 and ({ 0.12, 0.55, 1 })[j] or j / 4))
+        local y = h * (nl == 1 and 1 or (k == 1 and FW[j] or j / 4))
         line3(sX + kry * y, sY + kuy * y, sZ + kfy * y, sX + eX + kry * y, sY + eY + kuy * y, sZ + eZ + kfy * y, col)
       end
     elseif k == 3 then
@@ -3527,7 +3548,7 @@ local AV = STICKTIME_AV == true
       if t0 <= 0 then line3(sX, sY, sZ, sX + kry * h, sY + kuy * h, sZ + kfy * h, pc) end
       if t1 >= 1 then line3(sX + eX, sY + eY, sZ + eZ, sX + eX + kry * h, sY + eY + kuy * h, sZ + eZ + kfy * h, pc) end
       local b = h - 0.9
-      face(sX + kry * b, sY + kuy * b, sZ + kfy * b, eX, eY, eZ, kry * 0.9, kuy * 0.9, kfy * 0.9, (p % 2 == 0 and FC.ban2 or FC.ban1)[fi], fGateE[fi])
+      face(sX + kry * b, sY + kuy * b, sZ + kfy * b, eX, eY, eZ, kry * 0.9, kuy * 0.9, kfy * 0.9, (p % 2 == 0 and FC.ban2 or FC.ban1)[fi], fBoxE[fi])
     end
   end
 
@@ -3874,14 +3895,17 @@ local render, hitTest, pauseHit, initUI
       if SCN.dk[i] == 5 then
         local cx, cy = ox + SCN.dx[i] * s, oz - SCN.dz[i] * s
         local ux, uy, vx, vy = SCN.dux[i] * s, -SCN.duz[i] * s, SCN.dvx[i] * s, -SCN.dvz[i] * s
-        cx, cy = cx < x and x or cx > x1 and x1 or cx, cy < y and y or cy > y1 and y1 or cy
-        local ax, ay
-        for j = 0, 12 do
-          local c_, s_ = cos(j * 0.5236), sin(j * 0.5236)
-          local px_, py_ = cx + ux * c_ + vx * s_, cy + uy * c_ + vy * s_
-          px_, py_ = px_ < x and x or px_ > x1 and x1 or px_, py_ < y and y or py_ > y1 and y1 or py_
-          if ax then fillTri(cx, cy, ax, ay, px_, py_, C.mapWater) end
-          ax, ay = px_, py_
+        local ex, ey = (ux < 0 and -ux or ux) + (vx < 0 and -vx or vx), (uy < 0 and -uy or uy) + (vy < 0 and -vy or vy)
+        if cx + ex >= x and cx - ex <= x1 and cy + ey >= y and cy - ey <= y1 then     -- (any of it on the map)
+          cx, cy = cx < x and x or cx > x1 and x1 or cx, cy < y and y or cy > y1 and y1 or cy
+          local ax, ay
+          for j = 0, 12 do
+            local c_, s_ = cos(j * 0.5236), sin(j * 0.5236)
+            local px_, py_ = cx + ux * c_ + vx * s_, cy + uy * c_ + vy * s_
+            px_, py_ = px_ < x and x or px_ > x1 and x1 or px_, py_ < y and y or py_ > y1 and y1 or py_
+            if ax then fillTri(cx, cy, ax, ay, px_, py_, C.mapWater) end
+            ax, ay = px_, py_
+          end
         end
       end
     end

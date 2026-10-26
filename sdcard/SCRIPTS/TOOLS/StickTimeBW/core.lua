@@ -1801,9 +1801,10 @@ local line2
     line3(tX - kry * 0.4, tY - kuy * 0.4, tZ - kfy * 0.4, eX, eY, eZ, SOLID, BLK)
   end
 
-  -- mountains on the horizon: a ridge at infinity every 10 deg, the 13 around the way the camera
-  -- faces (the horizon in view is never more than 55 deg to a side of it; its azimuth from
-  -- atan(t) ~ t * (0.7854 + 0.273 * (1 - t)), within 0.3 deg), dotted
+  -- mountains on the horizon: a ridge at infinity every 10 deg, the 17 around the way the camera
+  -- faces (80 deg either side: the horizon in view reaches 65 deg to a side at Field of view 130,
+  -- more toward a rolled view's corners; the azimuth from atan(t) ~ t * (0.7854 + 0.273 * (1 -
+  -- t)), within 0.3 deg), dotted
   local function drawRidge()
     local ax_, az_ = kfx < 0 and -kfx or kfx, kfz < 0 and -kfz or kfz
     if ax_ + az_ < 0.05 then return end
@@ -1817,9 +1818,9 @@ local line2
     end
     if kfz < 0 then a = 3.1416 - a end
     if kfx < 0 then a = 6.2832 - a end
-    local j0 = floor(a / 0.174533) - 6
+    local j0 = floor(a / 0.174533) - 8
     local px_, py_
-    for j = j0, j0 + 13 do
+    for j = j0, j0 + 17 do
       local b = j * 0.174533
       local e = (1.6 + 2.2 * sin(b * 3 + 0.7) ^ 2 + 1.2 * sin(b * 7 + 1.9) ^ 2) * 0.0174533
       local x, y, z = sin(b) * cos(e), sin(e), cos(b) * cos(e)

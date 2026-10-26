@@ -1,6 +1,6 @@
 # Track gallery
 
-Tracks for StickTime and StickTime BW that anyone can fly. A bigger track (its card says *color radios*) needs StickTime 1.8.0 or later on a color radio: StickTime BW doesn't list it.
+Tracks for StickTime and StickTime BW that anyone can fly. A bigger track (its card says *color radios*) needs StickTime 1.8.0 or later on a color radio: StickTime BW doesn't list it. A track with scenery (props, rails, decals) needs StickTime 1.10.0 or later (StickTime BW flies its gates and structures), a bigger one with scenery 1.10.0 on a color radio.
 
 - **In the browser:** open the [emulator](https://juricabi.github.io/sticktime/) and go to **Tracks** → **Open**, then **Open** a track of the Gallery. In the editor, **Send to emulator** and **Fly c1** fly it, and **Send to radio** or **Save file** puts it on your radio.
 - **On the radio:** copy a `.txt` file from this folder to `/SCRIPTS/TOOLS/StickTimeTracks/` on the SD card as `c1.txt` … `c8.txt`. These are tracks 9 to 16 in the game. Restart StickTime to see it.

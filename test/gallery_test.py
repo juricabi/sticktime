@@ -84,7 +84,7 @@ def checker_tests():
     assert " / " not in nums                   # (the cases below add the structures)
     check(gallery.track_problems(with_boxes(20, 2)) == [], "checker: a format 2 track of 20 structures passes")
     for what, text in {"format 2 for a track that fits format 1": with_boxes(5, 2), "format 1 with 17 structures": with_boxes(17, 1),
-                       "65 structures": with_boxes(65, 2), "format 9": with_boxes(20, 9), "format 3 without scenery": with_boxes(20, 3)}.items():
+                       "65 structures": with_boxes(65, 2), "format 9": with_boxes(20, 9), "format 3 of two sections": with_boxes(20, 3)}.items():
         check(gallery.track_problems(text) != [], f"checker: refuses {what}")
     # formats 3 and 4 (1.10.0): the scenery after the structures, every section there, empty or not
     def scene(boxes, props, rails, decals, fmt, kind=1):
@@ -96,6 +96,8 @@ def checker_tests():
     check(gallery.track_problems(scene(0, 10, 3, 2, 3)) == [], f"checker: a format 3 track with props, rails and decals passes: {gallery.track_problems(scene(0, 10, 3, 2, 3))}")
     check(gallery.track_problems(scene(2, 0, 0, 0, 3, kind=8)) == [], "checker: format 3 for structures of a new kind (8) passes")
     check(gallery.track_problems(scene(4, 40, 0, 0, 4)) == [], f"checker: a format 4 track of 40 props passes: {gallery.track_problems(scene(4, 40, 0, 0, 4))}")
+    bare = gallery.track_problems(scene(4, 0, 0, 0, 3))       # (every section, structures of kind 1, nothing else)
+    check(any("no scenery" in m for m in bare), f"checker: refuses format 3 without scenery, for that: {bare}")
     def reid(text, old, new):          # (a change, with the id the editor would give it)
         n, ln = text.split("\n")[:2]
         fmt, _, more = ln.split(" ", 2)
