@@ -3528,6 +3528,24 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
         if py < qh[i] then
           local dx, dz = px - qx[i], pz - qz[i]
           local d = sqrt(dx * dx + dz * dz) - qr[i]
+          if qk[i] == 10 then
+            -- a tent (tentStep): its canopy, and under it the nearest leg
+            local e = qh[i] / 2.6
+            local ax, az = dx < 0 and -dx or dx, dz < 0 and -dz or dz
+            local cx, cz, cy = ax - 1.5 * e, az - 1.5 * e, 2.05 * e - py
+            if cx < 0 then cx = 0 end
+            if cz < 0 then cz = 0 end
+            if cy < 0 then
+              cy = py - 2.4 * e
+              if cy < 0 then cy = 0 end
+            end
+            d = sqrt(cx * cx + cy * cy + cz * cz)
+            if py < 2.05 * e then
+              cx, cz = ax - 1.45 * e, az - 1.45 * e
+              local l = sqrt(cx * cx + cz * cz) - 0.04
+              if l < d then d = l end
+            end
+          end
           if d < m then m = d end
         end
       end
@@ -5599,15 +5617,15 @@ local AV = STICKTIME_AV == true
   local FW = { 0.12, 0.55, 1 }                          -- a fence's three wires (shares of its height)
 
   -- a bar from a to b (camera space), r1 and r2 m thick at its ends: filled as thick as it is,
-  -- a line when thinner than about 2.4 px all along; cut 0.5 m in front of the camera
+  -- a line when thinner than about 2.4 px all along; cut by the near plane
   local function bar3(X1, Y1, Z1, X2, Y2, Z2, r1, r2, col)
-    if Z1 < 0.5 then
-      if Z2 < 0.5 then return end
-      local t = (0.5 - Z1) / (Z2 - Z1)
-      X1, Y1, Z1, r1 = X1 + (X2 - X1) * t, Y1 + (Y2 - Y1) * t, 0.5, r1 + (r2 - r1) * t
-    elseif Z2 < 0.5 then
-      local t = (0.5 - Z2) / (Z1 - Z2)
-      X2, Y2, Z2, r2 = X2 + (X1 - X2) * t, Y2 + (Y1 - Y2) * t, 0.5, r2 + (r1 - r2) * t
+    if Z1 < NEAR then
+      if Z2 < NEAR then return end
+      local t = (NEAR - Z1) / (Z2 - Z1)
+      X1, Y1, Z1, r1 = X1 + (X2 - X1) * t, Y1 + (Y2 - Y1) * t, NEAR, r1 + (r2 - r1) * t
+    elseif Z2 < NEAR then
+      local t = (NEAR - Z2) / (Z1 - Z2)
+      X2, Y2, Z2, r2 = X2 + (X1 - X2) * t, Y2 + (Y1 - Y2) * t, NEAR, r2 + (r1 - r2) * t
     end
     local s1, s2 = F / Z1, F / Z2
     local w1, w2 = r1 * s1, r2 * s2
@@ -5697,8 +5715,8 @@ local AV = STICKTIME_AV == true
                 local AX, AY, AZ, BX, BY, BZ = ux2 * c, uy2 * c, uz2 * c, nX, nY, nZ
                 if sd > 2 then AX, AY, AZ, BX, BY, BZ = nX * c, nY * c, nZ * c, ux2, uy2, uz2 end
                 for v = -1, 1, 2 do
-                  bar3(lX + (AX + BX * v) * pa, lY + (AY + BY * v) * pa, lZ + (AZ + BZ * v) * pa,
-                       hX + (AX - BX * v) * pb, hY + (AY - BY * v) * pb, hZ + (AZ - BZ * v) * pb, 0.05, 0.05, pc)
+                  line3(lX + (AX + BX * v) * pa, lY + (AY + BY * v) * pa, lZ + (AZ + BZ * v) * pa,
+                        hX + (AX - BX * v) * pb, hY + (AY - BY * v) * pb, hZ + (AZ - BZ * v) * pb, pc)
                 end
               end
             end
