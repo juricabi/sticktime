@@ -1823,7 +1823,7 @@ local S = { track = 1, quad = 1, twr = 0, mode = 1, rates = 2, rc = 100, rm = 60
             tilt = 25, fov = 110, laps = 3, ai = 2, skill = 2, ghost = 1, wind = 0, wash = 0, grip = 1, batt = 0, vib = 1,
             map = 1, sticks = 0, fps = 0 }
 S.colors = 0          -- 0 Auto (Summer on analog video, else Classic), 1 Classic, 2 Summer, 3 Evening, 4 Overcast, 5 Night
-S.sky = 1             -- Sky detail: clouds, the tree line on the horizon, sun, moon and stars
+S.sky = 1             -- Sky detail: clouds, sun, moon and stars
 -- rows: label, key, then either a value list (+ names, suffix) or nil, nil, suffix, min, max, step
 local OPTS = {
   { "Quad", "quad", { 1, 2, 3, 4, 5 }, { 'Racer 5"', 'Freestyle 5"', '3" toothpick', 'Whoop 65mm', 'Whoop 75mm' } },
@@ -4026,7 +4026,7 @@ local AV = STICKTIME_AV == true
   -- the scenery's colors (classic, natural; lit ones keep theirs at night), as ramps by name in FC
   local SCOL = {
     leaf = { { 46, 110, 50 }, { 44, 78, 40 } }, leafH = { { 80, 148, 66 }, { 66, 102, 52 } },
-    bush = { { 54, 106, 46 }, { 50, 76, 40 } }, bale = { { 212, 178, 92 }, { 176, 150, 94 } },
+    bush = { { 54, 106, 46 }, { 50, 76, 40 } }, bushH = { { 84, 140, 66 }, { 68, 98, 52 } }, bale = { { 212, 178, 92 }, { 176, 150, 94 } },
     baleT = { { 238, 212, 134 }, { 198, 178, 122 } }, baleS = { { 168, 138, 70 }, { 140, 118, 76 } }, tyre = { { 36, 36, 40 }, { 36, 36, 40 } },
     tyreL = { { 104, 104, 112 }, { 84, 84, 92 } }, cone = { { 255, 112, 20 }, { 222, 112, 50 } },
     white = { { 245, 245, 245 }, { 212, 212, 212 } }, mast = { { 124, 128, 136 }, { 104, 108, 114 } },
@@ -4042,10 +4042,9 @@ local AV = STICKTIME_AV == true
   }
   local FC = {}
   -- the sky's details (Settings > Sky detail), directions at infinity: clouds (a center, then
-  -- two domes of 5 corners), the sun or moon (10 corners), stars, the tree line along the horizon
-  -- (a conifer forest's edge: a tooth every 4 deg, its tip, and the horizon's points between)
-  local CLD, NCL, SUN, NSUN, STAR, NST, TLN, TLB = {}, 0, {}, 0, {}, 0, {}, {}
-  local cCloud, cSun, cStar, cTree
+  -- two domes of 5 corners), the sun or moon (10 corners), stars
+  local CLD, NCL, SUN, NSUN, STAR, NST = {}, 0, {}, 0, {}, 0
+  local cCloud, cSun, cStar
 
   local function mixc(a, b, t)
     return RGB(floor(a[1] + (b[1] - a[1]) * t + 0.5), floor(a[2] + (b[2] - a[2]) * t + 0.5), floor(a[3] + (b[3] - a[3]) * t + 0.5))
@@ -4154,7 +4153,7 @@ local AV = STICKTIME_AV == true
     end
     -- the sky's details, the same on every track: clouds by the look (none at night), each a
     -- low wide dome with two puffs on it; the sun, a low sun in the Evening, the moon and stars at
-    -- night; a tree line in the haze along the horizon
+    -- night
     local li = look == 0 and (AV and 2 or 1) or look
     local function dir(t, n, a, e)
       local c = cos(e)
@@ -4202,13 +4201,6 @@ local AV = STICKTIME_AV == true
       end
       cStar = RGB(206, 212, 228)
     end
-    for j = 0, 89 do
-      local e = (0.7 + rn() * 1.1 + 0.5 * sin(j * 0.31) ^ 2) * 0.0174533
-      dir(TLN, j * 3, (j + 0.5) * 0.069813, e)
-      TLB[j * 2 + 1], TLB[j * 2 + 2] = sin(j * 0.069813), cos(j * 0.069813)
-    end
-    TLB[181], TLB[182] = TLB[1], TLB[2]
-    cTree = mixc(nc(pick({ 36, 84, 44 }, { 34, 60, 38 })), HAZE, li == 4 and 0.6 or 0.42)
   end
 
   -- lcd.drawLine on color radios drops the whole line when an end is beyond the
@@ -4398,46 +4390,6 @@ local AV = STICKTIME_AV == true
     end
   end
 
-  -- Sky detail: the tree line, a tooth every 4 deg from the horizon to its tip: the 33 around
-  -- the way the camera faces (the horizon in view is never more than 55 deg to a side of it; its
-  -- azimuth from atan(t) ~ t * (0.7854 + 0.273 * (1 - t)), within 0.3 deg)
-  local function drawTreeLine()
-    if S.sky ~= 1 then return end
-    local ax_, az_ = kfx < 0 and -kfx or kfx, kfz < 0 and -kfz or kfz
-    if ax_ + az_ < 0.05 then return end                  -- straight up or down: no horizon in view
-    local a
-    if ax_ < az_ then
-      local t = ax_ / az_
-      a = t * (0.7854 + 0.273 * (1 - t))
-    else
-      local t = az_ / ax_
-      a = 1.5708 - t * (0.7854 + 0.273 * (1 - t))
-    end
-    if kfz < 0 then a = 3.1416 - a end
-    if kfx < 0 then a = 6.2832 - a end
-    local j0 = floor(a / 0.069813) - 16
-    local Z0, ax, ay = 0, 0, 0
-    for i = j0, j0 + 33 do
-      local j = i % 90
-      local x, z = TLB[j * 2 + 1], TLB[j * 2 + 2]
-      local Z1, bx, by = x * kfx + z * kfz, 0, 0
-      if Z1 > 0.3 then
-        local s = F / Z1
-        bx, by = CX + (x * krx + z * krz) * s, CY - (x * kux + z * kuz) * s
-        if i > j0 and Z0 > 0.3 and not ((ax < VX and bx < VX) or (ax > VX + VW and bx > VX + VW)) then
-          local o = (i - 1) % 90 * 3
-          local tx, ty, tz = TLN[o + 1], TLN[o + 2], TLN[o + 3]
-          local Zt = tx * kfx + ty * kfy + tz * kfz
-          if Zt > 0.3 then
-            s = F / Zt
-            fillTri(ax, ay, bx, by, CX + (tx * krx + ty * kry + tz * krz) * s, CY - (tx * kux + ty * kuy + tz * kuz) * s, cTree)
-          end
-        end
-      end
-      Z0, ax, ay = Z1, bx, by
-    end
-  end
-
   -- one side of the horizon (where c + (x-CX)*a - (y-CY)*b < 0) within the view: one rectangle
   -- + one thin wedge triangle (filled triangles cost one call per scanline on the radio). With
   -- e, only the wedge and e pixels of the rectangle next to it: the side along the horizon
@@ -4581,7 +4533,6 @@ local AV = STICKTIME_AV == true
       bands(hx0, hy0, hx1, hy1, sx, sy, 0, HZN - 1, hazeS, 8, HZN)
       bands(hx0, hy0, hx1, hy1, -sx, -sy, 1, floor(HZN / 2), hazeG, 8, HZN)
     end
-    drawTreeLine()                       -- (over the haze: it is in the haze's colour already)
   end
 
   -- ground grid: world lines on y=0, transformed incrementally
@@ -5128,9 +5079,10 @@ local AV = STICKTIME_AV == true
       local mx, my = x0 + ex * cc, y0 + ey * cc
       blob(mx, my, nx * cr, ny * cr, ux_ * cv, uy_ * cv, n, (k == 4 and FC.leaf or FC.bush)[fi])
       if cv > 12 and z < 55 then
+        -- the side the light falls on, round as the crown (only near ones get it)
         local q = 0.55
         blob(mx + ux_ * cv * 0.3 - nx * cr * 0.2, my + uy_ * cv * 0.3 - ny * cr * 0.2, nx * cr * q, ny * cr * q, ux_ * cv * q, uy_ * cv * q,
-             6, (k == 4 and FC.leafH or FC.bush)[fi])
+             12, (k == 4 and FC.leafH or FC.bushH)[fi])
       end
     elseif k == 6 or k == 7 then
       -- hay bale, tyre stack: an upright cylinder, its top seen from above, the tyres' rims
@@ -8538,7 +8490,8 @@ local line2
   end
 
   -- mountains on the horizon: a ridge at infinity every 10 deg, the 13 around the way the camera
-  -- faces (its azimuth as in the color edition's tree line), dotted
+  -- faces (the horizon in view is never more than 55 deg to a side of it; its azimuth from
+  -- atan(t) ~ t * (0.7854 + 0.273 * (1 - t)), within 0.3 deg), dotted
   local function drawRidge()
     local ax_, az_ = kfx < 0 and -kfx or kfx, kfz < 0 and -kfz or kfz
     if ax_ + az_ < 0.05 then return end
