@@ -151,7 +151,8 @@ local TRACKS = {
 -- this edition reads either to format 2's limits, the editor writes format 1 only within its).
 -- Formats 3 and 4 (1.10.0) are 1 and 2 with the scenery after the structures ("/" props "/" rails
 -- "/" decals, as in TRACKS' notes) and structure kinds 1-9: format 3 up to 24 gates, 16
--- structures, 32 props, 12 rails, 8 decals and 1600 bytes, for both editions; format 4 up to 48
+-- structures, 32 props, 12 rails, 8 decals and 1600 bytes, listed by both editions (StickTime BW
+-- builds its gates and structures, it has no memory for the scenery); format 4 up to 48
 -- gates, 64 structures, 128 props, 32 rails, 32 decals and 10000 bytes, this edition only (it reads
 -- 1 and 3 to 2 and 4's limits). Earlier versions don't list them. They are tracks 9-16 whether or
 -- not the slots before them are filled; only the name, format and id are read here
@@ -185,7 +186,9 @@ local NP, qx, qz, qr, qh, qk = 0, {}, {}, {}, {}, {}
 -- boxes: walls, towers, containers
 local BX = { n = 0, x0 = {}, x1 = {}, y0 = {}, y1 = {}, z0 = {}, z1 = {}, k = {} }
 -- scenery: rails between two points (fences, nets, race tape, power lines, banners; their posts
--- and pylons are pillars) and decals on the ground (center, half length and half width vectors)
+-- and pylons are pillars) and decals on the ground (center, half length and half width vectors).
+-- The color edition's only: StickTime BW has no memory for it (it flies a format 3 track's gates
+-- and structures)
 local SCN = { nr = 0, rx1 = {}, rz1 = {}, rx2 = {}, rz2 = {}, rk = {}, rh = {},
               nd = 0, dx = {}, dz = {}, dux = {}, duz = {}, dvx = {}, dvz = {}, dk = {} }
 local GB = { x0 = {}, x1 = {}, y0 = {}, y1 = {}, z0 = {}, z1 = {} }   -- gate bounds
@@ -876,7 +879,8 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
   local G = 10.78                               -- 1.1 g: a heavier, more planted feel
   local SRC = { "ail", "ele", "thr", "rud" }
   local grounded = true
-  local nearG, nearP, nearB, nearR = {}, {}, {}, {}
+  local nearG, nearP, nearB = {}, {}, {}
+  local nearR = {}
   local Tm = 0                                   -- motor thrust (lags the throttle)
   -- prop wash: shake (rad) and its turning part, wash build-up (0..1), shake size and severity,
   -- thrust loss

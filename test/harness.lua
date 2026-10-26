@@ -1114,7 +1114,8 @@ end
 -- 11. scenery (1.10.0): formats 3 and 4 with structure kinds 4-9, props, rails and decals (a section
 -- that can't be read is left out on its own); fences, wires and banners stop the quad, a pond landing
 -- is a SPLASH, Freestyle's UNDER; the pilots' area on every track; the trees keep off the scenery;
--- Night and Sky detail draw
+-- Night and Sky detail draw. StickTime BW (no memory for the scenery) lists format 3 and flies its
+-- gates and structures
 do
   local CT = "/SCRIPTS/TOOLS/StickTimeTracks/c"
   SD[CT .. "1.txt"] = "Scenery Test\n3 7 3 0  0 0 1 0 0  0 60 1 0 0 / 30 30 2 2 0 3 5 / 10 20 4 0  -10 20 9 0  12 40 6 0" ..
@@ -1141,6 +1142,22 @@ do
     return n
   end
   if L.info() ~= 11 then fail("scenery: the last track should be 11 (c3), is " .. tostring(L.info())) end
+  if not GAME_COLOR then
+    L.track(9)
+    local x0, x1 = L.box(1)
+    if select(10, L.info()) ~= 1 or x1 - x0 ~= 4 or select(19, L.get()) ~= 2 then
+      fail(string.format("scenery: StickTime BW should build a format 3 track's 2 gates and its structure of kind 5 (%s gates, %s structures)",
+        tostring(select(19, L.get())), tostring(select(10, L.info()))))
+    end
+    L.track(11)
+    if select(19, L.get()) ~= 2 then fail("scenery: StickTime BW should build a format 3 track with a broken props section") end
+    L.track(9) L.set("ai", 2) L.start(1)
+    sticks.thr = 300
+    run(200)
+    local st = select(16, L.get())
+    if st ~= 4 and st ~= 5 and st ~= 6 then fail("scenery: the race on a format 3 track isn't flying on StickTime BW (state " .. tostring(st) .. ")") end
+    print("scenery: StickTime BW lists format 3 (4: left out) and flies its gates and structures, kinds 4-9 too, without the scenery")
+  else
   L.track(9)
   local _, _, _, _, _, _, SCN = L.scenery()
   local x0, x1 = L.box(1)
@@ -1149,11 +1166,9 @@ do
       props(), props(10), props(11), SCN.nr, SCN.nd, tostring(SCN.dk[1]), tostring(select(10, L.info()))))
   end
   -- (the pond comes first: decals are drawn in layers)
-  if GAME_COLOR then
-    L.track(10)
-    _, _, _, _, _, _, SCN = L.scenery()
-    if props() ~= 3 or SCN.nd ~= 1 or SCN.nr ~= 0 then fail("scenery: format 4 track built wrong (" .. props() .. " props, " .. SCN.nd .. " decals)") end
-  end
+  L.track(10)
+  _, _, _, _, _, _, SCN = L.scenery()
+  if props() ~= 3 or SCN.nd ~= 1 or SCN.nr ~= 0 then fail("scenery: format 4 track built wrong (" .. props() .. " props, " .. SCN.nd .. " decals)") end
   L.track(11)
   _, _, _, _, _, _, SCN = L.scenery()
   if props() ~= 2 or SCN.nr ~= 1 or SCN.nd ~= 1 then
@@ -1195,13 +1210,11 @@ do
   fly(0, 0.6, 67, 0, 0, 0, 8, 0.5, thr)
   if L.msg() == nil or not string.find(L.msg(), "UNDER", 1, true) then fail("scenery: Freestyle under the banner should be UNDER (" .. tostring(L.msg()) .. ")") end
   -- Night and Sky detail, every look
-  if GAME_COLOR then
-    for c = 0, 5 do
-      L.set("colors", c) L.set("sky", c % 2)
-      fly(0, 3, -10, 0, 0, 0, 5, 0.3)
-    end
-    L.set("colors", 0) L.set("sky", 1)
+  for c = 0, 5 do
+    L.set("colors", c) L.set("sky", c % 2)
+    fly(0, 3, -10, 0, 0, 0, 5, 0.3)
   end
+  L.set("colors", 0) L.set("sky", 1)
   -- the built-in tracks: a windsock each, a tent (theirs or the pilots' area's), trees off the scenery
   local function sd(x, z, ax, az, bx, bz)
     local dx, dz = bx - ax, bz - az
@@ -1229,8 +1242,9 @@ do
       end
     end
   end
-  print(string.format("scenery: formats 3%s read, a broken section left out alone, fence, wire and banner stop the quad (over and under pass), SPLASH, UNDER, %s, a windsock and tent on all eight tracks",
-    GAME_COLOR and " and 4" or " (4: left out)", GAME_COLOR and "every Colors look and Sky detail drawn" or "B&W"))
+  print("scenery: formats 3 and 4 read, a broken section left out alone, fence, wire and banner stop the quad (over and under pass), " ..
+    "SPLASH, UNDER, every Colors look and Sky detail drawn, a windsock and tent on all eight tracks")
+  end
   idleSticks()
   for i = 1, 8 do SD[CT .. i .. ".txt"] = nil end
 end

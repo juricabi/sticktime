@@ -92,7 +92,7 @@
   }
   // name, then: the format, the id (FNV-1a of the numbers after it, mod 999999, + 1), the numbers.
   // The smallest format the track fits: 1 (every edition), 2 (a bigger track, color radios), and
-  // with scenery 3 (color and B&W) or 4 (a bigger one, color radios)
+  // with scenery 3 (StickTime BW flies its gates and structures) or 4 (a bigger one, color radios)
   function fileOf(T) {
     const nums = numbersOf(T);
     const id = fnv1a(nums) % 999999 + 1;
@@ -324,7 +324,7 @@
   // the pilots' area buildTrack adds after the trees (place): a tent and a windsock beside the start
   // pad, each at the first of its spots clear of the racing line, the climb to gate 1, the
   // structures, the pillars (the trees too), the rails and the ponds; none of a kind the track has.
-  // The trees are the color edition's (StickTime BW has fewer: its tent can stand elsewhere)
+  // (The color edition's: StickTime BW has no pilots' area, only a windsock drawn behind the pad)
   function pilotsOf(T, G, pad, trees) {
     const out = [];
     if (G.length < 2 || !pad) return out;
@@ -966,7 +966,8 @@
     const many = 'Many structures and props in view at once slow a radio down: Radio load shows how much.';
     el.edSize.title = fm === 2 ? 'More than ' + F1_GATES + ' gates, ' + F1_BOXES + ' structures or ' + F1_BYTES + ' bytes: StickTime on color radios flies it ' +
       '(' + BIG_FROM + ' and later); StickTime BW and versions before ' + BIG_FROM + ' don\'t list it. ' + many
-      : fm === 3 ? 'With scenery (props, rails, decals or structures of the new kinds): StickTime and StickTime BW ' + SCENE_FROM + ' and later fly it; earlier versions don\'t list it. ' + many
+      : fm === 3 ? 'With scenery (props, rails, decals or structures of the new kinds): StickTime ' + SCENE_FROM + ' and later flies it, StickTime BW ' + SCENE_FROM +
+        ' its gates and structures (B&W radios have no memory for the scenery); earlier versions don\'t list it. ' + many
         : fm === 4 ? 'A bigger track with scenery (more than ' + F1_GATES + ' gates, ' + F1_BOXES + ' structures, ' + F3_PROPS + ' props, ' + F3_RAILS + ' rails, ' + F3_DECALS +
           ' decals or ' + F3_BYTES + ' bytes): StickTime on color radios flies it (' + SCENE_FROM + ' and later); StickTime BW and earlier versions don\'t list it. ' + many : '';
     renderEditing();

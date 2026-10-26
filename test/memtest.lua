@@ -32,7 +32,15 @@ end
 -- StickTime BW: a custom track as big as the editor makes them (24 gates, 16 structures) in slot 1,
 -- track 9, played like the others
 if string.find(path, "StickTimeBW", 1, true) then
-  radio.setfile("/SCRIPTS/TOOLS/StickTimeTracks/c1.txt", "Big Test" .. string.char(10) .. "1 4321 7 30 0 0 1 0 0  18 2 2 15 0  35 9 4 30 0  49 21 1 45 0  61 35 5 60 0  68 52 6 75 0  70 70 1 90 0  68 88 4 105 0  61 105 2 120 0  49 119 1 135 0  35 131 7 150 0  18 138 4 165 0  0 140 1 180 0  -18 138 2 195 0  -35 131 1 210 0  -49 119 4 225 0  -61 105 6 240 0  -68 88 1 255 0  -70 70 2 270 0  -68 52 4 285 0  -61 35 1 300 0  -49 21 7 315 0  -35 9 1 330 0  -18 2 4 345 0 / 0 -35 3 2 0 4 1  40 -27 3 2 0 5 2  74 -4 3 2 0 6 3  97 30 3 2 0 4 1  105 70 3 2 0 5 2  97 110 3 2 0 6 3  74 144 3 2 0 4 1  40 167 3 2 0 5 2  0 175 3 2 0 6 3  -40 167 3 2 0 4 1  -74 144 3 2 0 5 2  -97 110 3 2 0 6 3  -105 70 3 2 0 4 1  -97 30 3 2 0 5 2  -74 -4 3 2 0 6 3  -40 -27 3 2 0 4 1" .. string.char(10))
+  local big = "Big Test" .. string.char(10) .. "1 4321 7 30 0 0 1 0 0  18 2 2 15 0  35 9 4 30 0  49 21 1 45 0  61 35 5 60 0  68 52 6 75 0  70 70 1 90 0  68 88 4 105 0  61 105 2 120 0  49 119 1 135 0  35 131 7 150 0  18 138 4 165 0  0 140 1 180 0  -18 138 2 195 0  -35 131 1 210 0  -49 119 4 225 0  -61 105 6 240 0  -68 88 1 255 0  -70 70 2 270 0  -68 52 4 285 0  -61 35 1 300 0  -49 21 7 315 0  -35 9 1 330 0  -18 2 4 345 0 / 0 -35 3 2 0 4 1  40 -27 3 2 0 5 2  74 -4 3 2 0 6 3  97 30 3 2 0 4 1  105 70 3 2 0 5 2  97 110 3 2 0 6 3  74 144 3 2 0 4 1  40 167 3 2 0 5 2  0 175 3 2 0 6 3  -40 167 3 2 0 4 1  -74 144 3 2 0 5 2  -97 110 3 2 0 6 3  -105 70 3 2 0 4 1  -97 30 3 2 0 5 2  -74 -4 3 2 0 6 3  -40 -27 3 2 0 4 1" .. string.char(10)
+  radio.setfile("/SCRIPTS/TOOLS/StickTimeTracks/c1.txt", big)
+  -- and the biggest format 3 track it reads (1.10.0): those gates and structures with as much scenery
+  -- after them as fits in 1599 bytes (StickTime BW reads the whole file and flies the gates and
+  -- structures; the scenery is the color edition's), track 10
+  local t3 = "Big Scenery" .. string.char(10) .. "3 4322" .. string.sub(big, 16, #big - 1) .. " /"
+  local rails, decals = string.rep(" -50 -50 50 -50 1 0", 12), string.rep(" 0 70 5 3 0 5", 8)
+  while #t3 + 10 + 2 + #rails + 2 + #decals + 1 <= 1599 do t3 = t3 .. " 10 20 4 0" end
+  radio.setfile("/SCRIPTS/TOOLS/StickTimeTracks/c2.txt", t3 .. " /" .. rails .. " /" .. decals .. string.char(10))
 end
 local base = radio.mem()
 radio.resetpeak()
@@ -87,7 +95,7 @@ okRun, runErr = pcall(function()
     -- BW: the custom one too) x 4 modes, Track is item 5; the pause menu's way back to the menu is
     -- the Lite's 3rd item, StickTime BW's 5th
     local bw = string.find(path, "StickTimeBW", 1, true)
-    for t = 1, bw and 9 or 8 do
+    for t = 1, bw and 10 or 8 do
       for m = 1, 4 do
         for _ = 2, m do key(NEXT) end
         key(ENTER)                                      -- start mode m

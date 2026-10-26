@@ -166,7 +166,8 @@ local TRACKS = {
 -- this edition reads either to format 2's limits, the editor writes format 1 only within its).
 -- Formats 3 and 4 (1.10.0) are 1 and 2 with the scenery after the structures ("/" props "/" rails
 -- "/" decals, as in TRACKS' notes) and structure kinds 1-9: format 3 up to 24 gates, 16
--- structures, 32 props, 12 rails, 8 decals and 1600 bytes, for both editions; format 4 up to 48
+-- structures, 32 props, 12 rails, 8 decals and 1600 bytes, listed by both editions (StickTime BW
+-- builds its gates and structures, it has no memory for the scenery); format 4 up to 48
 -- gates, 64 structures, 128 props, 32 rails, 32 decals and 10000 bytes, this edition only (it reads
 -- 1 and 3 to 2 and 4's limits). Earlier versions don't list them. They are tracks 9-16 whether or
 -- not the slots before them are filled; only the name, format and id are read here
@@ -176,9 +177,9 @@ local TRACKS = {
 -- editor makes them; StickTime and StickTime BW read the same files, the Lite doesn't). A name line, then the numbers: format 1,
 -- an id (bests start over when it changes), tree seed, trees (9: as many as most tracks), the gates
 -- (x z type yaw height), "/", the structures (x z half-x half-z bottom top kind). Format 3 (1.10.0)
--- adds the scenery after the structures ("/" props "/" rails "/" decals, as in TRACKS' notes) and
--- structure kinds 1-9: up to 24 gates, 16 structures, 32 props, 12 rails, 8 decals and 1600 bytes
--- (formats 2 and 4, bigger tracks, are the color edition's only). They are tracks 9-16 whether or
+-- has the scenery after the structures and structure kinds 1-9, up to 1600 bytes: this edition
+-- builds its gates and structures, the scenery is the color edition's (no memory for it here).
+-- Formats 2 and 4, bigger tracks, are the color edition's only. They are tracks 9-16 whether or
 -- not the slots before them are filled; only the name, format and id are read here
 --#endif
 local NB0, NT = #TRACKS, #TRACKS + 8
@@ -215,11 +216,13 @@ local AX, AY, AZ = {}, {}, {}           -- aim point per gate: racing line, mark
 local NP, qx, qz, qr, qh, qk = 0, {}, {}, {}, {}, {}
 -- boxes: walls, towers, containers
 local BX = { n = 0, x0 = {}, x1 = {}, y0 = {}, y1 = {}, z0 = {}, z1 = {}, k = {} }
+--#if COLOR
 -- scenery: rails between two points (fences, nets, race tape, power lines, banners; their posts
--- and pylons are pillars) and decals on the ground (center, half length and half width vectors)
+-- and pylons are pillars) and decals on the ground (center, half length and half width vectors).
+-- The color edition's only: StickTime BW has no memory for it (it flies a format 3 track's gates
+-- and structures)
 local SCN = { nr = 0, rx1 = {}, rz1 = {}, rx2 = {}, rz2 = {}, rk = {}, rh = {},
               nd = 0, dx = {}, dz = {}, dux = {}, duz = {}, dvx = {}, dvz = {}, dk = {} }
---#if COLOR
 local GB = { x0 = {}, x1 = {}, y0 = {}, y1 = {}, z0 = {}, z1 = {} }   -- gate bounds
 --#endif
 -- start pad, track bounds, wind direction
@@ -276,6 +279,7 @@ do
     end
     return m
   end
+--#if COLOR
   -- the scenery of the built-in tracks (props / rails / decals, see TRACKS), off their racing lines
   local DECO = {
     -- Meadow: hay bales on spread hay, a farm track, a pond, the fence along the field
@@ -374,12 +378,15 @@ do
     end
   end
 
+--#endif
   buildTrack = function(t)
 --#if COLOR
     nBuilt = nBuilt + 1
 --#endif
     local T = TRACKS[t]
+--#if COLOR
     local sc = DECO[t]                                 -- the scenery: a built-in track's, or the file's
+--#endif
     if T.file then
       -- a custom track: read its numbers now (and let them go once it is built)
       local f, fm = io.open(CUSTOM .. T.file .. ".txt", "r"), T.fm
@@ -391,8 +398,13 @@ do
 --#endif
       if f then io.close(f) end
       local g, b = string.match(string.match(s, "^%s*[^\r\n]*[\r\n]+(.*)") or "", "([^/]*)/?(.*)")
+--#if COLOR
       sc = nil
       if fm > 2 then b, sc = string.match(b or "", "([^/]*)/?(.*)") end   -- formats 3 and 4: the scenery after the structures
+--#endif
+--#if BW
+      if fm > 2 then b = string.match(b or "", "([^/]*)") end   -- format 3: the gates and structures (not the scenery)
+--#endif
       local n, d = 0, {}
       for v in string.gmatch(g or "", "%S+") do
         n = n + 1
@@ -518,6 +530,7 @@ do
     seed = T[2]
     local a = rnd() * 6.2832
     TR.wx, TR.wz = sin(a), cos(a)
+--#if COLOR
     -- the scenery: props (pillars), rails (with their posts or pylons) and decals
     SCN.nr, SCN.nd = 0, 0
     if sc then
@@ -576,13 +589,19 @@ do
         end
       end
     end
+--#endif
     -- scenery trees, kept away from the racing line, structures and the rest of the scenery
     local n, tries, want = 0, 0, @TREES@ * (T[5] or 1)
     while n < want and tries < want * 16 do
       tries = tries + 1
       local x = x0 - 30 + rnd() * (x1 - x0 + 60)
       local z = z0 - 30 + rnd() * (z1 - z0 + 60)
+--#if COLOR
       local ok = segDist2(x, z, TR.px, TR.pz, AX[1], AZ[1]) > 100 and boxDist2(x, z) > 16 and clearOf(x, z)
+--#endif
+--#if BW
+      local ok = segDist2(x, z, TR.px, TR.pz, AX[1], AZ[1]) > 100 and boxDist2(x, z) > 16
+--#endif
       for i = 1, NG do
         local j = i % NG + 1
         if ok and segDist2(x, z, AX[i], AZ[i], AX[j], AZ[j]) < 100 then ok = false end
@@ -616,6 +635,7 @@ do
       if k2 < k1 then k1 = k2 end
       AI.sf[i] = 0.55 + 0.225 * (k1 + 1)
     end
+--#if COLOR
     -- the pilots' area beside the start pad, on a track without a tent or windsock of its own:
     -- behind it or to a side, clear of the line (after the trees: they stay where they were)
     local tent, sock = false, false
@@ -624,6 +644,7 @@ do
     end
     if not tent then place({ -5, 8, -5, -8, -11, 0, 2, 10, 2, -10, -12, 8, -12, -8 }, 1.5, 2.6, 10, 6) end
     if not sock then place({ -7, 4, -7, -4, -9, 0, 0, 6, 0, -6, -13, 3, -13, -3 }, 0.08, 4, 11, 4) end
+--#endif
     if T.file then T[3], T[4] = nil, nil end
   end
 end
@@ -946,7 +967,10 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
   local G = 10.78                               -- 1.1 g: a heavier, more planted feel
   local SRC = { "ail", "ele", "thr", "rud" }
   local grounded = true
-  local nearG, nearP, nearB, nearR = {}, {}, {}, {}
+  local nearG, nearP, nearB = {}, {}, {}
+--#if COLOR
+  local nearR = {}
+--#endif
   local Tm = 0                                   -- motor thrust (lags the throttle)
   -- prop wash: shake (rad) and its turning part, wash build-up (0..1), shake size and severity,
   -- thrust loss
@@ -969,6 +993,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     return v
   end
 
+--#if COLOR
   -- the solid part of rail i nearest to (x, y, z): its distance and the direction from it to the
   -- point; nil past the rail's ends (posts and pylons there are pillars). Fences and nets are
   -- solid from the ground to their top, banners 0.9 m down from it; race tape is a line at its
@@ -1014,6 +1039,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     return false
   end
 
+--#endif
   readSticks = function(resolve)
     if resolve then
       for i = 1, 4 do
@@ -1409,6 +1435,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
         nearB[nb] = i
       end
     end
+--#if COLOR
     local nr, spx, spy, spz = 0, px, py, pz                  -- (where the frame starts: UNDER)
     for i = 1, SCN.nr do
       local ax, az, bx, bz, r = SCN.rx1[i], SCN.rz1[i], SCN.rx2[i], SCN.rz2[i], reach + 2.5
@@ -1418,6 +1445,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
         nearR[nr] = i
       end
     end
+--#endif
     -- the surface under the quad, for ground effect: the ground, or the top of a structure
     local fl = 0
     for j = 1, nb do
@@ -1546,7 +1574,9 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
       grounded = false
       if py < DR then
         py, grounded = DR, true
+--#if COLOR
         if SCN.nd > 0 and inPond(px, pz) then crash("SPLASH") return end
+--#endif
         if vy < 0 then hit(0, 1, 0, 0.6) end
         local fr = 1 - 7 * h
         vx, vz = vx * fr, vz * fr
@@ -1635,6 +1665,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
           else py = b0 hit(0, -1, 0, 0.3) end
         end
       end
+--#if COLOR
       -- rails: out along the way from their nearest part (from where it was, when right on it)
       for j = 1, nr do
         local i = nearR[j]
@@ -1649,7 +1680,9 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
           hit(nx, ny, nz, 0.3)
         end
       end
+--#endif
     end
+--#if COLOR
     -- freestyle: under a power line's wires or a banner (crossing below it this frame)
     if gmode == 3 then
       for j = 1, nr do
@@ -1670,6 +1703,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
         end
       end
     end
+--#endif
     P.wr, P.wp, P.wy = pwr, pwp, pwy
     orthonormalize()
     speed = sqrt(vx * vx + vy * vy + vz * vz)
@@ -1706,10 +1740,12 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
         local d = sqrt(dx * dx + dy * dy + dz * dz)
         if d < m then m = d end
       end
+--#if COLOR
       for j = 1, nr do
         local d = railNear(nearR[j], px, py, pz)
         if d and d < m then m = d end
       end
+--#endif
       R.prox = m
     end
   end
@@ -2285,9 +2321,8 @@ do
     nOrd = 0
     local n1 = NG + NP
     local n2 = n1 + BX.n
-    local n3 = n2 + SCN.nr
     local boxes = false
-    for n = 1, n3 + (gmode == 1 and AI.n or 0) do
+    for n = 1, n2 + (gmode == 1 and AI.n or 0) do
       local id, X, Y, Z, rad = n, 0, 0, 0, 4
       if n <= NG then
         X, Y, Z = gx[n] - kpx, gy[n] - kpy, gz[n] - kpz
@@ -2295,9 +2330,9 @@ do
         if GSH[k] == 3 then rad = 9 elseif k == 2 or k == 3 then rad = 7 end
       elseif n <= n1 then
         local i = n - NG
-        if qk[i] == 1 or qk[i] >= 4 then
+        if qk[i] == 1 then
           X, Y, Z = qx[i] - kpx, qh[i] * 0.4 - kpy, qz[i] - kpz
-          rad = qh[i] + 1.6
+          rad = qh[i]
         else
           Z = -1e9
         end
@@ -2308,15 +2343,8 @@ do
         X, Y, Z = (x0 + x1) * 0.5 - kpx, (y0 + y1) * 0.5 - kpy, (z0 + z1) * 0.5 - kpz
         rad = (x1 - x0 + y1 - y0 + z1 - z0) * 0.5
         id = 1000 + b
-      elseif n <= n3 then
-        -- a rail: around its middle
-        local i = n - n2
-        local ax, az, bx, bz = SCN.rx1[i], SCN.rz1[i], SCN.rx2[i], SCN.rz2[i]
-        X, Y, Z = (ax + bx) * 0.5 - kpx, SCN.rh[i] * 0.5 - kpy, (az + bz) * 0.5 - kpz
-        rad = ((bx - ax < 0 and ax - bx or bx - ax) + (bz - az < 0 and az - bz or bz - az)) * 0.5 + SCN.rh[i] + 2.5
-        id = 3000 + i
       else
-        local a = n - n3
+        local a = n - n2
         X, Y, Z = AI.x[a] - kpx, AI.y[a] - kpy, AI.z[a] - kpz
         rad = 1
         id = 2000 + a
@@ -3892,153 +3920,8 @@ local line2
     return x * krx + y * kry + z * krz, x * kux + y * kuy + z * kuz, x * kfx + y * kfy + z * kfz
   end
 
-  -- the props, in lines: a leafy tree's round crown, a bush's dome, a bale or a tyre stack's
-  -- outline, a cone, a mast and its lamps, the tent's legs and canopy, the windsock, a post
-  local function drawProp(i, z)
-    local k, h, r = qk[i], qh[i], qr[i]
-    local pat = z < 25 and SOLID or DOTTED
-    local bX, bY, bZ = cam(qx[i], 0, qz[i])
-    local uX, uY, uZ = kry, kuy, kfy                   -- up, 1 m
-    if k == 10 then
-      local x, zz = qx[i], qz[i]
-      local pX, pY, pZ = cam(x + 1.5, 2.4, zz - 1.5)
-      for s = 1, 4 do
-        local dx, dz = (s == 1 or s == 4) and 1.5 or -1.5, s <= 2 and 1.5 or -1.5
-        local qX, qY, qZ = cam(x + dx, 2.4, zz + dz)
-        line3(qX, qY, qZ, qX - uX * 2.4, qY - uY * 2.4, qZ - uZ * 2.4, pat, BLK)
-        line3(pX, pY, pZ, qX, qY, qZ, SOLID, BLK)
-        pX, pY, pZ = qX, qY, qZ
-      end
-      return
-    end
-    local tX, tY, tZ = bX + uX * h, bY + uY * h, bZ + uZ * h
-    if k == 9 or k == 11 or k == 12 then
-      line3(bX, bY, bZ, tX, tY, tZ, pat, BLK)
-      if k == 9 then line3(tX - 0.6, tY, tZ, tX + 0.6, tY, tZ, SOLID, BLK)
-      elseif k == 11 then
-        -- the sock downwind (limp without wind), a long thin triangle
-        local e = 0
-        if S.wind > 0 then
-          e = (S.wind == 1 and 3 or 7) * (1 + 0.3 * sin(gt * 0.009) + 0.2 * sin(gt * 0.031)) / 7.5
-          if e > 1 then e = 1 end
-        end
-        local wx, wy, wz = TR.wx * e * 1.4, -(1 - e) * 1.3 - 0.1, TR.wz * e * 1.4
-        local eX, eY, eZ = tX + wx * krx + wy * kry + wz * krz, tY + wx * kux + wy * kuy + wz * kuz, tZ + wx * kfx + wy * kfy + wz * kfz
-        line3(tX, tY, tZ, eX, eY, eZ, SOLID, BLK)
-        line3(tX - uX * 0.4, tY - uY * 0.4, tZ - uZ * 0.4, eX, eY, eZ, SOLID, BLK)
-      end
-      return
-    end
-    if k == 8 then r = r * 1.5 end
-    if k == 4 or k == 5 then r = k == 4 and h * 0.34 or r end
-    if k == 4 then
-      -- a trunk, the crown a hexagon (near) or a diamond
-      line3(bX, bY, bZ, bX + uX * h * 0.45, bY + uY * h * 0.45, bZ + uZ * h * 0.45, pat, BLK)
-      local cX, cY, cZ = bX + uX * h * 0.65, bY + uY * h * 0.65, bZ + uZ * h * 0.65
-      local n = z < 40 and 6 or 4
-      local oX, oY, oZ = cX + r, cY, cZ
-      for j = 1, n do
-        local a = j * 6.2832 / n
-        local c, s = cos(a) * r, sin(a) * r
-        local X, Y, Z = cX + c + uX * s, cY + uY * s, cZ + uZ * s
-        line3(oX, oY, oZ, X, Y, Z, pat, BLK)
-        oX, oY, oZ = X, Y, Z
-      end
-      return
-    end
-    -- the outline from the ground: a dome or cone (to the top), or a cylinder's sides and top
-    line3(bX - r, bY, bZ, bX + r, bY, bZ, pat, BLK)
-    if k == 5 or k == 8 then
-      line3(bX - r, bY, bZ, tX, tY, tZ, pat, BLK)
-      line3(bX + r, bY, bZ, tX, tY, tZ, pat, BLK)
-    else
-      line3(bX - r, bY, bZ, tX - r, tY, tZ, pat, BLK)
-      line3(bX + r, bY, bZ, tX + r, tY, tZ, pat, BLK)
-      line3(tX - r, tY, tZ, tX + r, tY, tZ, pat, BLK)
-      if k == 7 and z < 25 then line3(bX - r + uX * h * 0.5, bY + uY * h * 0.5, bZ + uZ * h * 0.5, bX + r + uX * h * 0.5, bY + uY * h * 0.5, bZ + uZ * h * 0.5, pat, BLK) end
-    end
-  end
-
-  -- a rail in lines: fences and nets (posts every 5 m near), race tape, a power line's wires
-  -- sagging between its pylons, a banner
-  local function drawRail(i, z)
-    local k, h = SCN.rk[i], SCN.rh[i]
-    local ax, az, bx, bz = SCN.rx1[i], SCN.rz1[i], SCN.rx2[i], SCN.rz2[i]
-    local pat = z < 30 and SOLID or DOTTED
-    local l = sqrt((bx - ax) * (bx - ax) + (bz - az) * (bz - az))
-    local nx, nz = -(bz - az) / l, (bx - ax) / l
-    if k == 4 then
-      local sag = l * 0.03
-      if sag > 3 then sag = 3 end
-      for e = 0, 1 do
-        local x, zz = e == 0 and ax or bx, e == 0 and az or bz
-        local pX, pY, pZ = cam(x, h + 2.2, zz)
-        for s = -1, 1, 2 do
-          local fX, fY, fZ = cam(x + nx * 1.2 * s, 0, zz + nz * 1.2 * s)
-          line3(fX, fY, fZ, pX, pY, pZ, SOLID, BLK)
-        end
-        local cX, cY, cZ = cam(x - nx * 2.4, h, zz - nz * 2.4)
-        local dX, dY, dZ = cam(x + nx * 2.4, h, zz + nz * 2.4)
-        line3(cX, cY, cZ, dX, dY, dZ, SOLID, BLK)
-      end
-      for o = -2, 2, 2 do
-        local y = o == 0 and h + 2 or h
-        local x0, z0 = ax + nx * o, az + nz * o
-        local pX, pY, pZ = cam(x0, y, z0)
-        for j = 1, 2 do
-          local t = j * 0.5
-          local X, Y, Z = cam(x0 + (bx - ax) * t, y - sag * 4 * t * (1 - t), z0 + (bz - az) * t)
-          line3(pX, pY, pZ, X, Y, Z, DOTTED, BLK)
-          pX, pY, pZ = X, Y, Z
-        end
-      end
-      return
-    end
-    local y0 = k == 5 and h - 0.9 or k == 1 and h * 0.5 or 0
-    local aX, aY, aZ = cam(ax, h, az)
-    local bX, bY, bZ = cam(bx, h, bz)
-    line3(aX, aY, aZ, bX, bY, bZ, pat, BLK)
-    if k ~= 3 then
-      local cX, cY, cZ = cam(ax, y0, az)
-      local dX, dY, dZ = cam(bx, y0, bz)
-      if k ~= 2 or z < 30 then line3(cX, cY, cZ, dX, dY, dZ, pat, BLK) end
-    end
-    -- posts: at the ends, and every 5 m on fences and nets near by
-    local m = (k <= 2 and z < 40) and floor(l / 5 + 0.5) or 1
-    if m < 1 then m = 1 end
-    for j = 0, m do
-      local t = j / m
-      local X, Y, Z = cam(ax + (bx - ax) * t, 0, az + (bz - az) * t)
-      line3(X, Y, Z, X + kry * h, Y + kuy * h, Z + kfy * h, pat, BLK)
-    end
-  end
-
-  -- decals on the ground, dotted outlines near by: a strip's long edges, a pond or sand's octagon
-  local function drawDecals()
-    for i = 1, SCN.nd do
-      local cx, cz, ux, uz, vx, vz = SCN.dx[i], SCN.dz[i], SCN.dux[i], SCN.duz[i], SCN.dvx[i], SCN.dvz[i]
-      local dx, dz = cx - kpx, cz - kpz
-      if dx * dx + dz * dz < 1600 + (ux * ux + uz * uz) * 4 then
-        if SCN.dk[i] < 5 then
-          for s = -1, 1, 2 do
-            local aX, aY, aZ = cam(cx - ux + vx * s, 0, cz - uz + vz * s)
-            local bX, bY, bZ = cam(cx + ux + vx * s, 0, cz + uz + vz * s)
-            line3(aX, aY, aZ, bX, bY, bZ, DOTTED, BLK)
-          end
-        else
-          local pX, pY, pZ = cam(cx + ux, 0, cz + uz)
-          for j = 1, 8 do
-            local c, s = cos(j * 0.7854), sin(j * 0.7854)
-            local X, Y, Z = cam(cx + ux * c + vx * s, 0, cz + uz * c + vz * s)
-            line3(pX, pY, pZ, X, Y, Z, DOTTED, BLK)
-            pX, pY, pZ = X, Y, Z
-          end
-        end
-      end
-    end
-  end
-
-  -- the start pad: two squares
+  -- the start pad (two squares), and a windsock behind it to the left (lines, as the Lite's): downwind,
+  -- limp without wind
   local function drawPad()
     local hx, hz = TR.hx, TR.hz
     for s = 1, 2 do
@@ -4051,6 +3934,15 @@ local line2
         pX, pY, pZ = X, Y, Z
       end
     end
+    local x, z = TR.px - hx * 7 - hz * 4, TR.pz - hz * 7 + hx * 4
+    local e = S.wind > 0 and (S.wind == 1 and 3 or 7) * (1 + 0.3 * sin(gt * 0.009) + 0.2 * sin(gt * 0.031)) / 7.5 or 0
+    if e > 1 then e = 1 end
+    local bX, bY, bZ = cam(x, 0, z)
+    local tX, tY, tZ = cam(x, 4, z)
+    local eX, eY, eZ = cam(x + TR.wx * e * 1.4, 3.9 - (1 - e) * 1.3, z + TR.wz * e * 1.4)
+    line3(bX, bY, bZ, tX, tY, tZ, SOLID, BLK)
+    line3(tX, tY, tZ, eX, eY, eZ, SOLID, BLK)
+    line3(tX - kry * 0.4, tY - kuy * 0.4, tZ - kfy * 0.4, eX, eY, eZ, SOLID, BLK)
   end
 
   -- mountains on the horizon: a ridge at infinity every 10 deg, the 13 around the way the camera
@@ -4091,18 +3983,15 @@ local line2
     drawGround()
     drawRidge()
     drawGrid()
-    if SCN.nd > 0 then drawDecals() end
     drawPad()
     collectObjects(90)
     for j = 1, nOrd do
       local o = ordP[j]
       local id, z = ordI[o], ordZ[o]
-      if id < 0 then
-        if qk[-id] == 1 then drawTree(-id, z) else drawProp(-id, z) end
+      if id < 0 then drawTree(-id, z)
       elseif id < 1000 then drawGate(id, z)
       elseif id < 2000 then drawBox(id - 1000, z)
-      elseif id < 3000 then drawAI(id - 2000, z)
-      else drawRail(id - 3000, z) end
+      else drawAI(id - 2000, z) end
     end
   end
 end)()
@@ -5230,7 +5119,9 @@ local function init()
 --#endif
     TEST.bat = function(k, v) if v then BAT[k] = v end return BAT[k], R.why end   -- a battery value; the crash's why
     TEST.box = function(b) return BX.x0[b], BX.x1[b], BX.y0[b], BX.y1[b], BX.z0[b], BX.z1[b] end
+--#if COLOR
     TEST.scenery = function() return NP, qx, qz, qr, qh, qk, SCN end   -- the pillars (props among them), rails and decals
+--#endif
     TEST.msg = function() return R.msg end                               -- the message on the screen (a trick's name)
     TEST.S = S
     -- the simulation time and the clock (ticks), the frame interval, the host-timed offset; t: the

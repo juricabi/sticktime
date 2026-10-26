@@ -142,9 +142,9 @@ local TRACKS = {
 -- editor makes them; StickTime and StickTime BW read the same files, the Lite doesn't). A name line, then the numbers: format 1,
 -- an id (bests start over when it changes), tree seed, trees (9: as many as most tracks), the gates
 -- (x z type yaw height), "/", the structures (x z half-x half-z bottom top kind). Format 3 (1.10.0)
--- adds the scenery after the structures ("/" props "/" rails "/" decals, as in TRACKS' notes) and
--- structure kinds 1-9: up to 24 gates, 16 structures, 32 props, 12 rails, 8 decals and 1600 bytes
--- (formats 2 and 4, bigger tracks, are the color edition's only). They are tracks 9-16 whether or
+-- has the scenery after the structures and structure kinds 1-9, up to 1600 bytes: this edition
+-- builds its gates and structures, the scenery is the color edition's (no memory for it here).
+-- Formats 2 and 4, bigger tracks, are the color edition's only. They are tracks 9-16 whether or
 -- not the slots before them are filled; only the name, format and id are read here
 local NB0, NT = #TRACKS, #TRACKS + 8
 local CUSTOM = "/SCRIPTS/TOOLS/StickTimeTracks/c"
@@ -173,10 +173,6 @@ local AX, AY, AZ = {}, {}, {}           -- aim point per gate: racing line, mark
 local NP, qx, qz, qr, qh, qk = 0, {}, {}, {}, {}, {}
 -- boxes: walls, towers, containers
 local BX = { n = 0, x0 = {}, x1 = {}, y0 = {}, y1 = {}, z0 = {}, z1 = {}, k = {} }
--- scenery: rails between two points (fences, nets, race tape, power lines, banners; their posts
--- and pylons are pillars) and decals on the ground (center, half length and half width vectors)
-local SCN = { nr = 0, rx1 = {}, rz1 = {}, rx2 = {}, rz2 = {}, rk = {}, rh = {},
-              nd = 0, dx = {}, dz = {}, dux = {}, duz = {}, dvx = {}, dvz = {}, dk = {} }
 -- start pad, track bounds, wind direction
 local TR = { px = 0, pz = -14, hx = 0, hz = 1, x0 = 0, x1 = 1, z0 = 0, z1 = 1, wx = 0, wz = 1 }
 -- AI pilots and the racing line (Hermite curves between aim points)
@@ -228,115 +224,15 @@ do
     end
     return m
   end
-  -- the scenery of the built-in tracks (props / rails / decals, see TRACKS), off their racing lines
-  local DECO = {
-    -- Meadow: hay bales on spread hay, a farm track, a pond, the fence along the field
-    "16 18 4 0 19 21 4 0 16 23 4 0 62 22 4 0 63 26 4 0 -12 42 4 0 -15 45 4 0 -18 62 2 0 68 -2 2 0 24 80 2 0 " ..
-    "80 30 2 0 -10 16 3 0 56 66 3 0 6 68 3 0 / -30 -36 64 -36 1 0 / -24 22 56 1.8 0 1 66 68 7 4 30 5 17 21 5 4 0 6",
-    -- Figure 8: a car park at dusk, light masts round it, cones along the bays
-    "30 -12 7 0 -30 -12 7 0 32 42 7 0 -32 42 7 0 30 98 7 0 -30 98 7 0 26 4 6 0 26 24 6 0 26 44 6 0 26 64 6 0 " ..
-    "26 84 6 0 -26 4 6 0 -26 24 6 0 -26 44 6 0 -26 64 6 0 -26 84 6 0 / / 0 42 60 36 0 2 28 42 52 0.08 0 4 " ..
-    "-28 42 52 0.08 0 4 0 -16 30 0.08 90 4 0 100 30 0.08 90 4",
-    -- Dive Tower: gravel under the tower, a power line along the far side, masts, trees
-    "54 82 7 0 -12 40 7 0 60 30 7 0 -20 70 2 0 66 100 2 0 10 102 2 0 -14 10 3 0 72 50 3 0 / -44 -34 84 -34 4 0 / " ..
-    "36 52 14 9 0 3 -26 30 50 1.6 0 1",
-    -- Slalom: tyre stacks outside the flags, banners along the lanes, worn lanes
-    "3 22 5 0 1 40 5 0 3 58 5 0 1 76 5 0 45 78 5 0 43 60 5 0 45 42 5 0 -8 -12 6 0 8 -12 6 0 / " ..
-    "-16 10 -16 40 5 0 -16 50 -16 80 5 0 66 90 66 60 5 0 66 50 66 20 5 0 / 2 48 50 8 0 1 44 60 42 8 0 1",
-    -- Hoop Forest: a pond in the clearing inside the loop, leafy trees and bushes, a path
-    "-14 46 2 0 -8 64 2 0 36 78 2 0 60 80 2 0 92 40 2 0 90 10 2 0 64 -24 2 0 38 -38 2 0 30 12 2 0 52 14 2 0 " ..
-    "46 28 3 0 -16 20 3 0 84 60 3 0 20 -36 3 0 / / 40 20 7 5 20 5 -18 30 50 1.4 10 1",
-    -- Grand Prix: a tarmac start straight with its lines, tents and banners along it, tyres, masts
-    "-14 10 8 0 -14 18 8 0 110 40 5 0 112 47 5 0 114 54 5 0 -16 60 7 0 60 112 7 0 122 20 7 0 40 30 7 0 / " ..
-    "-10 28 -10 54 5 0 15 28 15 54 5 0 -30 132 130 132 4 0 / 0 23 34 5 0 2 0 0 5 0.15 90 4 5 23 34 0.08 0 4 " ..
-    "-5 23 34 0.08 0 4",
-    -- Bando: tyres and posts round the site, a power line beyond it, mud and gravel
-    "-24 0 5 0 -26 4 5 0 30 -28 5 0 64 -6 10 0 64 4 10 0 / -80 -52 104 -52 4 0 / 46 80 8 5 40 1 -30 30 6 4 0 3",
-    -- Pro Track: nets behind the far end, tents and banners by the start, masts at the corners
-    "-16 12 8 0 -16 20 8 0 64 72 7 0 64 -32 7 0 -18 -32 7 0 -18 72 7 0 / -12 82 62 82 2 0 -12 30 -12 54 5 0 / " ..
-    "-16 16 8 4 0 1",
-  }
-  -- props by kind: default height (m), and the radius they collide with for each m of it
-  local PH = { 9, 8, 1.4, 1.2, 1, 0.5, 10, 2.6, 4, 2 }
-  local PR = { 0.14, 0.18, 0.6, 0.62, 0.4, 0.34, 0.012, 0.58, 0.02, 0.05 }
-  local RH = { 1.8, 4, 1, 12, 2.2 }                      -- rails by kind: default height (m)
-  -- a section's numbers in groups of m whose number k is a kind 1..km (a hair over a whole number
-  -- is that number); at most n groups. A broken group or an unknown kind: none of the section
-  local function section(s, m, k, km, n)
-    local d = {}
-    for v in string.gmatch(s or "", "%S+") do
-      if #d < m * n then d[#d + 1] = tonumber(v) or 0 end
-    end
-    if #d % m ~= 0 then return {} end
-    for i = k, #d, m do
-      local v = d[i]
-      if v < 1 or v > km or v - floor(v) > 0.01 then return {} end
-      d[i] = floor(v)
-    end
-    return d
-  end
-  -- far enough from the rails (4 m) and off the decals (2 m beyond their edges), for the trees
-  local function clearOf(x, z)
-    for i = 1, SCN.nr do
-      if segDist2(x, z, SCN.rx1[i], SCN.rz1[i], SCN.rx2[i], SCN.rz2[i]) < 16 then return false end
-    end
-    for i = 1, SCN.nd do
-      local cx, cz, ux, uz = SCN.dx[i], SCN.dz[i], SCN.dux[i], SCN.duz[i]
-      local r = sqrt(SCN.dvx[i] * SCN.dvx[i] + SCN.dvz[i] * SCN.dvz[i]) + 2
-      if segDist2(x, z, cx - ux, cz - uz, cx + ux, cz + uz) < r * r then return false end
-    end
-    return true
-  end
-  -- the pilots' area: a prop of kind k (radius r, height h) at the first of the spots (along the
-  -- start's heading, to its right; pairs) that keeps c m from the racing line and the climb to
-  -- gate 1, and clear of the structures, pillars, rails and ponds
-  local function place(spots, r, h, k, c)
-    for j = 1, #spots, 2 do
-      local a, b = spots[j], spots[j + 1]
-      local x, z = TR.px + TR.hx * a + TR.hz * b, TR.pz + TR.hz * a - TR.hx * b
-      local ok = segDist2(x, z, TR.px, TR.pz, AX[1], AZ[1]) > c * c * 0.5 and boxDist2(x, z) > (r + 1) * (r + 1)
-      for i = 1, NP do
-        local dx, dz, m = x - qx[i], z - qz[i], qr[i] + r + 1
-        if ok and dx * dx + dz * dz < m * m then ok = false end
-      end
-      for i = 1, SCN.nr do
-        if ok and segDist2(x, z, SCN.rx1[i], SCN.rz1[i], SCN.rx2[i], SCN.rz2[i]) < (r + 1) * (r + 1) then ok = false end
-      end
-      for i = 1, SCN.nd do
-        if ok and SCN.dk[i] == 5 then
-          local cx, cz, ux, uz = SCN.dx[i], SCN.dz[i], SCN.dux[i], SCN.duz[i]
-          local m = sqrt(SCN.dvx[i] * SCN.dvx[i] + SCN.dvz[i] * SCN.dvz[i]) + r
-          if segDist2(x, z, cx - ux, cz - uz, cx + ux, cz + uz) < m * m then ok = false end
-        end
-      end
-      -- the racing line, 8 pieces a leg, and the straight line between the gates
-      for i = 1, ok and NG or 0 do
-        local lx, lz, j = AX[i], AZ[i], i % NG + 1
-        if segDist2(x, z, lx, lz, AX[j], AZ[j]) < c * c then ok = false end
-        for q = 1, 8 do
-          local qx_, _, qz_ = AI.pos(i, q / 8)
-          if ok and segDist2(x, z, lx, lz, qx_, qz_) < c * c then ok = false end
-          lx, lz = qx_, qz_
-        end
-      end
-      if ok then
-        addPillar(x, z, r, h, k)
-        return
-      end
-    end
-  end
-
   buildTrack = function(t)
     local T = TRACKS[t]
-    local sc = DECO[t]                                 -- the scenery: a built-in track's, or the file's
     if T.file then
       -- a custom track: read its numbers now (and let them go once it is built)
       local f, fm = io.open(CUSTOM .. T.file .. ".txt", "r"), T.fm
       local s = f and io.read(f, fm == 3 and 1600 or 1000) or ""
       if f then io.close(f) end
       local g, b = string.match(string.match(s, "^%s*[^\r\n]*[\r\n]+(.*)") or "", "([^/]*)/?(.*)")
-      sc = nil
-      if fm > 2 then b, sc = string.match(b or "", "([^/]*)/?(.*)") end   -- formats 3 and 4: the scenery after the structures
+      if fm > 2 then b = string.match(b or "", "([^/]*)") end   -- format 3: the gates and structures (not the scenery)
       local n, d = 0, {}
       for v in string.gmatch(g or "", "%S+") do
         n = n + 1
@@ -434,61 +330,13 @@ do
     seed = T[2]
     local a = rnd() * 6.2832
     TR.wx, TR.wz = sin(a), cos(a)
-    -- the scenery: props (pillars), rails (with their posts or pylons) and decals
-    SCN.nr, SCN.nd = 0, 0
-    if sc then
-      local sp, sr, sd = string.match(sc, "([^/]*)/?([^/]*)/?(.*)")
-      local p, r = section(sp, 4, 3, 10, 32), section(sr, 6, 5, 5, 12)
-      for i = 1, #p, 4 do
-        local k, h = p[i + 2], p[i + 3]
-        if h <= 0 then h = PH[k] elseif h > 40 then h = 40 end
-        local q = h * PR[k]
-        addPillar(p[i], p[i + 1], q > 0.08 and q or 0.08, h, k == 1 and 1 or k + 2)
-      end
-      for i = 1, #r, 6 do
-        local ax, az, bx, bz, k, h = r[i], r[i + 1], r[i + 2], r[i + 3], r[i + 4], r[i + 5]
-        if h <= 0 then h = RH[k] elseif h > 40 then h = 40 end
-        if (bx - ax) * (bx - ax) + (bz - az) * (bz - az) > 0.25 then
-          local n = SCN.nr + 1
-          SCN.nr = n
-          SCN.rx1[n], SCN.rz1[n], SCN.rx2[n], SCN.rz2[n], SCN.rk[n], SCN.rh[n] = ax, az, bx, bz, k, h
-          -- race tape and banners hang from posts, power lines from pylons (the wires 2 m either
-          -- side of them at h, the earth wire 2 m above)
-          local pr, ph = k == 4 and 0.6 or 0.06, k == 4 and h + 2.2 or h
-          if k >= 3 then
-            addPillar(ax, az, pr, ph, 2)
-            addPillar(bx, bz, pr, ph, 2)
-          end
-        end
-      end
-      r = nil
-      p = section(sd, 6, 6, 6, 8)
-      for i = 1, #p, 6 do
-        local x, z, la, wb, w, k = p[i], p[i + 1], p[i + 2], p[i + 3], p[i + 4] * 0.0174533, p[i + 5]
-        if la > 0 and wb > 0 then
-          -- in layers: ponds and sand, then gravel and dirt, tarmac, painted lines
-          local L = k > 4 and 1 or k == 2 and 3 or k == 4 and 4 or 2
-          local n = SCN.nd + 1
-          while n > 1 do
-            local j = SCN.dk[n - 1]
-            if (j > 4 and 1 or j == 2 and 3 or j == 4 and 4 or 2) <= L then break end
-            SCN.dx[n], SCN.dz[n], SCN.dux[n], SCN.duz[n] = SCN.dx[n - 1], SCN.dz[n - 1], SCN.dux[n - 1], SCN.duz[n - 1]
-            SCN.dvx[n], SCN.dvz[n], SCN.dk[n] = SCN.dvx[n - 1], SCN.dvz[n - 1], j
-            n = n - 1
-          end
-          SCN.dx[n], SCN.dz[n], SCN.dux[n], SCN.duz[n] = x, z, sin(w) * la, cos(w) * la
-          SCN.dvx[n], SCN.dvz[n], SCN.dk[n] = cos(w) * wb, -sin(w) * wb, k
-          SCN.nd = SCN.nd + 1
-        end
-      end
-    end
     -- scenery trees, kept away from the racing line, structures and the rest of the scenery
     local n, tries, want = 0, 0, 8 * (T[5] or 1)
     while n < want and tries < want * 16 do
       tries = tries + 1
       local x = x0 - 30 + rnd() * (x1 - x0 + 60)
       local z = z0 - 30 + rnd() * (z1 - z0 + 60)
-      local ok = segDist2(x, z, TR.px, TR.pz, AX[1], AZ[1]) > 100 and boxDist2(x, z) > 16 and clearOf(x, z)
+      local ok = segDist2(x, z, TR.px, TR.pz, AX[1], AZ[1]) > 100 and boxDist2(x, z) > 16
       for i = 1, NG do
         local j = i % NG + 1
         if ok and segDist2(x, z, AX[i], AZ[i], AX[j], AZ[j]) < 100 then ok = false end
@@ -522,14 +370,6 @@ do
       if k2 < k1 then k1 = k2 end
       AI.sf[i] = 0.55 + 0.225 * (k1 + 1)
     end
-    -- the pilots' area beside the start pad, on a track without a tent or windsock of its own:
-    -- behind it or to a side, clear of the line (after the trees: they stay where they were)
-    local tent, sock = false, false
-    for i = 1, NP do
-      if qk[i] == 10 then tent = true elseif qk[i] == 11 then sock = true end
-    end
-    if not tent then place({ -5, 8, -5, -8, -11, 0, 2, 10, 2, -10, -12, 8, -12, -8 }, 1.5, 2.6, 10, 6) end
-    if not sock then place({ -7, 4, -7, -4, -9, 0, 0, 6, 0, -6, -13, 3, -13, -3 }, 0.08, 4, 11, 4) end
     if T.file then T[3], T[4] = nil, nil end
   end
 end
@@ -731,7 +571,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
   local G = 10.78                               -- 1.1 g: a heavier, more planted feel
   local SRC = { "ail", "ele", "thr", "rud" }
   local grounded = true
-  local nearG, nearP, nearB, nearR = {}, {}, {}, {}
+  local nearG, nearP, nearB = {}, {}, {}
   local Tm = 0                                   -- motor thrust (lags the throttle)
   -- prop wash: shake (rad) and its turning part, wash build-up (0..1), shake size and severity,
   -- thrust loss
@@ -749,51 +589,6 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
   local function clamp1(v)
     if v > 1 then return 1 elseif v < -1 then return -1 end
     return v
-  end
-
-  -- the solid part of rail i nearest to (x, y, z): its distance and the direction from it to the
-  -- point; nil past the rail's ends (posts and pylons there are pillars). Fences and nets are
-  -- solid from the ground to their top, banners 0.9 m down from it; race tape is a line at its
-  -- height, a power line three wires (2 m either side at its height, the earth wire 2 m above
-  -- the middle) that sag 3% of the span
-  local function railNear(i, x, y, z)
-    local ax, az = SCN.rx1[i], SCN.rz1[i]
-    local ex, ez = SCN.rx2[i] - ax, SCN.rz2[i] - az
-    local l2 = ex * ex + ez * ez
-    local t = ((x - ax) * ex + (z - az) * ez) / l2
-    if t < 0 or t > 1 then return end
-    local l = sqrt(l2)
-    local nx, nz = -ez / l, ex / l
-    local s = (x - ax) * nx + (z - az) * nz
-    local k, h = SCN.rk[i], SCN.rh[i]
-    local ds, dy
-    if k == 3 then
-      ds, dy = s, y - h
-    elseif k == 4 then
-      local sag = l * 0.03
-      local w = h - (sag < 3 and sag or 3) * 4 * t * (1 - t)
-      ds, dy = s, y - w - 2
-      for o = -2, 2, 4 do
-        if (s - o) * (s - o) + (y - w) * (y - w) < ds * ds + dy * dy then ds, dy = s - o, y - w end
-      end
-    else
-      local b = k == 5 and h - 0.9 or 0
-      ds, dy = s, y > h and y - h or y < b and y - b or 0
-    end
-    local d = sqrt(ds * ds + dy * dy)
-    if d < 1e-4 then return d, nx, 0, nz end
-    return d, nx * ds / d, dy / d, nz * ds / d
-  end
-  -- in a pond (a decal of kind 5), on the ground at (x, z)
-  local function inPond(x, z)
-    for i = 1, SCN.nd do
-      if SCN.dk[i] == 5 then
-        local dx, dz, ux, uz, wx, wz = x - SCN.dx[i], z - SCN.dz[i], SCN.dux[i], SCN.duz[i], SCN.dvx[i], SCN.dvz[i]
-        local a, b = (dx * ux + dz * uz) / (ux * ux + uz * uz), (dx * wx + dz * wz) / (wx * wx + wz * wz)
-        if a * a + b * b < 1 then return true end
-      end
-    end
-    return false
   end
 
   readSticks = function(resolve)
@@ -1183,15 +978,6 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
         nearB[nb] = i
       end
     end
-    local nr, spx, spy, spz = 0, px, py, pz                  -- (where the frame starts: UNDER)
-    for i = 1, SCN.nr do
-      local ax, az, bx, bz, r = SCN.rx1[i], SCN.rz1[i], SCN.rx2[i], SCN.rz2[i], reach + 2.5
-      if px > (ax < bx and ax or bx) - r and px < (ax > bx and ax or bx) + r and pz > (az < bz and az or bz) - r
-         and pz < (az > bz and az or bz) + r and py < SCN.rh[i] + r then
-        nr = nr + 1
-        nearR[nr] = i
-      end
-    end
     -- the surface under the quad, for ground effect: the ground, or the top of a structure
     local fl = 0
     for j = 1, nb do
@@ -1320,7 +1106,6 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
       grounded = false
       if py < DR then
         py, grounded = DR, true
-        if SCN.nd > 0 and inPond(px, pz) then crash("SPLASH") return end
         if vy < 0 then hit(0, 1, 0, 0.6) end
         local fr = 1 - 7 * h
         vx, vz = vx * fr, vz * fr
@@ -1409,40 +1194,6 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
           else py = b0 hit(0, -1, 0, 0.3) end
         end
       end
-      -- rails: out along the way from their nearest part (from where it was, when right on it)
-      for j = 1, nr do
-        local i = nearR[j]
-        local d, nx, ny, nz = railNear(i, px, py, pz)
-        local m = DR + (SCN.rk[i] < 3 and 0.04 or 0.03)
-        if d and d < m then
-          if d < 1e-3 then
-            local d0, ax, ay, az = railNear(i, ox, oy, oz)
-            if d0 then nx, ny, nz = ax, ay, az end
-          end
-          px, py, pz = px + nx * (m - d), py + ny * (m - d), pz + nz * (m - d)
-          hit(nx, ny, nz, 0.3)
-        end
-      end
-    end
-    -- freestyle: under a power line's wires or a banner (crossing below it this frame)
-    if gmode == 3 then
-      for j = 1, nr do
-        local i = nearR[j]
-        local k = SCN.rk[i]
-        if k >= 4 then
-          local ax, az = SCN.rx1[i], SCN.rz1[i]
-          local ex, ez = SCN.rx2[i] - ax, SCN.rz2[i] - az
-          local s0, s1 = (spx - ax) * ez - (spz - az) * ex, (px - ax) * ez - (pz - az) * ex
-          if (s0 < 0) ~= (s1 < 0) then
-            local f = s0 / (s0 - s1)
-            local cx, cy, cz = spx + (px - spx) * f, spy + (py - spy) * f, spz + (pz - spz) * f
-            local t = ((cx - ax) * ex + (cz - az) * ez) / (ex * ex + ez * ez)
-            local l, h = sqrt(ex * ex + ez * ez) * 0.03, SCN.rh[i]
-            local lo = k == 5 and h - 0.9 or h - (l < 3 and l or 3) * 4 * t * (1 - t)
-            if t > 0 and t < 1 and cy < lo - 0.3 and cy > 0.4 then trick("UNDER", 150) end
-          end
-        end
-      end
     end
     P.wr, P.wp, P.wy = pwr, pwp, pwy
     orthonormalize()
@@ -1469,10 +1220,6 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
         if dz < 0 then dz = 0 end
         local d = sqrt(dx * dx + dy * dy + dz * dz)
         if d < m then m = d end
-      end
-      for j = 1, nr do
-        local d = railNear(nearR[j], px, py, pz)
-        if d and d < m then m = d end
       end
       R.prox = m
     end
@@ -1736,9 +1483,8 @@ do
     nOrd = 0
     local n1 = NG + NP
     local n2 = n1 + BX.n
-    local n3 = n2 + SCN.nr
     local boxes = false
-    for n = 1, n3 + (gmode == 1 and AI.n or 0) do
+    for n = 1, n2 + (gmode == 1 and AI.n or 0) do
       local id, X, Y, Z, rad = n, 0, 0, 0, 4
       if n <= NG then
         X, Y, Z = gx[n] - kpx, gy[n] - kpy, gz[n] - kpz
@@ -1746,9 +1492,9 @@ do
         if GSH[k] == 3 then rad = 9 elseif k == 2 or k == 3 then rad = 7 end
       elseif n <= n1 then
         local i = n - NG
-        if qk[i] == 1 or qk[i] >= 4 then
+        if qk[i] == 1 then
           X, Y, Z = qx[i] - kpx, qh[i] * 0.4 - kpy, qz[i] - kpz
-          rad = qh[i] + 1.6
+          rad = qh[i]
         else
           Z = -1e9
         end
@@ -1759,15 +1505,8 @@ do
         X, Y, Z = (x0 + x1) * 0.5 - kpx, (y0 + y1) * 0.5 - kpy, (z0 + z1) * 0.5 - kpz
         rad = (x1 - x0 + y1 - y0 + z1 - z0) * 0.5
         id = 1000 + b
-      elseif n <= n3 then
-        -- a rail: around its middle
-        local i = n - n2
-        local ax, az, bx, bz = SCN.rx1[i], SCN.rz1[i], SCN.rx2[i], SCN.rz2[i]
-        X, Y, Z = (ax + bx) * 0.5 - kpx, SCN.rh[i] * 0.5 - kpy, (az + bz) * 0.5 - kpz
-        rad = ((bx - ax < 0 and ax - bx or bx - ax) + (bz - az < 0 and az - bz or bz - az)) * 0.5 + SCN.rh[i] + 2.5
-        id = 3000 + i
       else
-        local a = n - n3
+        local a = n - n2
         X, Y, Z = AI.x[a] - kpx, AI.y[a] - kpy, AI.z[a] - kpz
         rad = 1
         id = 2000 + a
@@ -2036,153 +1775,8 @@ local line2
     return x * krx + y * kry + z * krz, x * kux + y * kuy + z * kuz, x * kfx + y * kfy + z * kfz
   end
 
-  -- the props, in lines: a leafy tree's round crown, a bush's dome, a bale or a tyre stack's
-  -- outline, a cone, a mast and its lamps, the tent's legs and canopy, the windsock, a post
-  local function drawProp(i, z)
-    local k, h, r = qk[i], qh[i], qr[i]
-    local pat = z < 25 and SOLID or DOTTED
-    local bX, bY, bZ = cam(qx[i], 0, qz[i])
-    local uX, uY, uZ = kry, kuy, kfy                   -- up, 1 m
-    if k == 10 then
-      local x, zz = qx[i], qz[i]
-      local pX, pY, pZ = cam(x + 1.5, 2.4, zz - 1.5)
-      for s = 1, 4 do
-        local dx, dz = (s == 1 or s == 4) and 1.5 or -1.5, s <= 2 and 1.5 or -1.5
-        local qX, qY, qZ = cam(x + dx, 2.4, zz + dz)
-        line3(qX, qY, qZ, qX - uX * 2.4, qY - uY * 2.4, qZ - uZ * 2.4, pat, BLK)
-        line3(pX, pY, pZ, qX, qY, qZ, SOLID, BLK)
-        pX, pY, pZ = qX, qY, qZ
-      end
-      return
-    end
-    local tX, tY, tZ = bX + uX * h, bY + uY * h, bZ + uZ * h
-    if k == 9 or k == 11 or k == 12 then
-      line3(bX, bY, bZ, tX, tY, tZ, pat, BLK)
-      if k == 9 then line3(tX - 0.6, tY, tZ, tX + 0.6, tY, tZ, SOLID, BLK)
-      elseif k == 11 then
-        -- the sock downwind (limp without wind), a long thin triangle
-        local e = 0
-        if S.wind > 0 then
-          e = (S.wind == 1 and 3 or 7) * (1 + 0.3 * sin(gt * 0.009) + 0.2 * sin(gt * 0.031)) / 7.5
-          if e > 1 then e = 1 end
-        end
-        local wx, wy, wz = TR.wx * e * 1.4, -(1 - e) * 1.3 - 0.1, TR.wz * e * 1.4
-        local eX, eY, eZ = tX + wx * krx + wy * kry + wz * krz, tY + wx * kux + wy * kuy + wz * kuz, tZ + wx * kfx + wy * kfy + wz * kfz
-        line3(tX, tY, tZ, eX, eY, eZ, SOLID, BLK)
-        line3(tX - uX * 0.4, tY - uY * 0.4, tZ - uZ * 0.4, eX, eY, eZ, SOLID, BLK)
-      end
-      return
-    end
-    if k == 8 then r = r * 1.5 end
-    if k == 4 or k == 5 then r = k == 4 and h * 0.34 or r end
-    if k == 4 then
-      -- a trunk, the crown a hexagon (near) or a diamond
-      line3(bX, bY, bZ, bX + uX * h * 0.45, bY + uY * h * 0.45, bZ + uZ * h * 0.45, pat, BLK)
-      local cX, cY, cZ = bX + uX * h * 0.65, bY + uY * h * 0.65, bZ + uZ * h * 0.65
-      local n = z < 40 and 6 or 4
-      local oX, oY, oZ = cX + r, cY, cZ
-      for j = 1, n do
-        local a = j * 6.2832 / n
-        local c, s = cos(a) * r, sin(a) * r
-        local X, Y, Z = cX + c + uX * s, cY + uY * s, cZ + uZ * s
-        line3(oX, oY, oZ, X, Y, Z, pat, BLK)
-        oX, oY, oZ = X, Y, Z
-      end
-      return
-    end
-    -- the outline from the ground: a dome or cone (to the top), or a cylinder's sides and top
-    line3(bX - r, bY, bZ, bX + r, bY, bZ, pat, BLK)
-    if k == 5 or k == 8 then
-      line3(bX - r, bY, bZ, tX, tY, tZ, pat, BLK)
-      line3(bX + r, bY, bZ, tX, tY, tZ, pat, BLK)
-    else
-      line3(bX - r, bY, bZ, tX - r, tY, tZ, pat, BLK)
-      line3(bX + r, bY, bZ, tX + r, tY, tZ, pat, BLK)
-      line3(tX - r, tY, tZ, tX + r, tY, tZ, pat, BLK)
-      if k == 7 and z < 25 then line3(bX - r + uX * h * 0.5, bY + uY * h * 0.5, bZ + uZ * h * 0.5, bX + r + uX * h * 0.5, bY + uY * h * 0.5, bZ + uZ * h * 0.5, pat, BLK) end
-    end
-  end
-
-  -- a rail in lines: fences and nets (posts every 5 m near), race tape, a power line's wires
-  -- sagging between its pylons, a banner
-  local function drawRail(i, z)
-    local k, h = SCN.rk[i], SCN.rh[i]
-    local ax, az, bx, bz = SCN.rx1[i], SCN.rz1[i], SCN.rx2[i], SCN.rz2[i]
-    local pat = z < 30 and SOLID or DOTTED
-    local l = sqrt((bx - ax) * (bx - ax) + (bz - az) * (bz - az))
-    local nx, nz = -(bz - az) / l, (bx - ax) / l
-    if k == 4 then
-      local sag = l * 0.03
-      if sag > 3 then sag = 3 end
-      for e = 0, 1 do
-        local x, zz = e == 0 and ax or bx, e == 0 and az or bz
-        local pX, pY, pZ = cam(x, h + 2.2, zz)
-        for s = -1, 1, 2 do
-          local fX, fY, fZ = cam(x + nx * 1.2 * s, 0, zz + nz * 1.2 * s)
-          line3(fX, fY, fZ, pX, pY, pZ, SOLID, BLK)
-        end
-        local cX, cY, cZ = cam(x - nx * 2.4, h, zz - nz * 2.4)
-        local dX, dY, dZ = cam(x + nx * 2.4, h, zz + nz * 2.4)
-        line3(cX, cY, cZ, dX, dY, dZ, SOLID, BLK)
-      end
-      for o = -2, 2, 2 do
-        local y = o == 0 and h + 2 or h
-        local x0, z0 = ax + nx * o, az + nz * o
-        local pX, pY, pZ = cam(x0, y, z0)
-        for j = 1, 2 do
-          local t = j * 0.5
-          local X, Y, Z = cam(x0 + (bx - ax) * t, y - sag * 4 * t * (1 - t), z0 + (bz - az) * t)
-          line3(pX, pY, pZ, X, Y, Z, DOTTED, BLK)
-          pX, pY, pZ = X, Y, Z
-        end
-      end
-      return
-    end
-    local y0 = k == 5 and h - 0.9 or k == 1 and h * 0.5 or 0
-    local aX, aY, aZ = cam(ax, h, az)
-    local bX, bY, bZ = cam(bx, h, bz)
-    line3(aX, aY, aZ, bX, bY, bZ, pat, BLK)
-    if k ~= 3 then
-      local cX, cY, cZ = cam(ax, y0, az)
-      local dX, dY, dZ = cam(bx, y0, bz)
-      if k ~= 2 or z < 30 then line3(cX, cY, cZ, dX, dY, dZ, pat, BLK) end
-    end
-    -- posts: at the ends, and every 5 m on fences and nets near by
-    local m = (k <= 2 and z < 40) and floor(l / 5 + 0.5) or 1
-    if m < 1 then m = 1 end
-    for j = 0, m do
-      local t = j / m
-      local X, Y, Z = cam(ax + (bx - ax) * t, 0, az + (bz - az) * t)
-      line3(X, Y, Z, X + kry * h, Y + kuy * h, Z + kfy * h, pat, BLK)
-    end
-  end
-
-  -- decals on the ground, dotted outlines near by: a strip's long edges, a pond or sand's octagon
-  local function drawDecals()
-    for i = 1, SCN.nd do
-      local cx, cz, ux, uz, vx, vz = SCN.dx[i], SCN.dz[i], SCN.dux[i], SCN.duz[i], SCN.dvx[i], SCN.dvz[i]
-      local dx, dz = cx - kpx, cz - kpz
-      if dx * dx + dz * dz < 1600 + (ux * ux + uz * uz) * 4 then
-        if SCN.dk[i] < 5 then
-          for s = -1, 1, 2 do
-            local aX, aY, aZ = cam(cx - ux + vx * s, 0, cz - uz + vz * s)
-            local bX, bY, bZ = cam(cx + ux + vx * s, 0, cz + uz + vz * s)
-            line3(aX, aY, aZ, bX, bY, bZ, DOTTED, BLK)
-          end
-        else
-          local pX, pY, pZ = cam(cx + ux, 0, cz + uz)
-          for j = 1, 8 do
-            local c, s = cos(j * 0.7854), sin(j * 0.7854)
-            local X, Y, Z = cam(cx + ux * c + vx * s, 0, cz + uz * c + vz * s)
-            line3(pX, pY, pZ, X, Y, Z, DOTTED, BLK)
-            pX, pY, pZ = X, Y, Z
-          end
-        end
-      end
-    end
-  end
-
-  -- the start pad: two squares
+  -- the start pad (two squares), and a windsock behind it to the left (lines, as the Lite's): downwind,
+  -- limp without wind
   local function drawPad()
     local hx, hz = TR.hx, TR.hz
     for s = 1, 2 do
@@ -2195,6 +1789,15 @@ local line2
         pX, pY, pZ = X, Y, Z
       end
     end
+    local x, z = TR.px - hx * 7 - hz * 4, TR.pz - hz * 7 + hx * 4
+    local e = S.wind > 0 and (S.wind == 1 and 3 or 7) * (1 + 0.3 * sin(gt * 0.009) + 0.2 * sin(gt * 0.031)) / 7.5 or 0
+    if e > 1 then e = 1 end
+    local bX, bY, bZ = cam(x, 0, z)
+    local tX, tY, tZ = cam(x, 4, z)
+    local eX, eY, eZ = cam(x + TR.wx * e * 1.4, 3.9 - (1 - e) * 1.3, z + TR.wz * e * 1.4)
+    line3(bX, bY, bZ, tX, tY, tZ, SOLID, BLK)
+    line3(tX, tY, tZ, eX, eY, eZ, SOLID, BLK)
+    line3(tX - kry * 0.4, tY - kuy * 0.4, tZ - kfy * 0.4, eX, eY, eZ, SOLID, BLK)
   end
 
   -- mountains on the horizon: a ridge at infinity every 10 deg, the 13 around the way the camera
@@ -2235,18 +1838,15 @@ local line2
     drawGround()
     drawRidge()
     drawGrid()
-    if SCN.nd > 0 then drawDecals() end
     drawPad()
     collectObjects(90)
     for j = 1, nOrd do
       local o = ordP[j]
       local id, z = ordI[o], ordZ[o]
-      if id < 0 then
-        if qk[-id] == 1 then drawTree(-id, z) else drawProp(-id, z) end
+      if id < 0 then drawTree(-id, z)
       elseif id < 1000 then drawGate(id, z)
       elseif id < 2000 then drawBox(id - 1000, z)
-      elseif id < 3000 then drawAI(id - 2000, z)
-      else drawRail(id - 3000, z) end
+      else drawAI(id - 2000, z) end
     end
   end
 end)()
