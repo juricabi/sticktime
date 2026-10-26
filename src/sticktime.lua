@@ -993,12 +993,20 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     return v
   end
 
+  local hit                                      -- (below: a contact)
 --#if COLOR
+  -- a power line's sag at its middle: 3% of the span, at most 3 m and a quarter of its height (its
+  -- wires stay well off the ground)
+  local function sagOf(l, h)
+    local g = l * 0.03
+    if g > 3 then g = 3 end
+    return g < h * 0.25 and g or h * 0.25
+  end
   -- the solid part of rail i nearest to (x, y, z): its distance and the direction from it to the
   -- point; nil past the rail's ends (posts and pylons there are pillars). Fences and nets are
   -- solid from the ground to their top, banners 0.9 m down from it; race tape is a line at its
   -- height, a power line three wires (2 m either side at its height, the earth wire 2 m above
-  -- the middle) that sag 3% of the span
+  -- the middle) that sag (sagOf)
   local function railNear(i, x, y, z)
     local ax, az = SCN.rx1[i], SCN.rz1[i]
     local ex, ez = SCN.rx2[i] - ax, SCN.rz2[i] - az
@@ -1013,8 +1021,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     if k == 3 then
       ds, dy = s, y - h
     elseif k == 4 then
-      local sag = l * 0.03
-      local w = h - (sag < 3 and sag or 3) * 4 * t * (1 - t)
+      local w = h - sagOf(l, h) * 4 * t * (1 - t)
       ds, dy = s, y - w - 2
       for o = -2, 2, 4 do
         if (s - o) * (s - o) + (y - w) * (y - w) < ds * ds + dy * dy then ds, dy = s - o, y - w end
@@ -1026,6 +1033,76 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     local d = sqrt(ds * ds + dy * dy)
     if d < 1e-4 then return d, nx, 0, nz end
     return d, nx * ds / d, dy / d, nz * ds / d
+  end
+  -- a substep's move from (ox, oy, oz) to the quad against rail i, in the plane across the rail,
+  -- where a fence's, net's or banner's sheet is a vertical segment and tape and wires are points:
+  -- the first moment of the move that the quad (a ball of radius m) touches one, the quad stopped
+  -- there and hit (a sheet is as thin as a wire, and a substep at 40 m/s is half a metre: the
+  -- moment, not where the move ends). Nothing past the rail's ends (posts and pylons are pillars)
+  local m0s, m0y, mms, mmy, mR, mU, mCs, mCy, mF = 0, 0, 0, 0, 0, 0, 0, 0, false
+  -- a point of the rail (a wire, a sheet's edge): when along the move the ball first touches it
+  local function railPt(ws, wy)
+    local a = mms * mms + mmy * mmy
+    local ps, py_ = m0s - ws, m0y - wy
+    local c = ps * ps + py_ * py_ - mR * mR
+    local u = 0
+    if c > 0 then
+      local b = mms * ps + mmy * py_
+      local d = b * b - a * c
+      if a < 1e-12 or b >= 0 or d < 0 then return end
+      u = (-b - sqrt(d)) / a
+    end
+    if u < mU then mU, mCs, mCy, mF = u, ws, wy, false end
+  end
+  local function railStep(i, ox, oy, oz)
+    local ax, az = SCN.rx1[i], SCN.rz1[i]
+    local ex, ez = SCN.rx2[i] - ax, SCN.rz2[i] - az
+    local l2 = ex * ex + ez * ez
+    local t = ((px - ax) * ex + (pz - az) * ez) / l2
+    if t < 0 or t > 1 then return end
+    local l = sqrt(l2)
+    local nx, nz = -ez / l, ex / l
+    local s0, s1 = (ox - ax) * nx + (oz - az) * nz, (px - ax) * nx + (pz - az) * nz
+    local k, h = SCN.rk[i], SCN.rh[i]
+    local m = DR + (k < 3 and 0.04 or 0.03)
+    m0s, m0y, mms, mmy, mR, mU, mF = s0, oy, s1 - s0, py - oy, m, 2, false
+    if k == 3 then
+      railPt(0, h)
+    elseif k == 4 then
+      local w = h - sagOf(l, h) * 4 * t * (1 - t)
+      railPt(-2, w)
+      railPt(2, w)
+      railPt(0, w + 2)
+    else
+      -- the sheet's face: when the move comes within m of its plane, at a height the sheet has
+      local b = k == 5 and h - 0.9 or 0
+      local u = -1
+      if s0 >= m then
+        if s1 < m then u = (s0 - m) / (s0 - s1) end
+      elseif s0 <= -m then
+        if s1 > -m then u = (s0 + m) / (s0 - s1) end
+      else
+        u = 0
+      end
+      if u >= 0 then
+        local y = oy + mmy * u
+        if y >= b and y <= h then mU, mCs, mCy, mF = u, 0, y, true end
+      end
+      railPt(0, h)
+      if b > 0 then railPt(0, b) end
+    end
+    if mU > 1 then return end
+    -- the quad at that moment, out from the rail along the touch's normal
+    local u, cs, cy = mU, mCs, mCy
+    local qs, qy = s0 + mms * u, oy + mmy * u
+    local ds, dy = qs - cs, qy - cy
+    if mF then ds, dy = s0 < 0 and -1 or 1, 0 end           -- (the face: straight back)
+    local d = sqrt(ds * ds + dy * dy)
+    if d < 1e-4 then ds, dy, d = s0 < 0 and -1 or 1, 0, 1 end
+    ds, dy = ds / d, dy / d
+    local sn = cs + ds * m
+    px, py, pz = px + nx * (sn - s1), cy + dy * m, pz + nz * (sn - s1)
+    hit(nx * ds, dy, nz * ds, 0.3)
   end
   -- in a pond (a decal of kind 5), on the ground at (x, z)
   local function inPond(x, z)
@@ -1135,7 +1212,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
   -- props lose most of their thrust and the flight controller its hold, and the quad tumbles about
   -- the point that touched (the rim of a disk the size of the quad, nearest the surface; most at 45
   -- deg to it, none flat on), so the pilot has to fly it out. Nothing breaks: no respawn
-  local function hit(nx, ny, nz, mu)
+  hit = function(nx, ny, nz, mu)
     local vn = -(vx * nx + vy * ny + vz * nz)
     if vn <= 0 then return end
     vx, vy, vz = vx + vn * nx, vy + vn * ny, vz + vn * nz
@@ -1666,20 +1743,8 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
         end
       end
 --#if COLOR
-      -- rails: out along the way from their nearest part (from where it was, when right on it)
-      for j = 1, nr do
-        local i = nearR[j]
-        local d, nx, ny, nz = railNear(i, px, py, pz)
-        local m = DR + (SCN.rk[i] < 3 and 0.04 or 0.03)
-        if d and d < m then
-          if d < 1e-3 then
-            local d0, ax, ay, az = railNear(i, ox, oy, oz)
-            if d0 then nx, ny, nz = ax, ay, az end
-          end
-          px, py, pz = px + nx * (m - d), py + ny * (m - d), pz + nz * (m - d)
-          hit(nx, ny, nz, 0.3)
-        end
-      end
+      -- rails: back to the side the quad came from (railStep)
+      for j = 1, nr do railStep(nearR[j], ox, oy, oz) end
 --#endif
     end
 --#if COLOR
@@ -1696,8 +1761,8 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
             local f = s0 / (s0 - s1)
             local cx, cy, cz = spx + (px - spx) * f, spy + (py - spy) * f, spz + (pz - spz) * f
             local t = ((cx - ax) * ex + (cz - az) * ez) / (ex * ex + ez * ez)
-            local l, h = sqrt(ex * ex + ez * ez) * 0.03, SCN.rh[i]
-            local lo = k == 5 and h - 0.9 or h - (l < 3 and l or 3) * 4 * t * (1 - t)
+            local h = SCN.rh[i]
+            local lo = k == 5 and h - 0.9 or h - sagOf(sqrt(ex * ex + ez * ez), h) * 4 * t * (1 - t)
             if t > 0 and t < 1 and cy < lo - 0.3 and cy > 0.4 then trick("UNDER", 150) end
           end
         end
@@ -3612,8 +3677,9 @@ local AV = STICKTIME_AV == true
           end
         end
       end
-      local sag = len * 0.03
+      local sag = len * 0.03                         -- (as the physics' sagOf)
       if sag > 3 then sag = 3 end
+      if sag > h * 0.25 then sag = h * 0.25 end
       local wc = FC.wire[fi]
       local m = z > 60 and 1 or 3
       for o = -2, 2, 2 do

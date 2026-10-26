@@ -591,6 +591,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     return v
   end
 
+  local hit                                      -- (below: a contact)
   readSticks = function(resolve)
     if resolve then
       for i = 1, 4 do
@@ -686,7 +687,7 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
   -- props lose most of their thrust and the flight controller its hold, and the quad tumbles about
   -- the point that touched (the rim of a disk the size of the quad, nearest the surface; most at 45
   -- deg to it, none flat on), so the pilot has to fly it out. Nothing breaks: no respawn
-  local function hit(nx, ny, nz, mu)
+  hit = function(nx, ny, nz, mu)
     local vn = -(vx * nx + vy * ny + vz * nz)
     if vn <= 0 then return end
     vx, vy, vz = vx + vn * nx, vy + vn * ny, vz + vn * nz

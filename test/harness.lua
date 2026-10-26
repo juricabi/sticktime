@@ -1202,6 +1202,23 @@ do
   if pz_ > 70 then fail(string.format("scenery: through the banner (z %.1f)", pz_)) end
   _, _, pz_ = fly(0, 0.6, 68, 0, 0, 0, 6, 0.8, thr)
   if pz_ < 71 then fail(string.format("scenery: under the banner should pass (z %.1f)", pz_)) end
+  -- at race speed too (35 m/s: a substep is 0.35 m, more than the fence is thick), from start points
+  -- a few cm apart: the fence, the banner and a wire stop it, none is flown through
+  for _, r in ipairs({ { "fence", -20, 1, -90, 1 }, { "banner", 70, 1.75, 0, 3 }, { "power line wire", 48, 11.1, 0, 2 } }) do
+    local thru = 0
+    for k = 0, 7 do
+      local o = 1.5 + k * 0.06
+      local x, z = r[5] == 1 and r[2] + o or 35, r[5] == 1 and 30 or r[2] - o
+      if r[5] == 3 then x = 0 end
+      L.state(4) L.pose(x, r[3], z, r[4], 0, 0)
+      L.vel(r[5] == 1 and -35 or 0, 0, r[5] == 1 and 0 or 35)
+      sticks.ail, sticks.ele, sticks.rud, sticks.thr = 0, 0, 0, thr
+      run(4)
+      local t = { L.get() }
+      if (r[5] == 1 and t[1] < r[2] - 0.3) or (r[5] ~= 1 and t[3] > r[2] + 0.3) then thru = thru + 1 end
+    end
+    if thru > 0 then fail("scenery: at 35 m/s the quad went through the " .. r[1] .. " " .. thru .. " times of 8") end
+  end
   local _, _, _, st = fly(40, 0.4, 0, 0, 0, -2, 0, 0.5, -1024)
   local why = select(2, L.bat("s"))
   if st ~= 5 or why ~= "SPLASH" then fail("scenery: landing in the pond should be a SPLASH (state " .. tostring(st) .. ", " .. tostring(why) .. ")") end
