@@ -653,6 +653,23 @@ footer.credits a { color: inherit; }
         <button class="btn" id="edAddBox" type="button" title="Add a structure in the middle of the map">Add structure</button>
         <button class="btn" id="edAddWall" type="button" title="Add a wall with a gap to fly through: structures around a gap gate">Wall with gap</button>
         <span class="ed-sep" aria-hidden="true"></span>
+        <span class="ed-pair">
+          <select id="edPropKind" aria-label="Kind of prop to add"></select>
+          <button class="btn" id="edAddProp" type="button" title="Add a prop in the middle of the map: a tree, a bush, a hay bale, tyres, a cone, a light mast, a tent, a windsock or a post">Add prop</button>
+        </span>
+        <span class="ed-pair">
+          <select id="edRailKind" aria-label="Kind of rail to add"></select>
+          <button class="btn" id="edAddRail" type="button" title="Add a rail between two points: a fence, a safety net, race tape, a power line or a banner">Add rail</button>
+        </span>
+        <span class="ed-pair">
+          <select id="edDecalKind" aria-label="Kind of decal to add"></select>
+          <button class="btn" id="edAddDecal" type="button" title="Add a decal on the ground: a dirt road, tarmac, gravel, a painted line, a pond or sand">Add decal</button>
+        </span>
+        <span class="ed-pair">
+          <select id="edPreset" aria-label="Set of scenery to add"></select>
+          <button class="btn" id="edAddPreset" type="button" title="Add a set of scenery, grouped: the pilots' area (a tent, a windsock, hay bales), a taped lane, or a fence around the track">Add set</button>
+        </span>
+        <span class="ed-sep" aria-hidden="true"></span>
         <button class="btn icon" id="edRotL" type="button" title="Turn left (Shift+R)" aria-label="Turn left"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M5 3.5v4h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         <button class="btn icon" id="edRotR" type="button" title="Turn right (R)" aria-label="Turn right"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M19 3.5v4h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         <button class="btn" id="edDup" type="button" title="Duplicate (Ctrl+D)">Duplicate</button>
@@ -668,7 +685,7 @@ footer.credits a { color: inherit; }
         <canvas id="edMap" tabindex="0" aria-label="Track map, seen from above" aria-describedby="edHint"></canvas>
         <div class="ed-readout" id="edReadout" aria-hidden="true"></div>
       </div>
-      <p class="note ed-hint" id="edHint">Drag a gate or a structure to move it (it snaps to half metres; hold Alt to place it freely), the round handle to turn a gate, the square handles to size a structure. Drag the ground to pan; wheel or pinch to zoom. On the map: <kbd>R</kbd> turns, <kbd>Del</kbd> deletes, the arrows nudge, <kbd>Shift</kbd>+click selects more, <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes.</p>
+      <p class="note ed-hint" id="edHint">Drag a gate, a structure or a piece of scenery to move it (it snaps to half metres; hold Alt to place it freely), the round handle to turn a gate, the square handles to size a structure or move a rail's end. Drag the ground to pan; wheel or pinch to zoom. On the map: <kbd>R</kbd> turns, <kbd>Del</kbd> deletes, the arrows nudge, <kbd>Shift</kbd>+click selects more, <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes.</p>
       <div class="ed-out">
         <div class="ed-slotrow">
           <label class="field"><span>To slot</span><select id="edSlot" aria-label="To slot: where the Send buttons and Save file put the track (c1 to c8 are tracks 9 to 16 in the game)"></select></label>
@@ -11799,7 +11816,7 @@ const ROBOTO = { r: "d09GMgABAAAAAFV8ABIAAAAAsBgAAFUTAAEAAAAAAAAAAAAAAAAAAAAAAAA
 
 </script>
 <script>
-const TRACK_DATA = {"tracks":[{"name":"Meadow","seed":11,"trees":9,"gates":[[0,0,1,0,0],[0,30,1,15,0],[14,52,2,55,0],[38,56,1,110,0],[50,40,1,180,0],[36,24,1,190,0],[42,6,2,185,0],[32,-14,1,230,0],[12,-20,1,290,0]],"boxes":[]},{"name":"Figure 8","seed":23,"trees":9,"gates":[[-14,10,1,0,0],[6,46,2,40,0],[18,68,1,0,0],[0,88,1,-90,0],[-18,68,1,180,0],[18,16,1,180,0],[0,-4,1,-90,0]],"boxes":[]},{"name":"Dive Tower","seed":37,"trees":9,"gates":[[0,0,1,0,0],[0,26,2,5,0],[6,50,2,25,10],[22,70,1,75,0],[40,62,4,150,6],[36,40,3,200,0],[30,20,1,210,0],[18,6,1,190,0],[24,-14,2,205,0],[6,-22,1,295,0]],"boxes":[]},{"name":"Slalom","seed":53,"trees":9,"gates":[[0,0,5,0,0],[-2,22,7,0,0],[6,40,6,0,0],[-2,58,7,0,0],[6,76,6,0,0],[2,96,4,0,3],[22,112,2,90,0],[44,100,4,120,3],[48,78,7,180,0],[40,60,6,180,0],[48,42,7,180,0],[44,18,3,200,0],[28,-22,1,-90,0]],"boxes":[]},{"name":"Hoop Forest","seed":61,"trees":18,"gates":[[0,0,1,0,0],[6,22,4,35,2.4],[22,32,4,35,5],[28,52,4,45,3],[48,58,4,115,6],[56,38,2,140,0],[72,28,4,155,2],[70,6,4,220,4],[48,0,3,245,0],[30,-14,4,245,2.2],[12,-18,4,290,3]],"boxes":[]},{"name":"Grand Prix","seed":71,"trees":9,"gates":[[0,0,5,0,0],[0,46,1,5,0],[6,84,2,30,6],[26,100,7,90,0],[36,74,4,150,3],[50,58,1,90,0],[68,78,4,50,3],[92,92,7,120,0],[100,62,3,200,0],[88,30,1,175,0],[104,6,2,190,8],[80,-14,1,255,0],[50,-10,4,260,2.2],[26,-24,1,275,0]],"boxes":[]},{"name":"Bando","seed":83,"trees":9,"gates":[[0,0,1,0,0],[0,34,8,0,1.8],[0,46,8,0,1.8],[20,66,4,60,4],[40,88,3,146,0],[56,64,1,180,0],[43.95,10,8,180,1.3],[22,-16,4,250,2.5]],"boxes":[[-6.225,34,4.025,0.25,0,7,1],[6.225,34,4.025,0.25,0,7,1],[0,34,2.2,0.25,3.6,7,1],[-6.225,46,4.025,0.25,0,7,1],[6.225,46,4.025,0.25,0,7,1],[0,46,2.2,0.25,3.6,7,1],[-10,40,0.25,5.75,0,7,1],[10,36.025,0.25,1.775,0,7,1],[10,43.975,0.25,1.775,0,7,1],[10,40,0.25,2.2,3.6,7,1],[46,64,2,2,0,36,1],[33.6,10,1.25,3,0,2.6,2],[40.5,10,1.25,3,0,2.6,3],[47.4,10,1.25,3,0,2.6,2],[-30,20,3,1.25,0,5.2,3],[-36,50,4,4,0,3,1]]},{"name":"Pro Track","seed":97,"trees":9,"gates":[[0,0,1,0,0],[0,22,2,0,0],[0,44,3,0,0],[8,62,7,90,0],[16,44,4,180,0],[16,22,1,180,0],[24,4,6,90,0],[32,22,1,0,0],[32,46,2,0,0],[32,46,1,180,0],[46,26,4,160,3],[48,4,1,180,0],[46,-14,7,225,0],[24,-22,1,270,0]],"boxes":[]}],"GT":0.28,"FLAGH":3.4,"TREES":18,"GHW":[1.5,1.5,2.0,1.25,2.4,6.0,6.0,2.2],"GHH":[1.0,1.0,2.0,1.25,2.4,30.0,30.0,1.8],"GCY":[1.35,5.5,7.0,2.4,0.0,0.0,0.0,2.0]};
+const TRACK_DATA = {"tracks":[{"name":"Meadow","seed":11,"trees":9,"gates":[[0,0,1,0,0],[0,30,1,15,0],[14,52,2,55,0],[38,56,1,110,0],[50,40,1,180,0],[36,24,1,190,0],[42,6,2,185,0],[32,-14,1,230,0],[12,-20,1,290,0]],"boxes":[],"props":[[16,18,4,0],[19,21,4,0],[16,23,4,0],[62,22,4,0],[63,26,4,0],[-12,42,4,0],[-15,45,4,0],[-18,62,2,0],[68,-2,2,0],[24,80,2,0],[80,30,2,0],[-10,16,3,0],[56,66,3,0],[6,68,3,0]],"rails":[[-30,-36,64,-36,1,0]],"decals":[[-24,22,56,1.8,0,1],[66,68,7,4,30,5],[17,21,5,4,0,6]]},{"name":"Figure 8","seed":23,"trees":9,"gates":[[-14,10,1,0,0],[6,46,2,40,0],[18,68,1,0,0],[0,88,1,-90,0],[-18,68,1,180,0],[18,16,1,180,0],[0,-4,1,-90,0]],"boxes":[],"props":[[30,-12,7,0],[-30,-12,7,0],[32,42,7,0],[-32,42,7,0],[30,98,7,0],[-30,98,7,0],[26,4,6,0],[26,24,6,0],[26,44,6,0],[26,64,6,0],[26,84,6,0],[-26,4,6,0],[-26,24,6,0],[-26,44,6,0],[-26,64,6,0],[-26,84,6,0]],"rails":[],"decals":[[0,42,60,36,0,2],[28,42,52,0.08,0,4],[-28,42,52,0.08,0,4],[0,-16,30,0.08,90,4],[0,100,30,0.08,90,4]]},{"name":"Dive Tower","seed":37,"trees":9,"gates":[[0,0,1,0,0],[0,26,2,5,0],[6,50,2,25,10],[22,70,1,75,0],[40,62,4,150,6],[36,40,3,200,0],[30,20,1,210,0],[18,6,1,190,0],[24,-14,2,205,0],[6,-22,1,295,0]],"boxes":[],"props":[[54,82,7,0],[-12,40,7,0],[60,30,7,0],[-20,70,2,0],[66,100,2,0],[10,102,2,0],[-14,10,3,0],[72,50,3,0]],"rails":[[-44,-34,84,-34,4,0]],"decals":[[36,52,14,9,0,3],[-26,30,50,1.6,0,1]]},{"name":"Slalom","seed":53,"trees":9,"gates":[[0,0,5,0,0],[-2,22,7,0,0],[6,40,6,0,0],[-2,58,7,0,0],[6,76,6,0,0],[2,96,4,0,3],[22,112,2,90,0],[44,100,4,120,3],[48,78,7,180,0],[40,60,6,180,0],[48,42,7,180,0],[44,18,3,200,0],[28,-22,1,-90,0]],"boxes":[],"props":[[3,22,5,0],[1,40,5,0],[3,58,5,0],[1,76,5,0],[45,78,5,0],[43,60,5,0],[45,42,5,0],[-8,-12,6,0],[8,-12,6,0]],"rails":[[-16,10,-16,40,5,0],[-16,50,-16,80,5,0],[66,90,66,60,5,0],[66,50,66,20,5,0]],"decals":[[2,48,50,8,0,1],[44,60,42,8,0,1]]},{"name":"Hoop Forest","seed":61,"trees":18,"gates":[[0,0,1,0,0],[6,22,4,35,2.4],[22,32,4,35,5],[28,52,4,45,3],[48,58,4,115,6],[56,38,2,140,0],[72,28,4,155,2],[70,6,4,220,4],[48,0,3,245,0],[30,-14,4,245,2.2],[12,-18,4,290,3]],"boxes":[],"props":[[-14,46,2,0],[-8,64,2,0],[36,78,2,0],[60,80,2,0],[92,40,2,0],[90,10,2,0],[64,-24,2,0],[38,-38,2,0],[30,12,2,0],[52,14,2,0],[46,28,3,0],[-16,20,3,0],[84,60,3,0],[20,-36,3,0]],"rails":[],"decals":[[40,20,7,5,20,5],[-18,30,50,1.4,10,1]]},{"name":"Grand Prix","seed":71,"trees":9,"gates":[[0,0,5,0,0],[0,46,1,5,0],[6,84,2,30,6],[26,100,7,90,0],[36,74,4,150,3],[50,58,1,90,0],[68,78,4,50,3],[92,92,7,120,0],[100,62,3,200,0],[88,30,1,175,0],[104,6,2,190,8],[80,-14,1,255,0],[50,-10,4,260,2.2],[26,-24,1,275,0]],"boxes":[],"props":[[-14,10,8,0],[-14,18,8,0],[110,40,5,0],[112,47,5,0],[114,54,5,0],[-16,60,7,0],[60,112,7,0],[122,20,7,0],[40,30,7,0]],"rails":[[-10,28,-10,54,5,0],[15,28,15,54,5,0],[-30,132,130,132,4,0]],"decals":[[0,23,34,5,0,2],[0,0,5,0.15,90,4],[5,23,34,0.08,0,4],[-5,23,34,0.08,0,4]]},{"name":"Bando","seed":83,"trees":9,"gates":[[0,0,1,0,0],[0,34,8,0,1.8],[0,46,8,0,1.8],[20,66,4,60,4],[40,88,3,146,0],[56,64,1,180,0],[43.95,10,8,180,1.3],[22,-16,4,250,2.5]],"boxes":[[-6.225,34,4.025,0.25,0,7,1],[6.225,34,4.025,0.25,0,7,1],[0,34,2.2,0.25,3.6,7,1],[-6.225,46,4.025,0.25,0,7,1],[6.225,46,4.025,0.25,0,7,1],[0,46,2.2,0.25,3.6,7,1],[-10,40,0.25,5.75,0,7,1],[10,36.025,0.25,1.775,0,7,1],[10,43.975,0.25,1.775,0,7,1],[10,40,0.25,2.2,3.6,7,1],[46,64,2,2,0,36,1],[33.6,10,1.25,3,0,2.6,2],[40.5,10,1.25,3,0,2.6,3],[47.4,10,1.25,3,0,2.6,2],[-30,20,3,1.25,0,5.2,3],[-36,50,4,4,0,3,1]],"props":[[-24,0,5,0],[-26,4,5,0],[30,-28,5,0],[64,-6,10,0],[64,4,10,0]],"rails":[[-80,-52,104,-52,4,0]],"decals":[[20,40,30,22,0,3],[46,80,8,5,40,1]]},{"name":"Pro Track","seed":97,"trees":9,"gates":[[0,0,1,0,0],[0,22,2,0,0],[0,44,3,0,0],[8,62,7,90,0],[16,44,4,180,0],[16,22,1,180,0],[24,4,6,90,0],[32,22,1,0,0],[32,46,2,0,0],[32,46,1,180,0],[46,26,4,160,3],[48,4,1,180,0],[46,-14,7,225,0],[24,-22,1,270,0]],"boxes":[],"props":[[-16,12,8,0],[-16,20,8,0],[64,72,7,0],[64,-32,7,0],[-18,-32,7,0],[-18,72,7,0]],"rails":[[-12,82,62,82,2,0],[-12,30,-12,54,5,0]],"decals":[[-16,16,8,4,0,1]]}],"GT":0.28,"FLAGH":3.4,"TREES":18,"GHW":[1.5,1.5,2.0,1.25,2.4,6.0,6.0,2.2],"GHH":[1.0,1.0,2.0,1.25,2.4,30.0,30.0,1.8],"GCY":[1.35,5.5,7.0,2.4,0.0,0.0,0.0,2.0],"PH":[9.0,8.0,1.4,1.2,1.0,0.5,10.0,2.6,4.0,2.0],"PR":[0.14,0.18,0.6,0.62,0.4,0.34,0.012,0.58,0.02,0.05],"RH":[1.8,4.0,1.0,12.0,2.2]};
 const GAME_FILES = 'sdcard/';
 const GALLERY = {"tracks":[{"file":"bjelovar-stonehenge.txt","name":"Stonehenge Bando","by":"StickTime","about":"The \"Bjelovar Stonehenge\", the unfinished Pevec centre at Lepirac, as measured: a 61 x 32 m frame on an open basement, four floors, the atrium dive, the cores, the wall corridor, both towers and the beam frames. Color radios, StickTime 1.8.0 and later. Map data \u00a9 OpenStreetMap contributors.","source":"https://www.openstreetmap.org/way/917115123","text":"Stonehenge Bando\n2 968119 7 30 77.32 -2 1 0 1.6 56.23 29.65 1 0 16.35 50 95 1 345 6 32.5 107.4 1 270 4 -7 94 1 180 3 -7 66 1 180 3 -9 36 1 180 27.6 -11 20 1 180 26.62 -21.4 -13 1 270 27.25 -54.2 -13 1 270 8.8 -70 2 1 0 11 -45 15 1 90 17.5 -21 6.35 1 90 22.9 -5.5 6.3 8 90 22.4 3.5 6.3 8 90 9.4 12.9 6.35 1 90 8.78 32.6 -50.15 1 157 7.88 44.6 -70.11 1 149 7.88 56.6 -90.07 1 149 7.88 74 -101 6 50 0 77.6 -60.13 1 0 2.6 65.8 -27.15 1 0 2.8 / -4 1.8 16.2 30.4 5.25 5.9 1 -4 -13.55 16.2 15.05 10.6 10.9 1 -4 21.7 16.2 10.5 10.6 10.9 1 -13.35 6.35 6.85 4.85 10.6 10.9 1 9.25 6.35 2.95 4.85 10.6 10.9 1 -4 -13.55 16.2 15.05 14.07 14.37 1 -4 21.7 16.2 10.5 14.07 14.37 1 -13.35 6.35 6.85 4.85 14.07 14.37 1 9.25 6.35 2.95 4.85 14.07 14.37 1 -4 -13.55 16.2 15.05 17.55 17.85 1 -4 21.7 16.2 10.5 17.55 17.85 1 -13.35 6.35 6.85 4.85 17.55 17.85 1 9.25 6.35 2.95 4.85 17.55 17.85 1 -4 -13.55 16.2 15.05 21.03 21.33 1 -4 21.7 16.2 10.5 21.03 21.33 1 -13.35 6.35 6.85 4.85 21.03 21.33 1 9.25 6.35 2.95 4.85 21.03 21.33 1 -4 -13.55 16.2 15.05 24.5 24.8 1 -4 21.7 16.2 10.5 24.5 24.8 1 -13.35 6.35 6.85 4.85 24.5 24.8 1 9.25 6.35 2.95 4.85 24.5 24.8 1 -20.52 31.7 0.32 0.33 0 24.8 1 12.52 31.7 0.33 0.33 0 24.8 1 -20.52 21.7 0.32 0.32 0 24.8 1 12.52 21.7 0.33 0.32 0 24.8 1 -20.52 11.7 0.32 0.32 0 24.8 1 12.52 11.7 0.33 0.32 0 24.8 1 -20.52 1.7 0.32 0.33 0 24.8 1 12.52 1.7 0.33 0.33 0 24.8 1 -20.52 -8.3 0.32 0.32 0 24.8 1 12.52 -8.3 0.33 0.32 0 24.8 1 -20.52 -18.3 0.32 0.32 0 24.8 1 12.52 -18.3 0.33 0.32 0 24.8 1 -20.52 -28.3 0.32 0.32 0 24.8 1 12.52 -28.3 0.33 0.32 0 24.8 1 -20.1 1.8 0.1 30.4 24.8 25.85 1 12.1 1.8 0.1 30.4 24.8 25.85 1 -4 32.1 16 0.1 24.8 25.85 1 -1 -26.9 6 1.7 24.8 31.5 1 4 30.5 3.2 1.5 24.8 27.8 1 -17.65 72.1 4.85 39.9 0 2.8 1 -17.65 -69.35 4.85 40.65 0 2.8 1 56.23 29.65 2.88 1.7 0 14.35 1 56.23 -27.15 2.88 1.7 0 14.35 1 71.6 -59.63 0.3 0.3 0 14.95 1 83.6 -59.63 0.3 0.3 0 14.95 1 29.6 -50.15 18.3 0.2 4.45 5.45 1 29.6 -50.15 18.3 0.2 10.3 10.9 1 11.6 -49.65 0.3 0.3 0 14.95 1 23.6 -49.65 0.3 0.3 0 14.95 1 35.6 -49.65 0.3 0.3 0 14.95 1 47.6 -49.65 0.3 0.3 0 14.95 1 41.6 -70.11 18.3 0.2 4.45 5.45 1 41.6 -70.11 18.3 0.2 10.3 10.9 1 23.6 -69.61 0.3 0.3 0 14.95 1 35.6 -69.61 0.3 0.3 0 14.95 1 47.6 -69.61 0.3 0.3 0 14.95 1 59.6 -69.61 0.3 0.3 0 14.95 1 53.6 -90.07 18.3 0.2 4.45 5.45 1 53.6 -90.07 18.3 0.2 10.3 10.9 1 35.6 -89.57 0.3 0.3 0 14.95 1 47.6 -89.57 0.3 0.3 0 14.95 1 59.6 -89.57 0.3 0.3 0 14.95 1 71.6 -89.57 0.3 0.3 0 14.95 1\n"},{"file":"multigp-2017-utt.txt","name":"MultiGP UTT 2017","by":"MultiGP","about":"Universal Time Trial track 1 (2017): five gates in one long loop. MultiGP's layout, scaled 1.7x to the game's gates.","source":"https://www.multigp.com/wp-content/uploads/2017/05/MultiGP-universal-time-trial-track1.pdf","text":"MultiGP UTT 2017\n1 285132 17 0 0 0 1 0 0 0 95.34 1 0 0 -23.84 47.67 1 180 0 -47.67 95.34 1 0 0 -23.84 -23.84 1 90 0\n"},{"file":"multigp-2018-rq.txt","name":"MultiGP RQ 2018","by":"MultiGP, designed by Nelson Aquino","about":"The 2018 Regional Qualifier: eight gates, a split-S gate, a double gate to fly over, a hurdle (a low high gate here) and 11 flags. MultiGP's layout, scaled 1.7x to the game's gates.","source":"https://www.multigp.com/wp-content/uploads/2018/05/MultiGP-2018-regional-qualifier-track-diagram5.pdf","text":"MultiGP RQ 2018\n1 401681 18 0 1.29 0 1 0 0 0 23.8 7 0 0 0 47.6 6 0 0 0 71.4 7 0 0 0 96.49 1 270 0 -25.64 85.14 2 225 3.6 -36.99 59.5 1 180 0 -23.8 35.7 7 211 0 -46.31 35.7 1 0 0 -52.26 35.7 2 180 4 -58.21 35.7 1 0 0 -48.89 71.4 2 0 4 -48.89 71.4 1 180 0 -84.59 35.7 1 180 0 -59.5 11.9 7 150 0 -46.31 0 1 0 0 -71.4 0 6 231 0 -47.6 -36.99 1 90 0 -23.8 -35.7 6 73 0\n"},{"file":"multigp-2019-gq.txt","name":"MultiGP GQ 2019","by":"MultiGP, designed by Nelson Aquino","about":"The 2019 Global Qualifier: two double-gate towers, five gates and five flags, with a figure 8 through the middle tower. MultiGP's layout, scaled 1.7x to the game's gates.","source":"https://www.multigp.com/how-to-set-up-the-2019-global-qualifier-track-accurately/","text":"MultiGP GQ 2019\n1 445486 19 0 -1.55 18.14 1 0 0 -22.28 59.59 2 0 4 -1.55 80.31 1 185 0 -15.54 94.31 7 225 0 -15.54 91.04 1 270 0 -15.54 98.24 1 90 0 -32.64 101.04 1 180 0 -34.46 81.87 7 180 0 -32.64 80.31 1 180 0 -22.28 59.59 1 180 0 -32.64 28.5 2 180 4 -32.64 28.5 1 0 0 -36.27 15.54 6 200 0 -25.91 7.77 6 125 0 -15.54 0 6 79 0\n"},{"file":"multigp-2020-gq.txt","name":"MultiGP GQ 2020","by":"MultiGP, designed by Nelson Aquino","about":"The 2020 Global Qualifier: two split-S towers, a triple-gate weave and five flags. Where the diagram loops back through a tower or the triple, this flies a split-S and a weave. MultiGP's layout, scaled 1.7x to the game's gates.","source":"https://www.multigp.com/2020-multigp-series-global-qualifier-track-diagram/","text":"MultiGP GQ 2020\n1 7238 20 0 -36.1 25.5 1 0 0 -28.9 51 6 0 0 -36.1 76.5 1 0 0 -20.4 100.7 2 90 4 -20.4 100.7 1 270 0 -11.9 85 6 180 0 -2.1 102 2 0 4 -2.1 102 1 180 0 -3.4 85 7 180 0 -11.9 61.81 1 90 0 -11.9 58.2 1 270 0 -11.9 54.6 1 90 0 -4.7 34 1 180 0 -11.9 17 7 180 0 -28.9 8.5 7 0 0\n"},{"file":"multigp-2021-gq.txt","name":"MultiGP GQ 2021","by":"MultiGP, designed by Anthony \"AyyyKayyy\" Knight","about":"The 2021 Global Qualifier: two double gates, six gates, five flags and a hurdle (a high gate here). The power loop at the second double gate is flown as a half loop here: through the bottom, back through the top. MultiGP's layout, scaled 1.7x to the game's gates.","source":"https://www.multigp.com/2021-multigp-series-global-qualifier-track-diagram/","text":"MultiGP GQ 2021\n1 230590 21 0 1.58 20.4 1 0 0 -25.5 52.61 2 270 4 -42.5 75.82 6 315 0 -42.5 78.2 1 270 0 -42.5 91.46 1 90 0 -23.85 76.5 1 180 0 -23.85 76.5 2 0 4 -1.53 76.5 1 180 0 -25.5 52.61 1 270 0 -42.33 54.31 2 270 3 -42.5 51 6 180 0 -42.5 34 6 90 0 -25.5 34 7 180 0 -25.5 18.53 1 270 0 -25.5 10.13 1 270 0 -25.5 0 6 90 0\n"},{"file":"multigp-2022-gq.txt","name":"MultiGP GQ 2022","by":"MultiGP, designed by Anthony \"AyyyKayyy\" Knight","about":"The 2022 Global Qualifier: a double gate (flown bottom first here; the diagram has the top first), eight gates, five flags with tight turns round them and a hurdle (a high gate here). MultiGP's layout, scaled 1.7x to the game's gates.","source":"https://www.multigp.com/2022-multigp-series-global-qualifier-track-diagram-2/","text":"MultiGP GQ 2022\n1 594079 22 0 1.29 33.15 1 0 0 8.33 72.59 7 150 0 13.7 51.85 1 180 0 17.95 51.85 1 180 0 13.7 51.85 2 0 4 13.7 72.59 1 0 0 25.84 85 7 90 0 43.6 82.45 2 90 3 44.54 86.02 6 0 0 42.09 85 1 180 0 42.94 51.85 1 180 0 38.69 51.85 1 180 0 43.52 33.15 6 120 0 45.83 33.15 1 180 0 23.8 11.12 1 270 0 23.8 13.43 7 0 0\n"},{"file":"multigp-2023-gq.txt","name":"MultiGP GQ 2023","by":"MultiGP, designed by Anthony \"AyyyKayyy\" Knight","about":"The 2023 Global Qualifier: three H-gates (a flag on a gate's leg), a triple gate (flown as a weave here: the diagram has two of its gates the same way), two gates in line and a hurdle (a low high gate here). MultiGP's layout, scaled 1.7x to the game's gates.","source":"https://www.multigp.com/wp-content/uploads/2023/03/2023-MultiGP-GQ-track-official-diagram-metric.png","text":"MultiGP GQ 2023\n1 871088 23 0 25.91 1.81 1 90 0 42.49 17.1 6 0 0 42.49 34.37 7 0 0 42.49 36.01 1 90 0 42.49 51.12 6 0 0 42.49 49.48 1 270 0 25.91 68.4 2 0 2.5 44.04 84.98 1 180 0 22.8 70.21 1 270 0 1.81 51.3 1 180 0 5.96 51.3 1 0 0 10.1 51.3 1 180 0 8.29 20.55 7 180 0 8.29 32.39 1 90 0 8.29 18.91 1 275 0\n"},{"file":"multigp-2024-gq-spring.txt","name":"MultiGP GQ 24 Sp","by":"MultiGP, designed by Solace","about":"\"Anole\", the 2024 Spring Global Qualifier: a side-by-side pair, a stacked double gate, a hurdle (a low high gate here) and five flags. MultiGP's layout, scaled 1.7x to the game's gates.","source":"https://www.multigp.com/globalqualifier/gq-2024-spring-track/","text":"MultiGP GQ 24 Sp\n1 754909 24 0 1.78 22.78 1 0 0 8.58 48.11 1 0 0 4.42 48.11 1 0 0 3.31 68.34 1 0 0 30.35 73.61 2 180 4 30.35 73.61 1 180 0 35.27 73.61 2 0 2.4 36.12 89.08 1 355 0 38.93 73.61 7 180 0 39.95 60.18 6 225 0 42.75 60.18 1 180 0 42.75 31.11 1 180 0 41.11 31.11 7 0 0 42.75 31.11 1 180 0 22.78 17.68 6 135 0 37.91 1.78 1 270 0 14.45 7.82 7 290 0\n"},{"file":"multigp-2024-gq-summer.txt","name":"MultiGP GQ 24 Su","by":"MultiGP, designed by Avalt","about":"\"Gecko\", the 2024 Summer Global Qualifier: ten gates with a four-gate diagonal weave, a far double, a hurdle (a gate here) and five flags; one more flag sends the line round the far double. MultiGP's layout, scaled 1.7x to the game's gates.","source":"https://www.multigp.com/globalqualifier/2024-summer-gq-verification/","text":"MultiGP GQ 24 Su\n1 260982 24 0 14.9 17.79 1 310 0 1.81 43.53 1 0 0 14.25 43.53 1 180 0 4.66 43.53 7 40 0 45.08 56.48 1 90 0 44.04 60.11 6 0 0 16.06 78.24 7 345 0 16.06 89.12 7 120 0 16.06 81.09 1 270 0 16.06 85.24 1 90 0 46.89 60.11 1 180 0 43.53 43.53 7 195 0 31.09 26.43 6 176 0 43.8 12.71 1 135 0 40.87 9.78 1 315 0 35.3 4.21 1 135 0 32.37 1.28 1 315 0\n"},{"file":"multigp-2025-gq.txt","name":"MultiGP GQ 2025","by":"MultiGP, designed by Alvaro \"KLG\" Gonzalez","about":"\"Ursa\", the 2025 Spring Global Qualifier: a tower flown top then bottom, a side-by-side pair (its power loop flown as a U-turn here: the first gate the other way), an angled gate, a hurdle and five flags. MultiGP's layout, scaled 1.7x to the game's gates.","source":"https://www.multigp.com/globalqualifier/2025-spring-gq-verification/","text":"MultiGP GQ 2025\n1 128985 25 0 23.32 1.81 1 90 0 40.68 25.91 1 180 0 37.83 25.91 7 270 0 26.17 25.91 1 180 0 21.5 25.91 1 0 0 16.32 54.41 2 0 4 32.9 54.41 1 180 0 30.05 54.41 7 30 0 38.43 86.43 2 320 2.4 35.64 84.11 6 250 0 27.71 79.86 1 230 0 7.51 88.09 1 0 0 4.66 88.09 6 270 0 1.81 88.09 1 180 0 16.32 54.41 1 180 0 5.18 18.14 6 160 0\n"},{"file":"multigp-2026-cdra.txt","name":"MultiGP CDRA 26","by":"MultiGP","about":"The 2025-26 college (CDRA) qualifier: five gates and three flags. The diagram's loops round the flags at gates 4 and 5 are single turns here. MultiGP's layout, scaled 1.7x to the game's gates.","source":"https://www.multigp.com/wp-content/uploads/2025/08/2026-CDRA-Track-Diagram.pdf","text":"MultiGP CDRA 26\n1 453792 26 0 31.35 0 1 0 0 1.81 0 1 0 0 1.81 17.1 1 0 0 4.66 17.1 7 90 0 17.36 8.29 1 180 0 14.51 8.29 7 270 0 14.51 -21.5 1 90 0 14.51 -18.65 6 0 0\n"}]};
 const GALLERY_FILES = 'tracks/';
@@ -11824,11 +11841,23 @@ const GALLERY_FILES = 'tracks/';
   const GHW = [0, ...D.GHW], GHH = [0, ...D.GHH];   // by gate type 1-8: inner half width, half height
   const GCY = [0, ...D.GCY];                        // centre height when the file says 0
   const TYPES = ['', 'Gate', 'High gate', 'Dive gate', 'Hoop', 'Arch', 'Flag, pass right', 'Flag, pass left', 'Gap in a wall'];
-  const KINDS = ['', 'Concrete', 'Red container', 'Blue container'];
+  const KINDS = ['', 'Concrete', 'Red container', 'Blue container', 'Wood', 'Brick', 'Dark steel', 'White', 'Yellow container', 'Green container'];
+  // the scenery (buildTrack's props, rails and decals): kinds, and the game's default heights and
+  // radii (PH, PR, RH)
+  const PKINDS = ['', 'Conifer', 'Leafy tree', 'Bush', 'Hay bale', 'Tyre stack', 'Traffic cone', 'Light mast', 'Tent', 'Windsock', 'Post'];
+  const RKINDS = ['', 'Fence', 'Safety net', 'Race tape', 'Power line', 'Banner'];
+  const DKINDS = ['', 'Dirt road', 'Tarmac', 'Gravel', 'Painted line', 'Pond', 'Sand'];
+  const PH = [0, ...D.PH], PR = [0, ...D.PR], RH = [0, ...D.RH];
   // format 1, for every edition: 24 gates, 16 structures, 999 bytes (StickTime BW reads 1000); format 2,
-  // a bigger track, for the color edition from BIG_FROM on (StickTime BW and earlier versions list format 1 only)
+  // a bigger track, for the color edition from BIG_FROM on (StickTime BW and earlier versions list format 1 only).
+  // Formats 3 and 4 (SCENE_FROM on) are 1 and 2 with the scenery and structure kinds 4-9: format 3 for
+  // both editions (24 gates, 16 structures, 32 props, 12 rails, 8 decals, 1599 bytes), 4 for color radios
   const MAX_GATES = 48, MAX_BOXES = 64, MAX_BYTES = 5999, SLOTS = 8;
+  const MAX_PROPS = 128, MAX_RAILS = 32, MAX_DECALS = 32, MAX_BYTES4 = 9999;
   const F1_GATES = 24, F1_BOXES = 16, F1_BYTES = 999, BIG_FROM = '1.8.0';
+  const F3_PROPS = 32, F3_RAILS = 12, F3_DECALS = 8, F3_BYTES = 1599, SCENE_FROM = '1.10.0';
+  const MOST = [0, 1000, 6000, 1600, 10000];        // what the game reads of a file, by format
+  const RAIL_MAX = 200;                             // a rail's longest (m; the game's Bando has one of 184 m)
   const TOL = 0.02;          // faces this close count as touching (the game's draw-order rule)
   const GRID = 0.5;          // drags snap to it; Alt drags to the cm
   const DIR = '/SCRIPTS/TOOLS/StickTimeTracks/';
@@ -11859,28 +11888,44 @@ const GALLERY_FILES = 'tracks/';
   const gateOf = (x, z, t, yaw, h) => ({ x: pos(x), z: pos(z), t, yaw: normYaw(yaw), h: r2(clamp(h, 0, 100)) });
   const boxOf = (x, z, hx, hz, y0, y1, k) => ({ x: pos(x), z: pos(z), hx: r2(clamp(Math.abs(hx), 0.05, 200)), hz: r2(clamp(Math.abs(hz), 0.05, 200)),
     y0: r2(clamp(y0, 0, 200)), y1: r2(clamp(y1, 0.1, 300)), k });
+  // a height of 0 is the kind's own (PH, RH)
+  const propOf = (x, z, k, h) => ({ x: pos(x), z: pos(z), k, h: r2(clamp(h, 0, 40)) });
+  const railOf = (x1, z1, x2, z2, k, h) => ({ x1: pos(x1), z1: pos(z1), x2: pos(x2), z2: pos(z2), k, h: r2(clamp(h, 0, 40)) });
+  const decalOf = (x, z, a, b, yaw, k) => ({ x: pos(x), z: pos(z), a: r2(clamp(Math.abs(a), 0.05, 200)), b: r2(clamp(Math.abs(b), 0.05, 200)), yaw: normYaw(yaw), k });
 
   // ---------------------------------------------------------------- the file
   // A track: { name, seed, trees, gates: [{ id, g, x, z, t, yaw, h }], boxes: [{ id, g, x, z, hx, hz,
-  // y0, y1, k }] }. id is the editor's handle on an item and g its group (0: none): not in the file.
+  // y0, y1, k }], props: [{ id, g, x, z, k, h }], rails: [{ id, g, x1, z1, x2, z2, k, h }], decals:
+  // [{ id, g, x, z, a, b, yaw, k }] } (a, b: half length and half width). id is the editor's handle
+  // on an item and g its group (0: none): not in the file.
+  // the scenery: props, rails or decals, or a structure of a kind 4 to 9 (formats 3 and 4)
+  const scenic = (T) => !!(T.props.length || T.rails.length || T.decals.length || T.boxes.some((b) => b.k > 3));
   function numbersOf(T) {
     const a = [String(T.seed), String(T.trees)];
     for (const g of T.gates) a.push(dec(g.x), dec(g.z), String(g.t), String(normYaw(g.yaw)), dec(g.h));
     let s = a.join(' ');
-    if (T.boxes.length) {
-      s += ' / ' + T.boxes.map((b) => [dec(b.x), dec(b.z), dec(b.hx), dec(b.hz), dec(b.y0), dec(b.y1), String(b.k)].join(' ')).join(' ');
+    const boxes = T.boxes.map((b) => [dec(b.x), dec(b.z), dec(b.hx), dec(b.hz), dec(b.y0), dec(b.y1), String(b.k)].join(' ')).join(' ');
+    if (!scenic(T)) return boxes ? s + ' / ' + boxes : s;
+    // formats 3 and 4: every section, an empty one too: gates / structures / props / rails / decals
+    for (const sec of [boxes, T.props.map((p) => [dec(p.x), dec(p.z), String(p.k), dec(p.h)].join(' ')).join(' '),
+      T.rails.map((r) => [dec(r.x1), dec(r.z1), dec(r.x2), dec(r.z2), String(r.k), dec(r.h)].join(' ')).join(' '),
+      T.decals.map((d) => [dec(d.x), dec(d.z), dec(d.a), dec(d.b), String(normYaw(d.yaw)), String(d.k)].join(' ')).join(' ')]) {
+      s += ' /' + (sec ? ' ' + sec : '');
     }
     return s;
   }
   // name, then: the format, the id (FNV-1a of the numbers after it, mod 999999, + 1), the numbers.
-  // Format 1 while the track fits every edition, else 2
+  // The smallest format the track fits: 1 (every edition), 2 (a bigger track, color radios), and
+  // with scenery 3 (color and B&W) or 4 (a bigger one, color radios)
   function fileOf(T) {
     const nums = numbersOf(T);
     const id = fnv1a(nums) % 999999 + 1;
-    const text1 = T.name.trim() + '\n1 ' + id + ' ' + nums + '\n';
-    const bytes = new TextEncoder().encode(text1).length;
-    const format = T.gates.length > F1_GATES || T.boxes.length > F1_BOXES || bytes > F1_BYTES ? 2 : 1;
-    return { text: format === 1 ? text1 : T.name.trim() + '\n2 ' + id + ' ' + nums + '\n', id, bytes, format };
+    const head = T.name.trim() + '\n';
+    const bytes = new TextEncoder().encode(head + '1 ' + id + ' ' + nums + '\n').length;
+    const small = T.gates.length <= F1_GATES && T.boxes.length <= F1_BOXES;
+    const format = !scenic(T) ? (small && bytes <= F1_BYTES ? 1 : 2)
+      : small && T.props.length <= F3_PROPS && T.rails.length <= F3_RAILS && T.decals.length <= F3_DECALS && bytes <= F3_BYTES ? 3 : 4;
+    return { text: head + format + ' ' + id + ' ' + nums + '\n', id, bytes, format };
   }
 
   const NUM = /^[-+]?(\d+\.?\d*|\.\d+)$/;
@@ -11891,32 +11936,51 @@ const GALLERY_FILES = 'tracks/';
     const name = (nl < 0 ? s : s.slice(0, nl)).trim();
     if (!name) return { error: 'the first line should be the name of the track.' };
     const rest = nl < 0 ? '' : s.slice(nl + 1);
+    // formats 1 and 2: the numbers, "/", the structures; 3 and 4: four "/" between five sections
     const cut = rest.indexOf('/');
     const head = (cut < 0 ? rest : rest.slice(0, cut)).split(/\s+/).filter(Boolean);
-    const tail = cut < 0 ? [] : rest.slice(cut + 1).split(/\s+/).filter(Boolean);
-    if (head.length < 4) return { error: 'after the name come the format (1 or 2), an id, the tree seed and the trees.' };
-    if (head[0] !== '1' && head[0] !== '2') return { error: 'it is format ' + head[0].slice(0, 12) + ': the editor reads formats 1 and 2.' };
-    const bad = head.concat(tail).find((v) => !NUM.test(v));
+    if (head.length < 4) return { error: 'after the name come the format (1 to 4), an id, the tree seed and the trees.' };
+    if (!['1', '2', '3', '4'].includes(head[0])) return { error: 'it is format ' + head[0].slice(0, 12) + ': the editor reads formats 1 to 4.' };
+    const fm = +head[0];
+    const secs = cut < 0 ? [] : rest.slice(cut + 1).split(fm > 2 ? '/' : /(?!)/).map((p) => p.split(/\s+/).filter(Boolean));
+    if (secs.length > 4) return { error: 'format ' + fm + ' has at most five parts between "/": gates, structures, props, rails, decals.' };
+    const bad = head.concat(...secs).find((v) => !NUM.test(v));
     if (bad !== undefined) return { error: '"' + bad.slice(0, 24) + '" is not a number.' };
-    const g = head.slice(4).map(Number), b = tail.map(Number);
+    const g = head.slice(4).map(Number), [b, p, r, d] = [0, 1, 2, 3].map((i) => (secs[i] || []).map(Number));
     if (g.length % 5) return { error: 'gates are 5 numbers each (x z type yaw height): ' + (g.length % 5) + ' left over.' };
     if (b.length % 7) return { error: 'structures are 7 numbers each (x z half-x half-z bottom top kind): ' + (b.length % 7) + ' left over.' };
-    const T = { name, seed: clamp(Math.round(+head[2]), 1, 99), trees: clamp(Math.round(+head[3]), 0, 30), gates: [], boxes: [] };
+    if (p.length % 4) return { error: 'props are 4 numbers each (x z kind height): ' + (p.length % 4) + ' left over.' };
+    if (r.length % 6) return { error: 'rails are 6 numbers each (x1 z1 x2 z2 kind height): ' + (r.length % 6) + ' left over.' };
+    if (d.length % 6) return { error: 'decals are 6 numbers each (x z half-length half-width yaw kind): ' + (d.length % 6) + ' left over.' };
+    const T = { name, seed: clamp(Math.round(+head[2]), 1, 99), trees: clamp(Math.round(+head[3]), 0, 30), gates: [], boxes: [], props: [], rails: [], decals: [] };
+    const known = (k, n) => Number.isInteger(k) && k >= 1 && k <= n;
     for (let i = 0; i < g.length; i += 5) {
       const t = g[i + 2];
-      if (!(Number.isInteger(t) && t >= 1 && t <= 8)) return { error: 'gate ' + (i / 5 + 1) + ' is of type ' + t + ': the types are 1 to 8.' };
+      if (!known(t, 8)) return { error: 'gate ' + (i / 5 + 1) + ' is of type ' + t + ': the types are 1 to 8.' };
       T.gates.push(gateOf(g[i], g[i + 1], t, g[i + 3], g[i + 4]));
     }
+    const nk = fm > 2 ? 9 : 3;
     for (let i = 0; i < b.length; i += 7) {
       const k = b[i + 6];
-      if (!(Number.isInteger(k) && k >= 1 && k <= 3)) return { error: 'structure ' + (i / 7 + 1) + ' is of kind ' + k + ': the kinds are 1 to 3.' };
+      if (!known(k, nk)) return { error: 'structure ' + (i / 7 + 1) + ' is of kind ' + k + ': the kinds are 1 to ' + nk + (fm > 2 ? '.' : ' in format ' + fm + '.') };
       T.boxes.push(boxOf(b[i], b[i + 1], b[i + 2], b[i + 3], b[i + 4], b[i + 5], k));
     }
+    for (let i = 0; i < p.length; i += 4) {
+      if (!known(p[i + 2], 10)) return { error: 'prop ' + (i / 4 + 1) + ' is of kind ' + p[i + 2] + ': the kinds are 1 to 10.' };
+      T.props.push(propOf(p[i], p[i + 1], p[i + 2], p[i + 3]));
+    }
+    for (let i = 0; i < r.length; i += 6) {
+      if (!known(r[i + 4], 5)) return { error: 'rail ' + (i / 6 + 1) + ' is of kind ' + r[i + 4] + ': the kinds are 1 to 5.' };
+      T.rails.push(railOf(r[i], r[i + 1], r[i + 2], r[i + 3], r[i + 4], r[i + 5]));
+    }
+    for (let i = 0; i < d.length; i += 6) {
+      if (!known(d[i + 5], 6)) return { error: 'decal ' + (i / 6 + 1) + ' is of kind ' + d[i + 5] + ': the kinds are 1 to 6.' };
+      T.decals.push(decalOf(d[i], d[i + 1], d[i + 2], d[i + 3], d[i + 4], d[i + 5]));
+    }
     const notes = [];
-    const most = head[0] === '2' ? 6000 : 1000;
-    if (new TextEncoder().encode(s).length > most) notes.push('The game reads only the first ' + most + ' bytes of a track file: make it smaller.');
-    // numbers the editor writes otherwise (rounded, kept in range, another format): a new id
-    if (head.slice(2).concat(cut < 0 ? [] : ['/'].concat(tail)).join(' ') !== numbersOf(T)) {
+    if (new TextEncoder().encode(s).length > MOST[fm]) notes.push('The game reads only the first ' + MOST[fm] + ' bytes of a track file: make it smaller.');
+    // numbers the editor writes otherwise (rounded, kept in range, other sections): a new id
+    if (head.slice(2).concat(...secs.map((x) => ['/'].concat(x))).join(' ') !== numbersOf(T).split(/\s+/).join(' ')) {
       notes.push('Some values were adjusted to what the editor writes (rounded or kept in range): saving gives the track a new id, so its best times on the radio start over.');
     }
     return { T, note: notes.join(' ') };
@@ -11981,10 +12045,73 @@ const GALLERY_FILES = 'tracks/';
     dx = ax + dx * t - x; dz = az + dz * t - z;
     return dx * dx + dz * dz;
   }
+  // the scenery as buildTrack builds it: a prop's height (0: its kind's) and the radius it collides
+  // with; a rail's height and length, the posts or pylons at its ends (race tape, power lines,
+  // banners); a decal's half length and half width as vectors (u along its yaw, v across)
+  const propH = (p) => (p.h > 0 ? Math.min(p.h, 40) : PH[p.k]);
+  const propR = (p) => Math.max(propH(p) * PR[p.k], 0.08);
+  const railH = (r) => (r.h > 0 ? Math.min(r.h, 40) : RH[r.k]);
+  const railLen = (r) => Math.hypot(r.x2 - r.x1, r.z2 - r.z1);
+  const railOk = (r) => railLen(r) ** 2 > 0.25;      // (a shorter one the game leaves out)
+  function railPosts(r) {
+    if (r.k < 3 || !railOk(r)) return [];
+    const q = r.k === 4 ? 0.6 : 0.06;
+    return [[r.x1, r.z1, q], [r.x2, r.z2, q]];
+  }
+  function decalUV(d) {
+    const w = d.yaw * D2R;
+    return { ux: Math.sin(w) * d.a, uz: Math.cos(w) * d.a, vx: Math.cos(w) * d.b, vz: -Math.sin(w) * d.b };
+  }
+  // in a pond (decal of kind 5) grown by m metres; the game's inPond with m = 0
+  function inPond(d, x, z, m) {
+    const { ux, uz, vx, vz } = decalUV(d);
+    const dx = x - d.x, dz = z - d.z;
+    const a = (dx * ux + dz * uz) / (d.a * (d.a + m)), b = (dx * vx + dz * vz) / (d.b * (d.b + m));
+    return a * a + b * b < 1;
+  }
+  // the racing line as the AI pilots fly it (AI.pos: Hermite curves between the aim points, along
+  // the gates' normals), n pieces a leg: [x, y, z] points, the first of each leg its aim point
+  function lineOf(G, n) {
+    const out = [], N = G.length;
+    for (let i = 0; i < N; i++) {
+      const a = G[i], b = G[(i + 1) % N];
+      const any = (g) => (g.k === 3 ? [0, -1, 0] : [g.hx, 0, g.hz]);
+      const na = any(a), nb = any(b);
+      const c = Math.hypot(b.ax - a.ax, b.ay - a.ay, b.az - a.az) + 0.01;
+      for (let q = 0; q < n; q++) {
+        const s = q / n, s2 = s * s, s3 = s2 * s;
+        const h1 = 2 * s3 - 3 * s2 + 1, h3 = 3 * s2 - 2 * s3, h2 = (s3 - 2 * s2 + s) * c, h4 = (s3 - s2) * c;
+        out.push([h1 * a.ax + h2 * na[0] + h3 * b.ax + h4 * nb[0], h1 * a.ay + h2 * na[1] + h3 * b.ay + h4 * nb[1],
+          h1 * a.az + h2 * na[2] + h3 * b.az + h4 * nb[2]]);
+      }
+    }
+    return out;
+  }
+  // far enough from the rails (4 m) and off the decals (2 m beyond their edges): buildTrack's clearOf
+  function clearOf(T, x, z) {
+    for (const r of T.rails) if (railOk(r) && segDist2(x, z, r.x1, r.z1, r.x2, r.z2) < 16) return false;
+    for (const d of T.decals) {
+      const { ux, uz } = decalUV(d), m = d.b + 2;
+      if (segDist2(x, z, d.x - ux, d.z - uz, d.x + ux, d.z + uz) < m * m) return false;
+    }
+    return true;
+  }
   // the wind and the trees, as buildTrack makes them from the seed (trees: the color edition's count)
   function windOf(seed) {
     const a = (seed * 171 % 30269) / 30269 * 6.2832;
     return { x: Math.sin(a), z: Math.cos(a) };
+  }
+  // the pillars before the trees, as buildTrack adds them: gate legs and flag poles, then the props,
+  // then the rails' posts and pylons ([x, z, radius])
+  function pillarsOf(T, G) {
+    const P = [];
+    for (const g of G) {
+      const r = g.k === 4 ? 0.08 : g.k === 6 || g.k === 7 ? 0.12 : GT * 0.5;
+      for (const l of g.legs) P.push([l[0], l[1], r]);
+    }
+    for (const p of T.props) P.push([p.x, p.z, propR(p)]);
+    for (const r of T.rails) P.push(...railPosts(r));
+    return P;
   }
   function treesOf(T, G, pad) {
     const out = [];
@@ -11992,8 +12119,7 @@ const GALLERY_FILES = 'tracks/';
     let seed = T.seed;
     const rnd = () => (seed = seed * 171 % 30269) / 30269;
     rnd();                                             // (the wind's)
-    const P = [];
-    for (const g of G) for (const l of g.legs) P.push(l);
+    const P = pillarsOf(T, G);
     const B = T.boxes.map(bbOf);
     let x0 = pad.x, x1 = pad.x, z0 = pad.z, z1 = pad.z;
     for (const g of G) { x0 = Math.min(x0, g.x); x1 = Math.max(x1, g.x); z0 = Math.min(z0, g.z); z1 = Math.max(z1, g.z); }
@@ -12004,7 +12130,7 @@ const GALLERY_FILES = 'tracks/';
       tries++;
       const x = x0 - 30 + rnd() * (x1 - x0 + 60);
       const z = z0 - 30 + rnd() * (z1 - z0 + 60);
-      let ok = segDist2(x, z, pad.x, pad.z, G[0].ax, G[0].az) > 100 && B.every((b) => rectDist(x, z, b) ** 2 > 16);
+      let ok = segDist2(x, z, pad.x, pad.z, G[0].ax, G[0].az) > 100 && B.every((b) => rectDist(x, z, b) ** 2 > 16) && clearOf(T, x, z);
       for (let i = 0; ok && i < G.length; i++) {
         const j = (i + 1) % G.length;
         if (segDist2(x, z, G[i].ax, G[i].az, G[j].ax, G[j].az) < 100) ok = false;
@@ -12013,10 +12139,50 @@ const GALLERY_FILES = 'tracks/';
       if (ok) {
         n++;
         const h = 6 + rnd() * 6;
-        P.push([x, z]);
+        P.push([x, z, h * 0.14]);
         out.push({ x, z, h });
       }
     }
+    return out;
+  }
+  // the pilots' area buildTrack adds after the trees (place): a tent and a windsock beside the start
+  // pad, each at the first of its spots clear of the racing line, the climb to gate 1, the
+  // structures, the pillars (the trees too), the rails and the ponds; none of a kind the track has.
+  // The trees are the color edition's (StickTime BW has fewer: its tent can stand elsewhere)
+  function pilotsOf(T, G, pad, trees) {
+    const out = [];
+    if (G.length < 2 || !pad) return out;
+    const P = pillarsOf(T, G).concat(trees.map((t) => [t.x, t.z, t.h * 0.14]));
+    const B = T.boxes.map(bbOf), L = lineOf(G, 8), N = G.length;
+    const place = (spots, r, k, c) => {
+      for (let j = 0; j < spots.length; j += 2) {
+        const a = spots[j], b = spots[j + 1];
+        const x = pad.x + pad.hx * a + pad.hz * b, z = pad.z + pad.hz * a - pad.hx * b;
+        let ok = segDist2(x, z, pad.x, pad.z, G[0].ax, G[0].az) > c * c * 0.5 && B.every((q) => rectDist(x, z, q) ** 2 > (r + 1) ** 2);
+        ok = ok && P.every((q) => (x - q[0]) ** 2 + (z - q[1]) ** 2 >= (q[2] + r + 1) ** 2);
+        ok = ok && T.rails.every((q) => !railOk(q) || segDist2(x, z, q.x1, q.z1, q.x2, q.z2) >= (r + 1) ** 2);
+        ok = ok && T.decals.every((d) => {
+          if (d.k !== 5) return true;
+          const { ux, uz } = decalUV(d), m = d.b + r;
+          return segDist2(x, z, d.x - ux, d.z - uz, d.x + ux, d.z + uz) >= m * m;
+        });
+        for (let i = 0; ok && i < N; i++) {
+          const nx = G[(i + 1) % N];
+          if (segDist2(x, z, G[i].ax, G[i].az, nx.ax, nx.az) < c * c) ok = false;
+          for (let q = 1; ok && q <= 8; q++) {
+            const p0 = L[i * 8 + q - 1], p1 = q < 8 ? L[i * 8 + q] : [nx.ax, nx.ay, nx.az];
+            if (segDist2(x, z, p0[0], p0[2], p1[0], p1[2]) < c * c) ok = false;
+          }
+        }
+        if (ok) {
+          P.push([x, z, r]);
+          out.push({ x, z, k });
+          return;
+        }
+      }
+    };
+    if (!T.props.some((p) => p.k === 8)) place([-5, 8, -5, -8, -11, 0, 2, 10, 2, -10, -12, 8, -12, -8], 1.5, 8, 6);
+    if (!T.props.some((p) => p.k === 9)) place([-7, 4, -7, -4, -9, 0, 0, 6, 0, -6, -13, 3, -13, -3], 0.08, 9, 4);
     return out;
   }
 
@@ -12034,7 +12200,8 @@ const GALLERY_FILES = 'tracks/';
     if (ng < 2) add('A track needs at least 2 gates.');
     if (ng > MAX_GATES) add(ng + ' gates: ' + MAX_GATES + ' at most.');
     if (nb > MAX_BOXES) add(nb + ' structures: ' + MAX_BOXES + ' at most.');
-    if (file.bytes > MAX_BYTES) add('The file would be ' + file.bytes + ' bytes: ' + MAX_BYTES + ' at most. Fewer items or rounder numbers make it smaller.');
+    const most = file.format > 2 ? MAX_BYTES4 : MAX_BYTES;
+    if (file.bytes > most) add('The file would be ' + file.bytes + ' bytes: ' + most + ' at most. Fewer items or rounder numbers make it smaller.');
     if (ng && T.gates[0].t === 3) add('Gate 1 can\'t be a dive gate: the start pad faces gate 1 across the ground.', [T.gates[0].id]);
     const B = T.boxes.map(bbOf);
     T.boxes.forEach((b, i) => { if (!(b.hx > 0 && b.hz > 0 && b.y1 > b.y0)) add('Structure ' + (i + 1) + ' has no size.', [b.id]); });
@@ -12055,6 +12222,81 @@ const GALLERY_FILES = 'tracks/';
         if (b.y0 < 1.5 && rectDist(pad.x, pad.z, B[j]) < 2) add('Structure ' + (j + 1) + ' stands on the start pad (14 m behind gate 1).', [b.id]);
       });
     }
+    // the scenery: limits, props in a gate, a structure or on the pad, rails too long, ponds
+    // under the start, and anything the racing line runs through
+    const np = T.props.length, nr = T.rails.length, nd = T.decals.length;
+    if (np > MAX_PROPS) add(np + ' props: ' + MAX_PROPS + ' at most.');
+    if (nr > MAX_RAILS) add(nr + ' rails: ' + MAX_RAILS + ' at most.');
+    if (nd > MAX_DECALS) add(nd + ' decals: ' + MAX_DECALS + ' at most.');
+    const propBox = (p) => { const r = propR(p); return { x0: p.x - r, x1: p.x + r, z0: p.z - r, z1: p.z + r, y0: 0, y1: propH(p) }; };
+    T.props.forEach((p, i) => {
+      const pb = propBox(p), n = PKINDS[p.k] + ' (prop ' + (i + 1) + ')';
+      G.forEach((g, j) => { if (cuts(pb, g.box)) add(n + ' stands in gate ' + (j + 1) + '.', [p.id, T.gates[j].id]); });
+      B.forEach((b, j) => { if (cuts(pb, b)) add(n + ' stands in structure ' + (j + 1) + '.', [p.id, T.boxes[j].id]); });
+      if (pad && Math.hypot(p.x - pad.x, p.z - pad.z) < propR(p) + 2) add(n + ' stands on the start pad.', [p.id]);
+    });
+    T.rails.forEach((r, i) => {
+      const L = railLen(r);
+      if (!railOk(r)) add(RKINDS[r.k] + ' (rail ' + (i + 1) + ') has no length: its ends are under half a metre apart.', [r.id]);
+      else if (L > RAIL_MAX) add(RKINDS[r.k] + ' (rail ' + (i + 1) + ') is ' + Math.round(L) + ' m long: ' + RAIL_MAX + ' at most.', [r.id]);
+    });
+    if (pad && G.length) {
+      const g1 = G[0];
+      T.decals.forEach((d, i) => {
+        if (d.k !== 5) return;
+        let on = inPond(d, pad.x, pad.z, 1.5);
+        for (let s = 0; !on && s <= 20; s++) on = inPond(d, pad.x + (g1.ax - pad.x) * s / 20, pad.z + (g1.az - pad.z) * s / 20, 0.5);
+        if (on) add('Pond (decal ' + (i + 1) + ') lies under the start pad or the climb to gate 1: the quad would land in it.', [d.id]);
+      });
+    }
+    if (G.length >= 2 && (np || nr)) {
+      // the racing line's pieces with their heights: the AI's curve and the straight lines between
+      // the aim points (the autopilot of the tests, the trees' rule)
+      const L = lineOf(G, 8), N = G.length, segs = [];
+      for (let i = 0; i < N; i++) {
+        const nx = G[(i + 1) % N];
+        segs.push([G[i].ax, G[i].ay, G[i].az, nx.ax, nx.ay, nx.az]);
+        for (let q = 0; q < 8; q++) {
+          const a = L[i * 8 + q], b = q < 7 ? L[i * 8 + q + 1] : [nx.ax, nx.ay, nx.az];
+          segs.push([a[0], a[1], a[2], b[0], b[1], b[2]]);
+        }
+      }
+      // a prop (not a cone: the line passes over it) within 3 m of the line, on the ground
+      const near = (x, z, m) => segs.some(([ax, , az, bx, , bz]) => segDist2(x, z, ax, az, bx, bz) < m * m);
+      T.props.forEach((p, i) => {
+        if (p.k !== 6 && near(p.x, p.z, propR(p) + 3)) add(PKINDS[p.k] + ' (prop ' + (i + 1) + ') is on the racing line: keep 3 m from it.', [p.id]);
+      });
+      // a rail where the line passes within 3 m of its solid part across, at a height within 1.5 m of
+      // it (the game's railNear: fences and nets from the ground to their top, a banner's cloth 0.9 m
+      // down from it, race tape a line, a power line's wires 2 m either side sagging 3% of the span
+      // and its earth wire 2 m above the middle), or of the posts and pylons at its ends
+      const pts = [];
+      for (const [ax, ay, az, bx, by, bz] of segs) {
+        const n = Math.ceil(Math.hypot(bx - ax, bz - az) / 0.5) || 1;
+        for (let q = 0; q < n; q++) pts.push([ax + (bx - ax) * q / n, ay + (by - ay) * q / n, az + (bz - az) * q / n]);
+      }
+      const hits = (r) => {
+        const h = railH(r), L = railLen(r), ex = (r.x2 - r.x1) / L, ez = (r.z2 - r.z1) / L, sag = Math.min(L * 0.03, 3);
+        const wires = r.k === 4 ? [[-2, 0], [2, 0], [0, 2]] : [[0, 0]];
+        const lo = r.k === 5 ? h - 0.9 : r.k === 3 || r.k === 4 ? h : 0;
+        for (const [x, y, z] of pts) {
+          const along = (x - r.x1) * ex + (z - r.z1) * ez, s = (x - r.x1) * ez - (z - r.z1) * ex;
+          const past = along < 0 ? -along : along > L ? along - L : 0, t = clamp(along / L, 0, 1);
+          const w = r.k === 4 ? h - sag * 4 * t * (1 - t) : 0;
+          for (const [o, up] of wires) {
+            const y0 = r.k === 4 ? w + up : lo, y1 = r.k === 4 ? w + up : h;
+            if (Math.hypot(past, s - o) < 3 && y > y0 - 1.5 && y < y1 + 1.5) return true;
+          }
+          for (const [px, pz, pr] of railPosts(r)) {
+            if (Math.hypot(x - px, z - pz) < pr + 3 && y < (r.k === 4 ? h + 2.2 : h) + 1.5) return true;
+          }
+        }
+        return false;
+      };
+      T.rails.forEach((r, i) => {
+        if (railOk(r) && hits(r)) add(RKINDS[r.k] + ' (rail ' + (i + 1) + ') is across the racing line: keep 3 m from it' + (r.k === 4 || r.k === 5 ? ', or fly the line under or over it.' : '.'), [r.id]);
+      });
+    }
     return P;
   }
 
@@ -12064,32 +12306,37 @@ const GALLERY_FILES = 'tracks/';
       name: ('My ' + t.name).slice(0, 16), seed: t.seed, trees: t.trees,
       gates: t.gates.map(([x, z, k, yaw, h]) => ({ x: r2(x), z: r2(z), t: k, yaw: normYaw(yaw), h: r2(h) })),
       boxes: t.boxes.map(([x, z, hx, hz, y0, y1, k]) => ({ x: r2(x), z: r2(z), hx: r2(hx), hz: r2(hz), y0: r2(y0), y1: r2(y1), k })),
+      props: (t.props || []).map(([x, z, k, h]) => propOf(x, z, k, h)),
+      rails: (t.rails || []).map(([x1, z1, x2, z2, k, h]) => railOf(x1, z1, x2, z2, k, h)),
+      decals: (t.decals || []).map(([x, z, a, b, yaw, k]) => decalOf(x, z, a, b, yaw, k)),
     };
   }
   const blankTrack = () => ({
-    name: 'My Track', seed: 1 + Math.floor(Math.random() * 99), trees: 9, boxes: [],
+    name: 'My Track', seed: 1 + Math.floor(Math.random() * 99), trees: 9, boxes: [], props: [], rails: [], decals: [],
     gates: [{ x: 0, z: 0, t: 1, yaw: 0, h: 0 }, { x: 12, z: 40, t: 1, yaw: 180, h: 0 }],
   });
-  // a stored work in progress, checked number by number
+  // the five kinds of item, in the track's lists (gates first: they are the race's order)
+  const CATS = [['gates', 'gate'], ['boxes', 'box'], ['props', 'prop'], ['rails', 'rail'], ['decals', 'decal']];
+  // a stored work in progress, checked number by number (one from before 1.10.0 has no scenery)
   function clean(T) {
     if (!T || typeof T !== 'object' || !Array.isArray(T.gates) || !Array.isArray(T.boxes)) return null;
     const n = (v, d) => (Number.isFinite(+v) ? +v : d);
     const id = (v) => (Number.isInteger(v) && v > 0 ? v : 0);
+    const kind = (v, m) => clamp(Math.round(n(v, 1)), 1, m);
     const out = { name: typeof T.name === 'string' ? T.name.slice(0, 40) : 'My Track',
-      seed: clamp(Math.round(n(T.seed, 1)), 1, 99), trees: clamp(Math.round(n(T.trees, 9)), 0, 30), gates: [], boxes: [] };
-    for (const g of T.gates.slice(0, 64)) {
-      if (g && typeof g === 'object') {
-        out.gates.push(Object.assign({ id: id(g.id), g: id(g.g) }, gateOf(n(g.x, 0), n(g.z, 0), clamp(Math.round(n(g.t, 1)), 1, 8), n(g.yaw, 0), n(g.h, 0))));
+      seed: clamp(Math.round(n(T.seed, 1)), 1, 99), trees: clamp(Math.round(n(T.trees, 9)), 0, 30), gates: [], boxes: [], props: [], rails: [], decals: [] };
+    const each = (list, most, make, key) => {
+      for (const o of (Array.isArray(list) ? list : []).slice(0, most)) {
+        if (o && typeof o === 'object') out[key].push(Object.assign({ id: id(o.id), g: id(o.g) }, make(o)));
       }
-    }
-    for (const b of T.boxes.slice(0, 64)) {
-      if (b && typeof b === 'object') {
-        out.boxes.push(Object.assign({ id: id(b.id), g: id(b.g) },
-          boxOf(n(b.x, 0), n(b.z, 0), n(b.hx, 1), n(b.hz, 1), n(b.y0, 0), n(b.y1, 4), clamp(Math.round(n(b.k, 1)), 1, 3))));
-      }
-    }
+    };
+    each(T.gates, MAX_GATES + 16, (g) => gateOf(n(g.x, 0), n(g.z, 0), kind(g.t, 8), n(g.yaw, 0), n(g.h, 0)), 'gates');
+    each(T.boxes, MAX_BOXES, (b) => boxOf(n(b.x, 0), n(b.z, 0), n(b.hx, 1), n(b.hz, 1), n(b.y0, 0), n(b.y1, 4), kind(b.k, 9)), 'boxes');
+    each(T.props, MAX_PROPS, (p) => propOf(n(p.x, 0), n(p.z, 0), kind(p.k, 10), n(p.h, 0)), 'props');
+    each(T.rails, MAX_RAILS, (r) => railOf(n(r.x1, 0), n(r.z1, 0), n(r.x2, 10), n(r.z2, 0), kind(r.k, 5), n(r.h, 0)), 'rails');
+    each(T.decals, MAX_DECALS, (d) => decalOf(n(d.x, 0), n(d.z, 0), n(d.a, 5), n(d.b, 2), n(d.yaw, 0), kind(d.k, 6)), 'decals');
     const seen = new Set();
-    for (const it of out.gates.concat(out.boxes)) { if (it.id && seen.has(it.id)) it.id = 0; seen.add(it.id); }
+    for (const [key] of CATS) for (const it of out[key]) { if (it.id && seen.has(it.id)) it.id = 0; seen.add(it.id); }
     return out;
   }
 
@@ -12110,8 +12357,10 @@ const GALLERY_FILES = 'tracks/';
   const V = { x: 0, z: 30, s: 4 };                  // map centre (m) and scale (px per m)
   const gal = { list: [], open: false, mine: false, asked: false }; // the gallery's tracks; Open or My tracks shown; the site's list asked for
 
+  // every item of a track, gates first
+  const allOf = (T) => CATS.flatMap(([key]) => T[key]);
   function withIds(T) {
-    const all = T.gates.concat(T.boxes);
+    const all = allOf(T);
     for (const it of all) {
       if (it.id) ed.nextId = Math.max(ed.nextId, it.id + 1);
       if (it.g) ed.nextGroup = Math.max(ed.nextGroup, it.g + 1); else it.g = 0;
@@ -12123,7 +12372,7 @@ const GALLERY_FILES = 'tracks/';
   function inferGroups(T) {
     const up = new Map();
     const top = (a) => { while (up.get(a) !== a) a = up.get(a); return a; };
-    const all = T.gates.concat(T.boxes);
+    const all = allOf(T);
     for (const it of all) up.set(it.id, it.id);
     for (const g of T.gates) {
       if (g.t !== 8) continue;
@@ -12142,21 +12391,47 @@ const GALLERY_FILES = 'tracks/';
       it.g = num.get(r);
     }
   }
+  // an item by its id: its kind ('gate', 'box', 'prop', 'rail', 'decal'), itself, its place in its list
   function find(id) {
-    let i = ed.T.gates.findIndex((g) => g.id === id);
-    if (i >= 0) return { kind: 'gate', it: ed.T.gates[i], i };
-    i = ed.T.boxes.findIndex((b) => b.id === id);
-    return i >= 0 ? { kind: 'box', it: ed.T.boxes[i], i } : null;
+    for (const [key, kind] of CATS) {
+      const i = ed.T[key].findIndex((o) => o.id === id);
+      if (i >= 0) return { kind, it: ed.T[key][i], i };
+    }
+    return null;
   }
-  const items = () => ed.T.gates.concat(ed.T.boxes);
+  const items = () => allOf(ed.T);
   function groupOf(id) {
     const f = find(id);
     return f && f.it.g ? items().filter((o) => o.g === f.it.g).map((o) => o.id) : [id];
   }
+  // the selection by kind (gates, boxes, props, rails, decals), and all of it
   function selected() {
-    const gates = ed.T.gates.filter((g) => ed.sel.has(g.id)), boxes = ed.T.boxes.filter((b) => ed.sel.has(b.id));
-    return { gates, boxes, all: gates.concat(boxes) };
+    const s = { all: [] };
+    for (const [key] of CATS) {
+      s[key] = ed.T[key].filter((o) => ed.sel.has(o.id));
+      s.all.push(...s[key]);
+    }
+    return s;
   }
+  // where an item is (a rail: its middle), moving it, its outline on the map's ground
+  const placeOf = (o) => (o.x1 !== undefined ? [(o.x1 + o.x2) / 2, (o.z1 + o.z2) / 2] : [o.x, o.z]);
+  function moveBy(o, dx, dz) {
+    if (o.x1 !== undefined) { o.x1 = pos(o.x1 + dx); o.x2 = pos(o.x2 + dx); o.z1 = pos(o.z1 + dz); o.z2 = pos(o.z2 + dz); }
+    else { o.x = pos(o.x + dx); o.z = pos(o.z + dz); }
+  }
+  const posOf = (o) => (o.x1 !== undefined ? { x1: o.x1, z1: o.z1, x2: o.x2, z2: o.z2 } : { x: o.x, z: o.z });
+  function itemBounds(o, kind) {
+    if (kind === 'gate') return gateGeom(o).box;
+    if (kind === 'box') return bbOf(o);
+    if (kind === 'prop') { const r = Math.max(propR(o), o.k === 8 ? 1.5 : 0); return { x0: o.x - r, x1: o.x + r, z0: o.z - r, z1: o.z + r }; }
+    if (kind === 'rail') {
+      const e = o.k === 4 ? 2.4 : 0.2;
+      return { x0: Math.min(o.x1, o.x2) - e, x1: Math.max(o.x1, o.x2) + e, z0: Math.min(o.z1, o.z2) - e, z1: Math.max(o.z1, o.z2) + e };
+    }
+    const { ux, uz, vx, vz } = decalUV(o), ex = Math.abs(ux) + Math.abs(vx), ez = Math.abs(uz) + Math.abs(vz);
+    return { x0: o.x - ex, x1: o.x + ex, z0: o.z - ez, z1: o.z + ez };
+  }
+  const kindOf = (o) => (o.t !== undefined ? 'gate' : o.hx !== undefined ? 'box' : o.x1 !== undefined ? 'rail' : o.a !== undefined ? 'decal' : 'prop');
   // one item, or one whole group: the form shows the focused item of it
   function selOne() {
     const s = selected().all;
@@ -12205,6 +12480,7 @@ const GALLERY_FILES = 'tracks/';
     ed.bad = new Set(ed.probs.flatMap((p) => p.ids));
     ed.wind = windOf(T.seed);
     ed.trees = null;
+    ed.pilots = null;
   }
   function changed() { derive(); refresh(); saveSoon(); }   // after any change to the track
   function refresh() { renderSide(); redraw(); }
@@ -12233,10 +12509,13 @@ const GALLERY_FILES = 'tracks/';
   };
   // a slot's file: null (none), else { text, bad }: bad says why the game and the editor can't use it
   // ('big': too big to be read at all, text null; 'long': longer than the game reads of it, 1000
-  // bytes of format 1, 6000 of format 2; 'parse': the editor's checks reject it)
+  // bytes of format 1, 6000 of format 2, 1600 of 3, 10000 of 4; 'parse': the editor's checks reject it)
   const BAD = { big: 'too big to be a track', long: 'too long for the game', parse: 'can\'t be read' };
-  const formatOf = (t) => (/^[^\n]*\n\s*2\s/.test(String(t).replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n')) ? 2 : 1);
-  const badOf = (t) => (new TextEncoder().encode(t).length > (formatOf(t) === 2 ? 6000 : 1000) ? 'long' : unreadable(t) ? 'parse' : '');
+  // a track file's format (1 to 4; 1 when it says none of them), and whether only the color edition
+  // lists it (2 and 4: bigger tracks)
+  const formatOf = (t) => { const m = /^[^\n]*\n\s*([1-4])\s/.exec(String(t).replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n')); return m ? +m[1] : 1; };
+  const colorOnly = (fm) => fm === 2 || fm === 4;
+  const badOf = (t) => (new TextEncoder().encode(t).length > MOST[formatOf(t)] ? 'long' : unreadable(t) ? 'parse' : '');
   const asEntry = (t) => (t === null ? null : { text: t, bad: badOf(t) });
   // a slot's file in a question: "its name", or what is wrong with it
   const what = (e) => (e.bad === 'big' ? 'a file too big to be a track' : e.bad === 'long' ? 'a file too long for the game'
@@ -12261,7 +12540,7 @@ const GALLERY_FILES = 'tracks/';
   // ---------------------------------------------------------------- the page
   const el = {};
   for (const k of ['tracksBtn', 'edClose', 'radioBtn', 'rpClose',
-    'edOpen', 'connectDlg', 'connectGo', 'connectCancel', 'edGalBtn', 'edMineBtn', 'edMine', 'edMineStatus', 'edMineNote', 'edOpenList', 'edUpdList', 'edSyncMine', 'edNewCards', 'edSlotList', 'edEditing', 'edEditName', 'edEditKept', 'edEditState', 'edGallery', 'edCards', 'edGrid', 'edGalStatus', 'edGalSync', 'edGalSyncText', 'edGalSyncAll', 'edGateType', 'edAddGate', 'edAddBox', 'edAddWall',
+    'edOpen', 'connectDlg', 'connectGo', 'connectCancel', 'edGalBtn', 'edMineBtn', 'edMine', 'edMineStatus', 'edMineNote', 'edOpenList', 'edUpdList', 'edSyncMine', 'edNewCards', 'edSlotList', 'edEditing', 'edEditName', 'edEditKept', 'edEditState', 'edGallery', 'edCards', 'edGrid', 'edGalStatus', 'edGalSync', 'edGalSyncText', 'edGalSyncAll', 'edGateType', 'edAddGate', 'edAddBox', 'edAddWall', 'edPropKind', 'edAddProp', 'edRailKind', 'edAddRail', 'edDecalKind', 'edAddDecal', 'edPreset', 'edAddPreset',
     'edRotL', 'edRotR', 'edDup', 'edDel', 'edUndo', 'edRedo', 'edFit', 'edTrees', 'edMap', 'edMapBox', 'edReadout',
     'edSlot', 'edFly', 'edFlyText', 'edSendEmu', 'edSave', 'edSize', 'edLite', 'edStatus', 'edEmuHas', 'edFileHas',
     'edSyncLine', 'edSyncText', 'edSendText', 'edName', 'edSeed', 'edShuffle', 'edTreesN',
@@ -12318,17 +12597,33 @@ const GALLERY_FILES = 'tracks/';
     const s = selected();
     const f = ed.focus !== null ? find(ed.focus) : null;
     const one = f && selOne();
-    const sig = s.all.map((o) => o.id).join(',') + '|' + (one ? f.it.id + ':' + (f.kind === 'gate' ? f.it.t : 'b') : '');
+    const sig = s.all.map((o) => o.id).join(',') + '|' + (one ? f.it.id + ':' + (f.kind === 'gate' ? f.it.t : f.kind) : '');
     if (sig !== selSig) {
       selSig = sig;
       keepFocus(el.edSel, () => buildSel(s, f, one));
     }
     fillSel(s, f, one);
   }
+  const options = (names) => names.slice(1).map((n, i) => '<option value="' + (i + 1) + '">' + n + '</option>').join('');
+  const numIn = (label, f, step, min) => '<label class="ed-f"><span>' + label + '</span><input type="number" step="' + step + '"' +
+    (min !== undefined ? ' min="' + min + '"' : '') + ' data-f="' + f + '"></label>';
+  const ungroupRow = '<div class="ed-row"><button class="btn" type="button" data-a="ungroup" data-v="ungroup">Ungroup</button></div>';
   function buildSel(s, f, one) {
     const box = el.edSel;
+    const head = '<p class="ed-selhead"><strong data-v="what"></strong> <span class="note" data-v="sub"></span></p><div class="ed-form">';
     if (!s.all.length) {
-      box.innerHTML = '<p class="note">Nothing selected. Tap a gate or a structure on the map, or add one with the buttons above the map.</p>';
+      box.innerHTML = '<p class="note">Nothing selected. Tap a gate, a structure or a piece of scenery on the map, or add one with the buttons above the map.</p>';
+    } else if (one && f.kind === 'prop') {
+      box.innerHTML = head + '<label class="ed-f wide"><span>Kind</span><select data-f="k">' + options(PKINDS) + '</select></label>' +
+        numIn('X (m)', 'x', 0.5) + numIn('Z (m)', 'z', 0.5) + numIn('Height (m)', 'h', 0.1, 0) + '</div><p class="note" data-v="note"></p>' + ungroupRow;
+    } else if (one && f.kind === 'rail') {
+      box.innerHTML = head + '<label class="ed-f wide"><span>Kind</span><select data-f="k">' + options(RKINDS) + '</select></label>' +
+        numIn('X1 (m)', 'x1', 0.5) + numIn('Z1 (m)', 'z1', 0.5) + numIn('X2 (m)', 'x2', 0.5) + numIn('Z2 (m)', 'z2', 0.5) + numIn('Height (m)', 'h', 0.1, 0) +
+        '</div><p class="note" data-v="note"></p>' + ungroupRow;
+    } else if (one && f.kind === 'decal') {
+      box.innerHTML = head + '<label class="ed-f wide"><span>Kind</span><select data-f="k">' + options(DKINDS) + '</select></label>' +
+        numIn('X (m)', 'x', 0.5) + numIn('Z (m)', 'z', 0.5) + numIn('Length (m)', 'l', 0.5, 0.1) + numIn('Width (m)', 'w', 0.1, 0.1) + numIn('Yaw (°)', 'yaw', 5) +
+        '</div><p class="note" data-v="note"></p>' + ungroupRow;
     } else if (!one) {
       box.innerHTML = '<p class="ed-selhead"><strong data-v="what"></strong></p><p class="note">Drag them together on the map; R turns them (structures in 90° steps).</p>' +
         '<div class="ed-row"><button class="btn" type="button" data-a="group">Group</button><button class="btn" type="button" data-a="ungroup">Ungroup</button></div>';
@@ -12362,8 +12657,10 @@ const GALLERY_FILES = 'tracks/';
     const field = (name, val) => { const i = box.querySelector('[data-f="' + name + '"]'); if (i) setVal(i, val); };
     if (s.all.length && !one) {
       const parts = [];
-      if (s.gates.length) parts.push(s.gates.length + (s.gates.length === 1 ? ' gate' : ' gates'));
-      if (s.boxes.length) parts.push(s.boxes.length + (s.boxes.length === 1 ? ' structure' : ' structures'));
+      for (const [key, one_, many] of [['gates', 'gate', 'gates'], ['boxes', 'structure', 'structures'], ['props', 'prop', 'props'],
+        ['rails', 'rail', 'rails'], ['decals', 'decal', 'decals']]) {
+        if (s[key].length) parts.push(s[key].length + ' ' + (s[key].length === 1 ? one_ : many));
+      }
       v('what').textContent = parts.join(', ') + ' selected';
       box.querySelector('[data-a="group"]').disabled = s.all.length < 2 || (s.all[0].g && s.all.every((o) => o.g === s.all[0].g));
       box.querySelector('[data-a="ungroup"]').disabled = !s.all.some((o) => o.g);
@@ -12384,11 +12681,33 @@ const GALLERY_FILES = 'tracks/';
         v('note').textContent = note + ' Yaw 0 goes up the map, 90 to the right.';
         box.querySelector('[data-a="earlier"]').disabled = f.i === 0;
         box.querySelector('[data-a="later"]').disabled = f.i === ed.T.gates.length - 1;
-      } else {
+      } else if (f.kind === 'box') {
         v('what').textContent = 'Structure ' + (f.i + 1);
         v('sub').textContent = 'of ' + ed.T.boxes.length + (grouped ? ' · in a group' : '');
         field('k', it.k); field('x', dec(it.x)); field('z', dec(it.z)); field('w', dec(2 * it.hx)); field('d', dec(2 * it.hz));
         field('y0', dec(it.y0)); field('y1', dec(it.y1));
+      } else {
+        const names = { prop: ['Prop', PKINDS, 'props'], rail: ['Rail', RKINDS, 'rails'], decal: ['Decal', DKINDS, 'decals'] }[f.kind];
+        v('what').textContent = names[1][it.k];
+        v('sub').textContent = names[0].toLowerCase() + ' ' + (f.i + 1) + ' of ' + ed.T[names[2]].length + (grouped ? ' · in a group' : '');
+        field('k', it.k);
+        let note;
+        if (f.kind === 'prop') {
+          field('x', dec(it.x)); field('z', dec(it.z)); field('h', dec(it.h));
+          note = 'Height 0 is the kind\'s own: ' + dec(PH[it.k]) + ' m. ' + (it.k === 8 ? 'A 3 m canopy on four legs. ' : it.k === 9 ? 'It points downwind. ' : '') +
+            'The quad hits it from the ground to its top' + (it.k === 6 ? '; the racing line can pass over it.' : ': keep it 3 m off the racing line.');
+        } else if (f.kind === 'rail') {
+          field('x1', dec(it.x1)); field('z1', dec(it.z1)); field('x2', dec(it.x2)); field('z2', dec(it.z2)); field('h', dec(it.h));
+          note = 'From one end to the other, ' + dec(railLen(it)) + ' m. Height 0 is the kind\'s own: ' + dec(RH[it.k]) + ' m' +
+            (it.k === 4 ? ' to the wires (2 m either side, the earth wire 2 m higher; they sag 3% of the span), pylons at the ends: fly under it for an UNDER.'
+              : it.k === 5 ? ' to its top, the cloth 0.9 m deep between two posts: fly under it for an UNDER.' : it.k === 3 ? ', a line between two posts.' : ', solid from the ground.') +
+            ' Drag the square handles to move an end.';
+        } else {
+          field('x', dec(it.x)); field('z', dec(it.z)); field('l', dec(2 * it.a)); field('w', dec(2 * it.b)); field('yaw', it.yaw);
+          note = (it.k === 5 ? 'Landing in a pond is a SPLASH: back at the last gate. ' : 'On the ground, under everything; nothing to hit. ') +
+            (it.k >= 5 ? 'An ellipse, ' : 'A strip, ') + 'its length along the yaw (0 up the map, 90 to the right).';
+        }
+        v('note').textContent = note;
       }
       const ug = v('ungroup');
       if (ug) ug.hidden = !grouped;
@@ -12399,12 +12718,19 @@ const GALLERY_FILES = 'tracks/';
     if (key === 'x' || key === 'z') {
       // the whole group moves with it
       const d = r2(clamp(val, -999, 999)) - it[key];
-      for (const o of items()) if (o === it || (it.g && o.g === it.g && ed.sel.has(o.id))) o[key] = pos(o[key] + d);
+      for (const o of items()) if (o === it || (it.g && o.g === it.g && ed.sel.has(o.id))) moveBy(o, key === 'x' ? d : 0, key === 'z' ? d : 0);
     } else if (f.kind === 'gate') {
       if (key === 't') it.t = clamp(Math.round(val), 1, 8);
       else if (key === 'yaw') it.yaw = normYaw(val);
       else if (key === 'h') it.h = r2(clamp(val, 0, 100));
-    } else if (key === 'k') it.k = clamp(Math.round(val), 1, 3);
+    } else if (f.kind !== 'box') {
+      if (key === 'k') it.k = clamp(Math.round(val), 1, f.kind === 'prop' ? 10 : f.kind === 'rail' ? 5 : 6);
+      else if (key === 'h') it.h = r2(clamp(val, 0, 40));
+      else if (key === 'x1' || key === 'z1' || key === 'x2' || key === 'z2') it[key] = pos(val);
+      else if (key === 'l') it.a = r2(clamp(val, 0.1, 400) / 2);
+      else if (key === 'w') it.b = r2(clamp(val, 0.1, 400) / 2);
+      else if (key === 'yaw') it.yaw = normYaw(val);
+    } else if (key === 'k') it.k = clamp(Math.round(val), 1, 9);
     else if (key === 'w') it.hx = r2(clamp(val, 0.1, 400) / 2);
     else if (key === 'd') it.hz = r2(clamp(val, 0.1, 400) / 2);
     else if (key === 'y0') { it.y0 = r2(clamp(val, 0, 200)); if (it.y1 < it.y0 + 0.1) it.y1 = r2(it.y0 + 0.1); }
@@ -12453,19 +12779,22 @@ const GALLERY_FILES = 'tracks/';
     el.edSendEmu.title = bad ? 'Fix the problems listed under Check first' : 'Put it in slot c' + ed.slot + ' of the emulator\'s SD card (track ' + (8 + ed.slot) + ')';
     el.edFlyText.textContent = 'Fly c' + ed.slot;
     const s = sim(), a = s && s.app;
-    const bwBig = !!(inSlot && !inSlot.bad && a && formatOf(inSlot.text) === 2 && flyGame(a) === 'bw');
+    const bwBig = !!(inSlot && !inSlot.bad && a && colorOnly(formatOf(inSlot.text)) && flyGame(a) === 'bw');
     el.edFly.disabled = !inSlot || !!inSlot.bad || bwBig;
     el.edFly.title = !inSlot ? 'c' + ed.slot + ' of the emulator is empty: Send to emulator first' : inSlot.bad ? 'c' + ed.slot + ' of the emulator can\'t be read'
       : bwBig ? BW_BIG : 'Fly c' + ed.slot + ' of the emulator in Practice (track ' + (8 + ed.slot) + '), as it is there';
     el.edSave.title = bad ? 'Fix the problems listed under Check first' : 'Download c' + ed.slot + '.txt for the radio\'s SD card';
-    const big = ed.file.format === 2;
-    el.edSize.textContent = 'c' + ed.slot + '.txt · ' + ed.file.bytes + ' of ' + (big ? MAX_BYTES : F1_BYTES) + ' bytes · id ' + ed.file.id +
-      (big ? ' · a bigger track: color radios' : '');
-    el.edSize.title = big ? 'More than ' + F1_GATES + ' gates, ' + F1_BOXES + ' structures or ' + F1_BYTES + ' bytes: StickTime on color radios flies it ' +
-      '(' + BIG_FROM + ' and later); StickTime BW and versions before ' + BIG_FROM + ' don\'t list it. Many structures in view at once slow a radio down: ' +
-      'Radio load shows how much.' : '';
+    const fm = ed.file.format, most = [0, F1_BYTES, MAX_BYTES, F3_BYTES, MAX_BYTES4][fm];
+    el.edSize.textContent = 'c' + ed.slot + '.txt · ' + ed.file.bytes + ' of ' + most + ' bytes · id ' + ed.file.id +
+      (fm === 2 ? ' · a bigger track: color radios' : fm === 3 ? ' · scenery: StickTime ' + SCENE_FROM : fm === 4 ? ' · a bigger track with scenery: color radios, ' + SCENE_FROM : '');
+    const many = 'Many structures and props in view at once slow a radio down: Radio load shows how much.';
+    el.edSize.title = fm === 2 ? 'More than ' + F1_GATES + ' gates, ' + F1_BOXES + ' structures or ' + F1_BYTES + ' bytes: StickTime on color radios flies it ' +
+      '(' + BIG_FROM + ' and later); StickTime BW and versions before ' + BIG_FROM + ' don\'t list it. ' + many
+      : fm === 3 ? 'With scenery (props, rails, decals or structures of the new kinds): StickTime and StickTime BW ' + SCENE_FROM + ' and later fly it; earlier versions don\'t list it. ' + many
+        : fm === 4 ? 'A bigger track with scenery (more than ' + F1_GATES + ' gates, ' + F1_BOXES + ' structures, ' + F3_PROPS + ' props, ' + F3_RAILS + ' rails, ' + F3_DECALS +
+          ' decals or ' + F3_BYTES + ' bytes): StickTime on color radios flies it (' + SCENE_FROM + ' and later); StickTime BW and earlier versions don\'t list it. ' + many : '';
     renderEditing();
-    el.edSize.classList.toggle('bad', ed.file.bytes > MAX_BYTES);
+    el.edSize.classList.toggle('bad', ed.file.bytes > (fm > 2 ? MAX_BYTES4 : MAX_BYTES));
     const c = 'c' + ed.slot;
     el.edEmuHas.textContent = c + ': ' + holds(inSlot);
     el.edEmuHas.classList.toggle('warn', stale(inSlot));
@@ -12542,13 +12871,20 @@ const GALLERY_FILES = 'tracks/';
   function renderButtons() {
     const s = selected(), n = s.all.length, T = ed.T;
     el.edRotL.disabled = el.edRotR.disabled = el.edDel.disabled = !n;
-    el.edDup.disabled = !n || T.gates.length + s.gates.length > MAX_GATES || T.boxes.length + s.boxes.length > MAX_BOXES;
+    el.edDup.disabled = !n || !roomFor(s);
     el.edUndo.disabled = !ed.undo.length;
     el.edRedo.disabled = !ed.redo.length;
     el.edAddGate.disabled = T.gates.length >= MAX_GATES;
     el.edAddBox.disabled = T.boxes.length >= MAX_BOXES;
     el.edAddWall.disabled = T.gates.length >= MAX_GATES || T.boxes.length > MAX_BOXES - 3;
+    el.edAddProp.disabled = T.props.length >= MAX_PROPS;
+    el.edAddRail.disabled = T.rails.length >= MAX_RAILS;
+    el.edAddDecal.disabled = T.decals.length >= MAX_DECALS;
+    el.edAddPreset.disabled = !roomFor(presetOf(el.edPreset.value, true));
   }
+  // room in the track for these items as well (lists by kind, as selected() has them)
+  const LIMITS = { gates: MAX_GATES, boxes: MAX_BOXES, props: MAX_PROPS, rails: MAX_RAILS, decals: MAX_DECALS };
+  const roomFor = (s) => CATS.every(([key]) => ed.T[key].length + (s[key] || []).length <= LIMITS[key]);
 
   // ---------------------------------------------------------------- edits
   function insertAt() {
@@ -12600,44 +12936,88 @@ const GALLERY_FILES = 'tracks/';
     setSel([gate.id, ...walls.map((b) => b.id)], gate.id);
     changed();
   }
+  // the scenery: a prop, a rail (west to east, 20 m; a power line 60 m) or a decal of the kind
+  // picked beside its button, in the middle of the map
+  const mapMid = () => [r2(clamp(snapTo(V.x, GRID), -990, 990)), r2(clamp(snapTo(V.z, GRID), -990, 990))];
+  function addItems(lists, focus) {
+    if (!roomFor(lists)) return;
+    pushUndo();
+    const ids = [];
+    for (const [key] of CATS) for (const o of lists[key] || []) { o.id = ed.nextId++; ed.T[key].push(o); ids.push(o.id); }
+    setSel(ids, ids[focus || 0]);
+    changed();
+  }
+  function addProp() {
+    const [x, z] = mapMid();
+    addItems({ props: [Object.assign({ g: 0 }, propOf(x, z, clamp(parseInt(el.edPropKind.value, 10) || 1, 1, 10), 0))] });
+  }
+  function addRail() {
+    const [x, z] = mapMid(), k = clamp(parseInt(el.edRailKind.value, 10) || 1, 1, 5), l = k === 4 ? 30 : 10;
+    addItems({ rails: [Object.assign({ g: 0 }, railOf(x - l, z, x + l, z, k, 0))] });
+  }
+  function addDecal() {
+    const [x, z] = mapMid(), k = clamp(parseInt(el.edDecalKind.value, 10) || 1, 1, 6);
+    const ab = [0, [20, 2], [10, 6], [8, 6], [10, 0.08], [8, 5], [6, 4]][k];
+    addItems({ decals: [Object.assign({ g: 0 }, decalOf(x, z, ab[0], ab[1], 0, k))] });
+  }
+  // the sets, grouped: the pilots' area (a tent, a windsock, two hay bales), a taped lane (two race
+  // tapes 6 m apart), a fence around the track (its gates, structures and start pad, 6 m out, in
+  // rails of up to 120 m). dry: only what it would add (for the button)
+  function presetOf(name, dry) {
+    const [x, z] = mapMid(), g = dry ? 0 : ed.nextGroup++;
+    const P = (dx, dz, k) => Object.assign({ g }, propOf(x + dx, z + dz, k, 0));
+    const R = (x1, z1, x2, z2, k) => Object.assign({ g }, railOf(x1, z1, x2, z2, k, 0));
+    if (name === 'pilots') return { props: [P(0, 0, 8), P(4.5, 1, 9), P(-3.5, 1, 4), P(-3.5, -1.5, 4)] };
+    if (name === 'lane') return { rails: [R(x - 3, z - 10, x - 3, z + 10, 3), R(x + 3, z - 10, x + 3, z + 10, 3)] };
+    const b = boundsOf(ed.T.gates.concat(ed.T.boxes));
+    if (ed.pad) { b.x0 = Math.min(b.x0, ed.pad.x); b.x1 = Math.max(b.x1, ed.pad.x); b.z0 = Math.min(b.z0, ed.pad.z); b.z1 = Math.max(b.z1, ed.pad.z); }
+    if (!(b.x1 >= b.x0)) return { rails: [] };
+    const x0 = snapTo(b.x0 - 6, 1), x1 = snapTo(b.x1 + 6, 1), z0 = snapTo(b.z0 - 6, 1), z1 = snapTo(b.z1 + 6, 1), rails = [];
+    for (const [ax, az, bx, bz] of [[x0, z0, x1, z0], [x1, z0, x1, z1], [x1, z1, x0, z1], [x0, z1, x0, z0]]) {
+      const n = Math.ceil(Math.hypot(bx - ax, bz - az) / 120);
+      for (let i = 0; i < n; i++) rails.push(R(ax + (bx - ax) * i / n, az + (bz - az) * i / n, ax + (bx - ax) * (i + 1) / n, az + (bz - az) * (i + 1) / n, 1));
+    }
+    return { rails };
+  }
+  const addPreset = () => addItems(presetOf(el.edPreset.value, false));
   function deleteSel() {
     if (!ed.sel.size) return;
     pushUndo();
-    ed.T.gates = ed.T.gates.filter((g) => !ed.sel.has(g.id));
-    ed.T.boxes = ed.T.boxes.filter((b) => !ed.sel.has(b.id));
+    for (const [key] of CATS) ed.T[key] = ed.T[key].filter((o) => !ed.sel.has(o.id));
     setSel([]);
     changed();
   }
   function boundsOf(list) {
     const b = { x0: Infinity, x1: -Infinity, z0: Infinity, z1: -Infinity };
     for (const o of list) {
-      const r = o.hx !== undefined ? bbOf(o) : gateGeom(o).box;
+      const r = itemBounds(o, kindOf(o));
       b.x0 = Math.min(b.x0, r.x0); b.x1 = Math.max(b.x1, r.x1); b.z0 = Math.min(b.z0, r.z0); b.z1 = Math.max(b.z1, r.z1);
     }
     return b;
   }
-  // R: a gate turns 15° on its spot; with structures in it, the selection turns 90° (they stay
-  // square to the axes) round its gap gate or its middle
+  // R: a gate or a decal turns 15° on its spot, a rail round its middle; with structures in it, the
+  // selection turns 90° (they stay square to the axes) round its gap gate or its middle
   function rotateSel(dir) {
     const s = selected();
     if (!s.all.length) return;
     pushUndo();
-    if (s.all.length === 1 && s.gates.length === 1) {
-      s.gates[0].yaw = normYaw(s.gates[0].yaw + 15 * dir);
+    if (s.all.length === 1 && (s.gates.length || s.decals.length)) {
+      s.all[0].yaw = normYaw(s.all[0].yaw + 15 * dir);
       changed();
       return;
     }
     const quarter = s.boxes.length > 0, step = quarter ? 90 : 15;
     let px, pz;
     if (s.gates.length === 1) { px = s.gates[0].x; pz = s.gates[0].z; }
+    else if (s.all.length === 1) [px, pz] = placeOf(s.all[0]);
     else { const b = boundsOf(s.all); px = snapTo((b.x0 + b.x1) / 2, GRID); pz = snapTo((b.z0 + b.z1) / 2, GRID); }
     const c = quarter ? 0 : Math.cos(step * dir * D2R), sn = quarter ? dir : Math.sin(step * dir * D2R);
+    const turn = (x, z) => [pos(px + (x - px) * c + (z - pz) * sn), pos(pz - (x - px) * sn + (z - pz) * c)];
     for (const o of s.all) {
-      const dx = o.x - px, dz = o.z - pz;
-      o.x = pos(px + dx * c + dz * sn);
-      o.z = pos(pz - dx * sn + dz * c);
+      if (o.x1 !== undefined) { [o.x1, o.z1] = turn(o.x1, o.z1); [o.x2, o.z2] = turn(o.x2, o.z2); }
+      else [o.x, o.z] = turn(o.x, o.z);
     }
-    for (const g of s.gates) g.yaw = normYaw(g.yaw + step * dir);
+    for (const g of s.gates.concat(s.decals)) g.yaw = normYaw(g.yaw + step * dir);
     if (quarter) for (const b of s.boxes) [b.hx, b.hz] = [b.hz, b.hx];
     changed();
   }
@@ -12645,21 +13025,23 @@ const GALLERY_FILES = 'tracks/';
   function duplicate() {
     const s = selected(), T = ed.T;
     if (!s.all.length) return;
-    if (T.gates.length + s.gates.length > MAX_GATES || T.boxes.length + s.boxes.length > MAX_BOXES) {
-      status('No room for a copy: ' + MAX_GATES + ' gates and ' + MAX_BOXES + ' structures at most.', 'bad');
+    if (!roomFor(s)) {
+      status('No room for a copy: ' + MAX_GATES + ' gates, ' + MAX_BOXES + ' structures, ' + MAX_PROPS + ' props, ' + MAX_RAILS + ' rails and ' +
+        MAX_DECALS + ' decals at most.', 'bad');
       return;
     }
     pushUndo();
     const b = boundsOf(s.all), off = snapTo(b.x1 - b.x0, GRID) + 2, groups = new Map(), ids = [];
     const copy = (o) => {
-      const c = Object.assign({}, o, { id: ed.nextId++, x: pos(o.x + off) });
+      const c = Object.assign({}, o, { id: ed.nextId++ });
+      moveBy(c, off, 0);
       if (o.g) { if (!groups.has(o.g)) groups.set(o.g, ed.nextGroup++); c.g = groups.get(o.g); }
       ids.push(c.id);
       return c;
     };
-    const ng = s.gates.map(copy), nb = s.boxes.map(copy);
+    const ng = s.gates.map(copy);
     if (ng.length) T.gates.splice(insertAt(), 0, ...ng);
-    T.boxes.push(...nb);
+    for (const [key] of CATS.slice(1)) T[key].push(...s[key].map(copy));
     setSel(ids, ids[0]);
     changed();
   }
@@ -12670,7 +13052,7 @@ const GALLERY_FILES = 'tracks/';
     const now = performance.now();
     if (now - nudgeT > 1000) pushUndo();             // a run of nudges is one undo step
     nudgeT = now;
-    for (const o of s) { o.x = pos(o.x + dx); o.z = pos(o.z + dz); }
+    for (const o of s) moveBy(o, dx, dz);
     changed();
   }
   function moveGate(i, d) {
@@ -12731,7 +13113,7 @@ const GALLERY_FILES = 'tracks/';
     redraw();
   }
   function sceneBounds() {
-    const T = ed.T, b = boundsOf(T.gates.concat(T.boxes));
+    const b = boundsOf(items());
     for (const g of ed.G) {
       if (g.k === 6 || g.k === 7) {
         // the pass zone reaches 2 * iw from the pole
@@ -12770,8 +13152,14 @@ const GALLERY_FILES = 'tracks/';
   const C = {
     gate: '#eceef4', edge: 'rgba(24,27,36,.92)', pole: '#46485a', cloth: '#e22830', zone: 'rgba(255,214,64,.9)',
     pad: '#ff8c14', line: 'rgba(255,255,255,.6)', bad: '#ff5f5f', ink: 'rgba(238,246,240,.62)',
-    box: ['', '#cac5bb', '#ce4835', '#3c6ebb'], boxInk: ['', '#2a2722', '#fff3ef', '#eef4ff'],
+    // the structures' kinds (the game's KC, classic), and their labels' ink
+    box: ['', '#cac5bb', '#ce4835', '#3c6ebb', '#b28856', '#a6543e', '#565c64', '#e4e4e0', '#e4b832', '#40824a'],
+    boxInk: ['', '#2a2722', '#fff3ef', '#eef4ff', '#24180c', '#fff1ec', '#eef2f6', '#2a2a28', '#2a2208', '#eef8ee'],
     tree: 'rgba(52,112,52,.88)', treeEdge: 'rgba(16,44,22,.9)',
+    // the scenery (the game's SCOL, classic): props, rails, decals by kind
+    prop: ['', '#225c2e', '#2e6e32', '#36683a', '#d4b25c', '#24242a', '#ff7014', '#7c8088', '#f2f2f6', '#ff6018', '#46485a'],
+    rail: ['', '#aaaeb4', '#242c26', '#ee2428', '#888c92', '#ff8000'],
+    decal: ['', 'rgba(134,106,72,.85)', 'rgba(74,76,82,.9)', 'rgba(158,152,140,.85)', 'rgba(238,238,232,.95)', 'rgba(58,110,164,.85)', 'rgba(212,194,148,.85)'],
   };
   const FONT = '600 11px "IBM Plex Mono", ui-monospace, monospace';
   const FONT_S = '500 10px "IBM Plex Mono", ui-monospace, monospace';
@@ -12786,11 +13174,12 @@ const GALLERY_FILES = 'tracks/';
     ctx.fillStyle = cssVar('--mat', '#2b5a4e');
     ctx.fillRect(0, 0, W, H);
     drawGrid();
-    if (ed.showTrees) {
-      if (!ed.trees) ed.trees = treesOf(ed.T, ed.G, ed.pad);
-      drawTrees();
-    }
+    drawDecals();
+    if (!ed.trees) ed.trees = treesOf(ed.T, ed.G, ed.pad);
+    if (ed.showTrees) drawTrees();
     drawBoxes();
+    drawRails();
+    drawProps();
     drawRace();
     drawPad();
     ed.T.gates.forEach((g, i) => drawGate(g, ed.G[i], i));
@@ -12828,6 +13217,110 @@ const GALLERY_FILES = 'tracks/';
       ctx.fillStyle = 'rgba(96,64,40,.95)';
       ctx.beginPath(); ctx.arc(sx(t.x), sy(t.z), Math.max(t.h * 0.03 * V.s, 1), 0, 7); ctx.fill();
     }
+  }
+  // the outline of a selected, hovered or wrong item (path: draws its shape)
+  function mark(id, path) {
+    const bad = ed.bad.has(id), sel = ed.sel.has(id);
+    if (!bad && !sel && ed.hover !== id) return;
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = sel ? ACC : bad ? C.bad : 'rgba(255,255,255,.7)';
+    ctx.setLineDash(bad && !sel ? [5, 3] : []);
+    ctx.beginPath(); path(); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  // a decal's outline on the map: a strip's corners, an ellipse
+  function decalPath(d, grow) {
+    const X = sx(d.x), Y = sy(d.z), w = d.yaw * D2R;
+    const a = d.a * V.s + grow, b = Math.max(d.b * V.s, 0.75) + grow;
+    if (d.k >= 5) { ctx.ellipse(X, Y, Math.max(a, 1), Math.max(b, 1), w - Math.PI / 2, 0, 7); return; }
+    const ux = Math.sin(w), uy = -Math.cos(w), vx = -uy, vy = ux;
+    ctx.moveTo(X + ux * a + vx * b, Y + uy * a + vy * b); ctx.lineTo(X + ux * a - vx * b, Y + uy * a - vy * b);
+    ctx.lineTo(X - ux * a - vx * b, Y - uy * a - vy * b); ctx.lineTo(X - ux * a + vx * b, Y - uy * a + vy * b); ctx.closePath();
+  }
+  // the decals, on the ground under everything: in the game's layers (ponds and sand, gravel and
+  // dirt, tarmac, painted lines)
+  const LAYER = [0, 2, 3, 2, 4, 1, 1];
+  function drawDecals() {
+    const list = ed.T.decals.slice().sort((a, b) => LAYER[a.k] - LAYER[b.k]);
+    for (const d of list) {
+      ctx.fillStyle = C.decal[d.k];
+      ctx.beginPath(); decalPath(d, 0); ctx.fill();
+    }
+    for (const d of list) mark(d.id, () => decalPath(d, 2));
+  }
+  // the rails: a fence, a net, race tape (red and white), a power line (three wires, the pylons at
+  // its ends), a banner; posts where the game has them
+  function drawRails() {
+    for (const r of ed.T.rails) {
+      const X1 = sx(r.x1), Y1 = sy(r.z1), X2 = sx(r.x2), Y2 = sy(r.z2), L = Math.hypot(X2 - X1, Y2 - Y1) || 1;
+      const nx = -(Y2 - Y1) / L, ny = (X2 - X1) / L;          // across, on screen
+      mark(r.id, () => { ctx.moveTo(X1, Y1); ctx.lineTo(X2, Y2); });
+      const line = (o, color, w, dash) => {
+        ctx.strokeStyle = color; ctx.lineWidth = w; ctx.setLineDash(dash || []);
+        ctx.beginPath(); ctx.moveTo(X1 + nx * o, Y1 + ny * o); ctx.lineTo(X2 + nx * o, Y2 + ny * o); ctx.stroke();
+        ctx.setLineDash([]);
+      };
+      const k = r.k;
+      if (k === 4) {
+        for (const e of [[X1, Y1], [X2, Y2]]) {
+          const s = Math.max(1.2 * V.s, 3);
+          ctx.fillStyle = 'rgba(136,140,146,.9)'; ctx.fillRect(e[0] - s, e[1] - s, 2 * s, 2 * s);
+          ctx.strokeStyle = 'rgba(20,22,26,.8)'; ctx.lineWidth = 1; ctx.strokeRect(e[0] - s + 0.5, e[1] - s + 0.5, 2 * s - 1, 2 * s - 1);
+        }
+        for (const o of [-2, 0, 2]) line(o * V.s, '#202228', 1.2);
+      } else if (k === 3) {
+        line(0, C.rail[3], 2); line(0, '#fafafa', 2, [4, 4]);
+      } else if (k === 5) {
+        line(0, '#1c1e24', Math.max(0.3 * V.s, 3) + 2); line(0, C.rail[5], Math.max(0.3 * V.s, 3)); line(0, '#1e52cc', Math.max(0.3 * V.s, 3), [6, 6]);
+      } else {
+        line(0, '#1c1e24', Math.max(0.12 * V.s, 2) + 2); line(0, C.rail[k], Math.max(0.12 * V.s, 2));
+        // its posts, as the color edition draws them (every 2.5 m, a net's 5 m), when they are apart
+        const gap = k === 1 ? 2.5 : 5, n = Math.max(1, Math.round(railLen(r) / gap));
+        if (gap * V.s > 6) for (let i = 0; i <= n; i++) dot(X1 + (X2 - X1) * i / n, Y1 + (Y2 - Y1) * i / n, Math.max(0.1 * V.s, 1.5), C.pole);
+      }
+      for (const [px, pz] of k === 3 || k === 5 ? railPosts(r) : []) dot(sx(px), sy(pz), Math.max(0.12 * V.s, 2.2), C.pole, '#fafafa');
+    }
+  }
+  // a prop as seen from above, in its colours: a conifer's or a leafy tree's crown, a bush, a bale,
+  // a tyre stack, a cone, a mast and its lamps, the tent's canopy, the windsock (its sock downwind,
+  // as the game hangs it in a wind), a post. ghost: the game's own pilots' area, faint
+  function drawProp(p, ghost) {
+    const X = sx(p.x), Y = sy(p.z), k = p.k, h = propH(p), S = V.s;
+    const r = Math.max(propR(p) * S, 2);
+    ctx.globalAlpha = ghost ? 0.45 : 1;
+    if (k === 1 || k === 2) {
+      const c = Math.max(h * (k === 1 ? 0.24 : 0.34) * S, 4.5);
+      dot(X, Y, c, C.prop[k], 'rgba(12,36,16,.9)');
+      if (k === 2 && c > 6) dot(X - c * 0.25, Y - c * 0.25, c * 0.55, '#4e9442');
+      dot(X, Y, Math.max(c * 0.12, 1.2), '#604028');
+    } else if (k === 3) dot(X, Y, Math.max(r, 3.5), C.prop[3], 'rgba(12,36,16,.9)');
+    else if (k === 4) dot(X, Y, Math.max(r, 3), C.prop[4], 'rgba(60,44,12,.9)');
+    else if (k === 5) { dot(X, Y, Math.max(r, 3), C.prop[5], '#8a8a94'); dot(X, Y, Math.max(r * 0.45, 1.2), '#08080a'); }
+    else if (k === 6) {
+      const s = Math.max(r * 1.3, 3.5);
+      ctx.fillStyle = C.prop[6]; ctx.beginPath(); ctx.moveTo(X, Y - s); ctx.lineTo(X + s * 0.9, Y + s * 0.7); ctx.lineTo(X - s * 0.9, Y + s * 0.7); ctx.closePath(); ctx.fill();
+    } else if (k === 7) {
+      const l = Math.max(0.65 * S, 4);
+      ctx.fillStyle = '#fff6d0'; ctx.fillRect(X - l, Y - 1.5, 2 * l, 3);
+      dot(X, Y, Math.max(0.15 * S, 2.2), C.prop[7], '#1c1e24');
+    } else if (k === 8) {
+      const s = Math.max(1.5 * S, 5);
+      ctx.fillStyle = C.prop[8]; ctx.fillRect(X - s, Y - s, 2 * s, 2 * s);
+      ctx.strokeStyle = '#2458cc'; ctx.lineWidth = 2; ctx.strokeRect(X - s + 1, Y - s + 1, 2 * s - 2, 2 * s - 2);
+    } else if (k === 9) {
+      const l = Math.max(1.4 * S, 9), ux = ed.wind.x, uy = -ed.wind.z, w = Math.max(0.2 * S, 2.5);
+      ctx.fillStyle = C.prop[9]; ctx.beginPath(); ctx.moveTo(X + uy * w, Y - ux * w); ctx.lineTo(X + ux * l, Y + uy * l); ctx.lineTo(X - uy * w, Y + ux * w);
+      ctx.closePath(); ctx.fill();
+      dot(X, Y, 2.2, C.pole, '#fafafa');
+    } else dot(X, Y, Math.max(r, 2), C.prop[10], '#fafafa');
+    ctx.globalAlpha = 1;
+    if (!ghost) mark(p.id, () => ctx.arc(X, Y, Math.max(k === 8 ? 1.5 * S * 1.42 : k <= 2 ? h * (k === 1 ? 0.24 : 0.34) * S : r, 5) + 3, 0, 7));
+  }
+  function drawProps() {
+    for (const p of ed.T.props) drawProp(p);
+    // the tent and windsock the game adds beside the start pad when the track has none of them
+    if (!ed.pilots) ed.pilots = pilotsOf(ed.T, ed.G, ed.pad, ed.trees || []);
+    for (const p of ed.pilots) drawProp({ x: p.x, z: p.z, k: p.k, h: 0 }, true);
   }
   function drawBoxes() {
     const T = ed.T;
@@ -12993,10 +13486,12 @@ const GALLERY_FILES = 'tracks/';
     const G = ed.G[f.i], d = frontPx(f.it, G) + 26;
     return { x: sx(f.it.x) + G.hx * d, y: sy(f.it.z) - G.hz * d, f };
   }
+  // the focused structure's sides, or the focused rail's ends ('e1', 'e2')
   function sizeHandles() {
     const f = ed.focus !== null ? find(ed.focus) : null;
-    if (!f || f.kind !== 'box' || !selOne()) return [];
+    if (!f || (f.kind !== 'box' && f.kind !== 'rail') || !selOne()) return [];
     const b = f.it;
+    if (f.kind === 'rail') return [['e1', sx(b.x1), sy(b.z1)], ['e2', sx(b.x2), sy(b.z2)]];
     return [['x0', sx(b.x - b.hx), sy(b.z)], ['x1', sx(b.x + b.hx), sy(b.z)], ['z1', sx(b.x), sy(b.z + b.hz)], ['z0', sx(b.x), sy(b.z - b.hz)]];
   }
   function drawHandles() {
@@ -13057,9 +13552,24 @@ const GALLERY_FILES = 'tracks/';
       if (Math.hypot(px - bx, py - by) <= 9 + tolPx * 0.5) return { id: T.gates[i].id };
     }
     for (let i = T.gates.length - 1; i >= 0; i--) if (hitGate(i, x, z, tol)) return { id: T.gates[i].id };
+    // then what stands on the ground (props, rails), the structures, the decals under everything
+    for (let i = T.props.length - 1; i >= 0; i--) {
+      const p = T.props[i], r = Math.max(p.k === 8 ? 1.5 : p.k <= 2 ? propH(p) * 0.24 : propR(p), 4 / V.s);
+      if (Math.hypot(x - p.x, z - p.z) <= r + tol) return { id: p.id };
+    }
+    for (let i = T.rails.length - 1; i >= 0; i--) {
+      const r = T.rails[i];
+      if (segDist2(x, z, r.x1, r.z1, r.x2, r.z2) <= (Math.max(r.k === 4 ? 2.2 : 0.3, 4 / V.s) + tol) ** 2) return { id: r.id };
+    }
     const order = T.boxes.slice().sort((a, b) => b.y1 - a.y1);
     for (const b of order) {
       if (x >= b.x - b.hx - tol && x <= b.x + b.hx + tol && z >= b.z - b.hz - tol && z <= b.z + b.hz + tol) return { id: b.id };
+    }
+    const top = T.decals.slice().sort((a, b) => LAYER[b.k] - LAYER[a.k]);
+    for (const d of top) {
+      const { ux, uz, vx, vz } = decalUV(d), dx = x - d.x, dz = z - d.z;
+      const a = (dx * ux + dz * uz) / d.a, b = (dx * vx + dz * vz) / d.b, ea = d.a + tol, eb = Math.max(d.b, 4 / V.s) + tol;
+      if (d.k >= 5 ? (a / ea) ** 2 + (b / eb) ** 2 <= 1 : Math.abs(a) <= ea && Math.abs(b) <= eb) return { id: d.id };
     }
     return null;
   }
@@ -13105,9 +13615,11 @@ const GALLERY_FILES = 'tracks/';
     if (!ed.sel.has(h.id)) setSel(groupOf(h.id), h.id); else ed.focus = h.id;
     refresh();
     const f = find(h.id);
-    const orig = new Map(selected().all.map((o) => [o.id, { x: o.x, z: o.z }]));
-    // the grabbed item snaps: a gate by its middle, a structure by its corner
-    const ax = f.kind === 'box' ? f.it.x - f.it.hx : f.it.x, az = f.kind === 'box' ? f.it.z - f.it.hz : f.it.z;
+    const orig = new Map(selected().all.map((o) => [o.id, posOf(o)]));
+    // the grabbed item snaps: a gate (a prop, a decal) by its middle, a structure by its corner, a
+    // rail by its first end
+    const ax = f.kind === 'box' ? f.it.x - f.it.hx : f.kind === 'rail' ? f.it.x1 : f.it.x;
+    const az = f.kind === 'box' ? f.it.z - f.it.hz : f.kind === 'rail' ? f.it.z1 : f.it.z;
     drag = { mode: 'move', px: p.x, py: p.y, x: wx(p.x), z: wz(p.y), ax, az, orig, moved: false };
   });
   cv.addEventListener('pointermove', (e) => {
@@ -13126,7 +13638,7 @@ const GALLERY_FILES = 'tracks/';
     if (!drag) {
       const h = ptrs.size ? null : hit(p.x, p.y, 4);
       const id = h && !h.handle ? h.id : null;
-      cv.style.cursor = !h ? 'grab' : h.handle === 'size' ? (h.edge[0] === 'x' ? 'ew-resize' : 'ns-resize') : h.handle === 'turn' ? 'crosshair' : 'move';
+      cv.style.cursor = !h ? 'grab' : h.handle === 'size' ? (h.edge[0] === 'x' ? 'ew-resize' : h.edge[0] === 'z' ? 'ns-resize' : 'move') : h.handle === 'turn' ? 'crosshair' : 'move';
       if (id !== ed.hover) { ed.hover = id; redraw(); }
       el.edReadout.textContent = 'x ' + wx(p.x).toFixed(1) + '  z ' + wz(p.y).toFixed(1) + ' m';
       return;
@@ -13147,13 +13659,23 @@ const GALLERY_FILES = 'tracks/';
       if (!free) { dx = snapTo(drag.ax + dx, GRID) - drag.ax; dz = snapTo(drag.az + dz, GRID) - drag.az; }
       for (const o of selected().all) {
         const q = drag.orig.get(o.id);
-        if (q) { o.x = r2(clamp(q.x + dx, -999, 999)); o.z = r2(clamp(q.z + dz, -999, 999)); }
+        if (!q) continue;
+        Object.assign(o, q);
+        moveBy(o, dx, dz);
       }
     } else if (drag.mode === 'turn') {
       const f = find(drag.id);
       if (f) {
         const a = Math.atan2(x - f.it.x, z - f.it.z) / D2R;
         f.it.yaw = normYaw(free ? a : snapTo(a, 5));
+      }
+    } else if (drag.mode === 'size' && drag.edge[0] === 'e') {
+      // a rail's end, where the pointer is
+      const f = find(drag.id);
+      if (f) {
+        const e = drag.edge[1];
+        f.it['x' + e] = pos(free ? x : snapTo(x, GRID));
+        f.it['z' + e] = pos(free ? z : snapTo(z, GRID));
       }
     } else if (drag.mode === 'size') {
       const f = find(drag.id);
@@ -13233,6 +13755,11 @@ const GALLERY_FILES = 'tracks/';
 
   // ---------------------------------------------------------------- the rest of the page
   el.edGateType.innerHTML = TYPES.slice(1).map((n, i) => '<option value="' + (i + 1) + '">' + n + '</option>').join('');
+  el.edPropKind.innerHTML = options(PKINDS);
+  el.edRailKind.innerHTML = options(RKINDS);
+  el.edDecalKind.innerHTML = options(DKINDS);
+  el.edPreset.innerHTML = '<option value="pilots">Pilots\' area</option><option value="lane">Taped lane</option><option value="fence">Fence around</option>';
+  el.edPreset.addEventListener('change', renderButtons);
 
   // a tool button that its own action disables (Delete with nothing left selected...) hands the
   // keyboard to the map rather than to the page
@@ -13240,6 +13767,10 @@ const GALLERY_FILES = 'tracks/';
   tool(el.edAddGate, addGate);
   tool(el.edAddBox, addBox);
   tool(el.edAddWall, addWall);
+  tool(el.edAddProp, addProp);
+  tool(el.edAddRail, addRail);
+  tool(el.edAddDecal, addDecal);
+  tool(el.edAddPreset, addPreset);
   tool(el.edRotL, () => rotateSel(-1));
   tool(el.edRotR, () => rotateSel(1));
   tool(el.edDup, duplicate);
@@ -13293,6 +13824,7 @@ const GALLERY_FILES = 'tracks/';
     const v = inp.dataset.f;
     // the field shows what the track holds (rounded, clamped)
     if (v === 't' || v === 'k' || v === 'yaw') inp.value = String(f.it[v === 'yaw' ? 'yaw' : v]);
+    else if (f.kind === 'decal' && (v === 'l' || v === 'w')) inp.value = dec(2 * (v === 'l' ? f.it.a : f.it.b));
     else if (v === 'w' || v === 'd') inp.value = dec(2 * (v === 'w' ? f.it.hx : f.it.hz));
     else inp.value = dec(f.it[v]);
   });
@@ -13311,7 +13843,7 @@ const GALLERY_FILES = 'tracks/';
       setSel(groupOf(id), id);
       refresh();
       const f = find(id);
-      if (f) reveal(f.it.x, f.it.z);
+      if (f) reveal(...placeOf(f.it));
     } else if (mv && !mv.disabled) {
       const [i, d] = mv.dataset.move.split(',').map(Number);
       if (moveGate(i, d)) {
@@ -13329,7 +13861,7 @@ const GALLERY_FILES = 'tracks/';
     setSel(p.ids, p.ids[0]);
     refresh();
     const f = find(p.ids[0]);
-    if (f) reveal(f.it.x, f.it.z);
+    if (f) reveal(...placeOf(f.it));
   });
 
   // New track (Open): blank, or a copy of a built-in track, in a slot that is empty (in the
@@ -13375,7 +13907,7 @@ const GALLERY_FILES = 'tracks/';
     const out = [];
     const str = (v, n) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, n) : '');
     for (const t of (g && Array.isArray(g.tracks) ? g.tracks : []).slice(0, 500)) {
-      if (!t || typeof t.text !== 'string' || t.text.length > MAX_BYTES + 1) continue;
+      if (!t || typeof t.text !== 'string' || t.text.length > MAX_BYTES4 + 1) continue;
       const r = parseFile(t.text);
       if (r.error) continue;
       const src = str(t.source, 300);
@@ -13398,8 +13930,8 @@ const GALLERY_FILES = 'tracks/';
     });
     return { same, old };
   }
-  // a track file's id (its second line: <format 1 or 2> <id> ...), 0 if it has none
-  const idOf = (t) => { const m = /^[^\n]*\n\s*[12]\s+(\d+)/.exec(norm(t)); return m ? +m[1] : 0; };
+  // a track file's id (its second line: <format 1 to 4> <id> ...), 0 if it has none
+  const idOf = (t) => { const m = /^[^\n]*\n\s*[1-4]\s+(\d+)/.exec(norm(t)); return m ? +m[1] : 0; };
   const cs = (a) => andList(a.map((n) => 'c' + n));
   // a slot empty in the emulator and (read) on the radio: the editor's when it is, else the first;
   // else one empty in the emulator; else the editor's (sending to it asks)
@@ -13431,9 +13963,28 @@ const GALLERY_FILES = 'tracks/';
     if (!(b.x1 >= b.x0)) return;
     const m = 12, s = Math.min((w - 2 * m) / Math.max(b.x1 - b.x0, 1), (h - 2 * m) / Math.max(b.z1 - b.z0, 1), 12);
     const X = (v) => w / 2 + (v - (b.x0 + b.x1) / 2) * s, Y = (v) => h / 2 - (v - (b.z0 + b.z1) / 2) * s;
+    // the scenery under and around the race (the map fits the race: the rest may reach past it)
+    for (const d of T.decals.slice().sort((p, q) => LAYER[p.k] - LAYER[q.k])) {
+      const u = d.yaw * D2R;
+      x.fillStyle = C.decal[d.k]; x.beginPath();
+      if (d.k >= 5) x.ellipse(X(d.x), Y(d.z), Math.max(d.a * s, 1), Math.max(d.b * s, 1), u - Math.PI / 2, 0, 7);
+      else {
+        const ux = Math.sin(u), uy = -Math.cos(u), a = d.a * s, c = Math.max(d.b * s, 0.5);
+        x.moveTo(X(d.x) + ux * a - uy * c, Y(d.z) + uy * a + ux * c); x.lineTo(X(d.x) + ux * a + uy * c, Y(d.z) + uy * a - ux * c);
+        x.lineTo(X(d.x) - ux * a + uy * c, Y(d.z) - uy * a - ux * c); x.lineTo(X(d.x) - ux * a - uy * c, Y(d.z) - uy * a + ux * c); x.closePath();
+      }
+      x.fill();
+    }
     for (const o of T.boxes) {
       x.fillStyle = C.box[o.k] || C.box[1];
       x.fillRect(X(o.x - o.hx), Y(o.z + o.hz), Math.max(2 * o.hx * s, 1.5), Math.max(2 * o.hz * s, 1.5));
+    }
+    for (const r of T.rails) {
+      x.strokeStyle = C.rail[r.k]; x.lineWidth = r.k === 5 ? 2 : 1.2; x.beginPath();
+      x.moveTo(X(r.x1), Y(r.z1)); x.lineTo(X(r.x2), Y(r.z2)); x.stroke();
+    }
+    for (const p of T.props) {
+      x.fillStyle = C.prop[p.k]; x.beginPath(); x.arc(X(p.x), Y(p.z), p.k <= 2 ? 2 : 1.5, 0, 7); x.fill();
     }
     if (G.length > 1) {
       x.strokeStyle = C.line; x.lineWidth = 1; x.beginPath();
@@ -13505,8 +14056,9 @@ const GALLERY_FILES = 'tracks/';
     keepFocus(el.edCards, () => {
       el.edCards.innerHTML = gal.list.length ? gal.list.map((t, i) => {
         const ng = t.T.gates.length, nb = t.T.boxes.length;
-        const size = ng + ' gates' + (nb ? ', ' + nb + ' structures' : '') + (t.T.trees ? ', ' + t.T.trees + ' trees' : '') +
-          (formatOf(t.text) === 2 ? ' · color radios' : '');
+        const fm = formatOf(t.text), ns = t.T.props.length + t.T.rails.length + t.T.decals.length;
+        const size = ng + ' gates' + (nb ? ', ' + nb + ' structures' : '') + (ns ? ', ' + ns + ' scenery' : '') + (t.T.trees ? ', ' + t.T.trees + ' trees' : '') +
+          (fm === 2 ? ' · color radios' : fm === 3 ? ' · ' + SCENE_FROM + ' and later' : fm === 4 ? ' · color radios, ' + SCENE_FROM + ' and later' : '');
         const has = inWords(placesOf(t, emu).same, rad ? placesOf(t, rad).same : []);
         return '<li class="ed-card"><canvas class="ed-thumb" aria-hidden="true"></canvas><div class="ed-cinfo">' +
           '<strong>' + esc(t.name) + '</strong>' + (t.by ? '<span class="ed-by">by ' + esc(t.by) + '</span>' : '') +
@@ -13713,7 +14265,7 @@ const GALLERY_FILES = 'tracks/';
     ed.versions.add(ed.file.text);
     renderSlots();
     freshGame();                                       // (in its menus the game lists it at once)
-    status('Sent to c' + slot + ' in the emulator (track ' + (8 + slot) + '): ' + (ed.file.format === 2 && flyGame(s.app) === 'bw' ? BW_BIG + '.'
+    status('Sent to c' + slot + ' in the emulator (track ' + (8 + slot) + '): ' + (colorOnly(ed.file.format) && flyGame(s.app) === 'bw' ? BW_BIG + '.'
       : 'Fly c' + slot + ' flies it.') + (kept ? ''
       : ' The browser\'s storage is full or blocked: c' + slot + ' lasts only this visit (Save file keeps the track).'), kept ? 'ok' : 'bad');
     return true;
@@ -13730,7 +14282,7 @@ const GALLERY_FILES = 'tracks/';
       status('Not flown: Send to emulator puts your changes in c' + slot + ', then Fly c' + slot + '.');
       return;
     }
-    if (formatOf(cur.text) === 2 && flyGame(s.app) === 'bw') { status(BW_BIG + '.', 'bad'); return; }
+    if (colorOnly(formatOf(cur.text)) && flyGame(s.app) === 'bw') { status(BW_BIG + '.', 'bad'); return; }
     // StickTime Lite (and any other script) doesn't read custom tracks: back to the screen's own
     if (s.app.custom || s.app.script === 'lite') s.script('auto'); else s.boot();
     s.pause(false);
@@ -14147,7 +14699,8 @@ const GALLERY_FILES = 'tracks/';
     slot = slot || homeOf(ed.file.text) || freeSlot();
     if (slot) { ed.slot = slot; renderSlots(); renderFly(); }
     fit();
-    status('Opened ' + what + ': ' + r.T.gates.length + ' gates, ' + r.T.boxes.length + ' structures.' + (r.note ? ' ' + r.note : ''), r.note ? 'bad' : 'ok');
+    const sc = scenic(r.T) ? ', ' + r.T.props.length + ' props, ' + r.T.rails.length + ' rails, ' + r.T.decals.length + ' decals' : '';
+    status('Opened ' + what + ': ' + r.T.gates.length + ' gates, ' + r.T.boxes.length + ' structures' + sc + '.' + (r.note ? ' ' + r.note : ''), r.note ? 'bad' : 'ok');
   }
   // the radio's tracks into the emulator's slots, or the emulator's onto the radio (same slots):
   // put, the slots to write; lose, a different file there that would be replaced (named first);
@@ -14372,22 +14925,38 @@ const GALLERY_FILES = 'tracks/';
   const toolsDir = (create) => walk(STEPS[radio.at].slice(0, -1), create);
   // what to say when the radio's StickTime won't list a bigger track among these ('' when it will,
   // or when there is no telling)
+  // (and a track with scenery, formats 3 and 4: from SCENE_FROM on; format 3 in StickTime BW too)
   async function bigNote(texts) {
-    const big = texts.filter((t) => typeof t === 'string' && formatOf(t) === 2);
-    if (!big.length) return '';
-    const v = await colorVersion(), one = big.length === 1, it = one ? 'it' : 'them';
-    const which = ' ' + andList(big.map((t) => '"' + nameOf(t) + '"')) + (one ? ' is a bigger track: ' : ' are bigger tracks: ');
-    if (v === '') return which + 'only StickTime ' + BIG_FROM + ' or later on a color radio lists ' + it + ', and this card has no StickTime for color radios.';
-    if (v && cmpVer(v, BIG_FROM) < 0) return which + 'StickTime ' + v + ' on the card doesn\'t list ' + it + ', ' + BIG_FROM + ' and later do.' + (GAME ? ' Install updates it.' : '');
-    return '';
+    const notes = [];
+    for (const [fm, need, what, whats] of [[2, BIG_FROM, 'a bigger track', 'bigger tracks'], [4, SCENE_FROM, 'a bigger track with scenery', 'bigger tracks with scenery'],
+      [3, SCENE_FROM, 'a track with scenery', 'tracks with scenery']]) {
+      const list = texts.filter((t) => typeof t === 'string' && formatOf(t) === fm);
+      if (!list.length) continue;
+      const one = list.length === 1, it = one ? 'it' : 'them';
+      const which = ' ' + andList(list.map((t) => '"' + nameOf(t) + '"')) + (one ? ' is ' + what + ': ' : ' are ' + whats + ': ');
+      const v = await colorVersion();
+      const bw = fm === 3 ? await gameVersion('StickTimeBW.lua', /StickTime BW v(\d+(?:\.\d+)+)/) : '';
+      if (v === '' && bw === '') {
+        notes.push(which + 'only StickTime ' + need + ' or later ' + (fm === 3 ? '(color or B&W)' : 'on a color radio') + ' lists ' + it + ', and this card has no ' +
+          (fm === 3 ? 'StickTime for it.' : 'StickTime for color radios.'));
+        continue;
+      }
+      const old = [[v, 'StickTime'], [bw, 'StickTime BW']].filter(([x]) => x && cmpVer(x, need) < 0);
+      if (old.length) {
+        notes.push(which + andList(old.map(([x, n]) => n + ' ' + x)) + ' on the card ' + (old.length > 1 ? 'don\'t' : 'doesn\'t') + ' list ' + it + ', ' + need +
+          ' and later do.' + (GAME ? ' Install updates ' + (old.length > 1 ? 'them.' : 'it.') : ''));
+      }
+    }
+    return notes.join('');
   }
   // the color game's version on the card: '' without one, null when there is no telling (only its
   // tracks folder connected, a header without a version)
-  async function colorVersion() {
+  const colorVersion = () => gameVersion('StickTime.lua', /StickTime v(\d+(?:\.\d+)+)/);
+  async function gameVersion(file, re) {
     if (radio.at === 'tracks') return null;
-    const tools = await toolsDir(false), f = tools && await fileAt(tools, 'StickTime.lua');
+    const tools = await toolsDir(false), f = tools && await fileAt(tools, file);
     if (!f) return '';
-    const m = /StickTime v(\d+(?:\.\d+)+)/.exec(await (await f.getFile()).slice(0, 600).text());
+    const m = re.exec(await (await f.getFile()).slice(0, 600).text());
     return m ? m[1] : null;
   }
   async function fileAt(dir, path, create) {
