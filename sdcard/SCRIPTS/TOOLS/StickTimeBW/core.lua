@@ -228,8 +228,34 @@ do
     end
     return m
   end
-  -- the scenery of the built-in tracks (props / rails / decals, see TRACKS)
-  local DECO = {}
+  -- the scenery of the built-in tracks (props / rails / decals, see TRACKS), off their racing lines
+  local DECO = {
+    -- Meadow: hay bales on spread hay, a farm track, a pond, the fence along the field
+    "16 18 4 0 19 21 4 0 16 23 4 0 62 22 4 0 63 26 4 0 -12 42 4 0 -15 45 4 0 -18 62 2 0 68 -2 2 0 24 80 2 0 " ..
+    "80 30 2 0 -10 16 3 0 56 66 3 0 6 68 3 0 / -30 -36 64 -36 1 0 / -24 22 56 1.8 0 1 66 68 7 4 30 5 17 21 5 4 0 6",
+    -- Figure 8: a car park at dusk, light masts round it, cones along the bays
+    "30 -12 7 0 -30 -12 7 0 32 42 7 0 -32 42 7 0 30 98 7 0 -30 98 7 0 26 4 6 0 26 24 6 0 26 44 6 0 26 64 6 0 " ..
+    "26 84 6 0 -26 4 6 0 -26 24 6 0 -26 44 6 0 -26 64 6 0 -26 84 6 0 / / 0 42 60 36 0 2 28 42 52 0.08 0 4 " ..
+    "-28 42 52 0.08 0 4 0 -16 30 0.08 90 4 0 100 30 0.08 90 4",
+    -- Dive Tower: gravel under the tower, a power line along the far side, masts, trees
+    "54 82 7 0 -12 40 7 0 60 30 7 0 -20 70 2 0 66 100 2 0 10 102 2 0 -14 10 3 0 72 50 3 0 / -44 -34 84 -34 4 0 / " ..
+    "36 52 14 9 0 3 -26 30 50 1.6 0 1",
+    -- Slalom: tyre stacks outside the flags, banners along the lanes, worn lanes
+    "3 22 5 0 1 40 5 0 3 58 5 0 1 76 5 0 45 78 5 0 43 60 5 0 45 42 5 0 -8 -12 6 0 8 -12 6 0 / " ..
+    "-16 10 -16 40 5 0 -16 50 -16 80 5 0 66 90 66 60 5 0 66 50 66 20 5 0 / 2 48 50 8 0 1 44 60 42 8 0 1",
+    -- Hoop Forest: a pond in the clearing inside the loop, leafy trees and bushes, a path
+    "-14 46 2 0 -8 64 2 0 36 78 2 0 60 80 2 0 92 40 2 0 90 10 2 0 64 -24 2 0 38 -38 2 0 30 12 2 0 52 14 2 0 " ..
+    "46 28 3 0 -16 20 3 0 84 60 3 0 20 -36 3 0 / / 40 20 7 5 20 5 -18 30 50 1.4 10 1",
+    -- Grand Prix: a tarmac start straight with its lines, tents and banners along it, tyres, masts
+    "-14 10 8 0 -14 18 8 0 110 40 5 0 112 47 5 0 114 54 5 0 -16 60 7 0 60 112 7 0 122 20 7 0 40 30 7 0 / " ..
+    "-10 28 -10 54 5 0 15 28 15 54 5 0 -30 132 130 132 4 0 / 0 23 34 5 0 2 0 0 5 0.15 90 4 5 23 34 0.08 0 4 " ..
+    "-5 23 34 0.08 0 4",
+    -- Bando: tyres and posts round the site, a power line beyond it, gravel and mud
+    "-24 0 5 0 -26 4 5 0 30 -28 5 0 64 -6 10 0 64 4 10 0 / -80 -52 104 -52 4 0 / 20 40 30 22 0 3 46 80 8 5 40 1",
+    -- Pro Track: nets behind the far end, tents and banners by the start, masts at the corners
+    "-16 12 8 0 -16 20 8 0 64 72 7 0 64 -32 7 0 -18 -32 7 0 -18 72 7 0 / -12 82 62 82 2 0 -12 30 -12 54 5 0 / " ..
+    "-16 16 8 4 0 1",
+  }
   -- props by kind: default height (m), and the radius they collide with for each m of it
   local PH = { 9, 8, 1.4, 1.2, 1, 0.5, 10, 2.6, 4, 2 }
   local PR = { 0.14, 0.18, 0.6, 0.62, 0.4, 0.34, 0.012, 0.58, 0.02, 0.05 }
