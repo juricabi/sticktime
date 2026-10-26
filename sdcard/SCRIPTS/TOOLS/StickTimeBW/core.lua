@@ -1,6 +1,6 @@
 local toolName = "TNS|StickTime BW|TNE"
 --[[ ======================================================================
-  StickTime BW v1.10.0  -  a real 3D FPV quad simulator that runs on your radio
+  StickTime BW v1.11.0  -  a real 3D FPV quad simulator that runs on your radio
   Black & white version - 128x64 and 212x64 radios with an STM32F4 (TX12 MkII, Zorro, Boxer,
   Pocket, MT12, GX12, X9D+ 2019, X9E, T14, T20 ...)
 
@@ -57,7 +57,7 @@ local OPTS = {
   { "Yaw center", "yc", nil, nil, "", 10, 500, 10 },
   { "Yaw max", "ym", nil, nil, "", 100, 2000, 10 },
   { "Yaw expo", "ye", nil, nil, nil, 0, 100, 1 },
-  { "Camera tilt", "tilt", nil, nil, "", 0, 60, 5 },
+  { "Camera tilt", "tilt", nil, nil, "", 0, 90, 5 },
   { "Field of view", "fov", nil, nil, "", 70, 130, 10 },
   { "Race laps", "laps", { 1, 2, 3, 5, 10 } },
   { "Opponents", "ai", { 0, 1, 2, 3 } },
@@ -1494,29 +1494,38 @@ do
     local n2 = n1 + BX.n
     local kpx, kpy, kpz, kfx, kfy, kfz, krx, kry, krz, tanH, no = kpx, kpy, kpz, kfx, kfy, kfz, krx, kry, krz, tanH, 0
     for n = 1, n2 + (gmode == 1 and AI.n or 0) do
-      local id, X, Y, Z, rad = n, 0, 0, 0, 4
+      -- (one assignment a coordinate: a multiple one goes through temporaries)
+      local id, rad, X, Y, Z = n, 4
       if n <= NG then
-        X, Y, Z = gx[n] - kpx, gy[n] - kpy, gz[n] - kpz
+        X = gx[n] - kpx
+        Y = gy[n] - kpy
+        Z = gz[n] - kpz
         local k = gk[n]
         if GSH[k] == 3 then rad = 9 elseif k == 2 or k == 3 then rad = 7 end
       elseif n <= n1 then
         local i = n - NG
         if qk[i] == 1 then
-          X, Y, Z = qx[i] - kpx, qh[i] * 0.4 - kpy, qz[i] - kpz
+          X = qx[i] - kpx
+          Y = qh[i] * 0.4 - kpy
+          Z = qz[i] - kpz
           rad = qh[i]
         else
-          Z = -1e9
+          X = 0 Y = 0 Z = -1e9
         end
         id = -i
       elseif n <= n2 then
         local b = n - n1
         local x0, x1, y0, y1, z0, z1 = BX.x0[b], BX.x1[b], BX.y0[b], BX.y1[b], BX.z0[b], BX.z1[b]
-        X, Y, Z = (x0 + x1) * 0.5 - kpx, (y0 + y1) * 0.5 - kpy, (z0 + z1) * 0.5 - kpz
+        X = (x0 + x1) * 0.5 - kpx
+        Y = (y0 + y1) * 0.5 - kpy
+        Z = (z0 + z1) * 0.5 - kpz
         rad = (x1 - x0 + y1 - y0 + z1 - z0) * 0.5
         id = 1000 + b
       else
         local a = n - n2
-        X, Y, Z = AI.x[a] - kpx, AI.y[a] - kpy, AI.z[a] - kpz
+        X = AI.x[a] - kpx
+        Y = AI.y[a] - kpy
+        Z = AI.z[a] - kpz
         rad = 1
         id = 2000 + a
       end
@@ -1659,8 +1668,8 @@ local line2
       local X0, Y0, Z0 = bX + x * krx, bY + x * kux, bZ + x * kfx
       line3(X0 + a1, Y0 + a2, Z0 + a3, X0 + b1, Y0 + b2, Z0 + b3, pat, fl)
       local z = czw + i * gs
-      X0, Y0, Z0 = bX + z * krz, bY + z * kuz, bZ + z * kfz
-      line3(X0 + c1, Y0 + c2, Z0 + c3, X0 + d1, Y0 + d2, Z0 + d3, pat, fl)
+      local X1, Y1, Z1 = bX + z * krz, bY + z * kuz, bZ + z * kfz
+      line3(X1 + c1, Y1 + c2, Z1 + c3, X1 + d1, Y1 + d2, Z1 + d3, pat, fl)
     end
     -- higher up, a coarser one (30 m) beyond it, out to 16 times the height (180 m at most): its
     -- edge stays near the horizon (a line across the fine one: only its two ends beyond it)
@@ -1677,15 +1686,14 @@ local line2
         local x = cx + i * 30
         local X0, Y0, Z0 = bX + x * krx, bY + x * kux, bZ + x * kfx
         local q1, q2, q3 = b1, b2, b3
-        if x < x1 or x > x2 then q1, q2, q3 = a1, a2, a3 end
+        if x < x1 or x > x2 then q1 = a1 q2 = a2 q3 = a3 end
         line3(X0 + e1, Y0 + e2, Z0 + e3, X0 + a1, Y0 + a2, Z0 + a3, pat, fl)
         line3(X0 + q1, Y0 + q2, Z0 + q3, X0 + f1, Y0 + f2, Z0 + f3, pat, fl)
         local z = cz + i * 30
-        X0, Y0, Z0 = bX + z * krz, bY + z * kuz, bZ + z * kfz
-        q1, q2, q3 = d1, d2, d3
-        if z < z1 or z > z2 then q1, q2, q3 = c1, c2, c3 end
-        line3(X0 + g1, Y0 + g2, Z0 + g3, X0 + c1, Y0 + c2, Z0 + c3, pat, fl)
-        line3(X0 + q1, Y0 + q2, Z0 + q3, X0 + h1, Y0 + h2, Z0 + h3, pat, fl)
+        local X1, Y1, Z1 = bX + z * krz, bY + z * kuz, bZ + z * kfz
+        if z < z1 or z > z2 then q1 = c1 q2 = c2 q3 = c3 else q1 = d1 q2 = d2 q3 = d3 end
+        line3(X1 + g1, Y1 + g2, Z1 + g3, X1 + c1, Y1 + c2, Z1 + c3, pat, fl)
+        line3(X1 + q1, Y1 + q2, Z1 + q3, X1 + h1, Y1 + h2, Z1 + h3, pat, fl)
       end
     end
   end
@@ -1697,7 +1705,7 @@ local line2
     local k = gk[i]
     local sh = GSH[k]
     local dx, dy, dz = gx[i] - kpx, gy[i] - kpy, gz[i] - kpz
-    local cx, cy, cz = dx * krx + dy * kry + dz * krz, dx * kux + dy * kuy + dz * kuz, dx * kfx + dy * kfy + dz * kfz
+    local cx, cy, cz = dx * krx + dy * kry + dz * krz, dx * kux + dy * kuy + dz * kuz, z   -- (z: collectObjects's, the same sum)
     local r1, r3 = grx[i], grz[i]
     local Rx, Ry, Rz = r1 * krx + r3 * krz, r1 * kux + r3 * kuz, r1 * kfx + r3 * kfz
     local a1, a2, a3 = gax[i], gay[i], gaz[i]
@@ -1737,7 +1745,7 @@ local line2
           local c_, s_ = RCOS[j], RSIN[j]
           local X, Y, Z = cx + (Rx * c_ + Ax * s_) * r, cy + (Ry * c_ + Ay * s_) * r, cz + (Rz * c_ + Az * s_) * r
           line3(oX, oY, oZ, X, Y, Z, pat, BLK)
-          oX, oY, oZ = X, Y, Z
+          oX = X oY = Y oZ = Z
         end
         r = (r > iw and (z < 30 or nxt)) and iw or 0
       end
@@ -1755,10 +1763,11 @@ local line2
       local lh = k == 2 and gy[i] - ih - GT or gy[i]
       local ex, ey, ez = kry * lh, kuy * lh, kfy * lh
       local lw = iw + GT * 0.5
+      local wx, wy, wz = Rx * lw, Ry * lw, Rz * lw
       for sx = -1, 1, 2 do
         for sz = (k == 3 and -1 or 1), 1, 2 do
           local la = k == 3 and (ih + GT * 0.5) * sz or -(ih + GT)
-          local X, Y, Z = cx + Rx * lw * sx + Ax * la, cy + Ry * lw * sx + Ay * la, cz + Rz * lw * sx + Az * la
+          local X, Y, Z = cx + wx * sx + Ax * la, cy + wy * sx + Ay * la, cz + wz * sx + Az * la
           line3(X, Y, Z, X - ex, Y - ey, Z - ez, SOLID, BLK)
         end
       end
@@ -1772,15 +1781,14 @@ local line2
     local bX, bY, bZ = dx * krx + dy * kry + dz * krz, dx * kux + dy * kuy + dz * kuz, dx * kfx + dy * kfy + dz * kfz
     local tX, tY, tZ = bX + kry * h, bY + kuy * h, bZ + kfy * h
     line3(bX, bY, bZ, tX, tY, tZ, SOLID, BLK)
-    if z < 90 then
-      local w = h * 0.24
-      local q = h * 0.25
-      local mX, mY, mZ = bX + kry * q, bY + kuy * q, bZ + kfy * q
-      local lX, lY, lZ, rX, rY, rZ = mX - krx * w, mY - kux * w, mZ - kfx * w, mX + krx * w, mY + kux * w, mZ + kfx * w
-      line3(tX, tY, tZ, lX, lY, lZ, SOLID, BLK)
-      line3(tX, tY, tZ, rX, rY, rZ, SOLID, BLK)
-      line3(lX, lY, lZ, rX, rY, rZ, SOLID, BLK)
-    end
+    -- the canopy (collected within 90 m: always)
+    local w = h * 0.24
+    local q = h * 0.25
+    local mX, mY, mZ = bX + kry * q, bY + kuy * q, bZ + kfy * q
+    local lX, lY, lZ, rX, rY, rZ = mX - krx * w, mY - kux * w, mZ - kfx * w, mX + krx * w, mY + kux * w, mZ + kfx * w
+    line3(tX, tY, tZ, lX, lY, lZ, SOLID, BLK)
+    line3(tX, tY, tZ, rX, rY, rZ, SOLID, BLK)
+    line3(lX, lY, lZ, rX, rY, rZ, SOLID, BLK)
   end
 
   -- structures: the edges of the faces turned to the camera
@@ -1818,16 +1826,20 @@ local line2
   local function drawPad()
     local kpx, kpz, krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz = kpx, kpz, krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz
     local hx, hz, y = TR.hx, TR.hz, 0 - kpy
+    -- all of it within 10.3 m of the pad's centre: behind the near plane (0.2) with that to spare,
+    -- every line would be dropped
+    if (TR.px - kpx) * kfx + y * kfy + (TR.pz - kpz) * kfz < -10.6 then return end
     for s = 1, 2 do
       local e = s == 1 and 1.5 or 0.9
       local x, z = TR.px + (hx - hz) * e - kpx, TR.pz + (hz + hx) * e - kpz
       local pX, pY, pZ = x * krx + y * kry + z * krz, x * kux + y * kuy + z * kuz, x * kfx + y * kfy + z * kfz
       for j = 1, 4 do
         local a, b = (j == 1 or j == 4) and 1 or -1, j <= 2 and 1 or -1
-        x, z = TR.px + (hx * a + hz * b) * e - kpx, TR.pz + (hz * a - hx * b) * e - kpz
+        x = TR.px + (hx * a + hz * b) * e - kpx
+        z = TR.pz + (hz * a - hx * b) * e - kpz
         local X, Y, Z = x * krx + y * kry + z * krz, x * kux + y * kuy + z * kuz, x * kfx + y * kfy + z * kfz
         line3(pX, pY, pZ, X, Y, Z, SOLID, BLK)
-        pX, pY, pZ = X, Y, Z
+        pX = X pY = Y pZ = Z
       end
     end
     local x, z = TR.px - hx * 7 - hz * 4, TR.pz - hz * 7 + hx * 4
@@ -1836,7 +1848,9 @@ local line2
     local a, b, c = x - kpx, 4 - kpy, z - kpz
     local bX, bY, bZ = a * krx + y * kry + c * krz, a * kux + y * kuy + c * kuz, a * kfx + y * kfy + c * kfz
     local tX, tY, tZ = a * krx + b * kry + c * krz, a * kux + b * kuy + c * kuz, a * kfx + b * kfy + c * kfz
-    a, b, c = x + TR.wx * e * 1.4 - kpx, 3.9 - (1 - e) * 1.3 - kpy, z + TR.wz * e * 1.4 - kpz
+    a = x + TR.wx * e * 1.4 - kpx
+    b = 3.9 - (1 - e) * 1.3 - kpy
+    c = z + TR.wz * e * 1.4 - kpz
     local eX, eY, eZ = a * krx + b * kry + c * krz, a * kux + b * kuy + c * kuz, a * kfx + b * kfy + c * kfz
     line3(bX, bY, bZ, tX, tY, tZ, SOLID, BLK)
     line3(tX, tY, tZ, eX, eY, eZ, SOLID, BLK)
@@ -1873,7 +1887,7 @@ local line2
       if Z > 0.3 then
         local X, Y = CX + (x * krx + y * kry + z * krz) * F / Z, CY - (x * kux + y * kuy + z * kuz) * F / Z
         if px_ then line2(px_, py_, X, Y, pat, fl) end
-        px_, py_ = X, Y
+        px_ = X py_ = Y
       else
         px_ = nil
       end
