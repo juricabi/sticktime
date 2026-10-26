@@ -1111,6 +1111,130 @@ do
   for i = 1, 8 do SD[CT .. i .. ".txt"] = nil end
 end
 
+-- 11. scenery (1.10.0): formats 3 and 4 with structure kinds 4-9, props, rails and decals (a section
+-- that can't be read is left out on its own); fences, wires and banners stop the quad, a pond landing
+-- is a SPLASH, Freestyle's UNDER; the pilots' area on every track; the trees keep off the scenery;
+-- Night and Sky detail draw
+do
+  local CT = "/SCRIPTS/TOOLS/StickTimeTracks/c"
+  SD[CT .. "1.txt"] = "Scenery Test\n3 7 3 0  0 0 1 0 0  0 60 1 0 0 / 30 30 2 2 0 3 5 / 10 20 4 0  -10 20 9 0  12 40 6 0" ..
+    " / -20 0 -20 60 1 2  20 50 50 50 4 12  -30 70 30 70 5 2.2 / 0 30 4 0.1 0 4  40 0 6 5 0 5\n"
+  SD[CT .. "2.txt"] = "Big Scenery\n4 8 3 0  0 0 1 0 0  0 40 1 0 0 / / 5 5 4 0 / / 20 20 10 10 0 2\n"   -- color only
+  SD[CT .. "3.txt"] = "Bad Props\n3 9 3 0  0 0 1 0 0  0 40 1 0 0 / / 5 5 11 0 / -10 10 10 10 1 0 / 20 20 3 3 0 6\n"
+  STICKTIME_TEST = {}
+  local inst = chunk()
+  inst.init()
+  local L = STICKTIME_TEST
+  local function run(n)
+    for _ = 1, n do
+      clock = clock + 50
+      local ok, e = pcall(inst.run, 0)
+      if not ok then fail("scenery: run error " .. tostring(e)) return end
+    end
+  end
+  local function props(k)                               -- pillars of kind k (or all props: k nil)
+    local np, _, _, _, _, qk = L.scenery()
+    local n = 0
+    for i = 1, np do
+      if (k and qk[i] == k) or (not k and qk[i] >= 4) then n = n + 1 end
+    end
+    return n
+  end
+  if L.info() ~= 11 then fail("scenery: the last track should be 11 (c3), is " .. tostring(L.info())) end
+  L.track(9)
+  local _, _, _, _, _, _, SCN = L.scenery()
+  local x0, x1 = L.box(1)
+  if props() ~= 4 or props(11) ~= 1 or props(10) ~= 1 or SCN.nr ~= 3 or SCN.nd ~= 2 or SCN.dk[1] ~= 5 or select(10, L.info()) ~= 1 or x1 - x0 ~= 4 then
+    fail(string.format("scenery: format 3 track built wrong (%d props, %d tents, %d windsocks, %d rails, %d decals, first %s, %s structures)",
+      props(), props(10), props(11), SCN.nr, SCN.nd, tostring(SCN.dk[1]), tostring(select(10, L.info()))))
+  end
+  -- (the pond comes first: decals are drawn in layers)
+  if GAME_COLOR then
+    L.track(10)
+    _, _, _, _, _, _, SCN = L.scenery()
+    if props() ~= 3 or SCN.nd ~= 1 or SCN.nr ~= 0 then fail("scenery: format 4 track built wrong (" .. props() .. " props, " .. SCN.nd .. " decals)") end
+  end
+  L.track(11)
+  _, _, _, _, _, _, SCN = L.scenery()
+  if props() ~= 2 or SCN.nr ~= 1 or SCN.nd ~= 1 then
+    fail(string.format("scenery: a props section with an unknown kind should be left out alone (%d props, %d rails, %d decals)", props(), SCN.nr, SCN.nd))
+  end
+  -- contacts on track 9: angle mode, hovering, flown at things for a second
+  L.track(9) L.set("mode", 2) L.set("ai", 0) L.start(2)
+  local function fly(x, y, z, yaw, vx, vy, vz, secs, thr)
+    L.state(4) L.pose(x, y, z, yaw, 0, 0) L.vel(vx, vy, vz)
+    sticks.ail, sticks.ele, sticks.rud = 0, 0, 0
+    sticks.thr = thr or (hoverStick(1) * 2048 - 1024)
+    run(math.floor(secs * 20))
+    local t = { L.get() }
+    return t[1], t[2], t[3], t[16]
+  end
+  local px_ = fly(-17, 1, 30, -90, -10, 0, 0, 0.6)
+  if px_ < -20 then fail(string.format("scenery: through the fence at 1 m (x %.1f)", px_)) end
+  px_ = fly(-17, 3.5, 30, -90, -10, 0, 0, 0.6)
+  if px_ > -20 then fail(string.format("scenery: over the fence at 3.5 m should pass (x %.1f)", px_)) end
+  -- (moving, the hover throttle climbs: a little less, and from close by)
+  local thr = hoverStick(0.85) * 2048 - 1024
+  local hits = select(13, L.audio())
+  local _, _, pz_ = fly(35, 11.1, 46.5, 0, 0, 0, 6, 0.6, thr)
+  -- (a wire is thin: the quad strikes it with its props and tumbles round it, not on)
+  if pz_ > 49 or select(13, L.audio()) <= hits then
+    fail(string.format("scenery: through the power line's wire (z %.1f, %d hits)", pz_, select(13, L.audio()) - hits))
+  end
+  _, _, pz_ = fly(35, 6, 44, 0, 0, 0, 10, 1.5)
+  if pz_ < 56 then fail(string.format("scenery: under the power line should pass (z %.1f)", pz_)) end
+  _, _, pz_ = fly(0, 1.75, 68, 0, 0, 0, 6, 0.6, thr)
+  if pz_ > 70 then fail(string.format("scenery: through the banner (z %.1f)", pz_)) end
+  _, _, pz_ = fly(0, 0.6, 68, 0, 0, 0, 6, 0.8, thr)
+  if pz_ < 71 then fail(string.format("scenery: under the banner should pass (z %.1f)", pz_)) end
+  local _, _, _, st = fly(40, 0.4, 0, 0, 0, -2, 0, 0.5, -1024)
+  local why = select(2, L.bat("s"))
+  if st ~= 5 or why ~= "SPLASH" then fail("scenery: landing in the pond should be a SPLASH (state " .. tostring(st) .. ", " .. tostring(why) .. ")") end
+  -- Freestyle: under the banner is a trick
+  L.start(3) run(2)
+  fly(0, 0.6, 67, 0, 0, 0, 8, 0.5, thr)
+  if L.msg() == nil or not string.find(L.msg(), "UNDER", 1, true) then fail("scenery: Freestyle under the banner should be UNDER (" .. tostring(L.msg()) .. ")") end
+  -- Night and Sky detail, every look
+  if GAME_COLOR then
+    for c = 0, 5 do
+      L.set("colors", c) L.set("sky", c % 2)
+      fly(0, 3, -10, 0, 0, 0, 5, 0.3)
+    end
+    L.set("colors", 0) L.set("sky", 1)
+  end
+  -- the built-in tracks: a windsock each, a tent (theirs or the pilots' area's), trees off the scenery
+  local function sd(x, z, ax, az, bx, bz)
+    local dx, dz = bx - ax, bz - az
+    local l = dx * dx + dz * dz
+    local t = l > 0 and ((x - ax) * dx + (z - az) * dz) / l or 0
+    if t < 0 then t = 0 elseif t > 1 then t = 1 end
+    dx, dz = ax + dx * t - x, az + dz * t - z
+    return math.sqrt(dx * dx + dz * dz)
+  end
+  for t = 1, 8 do
+    L.track(t)
+    local np, qx, qz, _, _, qk
+    np, qx, qz, _, _, qk, SCN = L.scenery()
+    if props(11) ~= 1 or props(10) < 1 then fail("scenery: track " .. t .. " should have a windsock and a tent (" .. props(11) .. ", " .. props(10) .. ")") end
+    for i = 1, np do
+      if qk[i] == 1 then
+        for r = 1, SCN.nr do
+          if sd(qx[i], qz[i], SCN.rx1[r], SCN.rz1[r], SCN.rx2[r], SCN.rz2[r]) < 3.99 then fail("scenery: a tree on track " .. t .. " stands by a rail") end
+        end
+        for d = 1, SCN.nd do
+          local cx, cz, ux, uz = SCN.dx[d], SCN.dz[d], SCN.dux[d], SCN.duz[d]
+          local w = math.sqrt(SCN.dvx[d] ^ 2 + SCN.dvz[d] ^ 2) + 1.99
+          if sd(qx[i], qz[i], cx - ux, cz - uz, cx + ux, cz + uz) < w then fail("scenery: a tree on track " .. t .. " stands on a decal") end
+        end
+      end
+    end
+  end
+  print(string.format("scenery: formats 3%s read, a broken section left out alone, fence, wire and banner stop the quad (over and under pass), SPLASH, UNDER, %s, a windsock and tent on all eight tracks",
+    GAME_COLOR and " and 4" or " (4: left out)", GAME_COLOR and "every Colors look and Sky detail drawn" or "B&W"))
+  idleSticks()
+  for i = 1, 8 do SD[CT .. i .. ".txt"] = nil end
+end
+
 collectgarbage()
 print(string.format("%s %s %dx%d  frames %d  instr/frame (incl. mock lcd) avg %d max %d  tri rows avg %d max %d  rejected lines %d",
   _VERSION, kind, W, H, frames, math.floor(sumInstr / frames), maxInstr, math.floor(sumRows / frames), maxRows, stat.rejected))

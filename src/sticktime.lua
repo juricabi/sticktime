@@ -5274,6 +5274,7 @@ local function init()
     TEST.bat = function(k, v) if v then BAT[k] = v end return BAT[k], R.why end   -- a battery value; the crash's why
     TEST.box = function(b) return BX.x0[b], BX.x1[b], BX.y0[b], BX.y1[b], BX.z0[b], BX.z1[b] end
     TEST.scenery = function() return NP, qx, qz, qr, qh, qk, SCN end   -- the pillars (props among them), rails and decals
+    TEST.msg = function() return R.msg end                               -- the message on the screen (a trick's name)
     TEST.S = S
     -- the simulation time and the clock (ticks), the frame interval, the host-timed offset; t: the
     -- clock jumps to t ticks (hours of uptime)
