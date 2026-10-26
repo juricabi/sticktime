@@ -44,7 +44,7 @@ local OPTS = {
 { "Power", "twr", nums("0 3 4 5 6 7 8 10 12"), ":1" },                -- 0: Stock
 { "Flight mode", "mode", { 1, 2 }, { "Acro", "Angle" } },
 { "Rates", "rates", { 1, 2, 3 }, { "Soft", "Normal", "Fast" } },
-{ "Camera tilt", "tilt", nums("0 10 15 20 25 30 35 40 50") },
+{ "Camera tilt", "tilt", nums("0 10 15 20 25 30 35 40 50 60 70 80 90") },
 { "Laps", "laps", nums("1 2 3 5 10") },
 { "Wind", "wind", V3, { "Off", "Light", "Strong" } },
 { "Prop wash", "wash", V3, { "Off", "Stock", "Max" } },
@@ -702,11 +702,12 @@ local RC, RS = {}, {}                              -- ring points every 30 deg
 for j = 1, 12 do RC[j], RS[j] = cos(j * 0.5236), sin(j * 0.5236) end
 local kx, ky, kz, krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz = 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1
 local function line2(x1, y1, x2, y2, pat, fl)
-local dx, dy, t0_, t1, XM, YM = x2 - x1, y2 - y1, 0, 1, XM, YM
+local dx, dy, XM, YM = x2 - x1, y2 - y1, XM, YM
 if x1 >= 0 and x1 <= XM and x2 >= 0 and x2 <= XM and y1 >= 0 and y1 <= YM and y2 >= 0 and y2 <= YM then
 drawLine(floor(x1 + 0.5), floor(y1 + 0.5), floor(x1 + dx + 0.5), floor(y1 + dy + 0.5), pat, fl)
 return
 end
+local t0_, t1 = 0, 1
 if dx > 1e-6 or dx < -1e-6 then
 local ta, tb = -x1 / dx, (XM - x1) / dx
 if ta > tb then ta, tb = tb, ta end
@@ -727,16 +728,24 @@ local function line3(X1, Y1, Z1, X2, Y2, Z2, pat, fl, cam)
 if not cam then
 local kx, ky, kz, krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz = kx, ky, kz, krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz
 local a1, a2, a3, b1, b2, b3 = X1 - kx, Y1 - ky, Z1 - kz, X2 - kx, Y2 - ky, Z2 - kz
-X1, Y1, Z1 = a1 * krx + a2 * kry + a3 * krz, a1 * kux + a2 * kuy + a3 * kuz, a1 * kfx + a2 * kfy + a3 * kfz
-X2, Y2, Z2 = b1 * krx + b2 * kry + b3 * krz, b1 * kux + b2 * kuy + b3 * kuz, b1 * kfx + b2 * kfy + b3 * kfz
+X1 = a1 * krx + a2 * kry + a3 * krz
+Y1 = a1 * kux + a2 * kuy + a3 * kuz
+Z1 = a1 * kfx + a2 * kfy + a3 * kfz
+X2 = b1 * krx + b2 * kry + b3 * krz
+Y2 = b1 * kux + b2 * kuy + b3 * kuz
+Z2 = b1 * kfx + b2 * kfy + b3 * kfz
 end
 if Z1 < 0.2 then
 if Z2 < 0.2 then return end
 local t = (0.2 - Z1) / (Z2 - Z1)
-X1, Y1, Z1 = X1 + (X2 - X1) * t, Y1 + (Y2 - Y1) * t, 0.2
+X1 = X1 + (X2 - X1) * t
+Y1 = Y1 + (Y2 - Y1) * t
+Z1 = 0.2
 elseif Z2 < 0.2 then
 local t = (0.2 - Z2) / (Z1 - Z2)
-X2, Y2, Z2 = X2 + (X1 - X2) * t, Y2 + (Y1 - Y2) * t, 0.2
+X2 = X2 + (X1 - X2) * t
+Y2 = Y2 + (Y1 - Y2) * t
+Z2 = 0.2
 end
 local F, CX, CY = F, CX, CY
 return line2(CX + X1 * F / Z1, CY - Y1 * F / Z1, CX + X2 * F / Z2, CY - Y2 * F / Z2, pat, fl)
@@ -755,11 +764,6 @@ if o[3][j] == S[o[2]] then return j end
 end
 return 1
 end
-local function box(y)
-y = y * U
-lcd.drawFilledRectangle(8 * U, y, XM + 1 - 16 * U, YM + 1 - y * 2, ERASE)
-lcd.drawRectangle(8 * U, y, XM + 1 - 16 * U, YM + 1 - y * 2, BLK)
-end
 render = function()
 if state == 1 or state == 2 then
 lcd.clear()
@@ -775,6 +779,7 @@ local rows = floor((YM + 1 - y) / (8 * U))
 if rows > n then rows = n end
 if focus - scroll > rows then scroll = focus - rows end
 if focus <= scroll then scroll = focus - 1 end
+local ed = editing and state == 2
 for r = 1, rows do
 local i = scroll + r
 local o, f, v = OPTS[i], i == focus and INV or 0, nil
@@ -787,8 +792,8 @@ elseif o then
 local j = optIdx(o)
 v = i == 1 and QN or type(o[4]) == "table" and o[4][j] or o[3][j] == 0 and o[4] == ":1" and "Stock" or o[3][j] .. (o[4] or "")
 end
-drawText(2 * U, y, l, SML + ((editing and state == 2) and 0 or f))
-if v then drawText(XM - U, y, v, SML + RIGHT + ((editing and state == 2) and f or 0)) end
+drawText(2 * U, y, l, SML + (ed and 0 or f))
+if v then drawText(XM - U, y, v, SML + RIGHT + (ed and f or 0)) end
 y = y + 8 * U
 end
 return
@@ -832,30 +837,51 @@ else
 line2(CX + (-CY * b - c) / a, 0, CX + ((YM - CY) * b - c) / a, YM, SOLID, GRY)
 end
 local gx0, gz0 = floor(kx / 10) * 10, floor(kz / 10) * 10
+local xn, xf, zn, zf = gx0 - 60, gx0 + 60, gz0 - 60, gz0 + 60   -- its edges
+do
+local kux, kuy, kuz = kux, kuy, kuz
+local a2 = 0 - ky
+local y1, y2, y3 = a2 * kry, a2 * kuy, a2 * kfy
+local a3 = zn - kz
+local n1, n2, n3 = a3 * krz, a3 * kuz, a3 * kfz
+a3 = zf - kz
+local f1, f2, f3 = a3 * krz, a3 * kuz, a3 * kfz
+local a1 = xn - kx
+local l1, l2, l3 = a1 * krx + y1, a1 * kux + y2, a1 * kfx + y3
+a1 = xf - kx
+local r1, r2, r3 = a1 * krx + y1, a1 * kux + y2, a1 * kfx + y3
 for i = -6, 6 do
-line3(gx0 + i * 10, 0, gz0 - 60, gx0 + i * 10, 0, gz0 + 60, DOTTED, GRY)
-line3(gx0 - 60, 0, gz0 + i * 10, gx0 + 60, 0, gz0 + i * 10, DOTTED, GRY)
+a1 = gx0 + i * 10 - kx
+local p1, p2, p3 = a1 * krx + y1, a1 * kux + y2, a1 * kfx + y3
+line3(p1 + n1, p2 + n2, p3 + n3, p1 + f1, p2 + f2, p3 + f3, DOTTED, GRY, true)
+a3 = gz0 + i * 10 - kz
+local q1, q2, q3 = a3 * krz, a3 * kuz, a3 * kfz
+line3(l1 + q1, l2 + q2, l3 + q3, r1 + q1, r2 + q2, r3 + q3, DOTTED, GRY, true)
+end
 end
 local n = floor((ky < 11.3 and ky or 11.3) * 16 / 30)
 if n > 2 then
 local cx, cz, r = floor(kx / 30) * 30, floor(kz / 30) * 30, n * 30
 for i = -n, n do
 local x, z = cx + i * 30, cz + i * 30
-line3(x, 0, cz - r, x, 0, gz0 - 60, DOTTED, GRY)
-line3(x, 0, (x < gx0 - 60 or x > gx0 + 60) and gz0 - 60 or gz0 + 60, x, 0, cz + r, DOTTED, GRY)
-line3(cx - r, 0, z, gx0 - 60, 0, z, DOTTED, GRY)
-line3((z < gz0 - 60 or z > gz0 + 60) and gx0 - 60 or gx0 + 60, 0, z, cx + r, 0, z, DOTTED, GRY)
+line3(x, 0, cz - r, x, 0, zn, DOTTED, GRY)
+line3(x, 0, (x < xn or x > xf) and zn or zf, x, 0, cz + r, DOTTED, GRY)
+line3(cx - r, 0, z, xn, 0, z, DOTTED, GRY)
+line3((z < zn or z > zf) and xn or xf, 0, z, cx + r, 0, z, DOTTED, GRY)
 end
 end
+if (spx - kx) * kfx - ky * kfy + (spz - kz) * kfz >= -10.6 then
 local hx, hz = shx * 1.5, shz * 1.5
 quad(spx + hx + hz, 0, spz + hz - hx, spx + hx - hz, 0, spz + hz + hx, spx - hx - hz, 0, spz - hz + hx, spx - hx + hz, 0, spz - hz - hx, SOLID)
-hx, hz = spx - shx * 7 - shz * 4, spz - shz * 7 + shx * 4
+hx = spx - shx * 7 - shz * 4
+hz = spz - shz * 7 + shx * 4
 line3(hx, 0, hz, hx, 4, hz, SOLID, BLK)
 local e = S.wind > 0 and (S.wind == 1 and 3 or 7) * (1 + 0.3 * sin(gt * 0.009) + 0.2 * sin(gt * 0.031)) / 7.5 or 0
 if e > 1 then e = 1 end
 local x, y, z = hx + wdx * e * 1.4, 3.9 - (1 - e) * 1.3, hz + wdz * e * 1.4
 line3(hx, 4, hz, x, y, z, SOLID, BLK)
 line3(hx, 3.6, hz, x, y, z, SOLID, BLK)
+end
 end
 for i = 1, NG do
 local k, cx, cy, cz = gk[i], gx[i], gy[i], gz[i]
@@ -876,24 +902,34 @@ elseif k == 4 or k == 5 then
 local kux, kuy, kuz = kux, kuy, kuz
 w = w + 0.28
 for _ = 1, (nxt or z < 30) and 2 or 1 do
-local X, Y, Z = cx + r1 * w - kx, cy - ky, cz + r3 * w - kz
-X, Y, Z = X * krx + Y * kry + Z * krz, X * kux + Y * kuy + Z * kuz, X * kfx + Y * kfy + Z * kfz
+local X, Y, Z
+do
+local x_, y_, z_ = cx + r1 * w - kx, cy - ky, cz + r3 * w - kz
+X = x_ * krx + y_ * kry + z_ * krz
+Y = x_ * kux + y_ * kuy + z_ * kuz
+Z = x_ * kfx + y_ * kfy + z_ * kfz
+end
 for j = 1, k == 4 and 12 or 6 do
 local c_, s_ = RC[j] * w, RS[j] * w
-local X2, Y2, Z2 = cx + r1 * c_ + a1 * s_ - kx, cy + a2 * s_ - ky, cz + r3 * c_ + a3 * s_ - kz
-X2, Y2, Z2 = X2 * krx + Y2 * kry + Z2 * krz, X2 * kux + Y2 * kuy + Z2 * kuz, X2 * kfx + Y2 * kfy + Z2 * kfz
+local X2, Y2, Z2
+do
+local x2, y2, z2 = cx + r1 * c_ + a1 * s_ - kx, cy + a2 * s_ - ky, cz + r3 * c_ + a3 * s_ - kz
+X2 = x2 * krx + y2 * kry + z2 * krz
+Y2 = x2 * kux + y2 * kuy + z2 * kuz
+Z2 = x2 * kfx + y2 * kfy + z2 * kfz
+end
 line3(X, Y, Z, X2, Y2, Z2, p, BLK, true)
-X, Y, Z = X2, Y2, Z2
+X = X2 Y = Y2 Z = Z2
 end
 w = GW[k]
 end
 elseif k < 4 or nxt then
-if k < 4 then w, h = w + 0.28, h + 0.28 end
+if k < 4 then w = w + 0.28 h = h + 0.28 end
 for _ = 1, (k < 4 and (nxt or z < 30)) and 2 or 1 do
 local Rx, Rz, Ax, Ay, Az = r1 * w, r3 * w, a1 * h, a2 * h, a3 * h
 quad(cx - Rx - Ax, cy - Ay, cz - Rz - Az, cx + Rx - Ax, cy - Ay, cz + Rz - Az,
 cx + Rx + Ax, cy + Ay, cz + Rz + Az, cx - Rx + Ax, cy + Ay, cz - Rz + Az, p)
-w, h = GW[k], GH[k]
+w = GW[k] h = GH[k]
 end
 end
 end
@@ -919,17 +955,19 @@ local d = dx * kfx + dy * kfy + dz * kfz
 local l = dx * krx + dy * kry + dz * krz
 if d > -h and d < 90 and (l < 0 and -l or l) < d * 1.19 + 6 then
 line3(x, 0, z, x, h, z, SOLID, BLK)
-if qr[i] > 0.5 and d < 90 then
+if qr[i] > 0.5 then                            -- a tree (within 90 m: all of these are)
 l = h * 0.24 / (sqrt(dx * dx + dz * dz) + 0.01)
-dx, dz, d = dz * l, -dx * l, h * 0.25
-line3(x - dx, d, z - dz, x, h, z, SOLID, BLK)
-line3(x + dx, d, z + dz, x, h, z, SOLID, BLK)
-line3(x - dx, d, z - dz, x + dx, d, z + dz, SOLID, BLK)
+local ex, ez, y = dz * l, -dx * l, h * 0.25
+line3(x - ex, y, z - ez, x, h, z, SOLID, BLK)
+line3(x + ex, y, z + ez, x, h, z, SOLID, BLK)
+line3(x - ex, y, z - ez, x + ex, y, z + ez, SOLID, BLK)
 end
 end
 end
 if state == 8 then
-box(4)
+local y, w, h = 4 * U, XM + 1 - 16 * U, YM + 1 - 8 * U
+lcd.drawFilledRectangle(8 * U, y, w, h, ERASE)
+lcd.drawRectangle(8 * U, y, w, h, BLK)
 drawText(12 * U, 7 * U, newBest and "NEW RECORD!" or gm == 4 and "TIME UP" or "FINISHED", SML + INV)
 drawText(12 * U, 17 * U, gm == 4 and "Gates " .. rn .. "  best " .. BG[S.track] or "Total " .. timeStr(total), SML)
 if gm < 3 then drawText(12 * U, 26 * U, "Best lap " .. timeStr(BL[S.track]), SML) end
@@ -948,7 +986,8 @@ drawText(XM, U, l and ((lap > 0 and lap or 1) .. (gm == 1 and "/" .. S.laps or "
 local i = nextGate
 local dx, dy, dz = AX[i] - kx, AY[i] - ky, AZ[i] - kz
 local X, Y, Z = dx * krx + dy * kry + dz * krz, dx * kux + dy * kuy + dz * kuz, dx * kfx + dy * kfy + dz * kfz
-if Z < 1 or X * F > (CX - 3) * Z or -X * F > (CX - 3) * Z or Y * F > (CY - 3) * Z or -Y * F > (CY - 3) * Z then
+local xf, yf, zx, zy = X * F, Y * F, (CX - 3) * Z, (CY - 3) * Z
+if Z < 1 or xf > zx or -xf > zx or yf > zy or -yf > zy then
 if Z < 0 and X * X + Y * Y < 1 then X, Y = 0, -1 end
 local l2 = sqrt(X * X + Y * Y) + 0.0001
 local ex, ey = X / l2, -Y / l2
@@ -967,15 +1006,16 @@ drawLine(CX - 4 * U, CY, CX - 2 * U, CY, SOLID, BLK)
 drawLine(CX + 2 * U, CY, CX + 4 * U, CY, SOLID, BLK)
 if S.wind > 0 then
 local r = 6 * U
-local cx, cy = XM - r, YM - r
-lcd.drawFilledRectangle(cx - r, cy - r, r * 2 + 1, r * 2 + 1, ERASE)
-lcd.drawRectangle(cx - r, cy - r, r * 2 + 1, r * 2 + 1, BLK)
+local cx, cy, s = XM - r, YM - r, r * 2 + 1
+lcd.drawFilledRectangle(cx - r, cy - r, s, s, ERASE)
+lcd.drawRectangle(cx - r, cy - r, s, s, BLK)
 local a = 4 * U / (sqrt(fx * fx + fz * fz) + 0.0001)
 local ex, ey = (wdx * fz - wdz * fx) * a, -(wdx * fx + wdz * fz) * a
 local tx, ty = cx + ex, cy + ey
+local e6, e5, f6, f5 = ex * 0.6, ey * 0.5, ey * 0.6, ex * 0.5
 drawLine(cx - ex, cy - ey, tx, ty, SOLID, BLK)
-drawLine(tx, ty, tx - ex * 0.6 - ey * 0.5, ty - ey * 0.6 + ex * 0.5, SOLID, BLK)
-drawLine(tx, ty, tx - ex * 0.6 + ey * 0.5, ty - ey * 0.6 - ex * 0.5, SOLID, BLK)
+drawLine(tx, ty, tx - e6 - e5, ty - f6 + f5, SOLID, BLK)
+drawLine(tx, ty, tx - e6 + e5, ty - f6 - f5, SOLID, BLK)
 end
 if msg and gt - msgT < 200 then drawText(CX, 10 * U, msg, SML + CENTER) end
 end
@@ -986,7 +1026,9 @@ drawText(CX, CY - 8 * U, "CRASH", DBLSIZE + INV + CENTER)
 elseif state == 6 then
 drawText(CX, CY - 14 * U, "READY", SML + INV + CENTER)
 elseif state == 7 then
-box(10)
+local y, w, h = 10 * U, XM + 1 - 16 * U, YM + 1 - 20 * U
+lcd.drawFilledRectangle(8 * U, y, w, h, ERASE)
+lcd.drawRectangle(8 * U, y, w, h, BLK)
 for i = 1, 3 do drawText(22 * U, (6 + i * 11) * U, PAUSE[i], i == focus and INV or 0) end
 end
 end

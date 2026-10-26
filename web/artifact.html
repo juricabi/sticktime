@@ -1836,7 +1836,7 @@ local OPTS = {
   { "Yaw center", "yc", nil, nil, "°/s", 10, 500, 10 },
   { "Yaw max", "ym", nil, nil, "°/s", 100, 2000, 10 },
   { "Yaw expo", "ye", nil, nil, nil, 0, 100, 1 },
-  { "Camera tilt", "tilt", nil, nil, "°", 0, 60, 5 },
+  { "Camera tilt", "tilt", nil, nil, "°", 0, 90, 5 },
   { "Field of view", "fov", nil, nil, "°", 70, 130, 10 },
   { "Race laps", "laps", { 1, 2, 3, 5, 10 } },
   { "Opponents", "ai", { 0, 1, 2, 3 } },
@@ -3844,26 +3844,27 @@ do
   -- Touching faces count as separated (2 cm tolerance: radio Lua uses 32-bit floats).
   -- Boxes that intersect (a tree's box touching a wall): the farther one first.
   -- depth order (far to near) of the n objects into DO: an insertion sort fed with last frame's
-  -- order (objects keep their places from frame to frame, so it takes about one pass)
-  local LPOS, LST, BUF, stp, lastN = {}, {}, {}, 0, 0
+  -- order (objects keep their places from frame to frame, so it takes about one pass): the
+  -- objects still in view in that order (LN: last frame's, as object numbers), then the new ones.
+  -- POS: an object's ord entry this frame, 0 once it is placed (all 0 between frames)
+  local LN, POS, lastN = {}, {}, 0
   local function depthOrder(n)
-    for p = 1, lastN do BUF[p] = 0 end
-    for o = 1, n do
-      local k = ordN[o]
-      if LST[k] == stp then BUF[LPOS[k]] = o end
-    end
+    local ordN, ordZ, DO, POS, LN = ordN, ordZ, DO, POS, LN
+    for o = 1, n do POS[ordN[o]] = o end
     local m = 0
     for p = 1, lastN do
-      local o = BUF[p]
+      local k = LN[p]
+      local o = POS[k]
       if o > 0 then
         m = m + 1
-        DO[m] = o
+        DO[m], POS[k] = o, 0
       end
     end
     for o = 1, n do
-      if LST[ordN[o]] ~= stp then
+      local k = ordN[o]
+      if POS[k] > 0 then
         m = m + 1
-        DO[m] = o
+        DO[m], POS[k] = o, 0
       end
     end
     for k = 2, n do
@@ -3878,17 +3879,15 @@ do
   end
   -- this frame's depth order, where the next frame's depthOrder starts from
   local function keepOrder(n)
-    stp = stp + 1
-    for k = 1, n do
-      local key = ordN[DO[k]]
-      LPOS[key], LST[key] = k, stp
-    end
+    local ordN, DO, LN = ordN, DO, LN
+    for k = 1, n do LN[k] = ordN[DO[k]] end
     lastN = n
   end
 
   local function sortWithStructures(n)
     local ne = 0
     local isB, X0, X1, Y0, Y1, Z0, Z1 = OB.b, SB.x0, SB.x1, SB.y0, SB.y1, SB.z0, SB.z1
+    local sx0, sx1, sy0, sy1, CL, EA, EB, ordN, ordZ = sx0, sx1, sy0, sy1, CL, EA, EB, ordN, ordZ
     local cx, cy, cz = kpx, kpy, kpz
     -- candidates: the other objects, then the structures last to first, so that structure
     -- number b of nb pairs with CL[1 .. no + nb - b]: every other object and the structures
@@ -4072,6 +4071,9 @@ do
     end
     local isB, cx, cy, cz, th = OB.b, kpx, kpy, kpz, tanH
     local rx_, ry_, rz_, ux_, uy_, uz_, fx_, fy_, fz_ = krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz
+    local OCX, OCY, OCZ, ORAD, OID, ordZ, ordI, ordN = OCX, OCY, OCZ, ORAD, OID, ordZ, ordI, ordN
+    local sx0, sx1, sy0, sy1, X0, X1, Y0, Y1, Z0, Z1 = sx0, sx1, sy0, sy1, SB.x0, SB.x1, SB.y0, SB.y1, SB.z0, SB.z1
+    local arx, ary, arz, aux, auy, auz, afx, afy, afz          -- the camera's axes' components' sizes (with structures)
     local o = 0
     for n = 1, nn do
       local X, Y, Z, rad = OCX[n] - cx, OCY[n] - cy, OCZ[n] - cz, ORAD[n]
@@ -4090,17 +4092,22 @@ do
           if isBox then
             -- a box: its extent across, up and along the view, then the nearest and farthest
             -- depth for the outer edges (a wall seen edge-on is a narrow strip, not a circle)
-            boxes = true
-            local hx, hy, hz = (SB.x1[n] - SB.x0[n]) * 0.5, (SB.y1[n] - SB.y0[n]) * 0.5, (SB.z1[n] - SB.z0[n]) * 0.5
-            local a, c, e = rx_ * hx, ry_ * hy, rz_ * hz
-            local ex = (a < 0 and -a or a) + (c < 0 and -c or c) + (e < 0 and -e or e)
-            a, c, e = ux_ * hx, uy_ * hy, uz_ * hz
-            local ey = (a < 0 and -a or a) + (c < 0 and -c or c) + (e < 0 and -e or e)
-            a, c, e = fx_ * hx, fy_ * hy, fz_ * hz
-            local ez = (a < 0 and -a or a) + (c < 0 and -c or c) + (e < 0 and -e or e)
+            if not boxes then
+              boxes = true
+              arx, ary, arz = rx_ < 0 and -rx_ or rx_, ry_ < 0 and -ry_ or ry_, rz_ < 0 and -rz_ or rz_
+              aux, auy, auz = ux_ < 0 and -ux_ or ux_, uy_ < 0 and -uy_ or uy_, uz_ < 0 and -uz_ or uz_
+              afx, afy, afz = fx_ < 0 and -fx_ or fx_, fy_ < 0 and -fy_ or fy_, fz_ < 0 and -fz_ or fz_
+            end
+            local hx, hy, hz = (X1[n] - X0[n]) * 0.5, (Y1[n] - Y0[n]) * 0.5, (Z1[n] - Z0[n]) * 0.5
+            if hx < 0 then hx = -hx end
+            if hy < 0 then hy = -hy end
+            if hz < 0 then hz = -hz end
+            local ex = arx * hx + ary * hy + arz * hz
+            local ey = aux * hx + auy * hy + auz * hz
+            local ez = afx * hx + afy * hy + afz * hz
             if z - ez > NEAR then
               local f0, f1 = F / (z - ez), F / (z + ez)
-              a, c = x - ex, x + ex
+              local a, c = x - ex, x + ex
               sx0[o], sx1[o] = a * (a < 0 and f0 or f1), c * (c > 0 and f0 or f1)
               a, c = y - ey, y + ey
               sy0[o], sy1[o] = a * (a < 0 and f0 or f1), c * (c > 0 and f0 or f1)
@@ -4112,7 +4119,7 @@ do
             sx0[o], sy0[o] = x, y
             if n > ns then
               local r = 0.3
-              SB.x0[n], SB.x1[n], SB.y0[n], SB.y1[n], SB.z0[n], SB.z1[n] = OCX[n] - r, OCX[n] + r, OCY[n] - r, OCY[n] + r, OCZ[n] - r, OCZ[n] + r
+              X0[n], X1[n], Y0[n], Y1[n], Z0[n], Z1[n] = OCX[n] - r, OCX[n] + r, OCY[n] - r, OCY[n] + r, OCZ[n] - r, OCZ[n] + r
             end
           end
         end
@@ -4167,9 +4174,12 @@ local AV = STICKTIME_AV == true
   local RCOS, RSIN = {}, {}                             -- ring segments (12 per turn)
   for j = 1, 12 do RCOS[j], RSIN[j] = cos(j * 0.5235988), sin(j * 0.5235988) end
   local XL, YL = W - 1, H - 1
+  local VX1, VXW, VY1, VYH = VX - 1, VX + VW, VY - 1, VY + VH   -- the view's edges as the clippers test them
+  local TLO, THI = VY - 2000, VY + VH + 2000                     -- (tri: as far as the firmware may walk rows)
   local MT, NMT = {}, 0
   local HAZE = { 0, 0, 0 }                -- the haze at the horizon: far things fade into it
   local HZN = floor(10 * SC + 0.5)        -- haze band height (px)
+  local HZ2 = floor(HZN / 2)              -- the haze's steps over the mountains' bases
   -- Settings > Colors: sky, haze at the horizon, grass, far grass, grid near and far, mountains,
   -- snow. Classic is bright; Summer, Evening and Overcast have a natural sky that fades into the
   -- haze and duller grass, and calmer object and text colors: kinder to the eyes in FPV goggles,
@@ -4421,7 +4431,24 @@ local AV = STICKTIME_AV == true
     local F, CX, CY, XL, YL = F, CX, CY, XL, YL
     local s1, s2 = F / Z1, F / Z2
     local x1, y1, x2, y2 = CX + X1 * s1, CY - Y1 * s1, CX + X2 * s2, CY - Y2 * s2
-    if x1 <= XL and x2 <= XL and y1 <= YL and y2 <= YL then drawLine(x1, y1, x2, y2, SOLID, col) else ln(x1, y1, x2, y2, col) end
+    -- (an end past the right or bottom edge: cut there, as ln does; most lines have one)
+    if x1 > XL then
+      if x2 > XL then return end
+      y1 = y1 + (y2 - y1) * (XL - x1) / (x2 - x1)
+      x1 = XL
+    elseif x2 > XL then
+      y2 = y2 + (y1 - y2) * (XL - x2) / (x1 - x2)
+      x2 = XL
+    end
+    if y1 > YL then
+      if y2 > YL then return end
+      x1 = x1 + (x2 - x1) * (YL - y1) / (y2 - y1)
+      y1 = YL
+    elseif y2 > YL then
+      x2 = x2 + (x1 - x2) * (YL - y2) / (y1 - y2)
+      y2 = YL
+    end
+    drawLine(x1, y1, x2, y2, SOLID, col)
   end
 
   -- polygon in fxs/fys: clip to the 3D view (Sutherland-Hodgman), fill as a triangle fan
@@ -4455,8 +4482,9 @@ local AV = STICKTIME_AV == true
     return m
   end
 
-  local function fillPoly(n, col, x0, x1, y0, y1)
-    -- clip only against the view edges the polygon crosses (its bounds found here, or given)
+  local function fillPoly(n, col, x0, x1, y0, y1, t)
+    -- clip only against the view edges the polygon crosses (its bounds found here, or given, as
+    -- may be t, the first corner at the top, y0)
     if not x0 then
       x0, x1, y0, y1 = fxs[1], fxs[1], fys[1], fys[1]
       for i = 2, n do
@@ -4466,28 +4494,31 @@ local AV = STICKTIME_AV == true
       end
     end
     local px, py, qx, qy = fxs, fys, gxs, gys
-    if x0 < VX - 1 then
-      n = clip2(n, px, py, qx, qy, true, VX - 1, -1)
-      px, py, qx, qy = qx, qy, px, py
+    if x0 < VX1 then
+      n = clip2(n, px, py, qx, qy, true, VX1, -1)
+      px, py, qx, qy, t = qx, qy, px, py, nil
     end
-    if x1 > VX + VW then
-      n = clip2(n, px, py, qx, qy, true, VX + VW, 1)
-      px, py, qx, qy = qx, qy, px, py
+    if x1 > VXW then
+      n = clip2(n, px, py, qx, qy, true, VXW, 1)
+      px, py, qx, qy, t = qx, qy, px, py, nil
     end
-    if y0 < VY - 1 then
-      n = clip2(n, px, py, qx, qy, false, VY - 1, -1)
-      px, py, qx, qy = qx, qy, px, py
+    if y0 < VY1 then
+      n = clip2(n, px, py, qx, qy, false, VY1, -1)
+      px, py, qx, qy, t = qx, qy, px, py, nil
     end
-    if y1 > VY + VH then
-      n = clip2(n, px, py, qx, qy, false, VY + VH, 1)
-      px, py = qx, qy
+    if y1 > VYH then
+      n = clip2(n, px, py, qx, qy, false, VYH, 1)
+      px, py, t = qx, qy, nil
     end
     if n < 3 then return end
     -- a strip from the top corner down both sides: the firmware walks every row of each
     -- triangle, and a fan from one corner would walk up to n - 2 times the polygon's height
-    local t, ty = 1, py[1]
-    for i = 2, n do
-      if py[i] < ty then t, ty = i, py[i] end
+    local ty = y0
+    if not t then
+      t, ty = 1, py[1]
+      for i = 2, n do
+        if py[i] < ty then t, ty = i, py[i] end
+      end
     end
     local l, r = t == 1 and n or t - 1, t == n and 1 or t + 1
     fillTri(px[t], ty, px[l], py[l], px[r], py[r], col)
@@ -4506,8 +4537,7 @@ local AV = STICKTIME_AV == true
   -- filled triangle; far off-screen corners go through the clipper (the firmware
   -- walks every row between the top and bottom corner, even off-screen ones)
   local function tri(x1, y1, x2, y2, x3, y3, col)
-    local lo, hi = VY - 2000, VY + VH + 2000
-    if y1 > lo and y1 < hi and y2 > lo and y2 < hi and y3 > lo and y3 < hi then
+    if y1 > TLO and y1 < THI and y2 > TLO and y2 < THI and y3 > TLO and y3 < THI then
       -- (none wholly left or right of the screen: it would draw nothing, row by row)
       if (x1 < 0 and x2 < 0 and x3 < 0) or (x1 >= W and x2 >= W and x3 >= W) then return end
       fillTri(x1, y1, x2, y2, x3, y3, col)
@@ -4522,12 +4552,14 @@ local AV = STICKTIME_AV == true
   local function poly3(n, col)
     local NEAR, F, CX, CY = NEAR, F, CX, CY
     local m = 0
-    local jx, jy, jz = P3x[n], P3y[n], P3z[n]
+    local jz = P3z[n]
     for i = 1, n do
       local ix, iy, iz = P3x[i], P3y[i], P3z[i]
       -- (where it passes the near plane, then the corner if in front)
       if iz >= NEAR then
         if not (jz >= NEAR) then
+          local j = i > 1 and i - 1 or n
+          local jx, jy = P3x[j], P3y[j]
           local t, s = (NEAR - jz) / (iz - jz), F / NEAR
           m = m + 1
           fxs[m], fys[m] = CX + (jx + (ix - jx) * t) * s, CY - (jy + (iy - jy) * t) * s
@@ -4536,23 +4568,24 @@ local AV = STICKTIME_AV == true
         m = m + 1
         fxs[m], fys[m] = CX + ix * s, CY - iy * s
       elseif jz >= NEAR then
+        local j = i > 1 and i - 1 or n
+        local jx, jy = P3x[j], P3y[j]
         local t, s = (NEAR - jz) / (iz - jz), F / NEAR
         m = m + 1
         fxs[m], fys[m] = CX + (jx + (ix - jx) * t) * s, CY - (jy + (iy - jy) * t) * s
       end
-      jx = ix
-      jy = iy
       jz = iz
     end
     if m < 3 then return end
-    local x0, x1, y0, y1 = fxs[1], fxs[1], fys[1], fys[1]
+    -- (its bounds, and the first corner at the top for fillPoly)
+    local x0, x1, y0, y1, t = fxs[1], fxs[1], fys[1], fys[1], 1
     for i = 2, m do
       local x, y = fxs[i], fys[i]
       if x < x0 then x0 = x elseif x > x1 then x1 = x end
-      if y < y0 then y0 = y elseif y > y1 then y1 = y end
+      if y < y0 then y0, t = y, i elseif y > y1 then y1 = y end
     end
-    if x1 < VX or x0 > VX + VW or y1 < VY or y0 > VY + VH then return end
-    fillPoly(m, col, x0, x1, y0, y1)
+    if x1 < VX or x0 > VXW or y1 < VY or y0 > VYH then return end
+    fillPoly(m, col, x0, x1, y0, y1, t)
   end
 
   local function drawMountains()
@@ -4701,31 +4734,56 @@ local AV = STICKTIME_AV == true
   end
 
   -- lines along the horizon (hx0, hy0)-(hx1, hy1), steps k = k0..k1 of (sx, sy) away from it,
-  -- the colors cols[1..nc] spread over n steps; only the steps whose line crosses the view
-  local function bands(hx0, hy0, hx1, hy1, sx, sy, k0, k1, cols, nc, n)
+  -- the colors cols[1..nc] spread over n steps; only the steps whose line crosses the view,
+  -- from step ka on (k0 unless the steps before it are painted again later)
+  local function bands(hx0, hy0, hx1, hy1, sx, sy, k0, k1, cols, nc, n, ka)
     local s, c0, c1, v0, v1 = sy, hy0, hy1, VY, VY + VH - 1
     if sy == 0 then s, c0, c1, v0, v1 = sx, hx0, hx1, VX, VX + VW - 1 end
     if c0 > c1 then c0, c1 = c1, c0 end
     local lo, hi = v0 - c1, v1 - c0
     if s < 0 then lo, hi = c0 - v1, c1 - v0 end
-    lo, hi = lo > k0 and floor(lo) or k0, hi < k1 and floor(hi) + 1 or k1
+    ka = ka or k0
+    lo, hi = lo > ka and floor(lo) or ka, hi < k1 and floor(hi) + 1 or k1
+    -- (each step's color kept for this look and field of view, to the last step asked for)
+    local bc = BC[cols]
+    if not bc or bc.n ~= n or bc.c ~= nc or bc.k ~= k0 then
+      bc = { n = n, c = nc, k = k0, m = k0 - 1 }
+      BC[cols] = bc
+    end
+    if bc.m < k1 then
+      for k = bc.m + 1, k1 do bc[k] = cols[floor((k - k0) * nc / n) + 1] end
+      bc.m = k1
+    end
     if sx == 0 and hx0 <= XL and hx1 > XL then
       -- across the view (the usual case): ln's cut at the right edge, its ends the same for all
       local XL, YL, e, d = XL, YL, XL - hx1, hx0 - hx1
-      -- (each step's color kept for this look and field of view)
-      local bc = BC[cols]
-      if not bc or bc.n ~= n or bc.c ~= nc or bc.k ~= k0 then
-        bc = { n = n, c = nc, k = k0 }
-        BC[cols] = bc
+      if hy0 == hy1 then
+        -- level (the menu's camera, a quad at rest): the lines are rows, and the rows of one
+        -- color one rectangle, the same pixels. Step k's line is at hy0 + sy * k, on the row
+        -- floor(hy0) + sy * k: the sum is off by under 1/4000 on the radio (32-bit, below
+        -- 8192), too little to pass a whole number with hy0 this far from one; so it is over
+        -- YL (not drawn) when its row is YL or more, and under 0 is clipped away
+        local Y0 = floor(hy0)
+        local fr = hy0 - Y0
+        if fr > 0.001 and fr < 0.999 then
+          local w, k = XL - hx0 + 1, lo
+          while k <= hi do
+            local col, kb = bc[k], k
+            while kb < hi and bc[kb + 1] == col do kb = kb + 1 end
+            local ya, yb = Y0 + sy * k, Y0 + sy * kb
+            if ya > yb then ya, yb = yb, ya end
+            if ya < 0 then ya = 0 end
+            if yb >= YL then yb = YL - 1 end
+            if ya <= yb then fillRect(hx0, ya, w, yb - ya + 1, col) end
+            k = kb + 1
+          end
+          return
+        end
       end
       for k = lo, hi do
         local y1, y2 = hy0 + sy * k, hy1 + sy * k
         y2 = y2 + (y1 - y2) * e / d
         local col = bc[k]
-        if not col then
-          col = cols[floor((k - k0) * nc / n) + 1]
-          bc[k] = col
-        end
         if y1 > YL then
           if y2 <= YL then drawLine(hx0 + (XL - hx0) * (YL - y1) / (y2 - y1), YL, XL, y2, SOLID, col) end
         elseif y2 > YL then
@@ -4737,7 +4795,7 @@ local AV = STICKTIME_AV == true
       return
     end
     for k = lo, hi do
-      ln(hx0 + sx * k, hy0 + sy * k, hx1 + sx * k, hy1 + sy * k, cols[floor((k - k0) * nc / n) + 1])
+      ln(hx0 + sx * k, hy0 + sy * k, hx1 + sx * k, hy1 + sy * k, bc[k])
     end
   end
 
@@ -4773,18 +4831,18 @@ local AV = STICKTIME_AV == true
       sx, sy = a > 0 and 1 or -1, 0
     end
     -- natural looks: the sky fades from the haze at the horizon to its color ~18 deg up,
-    -- under the mountains
+    -- under the mountains (its first HZ2 + 1 steps painted again below, over their bases)
     local ns = (NAT and hx0) and floor(F * 0.325 + 0.5) or 0
     if f > 0.5 then
       lcd.clear(cGround)
       fillSide(-a, -b, -c, cSky)
-      if ns > 0 then bands(hx0, hy0, hx1, hy1, sx, sy, 0, ns - 1, hazeS, 16, ns) end
+      if ns > 0 then bands(hx0, hy0, hx1, hy1, sx, sy, 0, ns - 1, hazeS, 16, ns, HZ2 + 1) end
       drawSky()
       drawMountains()
       fillSide(a, b, c, cGround, 2)
     else
       lcd.clear(cSky)
-      if ns > 0 then bands(hx0, hy0, hx1, hy1, sx, sy, 0, ns - 1, hazeS, 16, ns) end
+      if ns > 0 then bands(hx0, hy0, hx1, hy1, sx, sy, 0, ns - 1, hazeS, 16, ns, HZ2 + 1) end
       drawSky()
       drawMountains()
       fillSide(a, b, c, cGround)
@@ -4793,12 +4851,12 @@ local AV = STICKTIME_AV == true
     -- atmospheric haze: soft bands hugging the horizon, over the mountains' bases, and the far
     -- ground fading into it
     if NAT then
-      local n, ng = floor(HZN / 2), floor(F * 0.105 + 0.5)
-      bands(hx0, hy0, hx1, hy1, sx, sy, 0, n < ns and n or ns - 1, hazeS, 16, ns)
+      local ng = floor(F * 0.105 + 0.5)
+      bands(hx0, hy0, hx1, hy1, sx, sy, 0, HZ2 < ns and HZ2 or ns - 1, hazeS, 16, ns)
       bands(hx0, hy0, hx1, hy1, -sx, -sy, 1, ng, hazeG, 8, ng)
     else
       bands(hx0, hy0, hx1, hy1, sx, sy, 0, HZN - 1, hazeS, 8, HZN)
-      bands(hx0, hy0, hx1, hy1, -sx, -sy, 1, floor(HZN / 2), hazeG, 8, HZN)
+      bands(hx0, hy0, hx1, hy1, -sx, -sy, 1, HZ2, hazeG, 8, HZN)
     end
   end
 
@@ -4812,13 +4870,23 @@ local AV = STICKTIME_AV == true
 
   -- a piece of the line from a to b (along it, in the world) in col, and col2 between gn0 and gn1
   local function gp(a, b, col, col2)
-    local gX, gY, gZ, gU, gV, gW = gX, gY, gZ, gU, gV, gW
+    local gX, gY, gZ, gU, gV, gW, NEAR = gX, gY, gZ, gU, gV, gW, NEAR
+    local Za, Zb = gZ + a * gW, gZ + b * gW
+    if Za < NEAR and Zb < NEAR then return end     -- (all of it behind the near plane)
     if col2 and b > gn0 and a < gn1 then
-      if a < gn0 then line3(gX + a * gU, gY + a * gV, gZ + a * gW, gX + gn0 * gU, gY + gn0 * gV, gZ + gn0 * gW, col) a = gn0 end
-      if b > gn1 then line3(gX + gn1 * gU, gY + gn1 * gV, gZ + gn1 * gW, gX + b * gU, gY + b * gV, gZ + b * gW, col) b = gn1 end
+      if a < gn0 then
+        local Z = gZ + gn0 * gW
+        line3(gX + a * gU, gY + a * gV, Za, gX + gn0 * gU, gY + gn0 * gV, Z, col)
+        a, Za = gn0, Z
+      end
+      if b > gn1 then
+        local Z = gZ + gn1 * gW
+        line3(gX + gn1 * gU, gY + gn1 * gV, Z, gX + b * gU, gY + b * gV, Zb, col)
+        b, Zb = gn1, Z
+      end
       col = col2
     end
-    line3(gX + a * gU, gY + a * gV, gZ + a * gW, gX + b * gU, gY + b * gV, gZ + b * gW, col)
+    line3(gX + a * gU, gY + a * gV, Za, gX + b * gU, gY + b * gV, Zb, col)
   end
 
   -- the decals' pieces of the grid line at x = w (xz 1, along z) or z = w (xz 2, along x): from, to
@@ -4827,19 +4895,31 @@ local AV = STICKTIME_AV == true
   local function gridE(xz, w, key)
     local E = { u = {} }
     local U = E.u
+    local GC = SCN.gc
     local dk, dux, duz, dvx, dvz, dx, dz = SCN.dk, SCN.dux, SCN.duz, SCN.dvx, SCN.dvz, SCN.dx, SCN.dz
-    for i = 1, SCN.nd do
-      local k = dk[i]
-      local ux, uz, vx, vz = dux[i], duz[i], dvx[i], dvz[i]
-      local q, c1, ext
-      if xz == 2 then
-        q, c1 = w - dz[i], dx[i]
-        ext = (uz < 0 and -uz or uz) + (vz < 0 and -vz or vz)
-      else
-        q, c1 = w - dx[i], dz[i]
-        ext = (ux < 0 and -ux or ux) + (vx < 0 and -vx or vx)
+    -- (how far each decal reaches along x and z, once per track; a painted line not at all: no grid on it)
+    local EX, EZ = GC.ex, GC.ez
+    if not EX then
+      EX, EZ = {}, {}
+      for i = 1, SCN.nd do
+        local ux, uz, vx, vz = dux[i], duz[i], dvx[i], dvz[i]
+        if dk[i] == 4 then
+          EX[i], EZ[i] = -1, -1
+        else
+          EX[i], EZ[i] = (ux < 0 and -ux or ux) + (vx < 0 and -vx or vx), (uz < 0 and -uz or uz) + (vz < 0 and -vz or vz)
+        end
       end
-      if k ~= 4 and (q < 0 and -q or q) < ext then
+      GC.ex, GC.ez = EX, EZ
+    end
+    -- the decals' place across the line, along it, and their reach across it
+    local dc, dw, ext = dx, dz, EX
+    if xz == 2 then dc, dw, ext = dz, dx, EZ end
+    for i = 1, SCN.nd do
+      local q = w - dc[i]
+      if (q < 0 and -q or q) < ext[i] then
+        local k = dk[i]
+        local ux, uz, vx, vz = dux[i], duz[i], dvx[i], dvz[i]
+        local c1 = dw[i]
         -- a point s along the line from the decal's center is a0 + a1 s lengths and b0 + b1 s widths from it
         local uu, vv = ux * ux + uz * uz, vx * vx + vz * vz
         local a0, b0, a1, b1 = q * ux / uu, q * vx / vv, uz / uu, vz / vv
@@ -4884,7 +4964,7 @@ local AV = STICKTIME_AV == true
     end
     for m = #U, n + 1, -1 do U[m] = nil end
     if not E[1] then E = NOGE end
-    SCN.gc[key] = E
+    GC[key] = E
     return E
   end
 
@@ -5022,7 +5102,7 @@ local AV = STICKTIME_AV == true
   local function drawPad()
     local hx, hz = TR.hx, TR.hz
     local ox, oz, y = TR.px - kpx, TR.pz - kpz, -kpy
-    local krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz = krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz
+    local krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz, NEAR = krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz, NEAR
     for s = 1, 2 do
       local e = s == 1 and 1.5 or 0.9
       local col = s == 1 and cPad or cPad2
@@ -5030,14 +5110,35 @@ local AV = STICKTIME_AV == true
       local bx, bz = ox + (hx + hz) * e, oz + (hz - hx) * e
       local cx, cz = ox + (hz - hx) * e, oz - (hz + hx) * e
       local dx, dz = ox - (hx + hz) * e, oz + (hx - hz) * e
-      local AX_, AY_, AZ_ = ax * krx + y * kry + az * krz, ax * kux + y * kuy + az * kuz, ax * kfx + y * kfy + az * kfz
-      local BX_, BY_, BZ_ = bx * krx + y * kry + bz * krz, bx * kux + y * kuy + bz * kuz, bx * kfx + y * kfy + bz * kfz
-      local CX_, CY_, CZ_ = cx * krx + y * kry + cz * krz, cx * kux + y * kuy + cz * kuz, cx * kfx + y * kfy + cz * kfz
-      local DX_, DY_, DZ_ = dx * krx + y * kry + dz * krz, dx * kux + y * kuy + dz * kuz, dx * kfx + y * kfy + dz * kfz
-      line3(AX_, AY_, AZ_, BX_, BY_, BZ_, col)
-      line3(BX_, BY_, BZ_, CX_, CY_, CZ_, col)
-      line3(CX_, CY_, CZ_, DX_, DY_, DZ_, col)
-      line3(DX_, DY_, DZ_, AX_, AY_, AZ_, col)
+      local AZ_, BZ_ = ax * kfx + y * kfy + az * kfz, bx * kfx + y * kfy + bz * kfz
+      local CZ_, DZ_ = cx * kfx + y * kfy + cz * kfz, dx * kfx + y * kfy + dz * kfz
+      if AZ_ >= NEAR and BZ_ >= NEAR and CZ_ >= NEAR and DZ_ >= NEAR then
+        -- the square in front of the near plane (nearly always): its corners projected once, its
+        -- sides then as line3 would draw them
+        local F, CX, CY = F, CX, CY
+        local s_ = F / AZ_
+        local x1, y1 = CX + (ax * krx + y * kry + az * krz) * s_, CY - (ax * kux + y * kuy + az * kuz) * s_
+        s_ = F / BZ_
+        local x2, y2 = CX + (bx * krx + y * kry + bz * krz) * s_, CY - (bx * kux + y * kuy + bz * kuz) * s_
+        s_ = F / CZ_
+        local x3, y3 = CX + (cx * krx + y * kry + cz * krz) * s_, CY - (cx * kux + y * kuy + cz * kuz) * s_
+        s_ = F / DZ_
+        local x4, y4 = CX + (dx * krx + y * kry + dz * krz) * s_, CY - (dx * kux + y * kuy + dz * kuz) * s_
+        ln(x1, y1, x2, y2, col)
+        ln(x2, y2, x3, y3, col)
+        ln(x3, y3, x4, y4, col)
+        ln(x4, y4, x1, y1, col)
+      elseif AZ_ >= NEAR or BZ_ >= NEAR or CZ_ >= NEAR or DZ_ >= NEAR then
+        -- (cut by it; all behind it: nothing of it shows)
+        local AX_, AY_ = ax * krx + y * kry + az * krz, ax * kux + y * kuy + az * kuz
+        local BX_, BY_ = bx * krx + y * kry + bz * krz, bx * kux + y * kuy + bz * kuz
+        local CX_, CY_ = cx * krx + y * kry + cz * krz, cx * kux + y * kuy + cz * kuz
+        local DX_, DY_ = dx * krx + y * kry + dz * krz, dx * kux + y * kuy + dz * kuz
+        line3(AX_, AY_, AZ_, BX_, BY_, BZ_, col)
+        line3(BX_, BY_, BZ_, CX_, CY_, CZ_, col)
+        line3(CX_, CY_, CZ_, DX_, DY_, DZ_, col)
+        line3(DX_, DY_, DZ_, AX_, AY_, AZ_, col)
+      end
     end
   end
 
@@ -5075,9 +5176,13 @@ local AV = STICKTIME_AV == true
     dx = CX + dx * s
     dy = CY - dy * s
     local p, q = cx - ax, cy - ay
-    local n = (p < 0 and -p or p) + (q < 0 and -q or q)
+    if p < 0 then p = -p end
+    if q < 0 then q = -q end
+    local n = p + q
     p, q = dx - bx, dy - by
-    local m = (p < 0 and -p or p) + (q < 0 and -q or q)
+    if p < 0 then p = -p end
+    if q < 0 then q = -q end
+    local m = p + q
     if m > n then n = m end
     -- a bar only a few pixels thick reads as its outline: keep it the fill colour
     if n < 4 then e1, e2 = fill, fill end
@@ -5151,11 +5256,11 @@ local AV = STICKTIME_AV == true
       if b2 < y0 then y0 = b2 elseif b2 > y1 then y1 = b2 end
       if b3 < y0 then y0 = b3 elseif b3 > y1 then y1 = b3 end
       if b4 < y0 then y0 = b4 elseif b4 > y1 then y1 = b4 end
-      if x1 < VX or x0 > VX + VW or y1 < VY or y0 > VY + VH then return end
+      if x1 < VX or x0 > VXW or y1 < VY or y0 > VYH then return end
       -- two triangles, which the firmware fills row by row in C. Ruled lines (one call
       -- each, drawn pixel by pixel) cost more on walls and leave holes between slanted
       -- lines that show as dots.
-      if x0 < VX or x1 > VX + VW or y0 < VY or y1 > VY + VH then
+      if x0 < VX or x1 > VXW or y0 < VY or y1 > VYH then
         fxs[1], fys[1], fxs[2], fys[2], fxs[3], fys[3], fxs[4], fys[4] = a1, b1, a2, b2, a3, b3, a4, b4
         fillPoly(4, col, x0, x1, y0, y1)
       elseif (b1 < b3 and b1 or b3) < (b2 < b4 and b2 or b4) then
@@ -5197,10 +5302,12 @@ local AV = STICKTIME_AV == true
   local function drawDecals()
     local y = -kpy
     local krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz = krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz
+    local kpx, kpz, F, tanH, NF = kpx, kpz, F, tanH, NF
+    local dk, dux, duz, dvx, dvz, dx, dz = SCN.dk, SCN.dux, SCN.duz, SCN.dvx, SCN.dvz, SCN.dx, SCN.dz
     for i = 1, SCN.nd do
       GF[i] = false
-      local cx, cz = SCN.dx[i] - kpx, SCN.dz[i] - kpz
-      local ux, uz, vx, vz, k = SCN.dux[i], SCN.duz[i], SCN.dvx[i], SCN.dvz[i], SCN.dk[i]
+      local cx, cz = dx[i] - kpx, dz[i] - kpz
+      local ux, uz, vx, vz, k = dux[i], duz[i], dvx[i], dvz[i], dk[i]
       local r = (ux < 0 and -ux or ux) + (uz < 0 and -uz or uz) + (vx < 0 and -vx or vx) + (vz < 0 and -vz or vz)
       local Z = cx * kfx + y * kfy + cz * kfz
       local d = sqrt(cx * cx + cz * cz + y * y) - r
@@ -5244,8 +5351,8 @@ local AV = STICKTIME_AV == true
     local fi = floor((z - 18) * 0.045) + 1
     if fi < 1 then fi = 1 elseif fi > NF then fi = NF end
     local nxt = i == nextGate and gmode ~= 3
-    local fill, e1, e2 = fGate[fi], fGateE[fi], fGateE[fi]
-    if nxt then fill, e1, e2 = fNext[fi], fNextE[fi], fNextG[fi] end
+    local fill, e1, e2
+    if nxt then fill, e1, e2 = fNext[fi], fNextE[fi], fNextG[fi] else fill, e1, e2 = fGate[fi], fGateE[fi], fGateE[fi] end
     local k = gk[i]
     local sh = GSH[k]
     local rx_, ry_, rz_, ux_, uy_, uz_, fx_, fy_, fz_ = krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz
@@ -5327,13 +5434,20 @@ local AV = STICKTIME_AV == true
       local lw = iw + GT * 0.5
       local h = k == 2 and gy[i] - oh or gy[i]
       local ex, ey, ez = ry_ * h, uy_ * h, fy_ * h
+      local lX, lY, lZ = Rx * lw, Ry * lw, Rz * lw
+      local la, aX, aY, aZ = -oh, Ax * -oh, Ay * -oh, Az * -oh
+      local near, qX, qY, qZ = z < 25                  -- (a second line beside each leg)
+      if near then qX, qY, qZ = Rx * 0.06, Ry * 0.06, Rz * 0.06 end
       for sx = -1, 1, 2 do
         for sz = (k == 3 and -1 or 1), 1, 2 do
-          local la = k == 3 and (ih + GT * 0.5) * sz or -oh
-          local X, Y, Z = cx + Rx * lw * sx + Ax * la, cy + Ry * lw * sx + Ay * la, cz + Rz * lw * sx + Az * la
+          if k == 3 then
+            la = (ih + GT * 0.5) * sz
+            aX, aY, aZ = Ax * la, Ay * la, Az * la
+          end
+          local X, Y, Z = cx + lX * sx + aX, cy + lY * sx + aY, cz + lZ * sx + aZ
           line3(X, Y, Z, X - ex, Y - ey, Z - ez, pc)
-          if z < 25 then
-            X, Y, Z = X + Rx * 0.06, Y + Ry * 0.06, Z + Rz * 0.06
+          if near then
+            X, Y, Z = X + qX, Y + qY, Z + qZ
             line3(X, Y, Z, X - ex, Y - ey, Z - ez, pc)
           end
         end
@@ -5349,16 +5463,21 @@ local AV = STICKTIME_AV == true
       line3(cx - wx - hx, cy - wy - hy, cz - wz - hz, cx - wx + hx, cy - wy + hy, cz - wz + hz, fill)
       return
     end
-    local oRx, oRy, oRz, oAx, oAy, oAz = Rx * ow, Ry * ow, Rz * ow, Ax * oh, Ay * oh, Az * oh
-    local iRx, iRy, iRz, iAx, iAy, iAz = Rx * iw, Ry * iw, Rz * iw, Ax * ih, Ay * ih, Az * ih
-    local aX, aY, aZ = cx - oRx + oAx, cy - oRy + oAy, cz - oRz + oAz   -- outer top-left
-    local bX, bY, bZ = cx + oRx + oAx, cy + oRy + oAy, cz + oRz + oAz   -- outer top-right
-    local cX, cY, cZ = cx + oRx - oAx, cy + oRy - oAy, cz + oRz - oAz   -- outer bottom-right
-    local dX, dY, dZ = cx - oRx - oAx, cy - oRy - oAy, cz - oRz - oAz   -- outer bottom-left
-    local eX, eY, eZ = cx - iRx + iAx, cy - iRy + iAy, cz - iRz + iAz   -- inner top-left
-    local fX, fY, fZ = cx + iRx + iAx, cy + iRy + iAy, cz + iRz + iAz   -- inner top-right
-    local gX, gY, gZ = cx + iRx - iAx, cy + iRy - iAy, cz + iRz - iAz   -- inner bottom-right
-    local hX, hY, hZ = cx - iRx - iAx, cy - iRy - iAy, cz - iRz - iAz   -- inner bottom-left
+    local oAx, oAy, oAz, iAx, iAy, iAz = Ax * oh, Ay * oh, Az * oh, Ax * ih, Ay * ih, Az * ih
+    local mX, mY, mZ = Rx * ow, Ry * ow, Rz * ow
+    local pX, pY, pZ = cx + mX, cy + mY, cz + mZ          -- the outer sides, right and left
+    mX, mY, mZ = cx - mX, cy - mY, cz - mZ
+    local aX, aY, aZ = mX + oAx, mY + oAy, mZ + oAz   -- outer top-left
+    local bX, bY, bZ = pX + oAx, pY + oAy, pZ + oAz   -- outer top-right
+    local cX, cY, cZ = pX - oAx, pY - oAy, pZ - oAz   -- outer bottom-right
+    local dX, dY, dZ = mX - oAx, mY - oAy, mZ - oAz   -- outer bottom-left
+    mX, mY, mZ = Rx * iw, Ry * iw, Rz * iw
+    pX, pY, pZ = cx + mX, cy + mY, cz + mZ                -- the inner sides
+    mX, mY, mZ = cx - mX, cy - mY, cz - mZ
+    local eX, eY, eZ = mX + iAx, mY + iAy, mZ + iAz   -- inner top-left
+    local fX, fY, fZ = pX + iAx, pY + iAy, pZ + iAz   -- inner top-right
+    local gX, gY, gZ = pX - iAx, pY - iAy, pZ - iAz   -- inner bottom-right
+    local hX, hY, hZ = mX - iAx, mY - iAy, mZ - iAz   -- inner bottom-left
     bar(dX, dY, dZ, cX, cY, cZ, hX, hY, hZ, gX, gY, gZ, fill, e1, e2)
     bar(aX, aY, aZ, dX, dY, dZ, eX, eY, eZ, hX, hY, hZ, fill, e1, e2)
     bar(bX, bY, bZ, cX, cY, cZ, fX, fY, fZ, gX, gY, gZ, fill, e1, e2)
@@ -5389,10 +5508,15 @@ local AV = STICKTIME_AV == true
     if tw > 3 then tw = 3 end
     local tc = fTrunk[fi]
     local safe = x0 < XL - 4 and cx < XL - 4 and y0 < YL - 4 and cy < YL - 4
-    for k = -tw, tw, 2 do
-      local o = k * 0.5
-      if safe then drawLine(x0 + ux_ * o, y0 + uy_ * o, cx + ux_ * o, cy + uy_ * o, SOLID, tc)
-      else ln(x0 + ux_ * o, y0 + uy_ * o, cx + ux_ * o, cy + uy_ * o, tc) end
+    if tw == 0 then
+      if safe then drawLine(x0, y0, cx, cy, SOLID, tc) else ln(x0, y0, cx, cy, tc) end
+    else
+      for k = -tw, tw, 2 do
+        local o = k * 0.5
+        local ox, oy = ux_ * o, uy_ * o
+        if safe then drawLine(x0 + ox, y0 + oy, cx + ox, cy + oy, SOLID, tc)
+        else ln(x0 + ox, y0 + oy, cx + ox, cy + oy, tc) end
+      end
     end
     tri(x1, y1, cx + nx, cy + ny, cx - nx, cy - ny, fTree[fi])
     -- lit half only on near trees, where it reads as a cone
@@ -5401,6 +5525,7 @@ local AV = STICKTIME_AV == true
 
   -- a box's faces turned to the camera: x faces cx, z faces cz, top ct, bottom cb, edges ec
   local function boxFaces(x0, x1, y0, y1, z0, z1, cx, cz, ct, cb, ec)
+    local kpx, kpy, kpz, krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz = kpx, kpy, kpz, krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz
     local dx, dy, dz = x0 - kpx, y0 - kpy, z0 - kpz
     local ox, oy, oz = dx * krx + dy * kry + dz * krz, dx * kux + dy * kuy + dz * kuz, dx * kfx + dy * kfy + dz * kfz
     local sx, sy, sz = x1 - x0, y1 - y0, z1 - z0
@@ -5416,6 +5541,7 @@ local AV = STICKTIME_AV == true
   end
 
   local function drawBox(b, z)
+    local BX = BX
     local fi = floor((z - 18) * 0.045) + 1
     if fi < 1 then fi = 1 elseif fi > NF then fi = NF end
     local k3 = BX.k[b] * 3 - 3
@@ -5444,6 +5570,7 @@ local AV = STICKTIME_AV == true
   -- with it, as its collision does (the faces turned to the camera; from under the canopy the
   -- legs are in front of it)
   local function drawTent(i, fi)
+    local kpx, kpy, kpz, krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz = kpx, kpy, kpz, krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz
     local x, z, e = qx[i], qz[i], qh[i] / 2.6
     local pc, cs, a, y0 = fPole[fi], FC.tentS[fi], 1.5 * e, 2.05 * e
     local under = kpy < y0
@@ -5461,6 +5588,7 @@ local AV = STICKTIME_AV == true
   -- the windsock: a pole, the sock from just under its top downwind, striped orange and white;
   -- limp without wind, straight out in a strong one, fluttering with the gusts
   local function drawSock(i, fi, bX, bY, bZ, h, z)
+    local krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz = krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz
     local tX, tY, tZ = bX + kry * h, bY + kuy * h, bZ + kfy * h
     line3(bX, bY, bZ, tX, tY, tZ, fPole[fi])
     local e = 0
@@ -5498,6 +5626,7 @@ local AV = STICKTIME_AV == true
   -- the props: drawn from their foot and top on the screen (as the trees), the tent and the
   -- windsock in 3D
   local function drawProp(i, z)
+    local krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz = krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz
     local k = qk[i]
     local h = qh[i]
     local dx, dy, dz = qx[i] - kpx, -kpy, qz[i] - kpz
@@ -5639,6 +5768,7 @@ local AV = STICKTIME_AV == true
     tri(x1 - ly * w1, y1 + lx * w1, x2 + ly * w2, y2 - lx * w2, x1 + ly * w1, y1 - lx * w1, col)
   end
   local function drawRail(p, z)
+    local krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz = krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz
     local i, t0, t1 = SCN.pi[p], SCN.p0[p], SCN.p1[p]
     local k, h = SCN.rk[i], SCN.rh[i]
     local fi = floor((z - 18) * 0.045) + 1
@@ -5959,15 +6089,6 @@ local render, hitTest, pauseHit, initUI
   local PB = { 0, 0, 0 }   -- pause button x, y, size
   local GMO = { 1.9, 1.9, 0.6, 2.1, 1.6, 2.2, 2.2, 2.4 }  -- next-gate marker height above the aim point
 
-  local function bestInfo()
-    local t = S.track
-    if focus == 3 then return "Best combo " .. BEST.f[t] end
-    if focus == 4 then return "Best Gate Rush " .. BEST.g[t] end
-    return "Lap " .. (BEST.l[t] > 0 and timeStr(BEST.l[t]) or "--"), "  Race " .. (BEST.r[t] > 0 and timeStr(BEST.r[t]) or "--"),
-           MED.of(BEST.l[t])
-  end
-
-
   local function place(p)
     return p .. (p == 1 and "st" or p == 2 and "nd" or p == 3 and "rd" or "th")
   end
@@ -5985,22 +6106,66 @@ local render, hitTest, pauseHit, initUI
     return 0
   end
 
+  -- the HUD's places and sizes: fixed by the screen, the fonts and the margin, worked out once
+  local HX1, HX2, HX3, HX4, HY1, HY2 = 0, 0, 0, 0, 0, 0                  -- the crosshair's line ends
+  local BOT, MY1, MY2, RX, RXM, MS, MX = 0, 0, 0, 0, 0, 0, 0             -- bottom, mode text rows, right x, the map
+  local ABW, ABH, ABY, ALX, ALY, ANY, SPY, BTX = 0, 0, 0, 0, 0, 0, 0, 0  -- altitude bar and text, ANGLE, speed, battery x
+  local WS, WH, WA, WB, WW, WX, WY, WYP = 0, 0, 0, 0, 0, 0, 0, 0         -- the wind box: size, half, arrow, place (portrait)
+  local SS, SX, SY, SD, SD2 = 0, 0, 0, 0, 0                              -- the stick boxes: size, place, dot
+  local PBX, PBS, MSGY, BCY, TW = 0, 0, 0, 0, 0                          -- pause button, message y, big text y, title width
+  local BBW, BBH, BYO, BQ, BQH, BWI, BHI = 0, 0, 0, 0, 0, 0, 0           -- the battery
+  local NRX, NRY, NM, NM2, NM14, NS = 0, 0, 0, 0, 0, 0                   -- the next-gate marker
+  local AE, AB = 0, 0                                                    -- the map's arrow
+  local PM, PY, PMS, PX2, PSY, PS, PY1, PY2, PY3, PYB, PYL, PTW, PTY, PBY, PFY = 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0  -- the portrait panel
+
   initUI = function()
     MG = floor(W / 80)
     hS, hM, hL, hX = textH(SMLSIZE), textH(0), textH(MIDSIZE), textH(DBLSIZE)
     if hS == 0 then hS, hM, hL, hX = floor(14 * SC + 0.5), floor(20 * SC + 0.5), floor(28 * SC + 0.5), floor(40 * SC + 0.5) end
+    local m, c = MG, 5 * SC + 1
+    HX1, HX2, HX3, HX4, HY1, HY2 = CX - c * 2, CX - c, CX + c, CX + c * 2, CY - c, CY - c * 0.5
+    BOT, MY1, MY2, RX, MS = VY + VH - m, m + hS, m + hS + hX, W - m, floor(H * 0.3)
+    RXM, MX = W - m * 2 - MS, W - m - MS
+    ABH, ABW = floor(VH * 0.28), floor(6 * SC + 1)
+    ABY, ALX, ALY, ANY, SPY = BOT - ABH, m + ABW + 4, BOT - hS, BOT - hS * 2, BOT - hL
+    BTX = m + ABW + 10 + (lcd.sizeText and lcd.sizeText("000m", SMLSIZE) or floor(30 * SC))
+    WS = floor(VH * 0.11)
+    WH, WA, WB, WW, WX, WY, WYP = WS / 2, WS * 0.38, WS * 0.17, WS * 0.05 + 0.5, W - m - WS, SPY - WS - 2, BOT - WS
+    SS = floor(VH * 0.16)
+    SX, SY, SD = CX - SS - 2, BOT - SS, floor(2 * SC + 2)
+    SD2 = SD * 2 + 1
+    PBX, PBS, MSGY, BCY = W / 2 - floor(11 * SC + 3), floor(22 * SC + 6), VY + VH * 0.22, CY - hX / 2
+    TW = lcd.sizeText and lcd.sizeText("StickTime ", DBLSIZE) or floor(150 * SC)
+    BBW, BBH = floor(16 * SC + 4), floor(6 * SC + 3)
+    BYO, BQ, BWI, BHI = floor((hS - BBH) / 2), floor(BBH / 4), BBW - 4, BBH - 4
+    BQH = BBH - 2 * BQ
+    NRX, NRY, NM, NS = VW / 2 - 16 * SC, VH / 2 - 16 * SC, 7 * SC, 9 * SC
+    NM2, NM14 = NM * 2, NM * 1.4
+    AE = 5 * SC + 2
+    AB = AE * 0.6
+    PM = MG + 2
+    PY, PMS = VH + PM, floor(W * 0.46)
+    PX2 = W - PM - PMS
+    PSY = PY + PMS + PM
+    PS = floor((PMS - 6) / 2)
+    if PS > H - PM - PSY then PS = H - PM - PSY end
+    PY1, PY2 = PY + hM, PY + hM + hX
+    PY3, PYB = PY2 + hS, PY + hM + hX + hS * 2 + PM
+    PYL, PTW, PTY = PYB + hL, PX2 - PM * 3, PYB + hL + hS + 4
+    PBY, PFY = H - PM - 38, H - PM - hS
   end
 
   -- on analog video a black outline (Betaflight OSD style, heavier to the lower right) keeps the
   -- text readable over any background after the composite signal smears it; else a drop shadow
   local OUTL = { -1, -1, 1, -1, -1, 1, 1, 1, 0, -1, 0, 1, -1, 0, 1, 0, 2, 1, 1, 2, 2, 2 }
-  local function txt(x, y, s, f)
-    if AV then
+  local txt = function(x, y, s, f)
+    drawText(x, y, s, f + SHADOWED)
+  end
+  if AV then
+    txt = function(x, y, s, f)
       local k = f % 32768 + C.black       -- the size and alignment flags, in black
       for i = 1, #OUTL, 2 do drawText(x + OUTL[i], y + OUTL[i + 1], s, k) end
       drawText(x, y, s, f)
-    else
-      drawText(x, y, s, f + SHADOWED)
     end
   end
 
@@ -6012,8 +6177,9 @@ local render, hitTest, pauseHit, initUI
   local function pauseButton(x, y, s)
     PB[1], PB[2], PB[3] = x, y, s
     fillRect(x, y, s, s, C.panel, 6)
-    fillRect(x + s * 0.3, y + s * 0.25, s * 0.14, s * 0.5, C.white)
-    fillRect(x + s * 0.56, y + s * 0.25, s * 0.14, s * 0.5, C.white)
+    local by, bw, bh = y + s * 0.25, s * 0.14, s * 0.5
+    fillRect(x + s * 0.3, by, bw, bh, C.white)
+    fillRect(x + s * 0.56, by, bw, bh, C.white)
   end
 
   -- a good place to enter gate i from, so its marker shows where to come in from before you aim (a
@@ -6060,15 +6226,14 @@ local render, hitTest, pauseHit, initUI
     local i = nextGate
     local dx, dy, dz = AX[i] - kpx, AY[i] - kpy, AZ[i] - kpz
     local X, Y, Z = dx * krx + dy * kry + dz * krz, dx * kux + dy * kuy + dz * kuz, dx * kfx + dy * kfy + dz * kfz
-    local rxm, rym = VW / 2 - 16 * SC, VH / 2 - 16 * SC
     if Z > 1 then
       local sx, sy = X * F / Z, Y * F / Z
-      if sx > -rxm and sx < rxm and sy > -rym and sy < rym then
+      if sx > -NRX and sx < NRX and sy > -NRY and sy < NRY then
         local top = GMO[gk[i]] * F / Z
-        local m = 7 * SC
         local bx, by = CX + sx, CY - sy - top
-        if by < VY + m * 2 then by = VY + m * 2 end
-        fillTri(bx, by, bx - m, by - m * 1.4, bx + m, by - m * 1.4, markerOn(i) and C.good or C.accent2)   -- green: lined up
+        if by < VY + NM2 then by = VY + NM2 end
+        local ty = by - NM14
+        fillTri(bx, by, bx - NM, ty, bx + NM, ty, markerOn(i) and C.good or C.accent2)   -- green: lined up
         return
       end
     end
@@ -6077,40 +6242,102 @@ local render, hitTest, pauseHit, initUI
     if Z < 0 and ex * ex + ey * ey < 1 then ex, ey = 0, 1 end
     local l = sqrt(ex * ex + ey * ey) + 0.0001
     ex, ey = ex / l, ey / l
-    local k = rxm / ((ex < 0 and -ex or ex) + 0.0001)
-    local k2 = rym / ((ey < 0 and -ey or ey) + 0.0001)
+    local k = NRX / ((ex < 0 and -ex or ex) + 0.0001)
+    local k2 = NRY / ((ey < 0 and -ey or ey) + 0.0001)
     if k2 < k then k = k2 end
-    local tx, ty, s = CX + ex * k, CY + ey * k, 9 * SC
-    fillTri(tx, ty, tx - ex * s * 1.6 - ey * s, ty - ey * s * 1.6 + ex * s, tx - ex * s * 1.6 + ey * s, ty - ey * s * 1.6 - ex * s, C.accent)
+    local tx, ty = CX + ex * k, CY + ey * k
+    local a, b = ex * NS, ey * NS
+    local a6, b6 = a * 1.6, b * 1.6
+    fillTri(tx, ty, tx - a6 - b, ty - b6 + a, tx - a6 + b, ty - b6 - a, C.accent)
   end
 
   -- the map's still parts on the screen (structures, ponds, rails, the track and its gates): worked
   -- out for each track and map box, then drawn from these lists every frame
-  local mapN, mapX, mapY, mapW, mapH, mapS, mapOX, mapOZ = -1, 0, 0, 0, 0, 0, 0, 0
-  local MB = { n = 0, {}, {}, {}, {} }                  -- structures: x, y, w, h
-  local MW = { n = 0, {}, {}, {}, {}, {}, {} }          -- ponds: triangles
+  local mapN, mapS, mapOX, mapOZ = -1, 0, 0, 0
+  local MB = { n = 0, {}, {}, {}, {}, {}, {}, {}, {} }  -- structures: x, y, w, h (5-8: their pixels' bounds)
+  local MW = { n = 0, {}, {}, {} }                      -- ponds: a line per row, x1, x2, y
   local MR = { n = 0, {}, {}, {}, {} }                  -- rails: lines
   local ML = { {}, {}, {}, {} }                         -- the track: a line per leg
-  local MGT = { {}, {}, {}, {}, f = {} }                -- gates: a bar's line (the second 1 px lower), a flag's dot (f)
+  local MGT = { {}, {}, {}, {}, {}, {}, f = {} }        -- gates: a bar's line (5, 6: the second's rows, 1 px lower), a flag's dot (f)
+
+  -- a filled triangle's pixels as the screen draws them (EdgeTX's drawFilledTriangle: Adafruit
+  -- GFX, the corners whole pixels as lcd rounds them down, a row at a time, integer slopes
+  -- truncated towards zero): its rows' spans a..b appended to QA, QB, QY
+  local QA, QB, QY, QN = {}, {}, {}, 0
+  local function span(a, b, y)
+    if a > b then a, b = b, a end
+    QN = QN + 1
+    QA[QN], QB[QN], QY[QN] = a, b, y
+  end
+  local function trunc(q)
+    if q < 0 then return -floor(-q) end
+    return floor(q)
+  end
+  local function triSpans(x0, y0, x1, y1, x2, y2)
+    x0, y0, x1, y1, x2, y2 = floor(x0), floor(y0), floor(x1), floor(y1), floor(x2), floor(y2)
+    if y0 > y1 then y0, y1, x0, x1 = y1, y0, x1, x0 end
+    if y1 > y2 then y2, y1, x2, x1 = y1, y2, x1, x2 end
+    if y0 > y1 then y0, y1, x0, x1 = y1, y0, x1, x0 end
+    if y0 == y2 then                                    -- all on one row
+      local a, b = x0, x0
+      if x1 < a then a = x1 elseif x1 > b then b = x1 end
+      if x2 < a then a = x2 elseif x2 > b then b = x2 end
+      span(a, b, y0)
+      return
+    end
+    local dx01, dy01, dx02, dy02, dx12, dy12 = x1 - x0, y1 - y0, x2 - x0, y2 - y0, x2 - x1, y2 - y1
+    local sa, sb, y = 0, 0, y0
+    local last = y1 == y2 and y1 or y1 - 1
+    while y <= last do
+      span(x0 + trunc(sa / dy01), x0 + trunc(sb / dy02), y)
+      sa, sb, y = sa + dx01, sb + dx02, y + 1
+    end
+    sa, sb = dx12 * (y - y1), dx02 * (y - y0)
+    while y <= y2 do
+      span(x1 + trunc(sa / dy12), x0 + trunc(sb / dy02), y)
+      sa, sb, y = sa + dx12, sb + dx02, y + 1
+    end
+  end
+
   local function mapMake(x, y, w, h)
-    mapN, mapX, mapY, mapW, mapH = nBuilt, x, y, w, h
+    mapN = nBuilt
     local sx, sz = TR.x1 - TR.x0 + 20, TR.z1 - TR.z0 + 20
     local s = (w - 6) / sx
     if (h - 6) / sz < s then s = (h - 6) / sz end
     local ox, oz = x + w / 2 - (TR.x0 + TR.x1) * 0.5 * s, y + h / 2 + (TR.z0 + TR.z1) * 0.5 * s
     mapS, mapOX, mapOZ = s, ox, oz
     -- structures: solid, in the colour they had blended over the panel (a blended fill is one
-    -- slow call each on the radio)
-    local t1, t2, t3, t4, t5, t6 = MB[1], MB[2], MB[3], MB[4]
+    -- slow call each on the radio). One within another's pixels (a stack of containers, the
+    -- parts of a building) adds nothing: left out. The screen rounds x, y, w and h down; only
+    -- rects at x, y >= 0 take part (the same whole pixels on the radio)
+    local t1, t2, t3, t4, t5, t6, t7, t8 = MB[1], MB[2], MB[3], MB[4], MB[5], MB[6], MB[7], MB[8]
     for b = 1, BX.n do
-      t1[b], t2[b], t3[b], t4[b] = ox + BX.x0[b] * s, oz - BX.z1[b] * s, (BX.x1[b] - BX.x0[b]) * s + 1, (BX.z1[b] - BX.z0[b]) * s + 1
+      local bx, by, bw, bh = ox + BX.x0[b] * s, oz - BX.z1[b] * s, (BX.x1[b] - BX.x0[b]) * s + 1, (BX.z1[b] - BX.z0[b]) * s + 1
+      t1[b], t2[b], t3[b], t4[b], t5[b], t6[b] = bx, by, bw, bh, floor(bx), floor(by)
+      t7[b], t8[b] = t5[b] + floor(bw), t6[b] + floor(bh)
     end
-    MB.n = BX.n
-    -- the ponds (ellipses of 12 corners) and the rails, within the map (the scenery can reach
-    -- past the track's bounds the map is fitted to)
-    local x1, y1 = x + w - 1, y + h - 1
     local n = 0
-    t1, t2, t3, t4, t5, t6 = MW[1], MW[2], MW[3], MW[4], MW[5], MW[6]
+    for b = 1, BX.n do
+      local bx, by, bx2, by2 = t5[b], t6[b], t7[b], t8[b]
+      local keep = true
+      if bx >= 0 and by >= 0 then
+        for a = 1, BX.n do
+          local ax, ay, ax2, ay2 = t5[a], t6[a], t7[a], t8[a]
+          if a ~= b and ax >= 0 and ay >= 0 and ax <= bx and ay <= by and ax2 >= bx2 and ay2 >= by2
+             and (a < b or ax < bx or ay < by or ax2 > bx2 or ay2 > by2) then keep = false break end
+        end
+      end
+      if keep then
+        n = n + 1
+        t1[n], t2[n], t3[n], t4[n] = t1[b], t2[b], t3[b], t4[b]
+      end
+    end
+    MB.n = n
+    -- the ponds (ellipses of 12 corners) and the rails, within the map (the scenery can reach
+    -- past the track's bounds the map is fitted to). A pond is a fan of 12 triangles: drawn as
+    -- one line per row of their pixels instead (the same pixels, a fraction of the calls)
+    local x1, y1 = x + w - 1, y + h - 1
+    QN = 0
     for i = 1, SCN.nd do
       if SCN.dk[i] == 5 then
         local cx, cy = ox + SCN.dx[i] * s, oz - SCN.dz[i] * s
@@ -6123,13 +6350,40 @@ local render, hitTest, pauseHit, initUI
             local c_, s_ = cos(j * 0.5236), sin(j * 0.5236)
             local px_, py_ = cx + ux * c_ + vx * s_, cy + uy * c_ + vy * s_
             px_, py_ = px_ < x and x or px_ > x1 and x1 or px_, py_ < y and y or py_ > y1 and y1 or py_
-            if ax then
-              n = n + 1
-              t1[n], t2[n], t3[n], t4[n], t5[n], t6[n] = cx, cy, ax, ay, px_, py_
-            end
+            if ax then triSpans(cx, cy, ax, ay, px_, py_) end
             ax, ay = px_, py_
           end
         end
+      end
+    end
+    -- the spans by row, then start (an insertion sort: a few dozen, once a track); those that
+    -- overlap or touch joined, the rows on the screen kept, clipped to it
+    for i = 2, QN do
+      local a, b, py_ = QA[i], QB[i], QY[i]
+      local j = i - 1
+      while j > 0 and (QY[j] > py_ or (QY[j] == py_ and QA[j] > a)) do
+        QA[j + 1], QB[j + 1], QY[j + 1] = QA[j], QB[j], QY[j]
+        j = j - 1
+      end
+      QA[j + 1], QB[j + 1], QY[j + 1] = a, b, py_
+    end
+    t1, t2, t3 = MW[1], MW[2], MW[3]
+    n = 0
+    local ca, cb, cy = 0, 0, nil
+    for i = 1, QN + 1 do
+      local a, b, py_ = QA[i], QB[i], QY[i]
+      if i <= QN and py_ == cy and a <= cb + 1 then
+        if b > cb then cb = b end
+      else
+        if cy and cy >= 0 and cy < H then
+          if ca < 0 then ca = 0 end
+          if cb > W - 1 then cb = W - 1 end
+          if ca <= cb then
+            n = n + 1
+            t1[n], t2[n], t3[n] = ca, cb, cy
+          end
+        end
+        ca, cb, cy = a, b, py_
       end
     end
     MW.n, n = n, 0
@@ -6159,45 +6413,47 @@ local render, hitTest, pauseHit, initUI
       t1[i], t2[i], t3[i], t4[i] = ox + AX[i] * s, oz - AZ[i] * s, ox + AX[j] * s, oz - AZ[j] * s
     end
     local e = 3 * SC + 1
-    t1, t2, t3, t4, t5 = MGT[1], MGT[2], MGT[3], MGT[4], MGT.f
+    t1, t2, t3, t4, t5, t6, t7 = MGT[1], MGT[2], MGT[3], MGT[4], MGT[5], MGT[6], MGT.f
     for i = 1, NG do
       local k = gk[i]
-      t5[i] = GSH[k] == 3
-      if t5[i] then
+      t7[i] = GSH[k] == 3
+      if t7[i] then
         local o = -GHW[k] * (k == 6 and 1 or -1)
         t1[i], t2[i] = ox + (gx[i] + grx[i] * o) * s - 1, oz - (gz[i] + grz[i] * o) * s - 1
       else
         local gxp, gzp = ox + gx[i] * s, oz - gz[i] * s
         t1[i], t2[i], t3[i], t4[i] = gxp - grx[i] * e, gzp + grz[i] * e, gxp + grx[i] * e, gzp - grz[i] * e
+        t5[i], t6[i] = t2[i] + 1, t4[i] + 1
       end
     end
   end
 
   local function drawMinimap(x, y, w, h, alpha)
     if alpha then fillRect(x, y, w, h, C.panel, alpha) end
-    if mapN ~= nBuilt or mapX ~= x or mapY ~= y or mapW ~= w or mapH ~= h then mapMake(x, y, w, h) end
+    if mapN ~= nBuilt then mapMake(x, y, w, h) end     -- (one box a session: the HUD's or the portrait panel's)
     local s, ox, oz = mapS, mapOX, mapOZ
     local t1, t2, t3, t4, t5, t6 = MB[1], MB[2], MB[3], MB[4]
     local c = C.mapBox
     for k = 1, MB.n do fillRect(t1[k], t2[k], t3[k], t4[k], c) end
-    t1, t2, t3, t4, t5, t6 = MW[1], MW[2], MW[3], MW[4], MW[5], MW[6]
+    t1, t2, t3 = MW[1], MW[2], MW[3]
     c = C.mapWater
-    for k = 1, MW.n do fillTri(t1[k], t2[k], t3[k], t4[k], t5[k], t6[k], c) end
+    for k = 1, MW.n do drawLine(t1[k], t3[k], t2[k], t3[k], SOLID, c) end
     t1, t2, t3, t4 = MR[1], MR[2], MR[3], MR[4]
     c = C.mapBox
     for k = 1, MR.n do drawLine(t1[k], t2[k], t3[k], t4[k], SOLID, c) end
     t1, t2, t3, t4 = ML[1], ML[2], ML[3], ML[4]
     c = C.dim
     for k = 1, NG do drawLine(t1[k], t2[k], t3[k], t4[k], SOLID, c) end
-    t1, t2, t3, t4, t5 = MGT[1], MGT[2], MGT[3], MGT[4], MGT.f
+    t1, t2, t3, t4, t5, t6 = MGT[1], MGT[2], MGT[3], MGT[4], MGT[5], MGT[6]
+    local t7 = MGT.f
     local ng, ca, cw = gmode ~= 3 and nextGate or 0, C.accent, C.white
     for i = 1, NG do
       c = i == ng and ca or cw
-      if t5[i] then
+      if t7[i] then
         fillRect(t1[i], t2[i], 3, 3, c)
       else
         drawLine(t1[i], t2[i], t3[i], t4[i], SOLID, c)
-        drawLine(t1[i], t2[i] + 1, t3[i], t4[i] + 1, SOLID, c)
+        drawLine(t1[i], t5[i], t3[i], t6[i], SOLID, c)
       end
     end
     if gmode == 1 then
@@ -6206,31 +6462,33 @@ local render, hitTest, pauseHit, initUI
     local dxp, dzp = ox + px * s, oz - pz * s
     local l = sqrt(fx * fx + fz * fz) + 0.0001
     local hx, hz = fx / l, fz / l
-    local e = 5 * SC + 2
-    local b = e * 0.6
-    fillTri(dxp + hx * e, dzp - hz * e, dxp - hx * b + hz * b, dzp + hz * b + hx * b, dxp - hx * b - hz * b, dzp + hz * b - hx * b, C.cyan)
+    local xb, zb = hx * AB, hz * AB
+    fillTri(dxp + hx * AE, dzp - hz * AE, dxp - xb + zb, dzp + zb + xb, dxp - xb - zb, dzp + zb - xb, C.cyan)
   end
 
   local function stickBox(x, y, s, sx, sy)
+    local h = s / 2
+    local cx, cy = x + h, y + h
     fillRect(x, y, s, s, C.panel, 6)
-    drawLine(x + s / 2, y + 2, x + s / 2, y + s - 3, SOLID, C.dim)
-    drawLine(x + 2, y + s / 2, x + s - 3, y + s / 2, SOLID, C.dim)
-    local d = floor(2 * SC + 2)
-    fillRect(x + s / 2 + sx * (s / 2 - d - 1) - d, y + s / 2 - sy * (s / 2 - d - 1) - d, d * 2 + 1, d * 2 + 1, C.accent)
+    drawLine(cx, y + 2, cx, y + s - 3, SOLID, C.dim)
+    drawLine(x + 2, cy, x + s - 3, cy, SOLID, C.dim)
+    local r = h - SD - 1
+    fillRect(cx + sx * r - SD, cy - sy * r - SD, SD2, SD2, C.accent)
   end
 
-  -- wind: where it blows, as seen from the quad (up is the way its nose points)
-  local function windBox(x, y, s)
-    fillRect(x, y, s, s, C.panel, 6)
+  -- wind: where it blows, as seen from the quad (up is the way its nose points). The box is WS square
+  local function windBox(x, y)
+    fillRect(x, y, WS, WS, C.panel, 6)
     local l = sqrt(fx * fx + fz * fz) + 0.0001
     local ex, ey = (TR.wx * fz - TR.wz * fx) / l, -(TR.wx * fx + TR.wz * fz) / l
-    local cx, cy, a, b, w = x + s / 2, y + s / 2, s * 0.38, s * 0.17, s * 0.05 + 0.5
-    local tx, ty = cx + ex * a, cy + ey * a                  -- tip
-    local hx, hy = tx - ex * b * 1.6, ty - ey * b * 1.6      -- back of the head
-    local bx, by = cx - ex * a, cy - ey * a                  -- tail
-    fillTri(bx - ey * w, by + ex * w, bx + ey * w, by - ex * w, hx + ey * w, hy - ex * w, C.white)
-    fillTri(bx - ey * w, by + ex * w, hx + ey * w, hy - ex * w, hx - ey * w, hy + ex * w, C.white)
-    fillTri(tx, ty, hx - ey * b, hy + ex * b, hx + ey * b, hy - ex * b, C.white)
+    local cx, cy = x + WH, y + WH
+    local tx, ty = cx + ex * WA, cy + ey * WA                -- tip
+    local hx, hy = tx - ex * WB * 1.6, ty - ey * WB * 1.6    -- back of the head
+    local bx, by = cx - ex * WA, cy - ey * WA                -- tail
+    local xw, yw, xb, yb = ex * WW, ey * WW, ex * WB, ey * WB
+    fillTri(bx - yw, by + xw, bx + yw, by - xw, hx + yw, hy - xw, C.white)
+    fillTri(bx - yw, by + xw, hx + yw, hy - xw, hx - yw, hy + xw, C.white)
+    fillTri(tx, ty, hx - yb, hy + xb, hx + yb, hy - xb, C.white)
   end
 
   local function drawSticks(x, y, s, gap)
@@ -6252,146 +6510,169 @@ local render, hitTest, pauseHit, initUI
     local w = BAT.w
     if w > 1 and gt % 50 >= 30 then return end
     local c = w == 0 and C.white or w == 1 and C.accent2 or C.bad
-    local bw, bh = floor(16 * SC + 4), floor(6 * SC + 3)
     y = y - hS
-    local by = y + floor((hS - bh) / 2)
-    fillRect(x, by, bw, bh, C.panel, 6)
-    lcd.drawRectangle(x, by, bw, bh, c)
-    fillRect(x + bw, by + floor(bh / 4), 2, bh - 2 * floor(bh / 4), c)
-    fillRect(x + 2, by + 2, floor((bw - 4) * BAT.s + 0.5), bh - 4, c)
-    txt(x + bw + 6, y, fmt("%.2fV", BAT.v), SMLSIZE + c)
+    local by = y + BYO
+    fillRect(x, by, BBW, BBH, C.panel, 6)
+    lcd.drawRectangle(x, by, BBW, BBH, c)
+    fillRect(x + BBW, by + BQ, 2, BQH, c)
+    fillRect(x + 2, by + 2, floor(BWI * BAT.s + 0.5), BHI, c)
+    txt(x + BBW + 6, y, fmt("%.2fV", BAT.v), SMLSIZE + c)
   end
 
+  -- the HUD's texts with a number in them, kept until the number changes: a number to text is
+  -- slow on the radio (printf), and garbage every frame
+  local lapK, lapN, lapS, cbK, cbN, cbS, scK, scS, bfK, bfS, rnK, rnS, bgK, bgS, bestK, bestS, posK, posN, posS
+  local altK, altS, spdK, spdS, fpsK, fpsX, fpsS, goK, go1, go2, go3, goS, goM, palK, palA, palS
+
   local function lapText(l)
-    local s = "LAP " .. l
-    if gmode == 1 then s = s .. "/" .. S.laps end
-    return s
+    local n = gmode == 1 and S.laps or false
+    if l ~= lapK or n ~= lapN then
+      lapK, lapN, lapS = l, n, "LAP " .. l
+      if n then lapS = lapS .. "/" .. n end
+    end
+    return lapS
   end
 
   local function comboText()
-    local m = 1 + (R.chn - 1) * 0.5
-    if m > 4 then m = 4 end
-    return fmt("COMBO x%.1f  %d", m, floor(R.ch * m))
+    local c, n = R.ch, R.chn
+    if c ~= cbK or n ~= cbN then
+      local m = 1 + (n - 1) * 0.5
+      if m > 4 then m = 4 end
+      cbK, cbN, cbS = c, n, fmt("COMBO x%.1f  %d", m, floor(c * m))
+    end
+    return cbS
   end
 
-  -- mode readout: title, big number, extra line, best (top-right)
+  local function fpsText()
+    local f, x = R.fps, R.fpsX
+    if f ~= fpsK or x ~= fpsX then fpsK, fpsX, fpsS = f, x, f .. " fps" .. x end
+    return fpsS
+  end
+
+  -- the speed, whole km/h
+  local function speedText()
+    local a = floor(speed * 3.6)
+    if a ~= spdK then spdK, spdS = a, a .. " km/h" end
+    return spdS
+  end
+
+  -- Time Trial's goal (MED.goal: from the best lap and the track's medal times)
+  local function goal()
+    local b, m1, m2, m3 = BEST.l[S.track], MED[1], MED[2], MED[3]
+    if b ~= goK or m1 ~= go1 or m2 ~= go2 or m3 ~= go3 then
+      goK, go1, go2, go3 = b, m1, m2, m3
+      goS, goM = MED.goal()
+    end
+    return goS, goM
+  end
+
+  -- mode readout: title, big number, extra line, best (top-right), its color; the race time
   local function modeInfo()
     local t = S.track
     if gmode == 3 then
-      return "SCORE", tostring(R.sc), R.chn > 0 and comboText() or nil, "BEST COMBO " .. BEST.f[t], C.white
+      local sc, bf = R.sc, BEST.f[t]
+      if sc ~= scK then scK, scS = sc, tostring(sc) end
+      if bf ~= bfK then bfK, bfS = bf, "BEST COMBO " .. bf end
+      return "SCORE", scS, R.chn > 0 and comboText() or nil, bfS, C.white
     elseif gmode == 4 then
-      return "GATES " .. R.rn, fmt("%.1f", R.rt), nil, "BEST " .. BEST.g[t], R.rt < 5 and C.bad or C.white
+      local rn, bg = R.rn, BEST.g[t]
+      if rn ~= rnK then rnK, rnS = rn, "GATES " .. rn end
+      if bg ~= bgK then bgK, bgS = bg, "BEST " .. bg end
+      return rnS, fmt("%.1f", R.rt), nil, bgS, R.rt < 5 and C.bad or C.white
     end
     local b = BEST.l[t]
-    local l, lt = lapClock()
-    return lapText(l), timeStr(lt), (gmode == 1 and AI.n > 0) and ("P" .. R.pos .. "/" .. (AI.n + 1)) or nil,
-           "BEST " .. (b > 0 and timeStr(b) or "--"), C.white
+    if b ~= bestK then bestK, bestS = b, "BEST " .. (b > 0 and timeStr(b) or "--") end
+    local l, lt, rt = lapClock()
+    local pos
+    if gmode == 1 and AI.n > 0 then
+      local p, n = R.pos, AI.n
+      if p ~= posK or n ~= posN then posK, posN, posS = p, n, "P" .. p .. "/" .. (n + 1) end
+      pos = posS
+    end
+    return lapText(l), timeStr(lt), pos, bestS, C.white, rt
   end
 
   local function drawHUD()
     local m = MG
-    local c = 5 * SC + 1
-    drawLine(CX - c * 2, CY, CX - c, CY, SOLID, C.white)
-    drawLine(CX + c, CY, CX + c * 2, CY, SOLID, C.white)
-    drawLine(CX, CY - c, CX, CY - c * 0.5, SOLID, C.white)
+    drawLine(HX1, CY, HX2, CY, SOLID, C.white)
+    drawLine(HX3, CY, HX4, CY, SOLID, C.white)
+    drawLine(CX, HY1, CX, HY2, SOLID, C.white)
     if state ~= COUNT then nextGateMarker() end
     if PORTRAIT then
-      if S.wind > 0 then
-        local s = floor(VH * 0.11)
-        windBox(W - m - s, VY + VH - m - s, s)
-      end
-      if S.batt > 0 and state < PAUSED then drawBattery(m, VY + VH - m) end
+      if S.wind > 0 then windBox(WX, WYP) end
+      if S.batt > 0 and state < PAUSED then drawBattery(m, BOT) end
       return
     end
-    local t1, big, extra, best, bc = modeInfo()
+    local t1, big, extra, best, bc, rt = modeInfo()
     txt(m, m, t1, SMLSIZE + C.white)
-    txt(m, m + hS, big, DBLSIZE + bc)
-    if extra then txt(m, m + hS + hX, extra, (gmode == 1 and MIDSIZE or SMLSIZE) + C.accent2) end
-    local rxp = W - m
-    if S.map == 1 then rxp = W - m * 2 - floor(H * 0.3) end
+    txt(m, MY1, big, DBLSIZE + bc)
+    if extra then txt(m, MY2, extra, (gmode == 1 and MIDSIZE or SMLSIZE) + C.accent2) end
+    local rxp = S.map == 1 and RXM or RX
     txt(rxp, m, best, SMLSIZE + RIGHT + C.accent2)
     if gmode == 1 and state ~= COUNT then
-      local _, _, rt = lapClock()
-      txt(rxp, m + hS, "RACE " .. timeStr(rt), SMLSIZE + RIGHT + C.white)
+      txt(rxp, MY1, "RACE " .. timeStr(rt), SMLSIZE + RIGHT + C.white)
     elseif gmode == 2 then
-      local g, k = MED.goal()
-      txt(rxp, m + hS, g, SMLSIZE + RIGHT + C.med[k])
+      local g, k = goal()
+      txt(rxp, MY1, g, SMLSIZE + RIGHT + C.med[k])
     end
-    if S.map == 1 then
-      local ms = floor(H * 0.3)
-      drawMinimap(W - m - ms, m, ms, ms, 7)
-    end
-    local bh, bw = floor(VH * 0.28), floor(6 * SC + 1)
-    local by = VY + VH - m - bh
-    fillRect(m, by, bw, bh, C.panel, 6)
-    local th = floor(bh * sT)
-    fillRect(m, by + bh - th, bw, th, sT > 0.7 and C.bad or C.accent)
-    txt(m + bw + 4, VY + VH - m - hS, floor(py) .. "m", SMLSIZE + C.white)
+    if S.map == 1 then drawMinimap(MX, m, MS, MS, 7) end
+    -- the altitude bar: the panel shows above the filled part only
+    local th = floor(ABH * sT)
+    fillRect(m, ABY, ABW, ABH - th, C.panel, 6)
+    fillRect(m, ABY + ABH - th, ABW, th, sT > 0.7 and C.bad or C.accent)
+    local a = floor(py)
+    if a ~= altK then altK, altS = a, a .. "m" end
+    txt(ALX, ALY, altS, SMLSIZE + C.white)
     -- the battery right of the altitude (not under the pause and finish boxes, which have it)
-    if S.batt > 0 and state < PAUSED then
-      drawBattery(m + bw + 10 + (lcd.sizeText and lcd.sizeText("000m", SMLSIZE) or floor(30 * SC)), VY + VH - m)
-    end
-    if P.angle then txt(m + bw + 4, VY + VH - m - hS * 2, "ANGLE", SMLSIZE + C.cyan) end
-    txt(W - m, VY + VH - m - hL, floor(speed * 3.6) .. " km/h", MIDSIZE + RIGHT + C.white)
-    if S.wind > 0 then
-      local s = floor(VH * 0.11)
-      windBox(W - m - s, VY + VH - m - hL - s - 2, s)
-    end
-    if S.sticks == 1 then
-      local s = floor(VH * 0.16)
-      drawSticks(CX - s - 2, VY + VH - m - s, s, 4)
-    end
-    if TOUCH then pauseButton(W / 2 - floor(11 * SC + 3), m, floor(22 * SC + 6)) end
+    if S.batt > 0 and state < PAUSED then drawBattery(BTX, BOT) end
+    if P.angle then txt(ALX, ANY, "ANGLE", SMLSIZE + C.cyan) end
+    txt(RX, SPY, speedText(), MIDSIZE + RIGHT + C.white)
+    if S.wind > 0 then windBox(WX, WY) end
+    if S.sticks == 1 then drawSticks(SX, SY, SS, 4) end
+    if TOUCH then pauseButton(PBX, m, PBS) end
     -- (a row higher with the battery on: with the firmware's timings the line is wide enough to reach it)
     if S.fps == 1 then
-      local y = VY + VH - m - hS - (S.sticks == 1 and floor(VH * 0.16) + 2 or S.batt > 0 and hS + 2 or 0)
-      txt(W / 2, y, R.fps .. " fps" .. R.fpsX, SMLSIZE + CENTER + C.dim)
+      txt(W / 2, ALY - (S.sticks == 1 and SS + 2 or S.batt > 0 and hS + 2 or 0), fpsText(), SMLSIZE + CENTER + C.dim)
     end
   end
 
   -- portrait radios (320x480): 4:3 FPV view on top, instrument panel below
   local function drawPanelPortrait()
-    local y0 = VH
-    fillRect(0, y0, W, H - y0, C.panelBG)
-    drawLine(0, y0, W, y0, SOLID, C.accent)
-    local m = MG + 2
-    local y = y0 + m
-    local ms = floor(W * 0.46)
-    local x2 = W - m - ms
-    drawMinimap(x2, y, ms, ms, 7)
-    local sy = y + ms + m
-    local s = floor((ms - 6) / 2)
-    if s > H - m - sy then s = H - m - sy end
-    if s > 16 then drawSticks(x2, sy, s, 6) end
-    local t1, big, extra, best, bc = modeInfo()
-    drawText(m, y, t1, C.white)
-    drawText(m, y + hM, big, DBLSIZE + bc)
-    drawText(m, y + hM + hX, best, SMLSIZE + C.accent2)
-    if extra then drawText(m, y + hM + hX + hS, extra, SMLSIZE + C.white)
+    fillRect(0, VH, W, H - VH, C.panelBG)
+    drawLine(0, VH, W, VH, SOLID, C.accent)
+    local m = PM
+    drawMinimap(PX2, PY, PMS, PMS, 7)
+    if PS > 16 then drawSticks(PX2, PSY, PS, 6) end
+    local t1, big, extra, best, bc, rt = modeInfo()
+    drawText(m, PY, t1, C.white)
+    drawText(m, PY1, big, DBLSIZE + bc)
+    drawText(m, PY2, best, SMLSIZE + C.accent2)
+    if extra then drawText(m, PY3, extra, SMLSIZE + C.white)
     elseif gmode == 1 and state ~= COUNT then
-      local _, _, rt = lapClock()
-      drawText(m, y + hM + hX + hS, "RACE " .. timeStr(rt), SMLSIZE + C.white)
+      drawText(m, PY3, "RACE " .. timeStr(rt), SMLSIZE + C.white)
     elseif gmode == 2 then
-      local g, k = MED.goal()
-      drawText(m, y + hM + hX + hS, g, SMLSIZE + C.med[k])
+      local g, k = goal()
+      drawText(m, PY3, g, SMLSIZE + C.med[k])
     end
-    local yb = y + hM + hX + hS * 2 + m
-    drawText(m, yb, floor(speed * 3.6) .. " km/h", MIDSIZE + C.white)
-    drawText(m, yb + hL, "ALT " .. floor(py) .. "m" .. (P.angle and "  ANGLE" or ""), SMLSIZE + C.dim)
-    local tw = x2 - m * 3
-    local ty = yb + hL + hS + 4
-    fillRect(m, ty, tw, 8, C.panel)
-    fillRect(m, ty, floor(tw * sT), 8, sT > 0.7 and C.bad or C.accent)
-    if TOUCH then pauseButton(m, H - m - 38, 38) end
-    if S.fps == 1 then drawText(m + 48, H - m - hS, R.fps .. " fps" .. R.fpsX, SMLSIZE + C.dim) end
+    drawText(m, PYB, speedText(), MIDSIZE + C.white)
+    local a, an = floor(py), P.angle
+    if a ~= palK or an ~= palA then palK, palA, palS = a, an, "ALT " .. a .. "m" .. (an and "  ANGLE" or "") end
+    drawText(m, PYL, palS, SMLSIZE + C.dim)
+    -- the throttle bar: the panel shows past the filled part only
+    local ft = floor(PTW * sT)
+    fillRect(m + ft, PTY, PTW - ft, 8, C.panel)
+    fillRect(m, PTY, ft, 8, sT > 0.7 and C.bad or C.accent)
+    if TOUCH then pauseButton(m, PBY, 38) end
+    if S.fps == 1 then drawText(m + 48, PFY, fpsText(), SMLSIZE + C.dim) end
   end
 
   local function bigCenter(s, col, sub)
-    local y = CY - hX / 2 - (sub and hS or 0)
+    local y = BCY - (sub and hS or 0)
     txt(CX, y, s, DBLSIZE + CENTER + col)
     if sub then txt(CX, y + hX, sub, SMLSIZE + CENTER + C.white) end
   end
 
+  local lvK, lvS                                    -- a list's edited value, "< 3 >"
   local function drawList(title, n, label, value, x, y, w, maxH)
     hitN = 0
     local rh = hM + floor(8 * SC + 2)
@@ -6405,16 +6686,20 @@ local render, hitTest, pauseHit, initUI
     if focus - scroll > rows then scroll = focus - rows end
     if focus <= scroll then scroll = focus - 1 end
     panel(x, top - 2, w, rows * rh + 4)
+    local lx, vx, ty = x + MG + 4, x + w - MG - 4, (rh - hM) / 2
     for r = 1, rows do
       local i = scroll + r
       local ry = top + (r - 1) * rh
       local foc = i == focus
       if foc then fillRect(x + 2, ry, w - 4, rh, C.accent, editing and 0 or 9) end
-      drawText(x + MG + 4, ry + (rh - hM) / 2, label(i), foc and C.white or C.dim)
+      drawText(lx, ry + ty, label(i), foc and C.white or C.dim)
       local v = value and value(i)
       if v then
-        if foc then v = "< " .. v .. " >" end
-        drawText(x + w - MG - 4, ry + (rh - hM) / 2, v, RIGHT + (foc and (editing and C.black or C.accent2) or C.white))
+        if foc then
+          if v ~= lvK then lvK, lvS = v, "< " .. v .. " >" end
+          v = lvS
+        end
+        drawText(vx, ry + ty, v, RIGHT + (foc and (editing and C.black or C.accent2) or C.white))
       end
       hit(x, ry, w, rh, i)
     end
@@ -6428,8 +6713,13 @@ local render, hitTest, pauseHit, initUI
     return MG * 2, w
   end
 
+  local mlL, mlA, mlS                               -- the Race row, "Race (3 laps, 2 AI)"
   local function mainLabel(i)
-    if i == 1 then return "Race (" .. S.laps .. " laps" .. (S.ai > 0 and ", " .. S.ai .. " AI" or "") .. ")" end
+    if i == 1 then
+      local l, a = S.laps, S.ai
+      if l ~= mlL or a ~= mlA then mlL, mlA, mlS = l, a, "Race (" .. l .. " laps" .. (a > 0 and ", " .. a .. " AI" or "") .. ")" end
+      return mlS
+    end
     return MAIN_ITEMS[i]
   end
 
@@ -6438,28 +6728,47 @@ local render, hitTest, pauseHit, initUI
     return nil
   end
 
+  -- the menu's best line: "Lap 23.45 GOLD  Race 1:10.20", the medal in its color (as three texts
+  -- with sizeText, else one); Freestyle's and Gate Rush's best. Built when a best changes, with
+  -- the widths of its parts
+  local biF, biT, biV, biR, biM, bi1, bi2, biW, biMW, biLine
+  local function infoLine(ix, iy)
+    local t, f = S.track, focus
+    local v, r = f == 3 and BEST.f[t] or f == 4 and BEST.g[t] or BEST.l[t], BEST.r[t]
+    local m = (f == 3 or f == 4) and 0 or MED.of(BEST.l[t])
+    if f ~= biF or t ~= biT or v ~= biV or r ~= biR or m ~= biM then
+      biF, biT, biV, biR, biM = f, t, v, r, m
+      if f == 3 then biLine = "Best combo " .. v
+      elseif f == 4 then biLine = "Best Gate Rush " .. v
+      else
+        local a, b = "Lap " .. (v > 0 and timeStr(v) or "--"), "  Race " .. (r > 0 and timeStr(r) or "--")
+        if lcd.sizeText then
+          if m > 0 then a = a .. " " end
+          bi1, bi2, biW, biMW = a, b, lcd.sizeText(a, SMLSIZE), m > 0 and lcd.sizeText(MED.n[m], SMLSIZE) or 0
+          biLine = nil
+        else
+          biLine = a .. (m > 0 and " " .. MED.n[m] or "") .. b
+        end
+      end
+    end
+    if biLine then
+      txt(ix, iy, biLine, SMLSIZE + C.white)
+      return
+    end
+    txt(ix, iy, bi1, SMLSIZE + C.white)
+    ix = ix + biW
+    if m > 0 then
+      txt(ix, iy, MED.n[m], SMLSIZE + C.med[m])
+      ix = ix + biMW
+    end
+    txt(ix, iy, bi2, SMLSIZE + C.white)
+  end
+
   local function drawMenu()
     local x, w = menuBox()
     local y = MG
     txt(x + MG, y, "StickTime", DBLSIZE + C.white)
-    local tw = lcd.sizeText and lcd.sizeText("StickTime ", DBLSIZE) or floor(150 * SC)
-    txt(x + MG + tw, y + hX - hS - 4, "FPV simulator", SMLSIZE + C.accent2)
-    local info, race, m = bestInfo()
-    -- "Lap 23.45 GOLD  Race 1:10.20", the medal in its color
-    local function infoLine(ix, iy)
-      if race and lcd.sizeText then
-        if m > 0 then info = info .. " " end
-        txt(ix, iy, info, SMLSIZE + C.white)
-        ix = ix + lcd.sizeText(info, SMLSIZE)
-        if m > 0 then
-          txt(ix, iy, MED.n[m], SMLSIZE + C.med[m])
-          ix = ix + lcd.sizeText(MED.n[m], SMLSIZE)
-        end
-        txt(ix, iy, race, SMLSIZE + C.white)
-      else
-        txt(ix, iy, info .. (race and (m > 0 and " " .. MED.n[m] or "") .. race or ""), SMLSIZE + C.white)
-      end
-    end
+    txt(x + MG + TW, y + hX - hS - 4, "FPV simulator", SMLSIZE + C.accent2)
     if PORTRAIT then
       -- 3D view stays clear on top, the menu fills the instrument panel
       infoLine(x + MG, VH - MG - hS)
@@ -6575,7 +6884,7 @@ local render, hitTest, pauseHit, initUI
     end
     if R.msg and state ~= PAUSED and state ~= DONE then
       if gt - R.msgT < 220 then
-        txt(CX, VY + VH * 0.22, R.msg, MIDSIZE + CENTER + (R.good and C.good or C.accent2))
+        txt(CX, MSGY, R.msg, MIDSIZE + CENTER + (R.good and C.good or C.accent2))
       else
         R.msg = nil
       end
@@ -6916,7 +7225,7 @@ local OPTS = {
   { "Yaw center", "yc", nil, nil, "", 10, 500, 10 },
   { "Yaw max", "ym", nil, nil, "", 100, 2000, 10 },
   { "Yaw expo", "ye", nil, nil, nil, 0, 100, 1 },
-  { "Camera tilt", "tilt", nil, nil, "", 0, 60, 5 },
+  { "Camera tilt", "tilt", nil, nil, "", 0, 90, 5 },
   { "Field of view", "fov", nil, nil, "", 70, 130, 10 },
   { "Race laps", "laps", { 1, 2, 3, 5, 10 } },
   { "Opponents", "ai", { 0, 1, 2, 3 } },
@@ -8362,29 +8671,38 @@ do
     local n2 = n1 + BX.n
     local kpx, kpy, kpz, kfx, kfy, kfz, krx, kry, krz, tanH, no = kpx, kpy, kpz, kfx, kfy, kfz, krx, kry, krz, tanH, 0
     for n = 1, n2 + (gmode == 1 and AI.n or 0) do
-      local id, X, Y, Z, rad = n, 0, 0, 0, 4
+      -- (one assignment a coordinate: a multiple one goes through temporaries)
+      local id, rad, X, Y, Z = n, 4
       if n <= NG then
-        X, Y, Z = gx[n] - kpx, gy[n] - kpy, gz[n] - kpz
+        X = gx[n] - kpx
+        Y = gy[n] - kpy
+        Z = gz[n] - kpz
         local k = gk[n]
         if GSH[k] == 3 then rad = 9 elseif k == 2 or k == 3 then rad = 7 end
       elseif n <= n1 then
         local i = n - NG
         if qk[i] == 1 then
-          X, Y, Z = qx[i] - kpx, qh[i] * 0.4 - kpy, qz[i] - kpz
+          X = qx[i] - kpx
+          Y = qh[i] * 0.4 - kpy
+          Z = qz[i] - kpz
           rad = qh[i]
         else
-          Z = -1e9
+          X = 0 Y = 0 Z = -1e9
         end
         id = -i
       elseif n <= n2 then
         local b = n - n1
         local x0, x1, y0, y1, z0, z1 = BX.x0[b], BX.x1[b], BX.y0[b], BX.y1[b], BX.z0[b], BX.z1[b]
-        X, Y, Z = (x0 + x1) * 0.5 - kpx, (y0 + y1) * 0.5 - kpy, (z0 + z1) * 0.5 - kpz
+        X = (x0 + x1) * 0.5 - kpx
+        Y = (y0 + y1) * 0.5 - kpy
+        Z = (z0 + z1) * 0.5 - kpz
         rad = (x1 - x0 + y1 - y0 + z1 - z0) * 0.5
         id = 1000 + b
       else
         local a = n - n2
-        X, Y, Z = AI.x[a] - kpx, AI.y[a] - kpy, AI.z[a] - kpz
+        X = AI.x[a] - kpx
+        Y = AI.y[a] - kpy
+        Z = AI.z[a] - kpz
         rad = 1
         id = 2000 + a
       end
@@ -8527,8 +8845,8 @@ local line2
       local X0, Y0, Z0 = bX + x * krx, bY + x * kux, bZ + x * kfx
       line3(X0 + a1, Y0 + a2, Z0 + a3, X0 + b1, Y0 + b2, Z0 + b3, pat, fl)
       local z = czw + i * gs
-      X0, Y0, Z0 = bX + z * krz, bY + z * kuz, bZ + z * kfz
-      line3(X0 + c1, Y0 + c2, Z0 + c3, X0 + d1, Y0 + d2, Z0 + d3, pat, fl)
+      local X1, Y1, Z1 = bX + z * krz, bY + z * kuz, bZ + z * kfz
+      line3(X1 + c1, Y1 + c2, Z1 + c3, X1 + d1, Y1 + d2, Z1 + d3, pat, fl)
     end
     -- higher up, a coarser one (30 m) beyond it, out to 16 times the height (180 m at most): its
     -- edge stays near the horizon (a line across the fine one: only its two ends beyond it)
@@ -8545,15 +8863,14 @@ local line2
         local x = cx + i * 30
         local X0, Y0, Z0 = bX + x * krx, bY + x * kux, bZ + x * kfx
         local q1, q2, q3 = b1, b2, b3
-        if x < x1 or x > x2 then q1, q2, q3 = a1, a2, a3 end
+        if x < x1 or x > x2 then q1 = a1 q2 = a2 q3 = a3 end
         line3(X0 + e1, Y0 + e2, Z0 + e3, X0 + a1, Y0 + a2, Z0 + a3, pat, fl)
         line3(X0 + q1, Y0 + q2, Z0 + q3, X0 + f1, Y0 + f2, Z0 + f3, pat, fl)
         local z = cz + i * 30
-        X0, Y0, Z0 = bX + z * krz, bY + z * kuz, bZ + z * kfz
-        q1, q2, q3 = d1, d2, d3
-        if z < z1 or z > z2 then q1, q2, q3 = c1, c2, c3 end
-        line3(X0 + g1, Y0 + g2, Z0 + g3, X0 + c1, Y0 + c2, Z0 + c3, pat, fl)
-        line3(X0 + q1, Y0 + q2, Z0 + q3, X0 + h1, Y0 + h2, Z0 + h3, pat, fl)
+        local X1, Y1, Z1 = bX + z * krz, bY + z * kuz, bZ + z * kfz
+        if z < z1 or z > z2 then q1 = c1 q2 = c2 q3 = c3 else q1 = d1 q2 = d2 q3 = d3 end
+        line3(X1 + g1, Y1 + g2, Z1 + g3, X1 + c1, Y1 + c2, Z1 + c3, pat, fl)
+        line3(X1 + q1, Y1 + q2, Z1 + q3, X1 + h1, Y1 + h2, Z1 + h3, pat, fl)
       end
     end
   end
@@ -8565,7 +8882,7 @@ local line2
     local k = gk[i]
     local sh = GSH[k]
     local dx, dy, dz = gx[i] - kpx, gy[i] - kpy, gz[i] - kpz
-    local cx, cy, cz = dx * krx + dy * kry + dz * krz, dx * kux + dy * kuy + dz * kuz, dx * kfx + dy * kfy + dz * kfz
+    local cx, cy, cz = dx * krx + dy * kry + dz * krz, dx * kux + dy * kuy + dz * kuz, z   -- (z: collectObjects's, the same sum)
     local r1, r3 = grx[i], grz[i]
     local Rx, Ry, Rz = r1 * krx + r3 * krz, r1 * kux + r3 * kuz, r1 * kfx + r3 * kfz
     local a1, a2, a3 = gax[i], gay[i], gaz[i]
@@ -8605,7 +8922,7 @@ local line2
           local c_, s_ = RCOS[j], RSIN[j]
           local X, Y, Z = cx + (Rx * c_ + Ax * s_) * r, cy + (Ry * c_ + Ay * s_) * r, cz + (Rz * c_ + Az * s_) * r
           line3(oX, oY, oZ, X, Y, Z, pat, BLK)
-          oX, oY, oZ = X, Y, Z
+          oX = X oY = Y oZ = Z
         end
         r = (r > iw and (z < 30 or nxt)) and iw or 0
       end
@@ -8623,10 +8940,11 @@ local line2
       local lh = k == 2 and gy[i] - ih - GT or gy[i]
       local ex, ey, ez = kry * lh, kuy * lh, kfy * lh
       local lw = iw + GT * 0.5
+      local wx, wy, wz = Rx * lw, Ry * lw, Rz * lw
       for sx = -1, 1, 2 do
         for sz = (k == 3 and -1 or 1), 1, 2 do
           local la = k == 3 and (ih + GT * 0.5) * sz or -(ih + GT)
-          local X, Y, Z = cx + Rx * lw * sx + Ax * la, cy + Ry * lw * sx + Ay * la, cz + Rz * lw * sx + Az * la
+          local X, Y, Z = cx + wx * sx + Ax * la, cy + wy * sx + Ay * la, cz + wz * sx + Az * la
           line3(X, Y, Z, X - ex, Y - ey, Z - ez, SOLID, BLK)
         end
       end
@@ -8640,15 +8958,14 @@ local line2
     local bX, bY, bZ = dx * krx + dy * kry + dz * krz, dx * kux + dy * kuy + dz * kuz, dx * kfx + dy * kfy + dz * kfz
     local tX, tY, tZ = bX + kry * h, bY + kuy * h, bZ + kfy * h
     line3(bX, bY, bZ, tX, tY, tZ, SOLID, BLK)
-    if z < 90 then
-      local w = h * 0.24
-      local q = h * 0.25
-      local mX, mY, mZ = bX + kry * q, bY + kuy * q, bZ + kfy * q
-      local lX, lY, lZ, rX, rY, rZ = mX - krx * w, mY - kux * w, mZ - kfx * w, mX + krx * w, mY + kux * w, mZ + kfx * w
-      line3(tX, tY, tZ, lX, lY, lZ, SOLID, BLK)
-      line3(tX, tY, tZ, rX, rY, rZ, SOLID, BLK)
-      line3(lX, lY, lZ, rX, rY, rZ, SOLID, BLK)
-    end
+    -- the canopy (collected within 90 m: always)
+    local w = h * 0.24
+    local q = h * 0.25
+    local mX, mY, mZ = bX + kry * q, bY + kuy * q, bZ + kfy * q
+    local lX, lY, lZ, rX, rY, rZ = mX - krx * w, mY - kux * w, mZ - kfx * w, mX + krx * w, mY + kux * w, mZ + kfx * w
+    line3(tX, tY, tZ, lX, lY, lZ, SOLID, BLK)
+    line3(tX, tY, tZ, rX, rY, rZ, SOLID, BLK)
+    line3(lX, lY, lZ, rX, rY, rZ, SOLID, BLK)
   end
 
   -- structures: the edges of the faces turned to the camera
@@ -8686,16 +9003,20 @@ local line2
   local function drawPad()
     local kpx, kpz, krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz = kpx, kpz, krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz
     local hx, hz, y = TR.hx, TR.hz, 0 - kpy
+    -- all of it within 10.3 m of the pad's centre: behind the near plane (0.2) with that to spare,
+    -- every line would be dropped
+    if (TR.px - kpx) * kfx + y * kfy + (TR.pz - kpz) * kfz < -10.6 then return end
     for s = 1, 2 do
       local e = s == 1 and 1.5 or 0.9
       local x, z = TR.px + (hx - hz) * e - kpx, TR.pz + (hz + hx) * e - kpz
       local pX, pY, pZ = x * krx + y * kry + z * krz, x * kux + y * kuy + z * kuz, x * kfx + y * kfy + z * kfz
       for j = 1, 4 do
         local a, b = (j == 1 or j == 4) and 1 or -1, j <= 2 and 1 or -1
-        x, z = TR.px + (hx * a + hz * b) * e - kpx, TR.pz + (hz * a - hx * b) * e - kpz
+        x = TR.px + (hx * a + hz * b) * e - kpx
+        z = TR.pz + (hz * a - hx * b) * e - kpz
         local X, Y, Z = x * krx + y * kry + z * krz, x * kux + y * kuy + z * kuz, x * kfx + y * kfy + z * kfz
         line3(pX, pY, pZ, X, Y, Z, SOLID, BLK)
-        pX, pY, pZ = X, Y, Z
+        pX = X pY = Y pZ = Z
       end
     end
     local x, z = TR.px - hx * 7 - hz * 4, TR.pz - hz * 7 + hx * 4
@@ -8704,7 +9025,9 @@ local line2
     local a, b, c = x - kpx, 4 - kpy, z - kpz
     local bX, bY, bZ = a * krx + y * kry + c * krz, a * kux + y * kuy + c * kuz, a * kfx + y * kfy + c * kfz
     local tX, tY, tZ = a * krx + b * kry + c * krz, a * kux + b * kuy + c * kuz, a * kfx + b * kfy + c * kfz
-    a, b, c = x + TR.wx * e * 1.4 - kpx, 3.9 - (1 - e) * 1.3 - kpy, z + TR.wz * e * 1.4 - kpz
+    a = x + TR.wx * e * 1.4 - kpx
+    b = 3.9 - (1 - e) * 1.3 - kpy
+    c = z + TR.wz * e * 1.4 - kpz
     local eX, eY, eZ = a * krx + b * kry + c * krz, a * kux + b * kuy + c * kuz, a * kfx + b * kfy + c * kfz
     line3(bX, bY, bZ, tX, tY, tZ, SOLID, BLK)
     line3(tX, tY, tZ, eX, eY, eZ, SOLID, BLK)
@@ -8741,7 +9064,7 @@ local line2
       if Z > 0.3 then
         local X, Y = CX + (x * krx + y * kry + z * krz) * F / Z, CY - (x * kux + y * kuy + z * kuz) * F / Z
         if px_ then line2(px_, py_, X, Y, pat, fl) end
-        px_, py_ = X, Y
+        px_ = X py_ = Y
       else
         px_ = nil
       end
@@ -9367,7 +9690,7 @@ local OPTS = {
 { "Power", "twr", nums("0 3 4 5 6 7 8 10 12"), ":1" },                -- 0: Stock
 { "Flight mode", "mode", { 1, 2 }, { "Acro", "Angle" } },
 { "Rates", "rates", { 1, 2, 3 }, { "Soft", "Normal", "Fast" } },
-{ "Camera tilt", "tilt", nums("0 10 15 20 25 30 35 40 50") },
+{ "Camera tilt", "tilt", nums("0 10 15 20 25 30 35 40 50 60 70 80 90") },
 { "Laps", "laps", nums("1 2 3 5 10") },
 { "Wind", "wind", V3, { "Off", "Light", "Strong" } },
 { "Prop wash", "wash", V3, { "Off", "Stock", "Max" } },
@@ -10032,11 +10355,12 @@ local RC, RS = {}, {}                              -- ring points every 30 deg
 for j = 1, 12 do RC[j], RS[j] = cos(j * 0.5236), sin(j * 0.5236) end
 local kx, ky, kz, krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz = 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1
 local function line2(x1, y1, x2, y2, pat, fl)
-local dx, dy, t0_, t1, XM, YM = x2 - x1, y2 - y1, 0, 1, XM, YM
+local dx, dy, XM, YM = x2 - x1, y2 - y1, XM, YM
 if x1 >= 0 and x1 <= XM and x2 >= 0 and x2 <= XM and y1 >= 0 and y1 <= YM and y2 >= 0 and y2 <= YM then
 drawLine(floor(x1 + 0.5), floor(y1 + 0.5), floor(x1 + dx + 0.5), floor(y1 + dy + 0.5), pat, fl)
 return
 end
+local t0_, t1 = 0, 1
 if dx > 1e-6 or dx < -1e-6 then
 local ta, tb = -x1 / dx, (XM - x1) / dx
 if ta > tb then ta, tb = tb, ta end
@@ -10057,16 +10381,24 @@ local function line3(X1, Y1, Z1, X2, Y2, Z2, pat, fl, cam)
 if not cam then
 local kx, ky, kz, krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz = kx, ky, kz, krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz
 local a1, a2, a3, b1, b2, b3 = X1 - kx, Y1 - ky, Z1 - kz, X2 - kx, Y2 - ky, Z2 - kz
-X1, Y1, Z1 = a1 * krx + a2 * kry + a3 * krz, a1 * kux + a2 * kuy + a3 * kuz, a1 * kfx + a2 * kfy + a3 * kfz
-X2, Y2, Z2 = b1 * krx + b2 * kry + b3 * krz, b1 * kux + b2 * kuy + b3 * kuz, b1 * kfx + b2 * kfy + b3 * kfz
+X1 = a1 * krx + a2 * kry + a3 * krz
+Y1 = a1 * kux + a2 * kuy + a3 * kuz
+Z1 = a1 * kfx + a2 * kfy + a3 * kfz
+X2 = b1 * krx + b2 * kry + b3 * krz
+Y2 = b1 * kux + b2 * kuy + b3 * kuz
+Z2 = b1 * kfx + b2 * kfy + b3 * kfz
 end
 if Z1 < 0.2 then
 if Z2 < 0.2 then return end
 local t = (0.2 - Z1) / (Z2 - Z1)
-X1, Y1, Z1 = X1 + (X2 - X1) * t, Y1 + (Y2 - Y1) * t, 0.2
+X1 = X1 + (X2 - X1) * t
+Y1 = Y1 + (Y2 - Y1) * t
+Z1 = 0.2
 elseif Z2 < 0.2 then
 local t = (0.2 - Z2) / (Z1 - Z2)
-X2, Y2, Z2 = X2 + (X1 - X2) * t, Y2 + (Y1 - Y2) * t, 0.2
+X2 = X2 + (X1 - X2) * t
+Y2 = Y2 + (Y1 - Y2) * t
+Z2 = 0.2
 end
 local F, CX, CY = F, CX, CY
 return line2(CX + X1 * F / Z1, CY - Y1 * F / Z1, CX + X2 * F / Z2, CY - Y2 * F / Z2, pat, fl)
@@ -10085,11 +10417,6 @@ if o[3][j] == S[o[2]] then return j end
 end
 return 1
 end
-local function box(y)
-y = y * U
-lcd.drawFilledRectangle(8 * U, y, XM + 1 - 16 * U, YM + 1 - y * 2, ERASE)
-lcd.drawRectangle(8 * U, y, XM + 1 - 16 * U, YM + 1 - y * 2, BLK)
-end
 render = function()
 if state == 1 or state == 2 then
 lcd.clear()
@@ -10105,6 +10432,7 @@ local rows = floor((YM + 1 - y) / (8 * U))
 if rows > n then rows = n end
 if focus - scroll > rows then scroll = focus - rows end
 if focus <= scroll then scroll = focus - 1 end
+local ed = editing and state == 2
 for r = 1, rows do
 local i = scroll + r
 local o, f, v = OPTS[i], i == focus and INV or 0, nil
@@ -10117,8 +10445,8 @@ elseif o then
 local j = optIdx(o)
 v = i == 1 and QN or type(o[4]) == "table" and o[4][j] or o[3][j] == 0 and o[4] == ":1" and "Stock" or o[3][j] .. (o[4] or "")
 end
-drawText(2 * U, y, l, SML + ((editing and state == 2) and 0 or f))
-if v then drawText(XM - U, y, v, SML + RIGHT + ((editing and state == 2) and f or 0)) end
+drawText(2 * U, y, l, SML + (ed and 0 or f))
+if v then drawText(XM - U, y, v, SML + RIGHT + (ed and f or 0)) end
 y = y + 8 * U
 end
 return
@@ -10162,30 +10490,51 @@ else
 line2(CX + (-CY * b - c) / a, 0, CX + ((YM - CY) * b - c) / a, YM, SOLID, GRY)
 end
 local gx0, gz0 = floor(kx / 10) * 10, floor(kz / 10) * 10
+local xn, xf, zn, zf = gx0 - 60, gx0 + 60, gz0 - 60, gz0 + 60   -- its edges
+do
+local kux, kuy, kuz = kux, kuy, kuz
+local a2 = 0 - ky
+local y1, y2, y3 = a2 * kry, a2 * kuy, a2 * kfy
+local a3 = zn - kz
+local n1, n2, n3 = a3 * krz, a3 * kuz, a3 * kfz
+a3 = zf - kz
+local f1, f2, f3 = a3 * krz, a3 * kuz, a3 * kfz
+local a1 = xn - kx
+local l1, l2, l3 = a1 * krx + y1, a1 * kux + y2, a1 * kfx + y3
+a1 = xf - kx
+local r1, r2, r3 = a1 * krx + y1, a1 * kux + y2, a1 * kfx + y3
 for i = -6, 6 do
-line3(gx0 + i * 10, 0, gz0 - 60, gx0 + i * 10, 0, gz0 + 60, DOTTED, GRY)
-line3(gx0 - 60, 0, gz0 + i * 10, gx0 + 60, 0, gz0 + i * 10, DOTTED, GRY)
+a1 = gx0 + i * 10 - kx
+local p1, p2, p3 = a1 * krx + y1, a1 * kux + y2, a1 * kfx + y3
+line3(p1 + n1, p2 + n2, p3 + n3, p1 + f1, p2 + f2, p3 + f3, DOTTED, GRY, true)
+a3 = gz0 + i * 10 - kz
+local q1, q2, q3 = a3 * krz, a3 * kuz, a3 * kfz
+line3(l1 + q1, l2 + q2, l3 + q3, r1 + q1, r2 + q2, r3 + q3, DOTTED, GRY, true)
+end
 end
 local n = floor((ky < 11.3 and ky or 11.3) * 16 / 30)
 if n > 2 then
 local cx, cz, r = floor(kx / 30) * 30, floor(kz / 30) * 30, n * 30
 for i = -n, n do
 local x, z = cx + i * 30, cz + i * 30
-line3(x, 0, cz - r, x, 0, gz0 - 60, DOTTED, GRY)
-line3(x, 0, (x < gx0 - 60 or x > gx0 + 60) and gz0 - 60 or gz0 + 60, x, 0, cz + r, DOTTED, GRY)
-line3(cx - r, 0, z, gx0 - 60, 0, z, DOTTED, GRY)
-line3((z < gz0 - 60 or z > gz0 + 60) and gx0 - 60 or gx0 + 60, 0, z, cx + r, 0, z, DOTTED, GRY)
+line3(x, 0, cz - r, x, 0, zn, DOTTED, GRY)
+line3(x, 0, (x < xn or x > xf) and zn or zf, x, 0, cz + r, DOTTED, GRY)
+line3(cx - r, 0, z, xn, 0, z, DOTTED, GRY)
+line3((z < zn or z > zf) and xn or xf, 0, z, cx + r, 0, z, DOTTED, GRY)
 end
 end
+if (spx - kx) * kfx - ky * kfy + (spz - kz) * kfz >= -10.6 then
 local hx, hz = shx * 1.5, shz * 1.5
 quad(spx + hx + hz, 0, spz + hz - hx, spx + hx - hz, 0, spz + hz + hx, spx - hx - hz, 0, spz - hz + hx, spx - hx + hz, 0, spz - hz - hx, SOLID)
-hx, hz = spx - shx * 7 - shz * 4, spz - shz * 7 + shx * 4
+hx = spx - shx * 7 - shz * 4
+hz = spz - shz * 7 + shx * 4
 line3(hx, 0, hz, hx, 4, hz, SOLID, BLK)
 local e = S.wind > 0 and (S.wind == 1 and 3 or 7) * (1 + 0.3 * sin(gt * 0.009) + 0.2 * sin(gt * 0.031)) / 7.5 or 0
 if e > 1 then e = 1 end
 local x, y, z = hx + wdx * e * 1.4, 3.9 - (1 - e) * 1.3, hz + wdz * e * 1.4
 line3(hx, 4, hz, x, y, z, SOLID, BLK)
 line3(hx, 3.6, hz, x, y, z, SOLID, BLK)
+end
 end
 for i = 1, NG do
 local k, cx, cy, cz = gk[i], gx[i], gy[i], gz[i]
@@ -10206,24 +10555,34 @@ elseif k == 4 or k == 5 then
 local kux, kuy, kuz = kux, kuy, kuz
 w = w + 0.28
 for _ = 1, (nxt or z < 30) and 2 or 1 do
-local X, Y, Z = cx + r1 * w - kx, cy - ky, cz + r3 * w - kz
-X, Y, Z = X * krx + Y * kry + Z * krz, X * kux + Y * kuy + Z * kuz, X * kfx + Y * kfy + Z * kfz
+local X, Y, Z
+do
+local x_, y_, z_ = cx + r1 * w - kx, cy - ky, cz + r3 * w - kz
+X = x_ * krx + y_ * kry + z_ * krz
+Y = x_ * kux + y_ * kuy + z_ * kuz
+Z = x_ * kfx + y_ * kfy + z_ * kfz
+end
 for j = 1, k == 4 and 12 or 6 do
 local c_, s_ = RC[j] * w, RS[j] * w
-local X2, Y2, Z2 = cx + r1 * c_ + a1 * s_ - kx, cy + a2 * s_ - ky, cz + r3 * c_ + a3 * s_ - kz
-X2, Y2, Z2 = X2 * krx + Y2 * kry + Z2 * krz, X2 * kux + Y2 * kuy + Z2 * kuz, X2 * kfx + Y2 * kfy + Z2 * kfz
+local X2, Y2, Z2
+do
+local x2, y2, z2 = cx + r1 * c_ + a1 * s_ - kx, cy + a2 * s_ - ky, cz + r3 * c_ + a3 * s_ - kz
+X2 = x2 * krx + y2 * kry + z2 * krz
+Y2 = x2 * kux + y2 * kuy + z2 * kuz
+Z2 = x2 * kfx + y2 * kfy + z2 * kfz
+end
 line3(X, Y, Z, X2, Y2, Z2, p, BLK, true)
-X, Y, Z = X2, Y2, Z2
+X = X2 Y = Y2 Z = Z2
 end
 w = GW[k]
 end
 elseif k < 4 or nxt then
-if k < 4 then w, h = w + 0.28, h + 0.28 end
+if k < 4 then w = w + 0.28 h = h + 0.28 end
 for _ = 1, (k < 4 and (nxt or z < 30)) and 2 or 1 do
 local Rx, Rz, Ax, Ay, Az = r1 * w, r3 * w, a1 * h, a2 * h, a3 * h
 quad(cx - Rx - Ax, cy - Ay, cz - Rz - Az, cx + Rx - Ax, cy - Ay, cz + Rz - Az,
 cx + Rx + Ax, cy + Ay, cz + Rz + Az, cx - Rx + Ax, cy + Ay, cz - Rz + Az, p)
-w, h = GW[k], GH[k]
+w = GW[k] h = GH[k]
 end
 end
 end
@@ -10249,17 +10608,19 @@ local d = dx * kfx + dy * kfy + dz * kfz
 local l = dx * krx + dy * kry + dz * krz
 if d > -h and d < 90 and (l < 0 and -l or l) < d * 1.19 + 6 then
 line3(x, 0, z, x, h, z, SOLID, BLK)
-if qr[i] > 0.5 and d < 90 then
+if qr[i] > 0.5 then                            -- a tree (within 90 m: all of these are)
 l = h * 0.24 / (sqrt(dx * dx + dz * dz) + 0.01)
-dx, dz, d = dz * l, -dx * l, h * 0.25
-line3(x - dx, d, z - dz, x, h, z, SOLID, BLK)
-line3(x + dx, d, z + dz, x, h, z, SOLID, BLK)
-line3(x - dx, d, z - dz, x + dx, d, z + dz, SOLID, BLK)
+local ex, ez, y = dz * l, -dx * l, h * 0.25
+line3(x - ex, y, z - ez, x, h, z, SOLID, BLK)
+line3(x + ex, y, z + ez, x, h, z, SOLID, BLK)
+line3(x - ex, y, z - ez, x + ex, y, z + ez, SOLID, BLK)
 end
 end
 end
 if state == 8 then
-box(4)
+local y, w, h = 4 * U, XM + 1 - 16 * U, YM + 1 - 8 * U
+lcd.drawFilledRectangle(8 * U, y, w, h, ERASE)
+lcd.drawRectangle(8 * U, y, w, h, BLK)
 drawText(12 * U, 7 * U, newBest and "NEW RECORD!" or gm == 4 and "TIME UP" or "FINISHED", SML + INV)
 drawText(12 * U, 17 * U, gm == 4 and "Gates " .. rn .. "  best " .. BG[S.track] or "Total " .. timeStr(total), SML)
 if gm < 3 then drawText(12 * U, 26 * U, "Best lap " .. timeStr(BL[S.track]), SML) end
@@ -10278,7 +10639,8 @@ drawText(XM, U, l and ((lap > 0 and lap or 1) .. (gm == 1 and "/" .. S.laps or "
 local i = nextGate
 local dx, dy, dz = AX[i] - kx, AY[i] - ky, AZ[i] - kz
 local X, Y, Z = dx * krx + dy * kry + dz * krz, dx * kux + dy * kuy + dz * kuz, dx * kfx + dy * kfy + dz * kfz
-if Z < 1 or X * F > (CX - 3) * Z or -X * F > (CX - 3) * Z or Y * F > (CY - 3) * Z or -Y * F > (CY - 3) * Z then
+local xf, yf, zx, zy = X * F, Y * F, (CX - 3) * Z, (CY - 3) * Z
+if Z < 1 or xf > zx or -xf > zx or yf > zy or -yf > zy then
 if Z < 0 and X * X + Y * Y < 1 then X, Y = 0, -1 end
 local l2 = sqrt(X * X + Y * Y) + 0.0001
 local ex, ey = X / l2, -Y / l2
@@ -10297,15 +10659,16 @@ drawLine(CX - 4 * U, CY, CX - 2 * U, CY, SOLID, BLK)
 drawLine(CX + 2 * U, CY, CX + 4 * U, CY, SOLID, BLK)
 if S.wind > 0 then
 local r = 6 * U
-local cx, cy = XM - r, YM - r
-lcd.drawFilledRectangle(cx - r, cy - r, r * 2 + 1, r * 2 + 1, ERASE)
-lcd.drawRectangle(cx - r, cy - r, r * 2 + 1, r * 2 + 1, BLK)
+local cx, cy, s = XM - r, YM - r, r * 2 + 1
+lcd.drawFilledRectangle(cx - r, cy - r, s, s, ERASE)
+lcd.drawRectangle(cx - r, cy - r, s, s, BLK)
 local a = 4 * U / (sqrt(fx * fx + fz * fz) + 0.0001)
 local ex, ey = (wdx * fz - wdz * fx) * a, -(wdx * fx + wdz * fz) * a
 local tx, ty = cx + ex, cy + ey
+local e6, e5, f6, f5 = ex * 0.6, ey * 0.5, ey * 0.6, ex * 0.5
 drawLine(cx - ex, cy - ey, tx, ty, SOLID, BLK)
-drawLine(tx, ty, tx - ex * 0.6 - ey * 0.5, ty - ey * 0.6 + ex * 0.5, SOLID, BLK)
-drawLine(tx, ty, tx - ex * 0.6 + ey * 0.5, ty - ey * 0.6 - ex * 0.5, SOLID, BLK)
+drawLine(tx, ty, tx - e6 - e5, ty - f6 + f5, SOLID, BLK)
+drawLine(tx, ty, tx - e6 + e5, ty - f6 - f5, SOLID, BLK)
 end
 if msg and gt - msgT < 200 then drawText(CX, 10 * U, msg, SML + CENTER) end
 end
@@ -10316,7 +10679,9 @@ drawText(CX, CY - 8 * U, "CRASH", DBLSIZE + INV + CENTER)
 elseif state == 6 then
 drawText(CX, CY - 14 * U, "READY", SML + INV + CENTER)
 elseif state == 7 then
-box(10)
+local y, w, h = 10 * U, XM + 1 - 16 * U, YM + 1 - 20 * U
+lcd.drawFilledRectangle(8 * U, y, w, h, ERASE)
+lcd.drawRectangle(8 * U, y, w, h, BLK)
 for i = 1, 3 do drawText(22 * U, (6 + i * 11) * U, PAUSE[i], i == focus and INV or 0) end
 end
 end
