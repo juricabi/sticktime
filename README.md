@@ -9,6 +9,8 @@ A real 3D FPV quad simulator that runs **on your radio** as an EdgeTX Lua tool. 
 | ![Race with AI pilots](docs/tx16s-race.png) | ![Bando](docs/tx16s-bando.png) | ![Freestyle](docs/tx16s-freestyle.png) |
 | **TX16S MK3 (800×480) · tower and dive gate** | **TX12 MkII (128×64) · StickTime BW** | **X9D (212×64 grey) · StickTime Lite** |
 | ![TX16S MK3](docs/mk3-bando.png) | ![TX12](docs/tx12-race.png) | ![Lite on X9D](docs/lite-x9d.png) |
+| **TX16S · Night on the Pro Track** | **TX16S · Farm Field (gallery)** | **TX16S · Power Line (gallery)** |
+| ![Night](docs/tx16s-night.png) | ![Farm Field](docs/tx16s-farm-field.png) | ![Power Line](docs/tx16s-power-line.png) |
 
 ## In your goggles: StickTime Pi
 
