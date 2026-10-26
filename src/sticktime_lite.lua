@@ -958,25 +958,6 @@ render = function()
     line3(gx0 + i * 10, 0, gz0 - 35, gx0 + i * 10, 0, gz0 + 35, DOTTED, GRY)
     line3(gx0 - 35, 0, gz0 + i * 10, gx0 + 35, 0, gz0 + i * 10, DOTTED, GRY)
   end
-  -- mountains on the horizon: a ridge at infinity every 15 deg around the camera's heading (from
-  -- acos ~ 1.5708 - 1.3 x, within 16 deg)
-  if A + B > 0.05 then
-    local h0 = floor((kfx > 0 and 1 or -1) * (1.5708 - kfz / sqrt(kfx * kfx + kfz * kfz) * 1.3) / 0.2618)
-    local X0, Y0
-    for j = h0 - 6, h0 + 6 do
-      local q = j * 0.2618
-      local e = 0.03 + 0.04 * sin(q * 3 + 0.7) ^ 2 + 0.02 * sin(q * 7 + 1.9) ^ 2
-      local x, z = sin(q), cos(q)
-      local Z = x * kfx + e * kfy + z * kfz
-      if Z > 0.3 then
-        local X, Y = CX + (x * krx + e * kry + z * krz) * F / Z, CY - (x * kux + e * kuy + z * kuz) * F / Z
-        if X0 then line2(X0, Y0, X, Y, DOTTED, GRY) end
-        X0, Y0 = X, Y
-      else
-        X0 = nil
-      end
-    end
-  end
   -- the start pad, and a windsock behind it to the left: downwind, limp without wind
   local hx, hz = shx * 1.5, shz * 1.5
   quad(spx + hx + hz, 0, spz + hz - hx, spx + hx - hz, 0, spz + hz + hx, spx - hx - hz, 0, spz - hz + hx, spx - hx + hz, 0, spz - hz - hx, SOLID)

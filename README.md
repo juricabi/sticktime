@@ -48,7 +48,7 @@ Download `StickTime-<version>-sdcard.zip` from the [latest release](https://gith
 - **Hits:** the quad stops against what it hits and flies on. A hard hit edge-on is a prop strike: half a second of tumbling to fly out of. Upside down on the ground: **turtle mode**, roll or pitch to flip back. **Pause → Respawn** puts you at the last gate.
 - **Battery** (Off, Real, 1.5x, 2x): each class's real pack sags and runs down (about 2 min of hard racing on a 5"); a fresh pack flies exactly like no battery. Beeps and a yellow/red battery below 3.5 / 3.3 V a cell, then EMPTY and a fresh pack. Respawn also brings a fresh pack.
 - **Also:** wind with gusts, prop wash (Off, Stock, Max), Grip (rotor drag), vibration on hits and laps. On color screens the marker over the next gate shows where to come in from, a guide on a track you're learning: green on its way-in side (within 70° of its axis) or heading straight into it, yellow when you need to go round (a dive gate: green above it; a flag: before it, on or heading to the side you pass it).
-- **Colors** (color screens, StickTime 1.9.0 and later): Classic, or a natural sky that fades into the haze at the horizon over duller grass, with calmer object and text colors: **Summer**, **Evening** or **Overcast**, and **Night** (1.10.0): stars, the moon, LED gates. Kinder to the eyes in FPV goggles, and clean on analog video (it carries detail in brightness, not color). **Auto** is Classic on a radio and Summer on [StickTime Pi](https://github.com/juricabi/sticktime-pi)'s analog video output. **Sky detail** (1.10.0, On by default) draws clouds drifting slowly round, the sun (low and orange in the Evening), and at Night the moon and stars; under 1 ms a frame on a TX16S, and off in a moment on a slow radio. B&W radios get a ridge of mountains on the horizon.
+- **Colors** (color screens, StickTime 1.9.0 and later): Classic, or a natural sky that fades into the haze at the horizon over duller grass, with calmer object and text colors: **Summer**, **Evening** or **Overcast**, and **Night** (1.10.0): stars, the moon, LED gates. Kinder to the eyes in FPV goggles, and clean on analog video (it carries detail in brightness, not color). **Auto** is Classic on a radio and Summer on [StickTime Pi](https://github.com/juricabi/sticktime-pi)'s analog video output. **Sky detail** (1.10.0, On by default) draws clouds drifting slowly round, the sun (low and orange in the Evening), and at Night the moon and stars; under 1 ms a frame on a TX16S, and off in a moment on a slow radio. StickTime BW draws a ridge of mountains on the horizon.
 - **Saving:** bests and the ghost are saved the moment you set them, so switching the radio off keeps them. (A lap that sets a new ghost writes a 5 KB file, which can pause the radio for a moment; races never write a ghost.)
 
 | What each edition has | Color | BW | Lite |
@@ -64,7 +64,7 @@ Download `StickTime-<version>-sdcard.zip` from the [latest release](https://gith
 | Your own tracks 9-16 | yes | yes | no |
 | Bigger tracks of your own (up to 48 gates, 64 structures) | yes | no (24 gates, 16 structures) | no |
 | Scenery: props, rails, decals, structure colors; on the eight tracks and your own | yes | no (no memory for it: a track of your own with scenery flies with its gates and structures) | no |
-| The start pad, a windsock, mountains on the horizon | yes | yes (in lines) | yes (in lines) |
+| The start pad, a windsock, mountains on the horizon | yes | yes (in lines) | the pad and the windsock (in lines) |
 | Ghost | yes | no (not enough memory on B&W radios) | no |
 | Minimap, stick view, touch | yes | no | no |
 | Colors: Classic, Summer, Evening, Overcast, Night; Sky detail | yes | no (B&W) | no (B&W) |
@@ -136,9 +136,9 @@ Measured on EdgeTX 2.11's own Lua core (the tests also run main's, which packs v
 | | Heap for Lua (EdgeTX 2.11.4) | Lua memory while playing | Peak heap use |
 |---|---|---|---|
 | StickTime BW on STM32F4 | 114–121 KB + 34 KB CCM | about 108 KB | 108 KB + 34 KB CCM (105 without a format 3 track of your own) |
-| StickTime Lite on STM32F2 | 63–73 KB + 10 KB pools | about 54 KB | 60 KB + 10 KB pools |
+| StickTime Lite on STM32F2 | 63–73 KB + 10 KB pools | about 53 KB | 60 KB + 10 KB pools |
 
-The Lite runs on a heap down to 60.5 KB, so about 3 KB of an X9D+ stays free (the memory test passes on every heap from there up, with no emergency garbage collection). Its quads and tracks are files in its folder (`StickTimeLite/q1.txt` to `q5.txt`, `t1.txt` to `t8.txt`), read only when you pick one; it parses numbers without making a string for each, collects garbage before it builds a track and before the flight starts, and writes its save file piece by piece. The loaders collect what compiling them left behind before they load the game, and keep their error screen in `why.lua`, so the game loads into a clean heap.
+The Lite runs on a heap down to 61.5 KB on EdgeTX 2.11.4, so about 1.8 KB of an X9D+ stays free (the memory test passes on every heap from there up, with no emergency garbage collection; 1.9.0 ran down to 61.0 KB there). That is also why the Lite has the start pad and a windsock but no mountains on its horizon, and StickTime BW no scenery: the code for them didn't fit. Its quads and tracks are files in its folder (`StickTimeLite/q1.txt` to `q5.txt`, `t1.txt` to `t8.txt`), read only when you pick one; it parses numbers without making a string for each, collects garbage before it builds a track and before the flight starts, and writes its save file piece by piece. The loaders collect what compiling them left behind before they load the game, and keep their error screen in `why.lua`, so the game loads into a clean heap.
 </details>
 
 <details>
