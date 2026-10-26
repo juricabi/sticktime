@@ -283,31 +283,31 @@ do
   -- the scenery of the built-in tracks (props / rails / decals, see TRACKS), off their racing lines
   local DECO = {
     -- Meadow: hay bales on spread hay, a farm track, a pond, the fence along the field
-    "16 18 4 0 19 21 4 0 16 23 4 0 62 22 4 0 63 26 4 0 -12 42 4 0 -15 45 4 0 -18 62 2 0 68 -2 2 0 24 80 2 0 " ..
-    "80 30 2 0 -10 16 3 0 56 66 3 0 6 68 3 0 / -30 -36 64 -36 1 0 / -24 22 56 1.8 0 1 66 68 7 4 30 5 17 21 5 4 0 6",
-    -- Figure 8: a car park at dusk, light masts round it, cones along the bays
-    "30 -12 7 0 -30 -12 7 0 32 42 7 0 -32 42 7 0 30 98 7 0 -30 98 7 0 26 4 6 0 26 24 6 0 26 44 6 0 26 64 6 0 " ..
-    "26 84 6 0 -26 4 6 0 -26 24 6 0 -26 44 6 0 -26 64 6 0 -26 84 6 0 / / 0 42 60 36 0 2 28 42 52 0.08 0 4 " ..
-    "-28 42 52 0.08 0 4 0 -16 30 0.08 90 4 0 100 30 0.08 90 4",
+    "16 18 4 0 19 21 4 0 -12 42 4 0 -18 62 2 0 56 66 3 0 / -30 -36 64 -36 1 0 / " ..
+    "-24 14 40 1.8 0 1 66 68 7 4 30 5 17 21 5 4 0 6",
+    -- Figure 8: a car park at dusk, light masts at its corners, cones along the bays
+    "30 -12 7 0 -30 -12 7 0 30 98 7 0 -30 98 7 0 26 24 6 0 26 64 6 0 -26 24 6 0 -26 64 6 0 / / " ..
+    "0 42 60 36 0 2 28 42 52 0.08 0 4 -28 42 52 0.08 0 4 0 -16 30 0.08 90 4 0 100 30 0.08 90 4",
     -- Dive Tower: gravel under the tower, a power line along the far side, masts, trees
-    "54 82 7 0 -12 40 7 0 60 30 7 0 -20 70 2 0 66 100 2 0 10 102 2 0 -14 10 3 0 72 50 3 0 / -44 -34 84 -34 4 0 / " ..
-    "36 52 14 9 0 3 -26 30 50 1.6 0 1",
-    -- Slalom: tyre stacks outside the flags, banners along the lanes, worn lanes
-    "3 22 5 0 1 40 5 0 3 58 5 0 1 76 5 0 45 78 5 0 43 60 5 0 45 42 5 0 -8 -12 6 0 8 -12 6 0 / " ..
-    "-16 10 -16 40 5 0 -16 50 -16 80 5 0 66 90 66 60 5 0 66 50 66 20 5 0 / 2 48 50 8 0 1 44 60 42 8 0 1",
+    "54 82 7 0 -12 40 7 0 -20 70 2 0 72 50 3 0 / -44 -34 84 -34 4 0 / " ..
+    "36 52 14 9 0 3 -26 40 30 1.6 0 1",
+    -- Slalom: tyre stacks outside the flags, banners along the lanes, a worn lane
+    "3 22 5 0 3 58 5 0 45 78 5 0 45 42 5 0 -8 -12 6 0 8 -12 6 0 / -16 10 -16 40 5 0 66 90 66 60 5 0 / " ..
+    "2 48 50 8 0 1",
     -- Hoop Forest: a pond in the clearing inside the loop, leafy trees and bushes, a path
-    "-14 46 2 0 -8 64 2 0 36 78 2 0 60 80 2 0 92 40 2 0 90 10 2 0 64 -24 2 0 38 -38 2 0 30 12 2 0 52 14 2 0 " ..
-    "46 28 3 0 -16 20 3 0 84 60 3 0 20 -36 3 0 / / 40 20 7 5 20 5 -18 30 50 1.4 10 1",
+    "-14 46 2 0 36 78 2 0 60 80 2 0 64 -24 2 0 30 12 2 0 46 28 3 0 / / " ..
+    "40 20 7 5 20 5 -18 30 35 1.4 10 1",
     -- Grand Prix: a tarmac start straight with its lines, tents and banners along it, tyres, masts
-    "-14 10 8 0 -14 18 8 0 110 40 5 0 112 47 5 0 114 54 5 0 -16 60 7 0 60 112 7 0 122 20 7 0 40 30 7 0 / " ..
-    "-10 28 -10 54 5 0 15 28 15 54 5 0 -30 132 130 132 4 0 / 0 23 34 5 0 2 0 0 5 0.15 90 4 4.7 23 34 0.08 0 4 " ..
+    "-14 10 8 0 -14 18 8 0 112 47 5 0 -16 60 7 0 122 20 7 0 / " ..
+    "-10 28 -10 54 5 0 15 28 15 54 5 0 0 132 100 132 4 0 / 0 23 34 5 0 2 0 0 5 0.15 90 4 4.7 23 34 0.08 0 4 " ..
     "-4.7 23 34 0.08 0 4",
     -- Bando: tyres and posts round the site, a power line beyond it, mud and gravel
-    "-24 0 5 0 -26 4 5 0 30 -28 5 0 64 -6 10 0 64 4 10 0 / -80 -52 104 -52 4 0 / 46 80 8 5 40 1 -30 30 6 4 0 3",
-    -- Pro Track: nets behind the far end, tents and banners by the start, masts at the corners
-    "-16 12 8 0 -16 20 8 0 64 72 7 0 64 -32 7 0 -18 -32 7 0 -18 72 7 0 / -12 82 62 82 2 0 -12 30 -12 54 5 0 / " ..
+    "-24 0 5 0 30 -28 5 0 64 -6 10 0 64 4 10 0 / -40 -52 80 -52 4 0 / 46 80 8 5 40 1 -30 30 6 4 0 3",
+    -- Pro Track: nets behind the far end, tents and banners by the start, masts at two corners
+    "-16 12 8 0 -16 20 8 0 64 72 7 0 -18 -32 7 0 / -12 82 62 82 2 0 -12 30 -12 54 5 0 / " ..
     "-16 16 8 4 0 1",
   }
+
   -- props by kind: default height (m), and the radius they collide with for each m of it
   local PH = { 9, 8, 1.4, 1.2, 1, 0.5, 10, 2.6, 4, 2 }
   local PR = { 0.14, 0.18, 0.6, 0.62, 0.4, 0.34, 0.012, 0.58, 0.02, 0.05 }
@@ -1111,6 +1111,51 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     px, py, pz = px + nx * (sn - s1), cy + dy * m, pz + nz * (sn - s1)
     hit(nx * ds, dy, nz * ds, 0.3)
   end
+  -- the pilots' tent as drawn (drawTent): legs 1.45 m out from its middle and a canopy 3 m square
+  -- from 2.05 to 2.4 m (at its 2.6 m height; it grows with it); under it is open. A leg is a thin
+  -- pole; the canopy a slab the quad lands on from above, is stopped by from below, and backs out of
+  -- sideways (h: the substep)
+  local function tentStep(i, ox, oy, oz, h)
+    local x, z, e = qx[i], qz[i], qh[i] / 2.6
+    local y0 = 2.05 * e
+    if py < y0 then
+      for sx = -1, 1, 2 do
+        for sz = -1, 1, 2 do
+          local lx, lz = x + sx * 1.45 * e, z + sz * 1.45 * e
+          local dx, dz, r = px - lx, pz - lz, DR + 0.04
+          if dx < r and dx > -r and dz < r and dz > -r and dx * dx + dz * dz < r * r then
+            if dx * dx + dz * dz < 1e-4 then dx, dz = ox - lx, oz - lz + 0.01 end
+            local l = sqrt(dx * dx + dz * dz)
+            dx, dz = dx / l, dz / l
+            px, pz = lx + dx * r, lz + dz * r
+            hit(dx, 0, dz, 0.3)
+          end
+        end
+      end
+    end
+    local a = 1.5 * e + DR
+    local a0, a1, c0, c1, b0, b1 = x - a, x + a, z - a, z + a, y0 - DR, 2.4 * e + DR
+    if px > a0 and px < a1 and pz > c0 and pz < c1 and py > b0 and py < b1 then
+      if oy >= b1 then
+        -- on top: like a roof
+        py, grounded = b1, true
+        hit(0, 1, 0, 0.6)
+        local fr = 1 - 7 * h
+        vx, vz = vx * fr, vz * fr
+      elseif oy <= b0 then
+        py = b0 hit(0, -1, 0, 0.3)
+      else
+        local t, k = px - a0, 1
+        if a1 - px < t then t, k = a1 - px, 2 end
+        if pz - c0 < t then t, k = pz - c0, 3 end
+        if c1 - pz < t then k = 4 end
+        if k == 1 then px = a0 hit(-1, 0, 0, 0.3)
+        elseif k == 2 then px = a1 hit(1, 0, 0, 0.3)
+        elseif k == 3 then pz = c0 hit(0, 0, -1, 0.3)
+        else pz = c1 hit(0, 0, 1, 0.3) end
+      end
+    end
+  end
   -- in a pond (a decal of kind 5), on the ground at (x, z)
   local function inPond(x, z)
     for i = 1, SCN.nd do
@@ -1719,6 +1764,9 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
       for j = 1, np do
         local i = nearP[j]
         local dx, dz, r = px - qx[i], pz - qz[i], qr[i] + DR
+--#if COLOR
+        if qk[i] == 10 then r = -1 end                     -- (a tent: its legs and canopy, tentStep)
+--#endif
         if dx < r and dx > -r and dz < r and dz > -r and py < qh[i] and dx * dx + dz * dz < r * r then
           -- out from the middle of the trunk or pole
           if dx * dx + dz * dz < 1e-4 then dx, dz = ox - qx[i], oz - qz[i] + 0.01 end
@@ -1762,7 +1810,12 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
         end
       end
 --#if COLOR
-      -- rails: back to the side the quad came from (railStep)
+      -- tents: four thin legs and the canopy, open under it (tentStep); rails: back to the side the
+      -- quad came from (railStep)
+      for j = 1, np do
+        local i = nearP[j]
+        if qk[i] == 10 then tentStep(i, ox, oy, oz, h) end
+      end
       for j = 1, nr do railStep(nearR[j], ox, oy, oz) end
 --#endif
     end
@@ -1809,6 +1862,26 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
         if py < qh[i] then
           local dx, dz = px - qx[i], pz - qz[i]
           local d = sqrt(dx * dx + dz * dz) - qr[i]
+--#if COLOR
+          if qk[i] == 10 then
+            -- a tent (tentStep): its canopy, and under it the nearest leg
+            local e = qh[i] / 2.6
+            local ax, az = dx < 0 and -dx or dx, dz < 0 and -dz or dz
+            local cx, cz, cy = ax - 1.5 * e, az - 1.5 * e, 2.05 * e - py
+            if cx < 0 then cx = 0 end
+            if cz < 0 then cz = 0 end
+            if cy < 0 then
+              cy = py - 2.4 * e
+              if cy < 0 then cy = 0 end
+            end
+            d = sqrt(cx * cx + cy * cy + cz * cz)
+            if py < 2.05 * e then
+              cx, cz = ax - 1.45 * e, az - 1.45 * e
+              local l = sqrt(cx * cx + cz * cz) - 0.04
+              if l < d then d = l end
+            end
+          end
+--#endif
           if d < m then m = d end
         end
       end
@@ -3535,7 +3608,13 @@ local AV = STICKTIME_AV == true
           local fi = floor((d - 18) * 0.045) + 1
           if fi < 1 then fi = 1 elseif fi > NF then fi = NF end
           local col = (k == 1 and FC.dirt or k == 2 and FC.tarmac or k == 3 and FC.gravel or k == 4 and FC.paint or k == 5 and FC.water or FC.sand)[fi]
-          if k < 5 then
+          if k == 4 and d > 0 and (vx * vx + vz * vz) * F * F < 0.5625 * d * d then
+            -- a painted line under 1.5 px wide even at its nearest: a line along it (its two
+            -- triangles would walk every row it spans)
+            local ax, az, bx, bz = cx - ux, cz - uz, cx + ux, cz + uz
+            line3(ax * krx + y * kry + az * krz, ax * kux + y * kuy + az * kuz, ax * kfx + y * kfy + az * kfz,
+                  bx * krx + y * kry + bz * krz, bx * kux + y * kuy + bz * kuz, bx * kfx + y * kfy + bz * kfz, col)
+          elseif k < 5 then
             local ax, az = cx - ux - vx, cz - uz - vz
             face(ax * krx + y * kry + az * krz, ax * kux + y * kuy + az * kuz, ax * kfx + y * kfy + az * kfz,
                  2 * (ux * krx + uz * krz), 2 * (ux * kux + uz * kuz), 2 * (ux * kfx + uz * kfz),
@@ -3934,6 +4013,29 @@ local AV = STICKTIME_AV == true
   -- with their posts, race tape in red and white dashes, the power lines' wires sagging between
   -- their pylons, banners
   local FW = { 0.12, 0.55, 1 }                          -- a fence's three wires (shares of its height)
+
+  -- a bar from a to b (camera space), r1 and r2 m thick at its ends: filled as thick as it is,
+  -- a line when thinner than about 2.4 px all along; cut by the near plane
+  local function bar3(X1, Y1, Z1, X2, Y2, Z2, r1, r2, col)
+    if Z1 < NEAR then
+      if Z2 < NEAR then return end
+      local t = (NEAR - Z1) / (Z2 - Z1)
+      X1, Y1, Z1, r1 = X1 + (X2 - X1) * t, Y1 + (Y2 - Y1) * t, NEAR, r1 + (r2 - r1) * t
+    elseif Z2 < NEAR then
+      local t = (NEAR - Z2) / (Z1 - Z2)
+      X2, Y2, Z2, r2 = X2 + (X1 - X2) * t, Y2 + (Y1 - Y2) * t, NEAR, r2 + (r1 - r2) * t
+    end
+    local s1, s2 = F / Z1, F / Z2
+    local w1, w2 = r1 * s1, r2 * s2
+    if w1 < 1.2 and w2 < 1.2 then line3(X1, Y1, Z1, X2, Y2, Z2, col) return end
+    local x1, y1, x2, y2 = CX + X1 * s1, CY - Y1 * s1, CX + X2 * s2, CY - Y2 * s2
+    local lx, ly = x2 - x1, y2 - y1
+    local l = sqrt(lx * lx + ly * ly)
+    if l < 0.5 then return end
+    w1, w2 = w1 / l, w2 / l
+    tri(x1 - ly * w1, y1 + lx * w1, x2 - ly * w2, y2 + lx * w2, x2 + ly * w2, y2 - lx * w2, col)
+    tri(x1 - ly * w1, y1 + lx * w1, x2 + ly * w2, y2 - lx * w2, x1 + ly * w1, y1 - lx * w1, col)
+  end
   local function drawRail(p, z)
     local i, t0, t1 = SCN.pi[p], SCN.p0[p], SCN.p1[p]
     local k, h = SCN.rk[i], SCN.rh[i]
@@ -3996,20 +4098,7 @@ local AV = STICKTIME_AV == true
               local fX, fY, fZ = bX_ + ux2 * 1.2 * sa + nX * 1.2 * sb, bY_ + uy2 * 1.2 * sa + nY * 1.2 * sb, bZ_ + uz2 * 1.2 * sa + nZ * 1.2 * sb
               local gX, gY, gZ = bX_ + ux2 * 0.35 * sa + nX * 0.35 * sb + kry * th, bY_ + uy2 * 0.35 * sa + nY * 0.35 * sb + kuy * th,
                 bZ_ + uz2 * 0.35 * sa + nZ * 0.35 * sb + kfy * th
-              if fZ > 1 and gZ > 1 and F * 0.2 > 1.2 * fZ then
-                -- a leg 0.4 m thick at the foot, 0.2 at the top
-                local s0, s1 = F / fZ, F / gZ
-                local x0, y0, x1, y1 = CX + fX * s0, CY - fY * s0, CX + gX * s1, CY - gY * s1
-                local lx, ly = x1 - x0, y1 - y0
-                local l = sqrt(lx * lx + ly * ly)
-                if l > 0.5 then
-                  local w0, w1 = 0.2 * s0 / l, 0.1 * s1 / l
-                  tri(x0 - ly * w0, y0 + lx * w0, x1 - ly * w1, y1 + lx * w1, x1 + ly * w1, y1 - lx * w1, pc)
-                  tri(x0 - ly * w0, y0 + lx * w0, x1 + ly * w1, y1 - lx * w1, x0 + ly * w0, y0 - lx * w0, pc)
-                end
-              else
-                line3(fX, fY, fZ, gX, gY, gZ, pc)
-              end
+              bar3(fX, fY, fZ, gX, gY, gZ, 0.2, 0.1, pc)      -- a leg 0.4 m thick at the foot, 0.2 at the top
             end
           end
           if z < 40 then
