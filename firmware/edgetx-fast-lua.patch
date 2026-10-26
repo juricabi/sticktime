@@ -1,5 +1,5 @@
 diff --git a/radio/src/boards/generic_stm32/linker/stm32h750_sdram/extra_sections.ld b/radio/src/boards/generic_stm32/linker/stm32h750_sdram/extra_sections.ld
-index bc3890cc092..92a19a84f65 100644
+index bc3890cc09..92a19a84f6 100644
 --- a/radio/src/boards/generic_stm32/linker/stm32h750_sdram/extra_sections.ld
 +++ b/radio/src/boards/generic_stm32/linker/stm32h750_sdram/extra_sections.ld
 @@ -22,6 +22,9 @@
@@ -13,7 +13,7 @@ index bc3890cc092..92a19a84f65 100644
    . = ALIGN(4);
    _eiram = .;
 diff --git a/radio/src/boards/helloradio-h750/lcd_driver.cpp b/radio/src/boards/helloradio-h750/lcd_driver.cpp
-index db167fbe49b..faf46b025f9 100644
+index db167fbe49..faf46b025f 100644
 --- a/radio/src/boards/helloradio-h750/lcd_driver.cpp
 +++ b/radio/src/boards/helloradio-h750/lcd_driver.cpp
 @@ -31,6 +31,17 @@
@@ -286,7 +286,7 @@ index db167fbe49b..faf46b025f9 100644
    lcdSetFlushCb(startLcdRefresh);
  }
 diff --git a/radio/src/boards/senduwing-h750/lcd_driver.cpp b/radio/src/boards/senduwing-h750/lcd_driver.cpp
-index b16009fa64d..66021a7b91a 100644
+index b16009fa64..66021a7b91 100644
 --- a/radio/src/boards/senduwing-h750/lcd_driver.cpp
 +++ b/radio/src/boards/senduwing-h750/lcd_driver.cpp
 @@ -183,6 +183,31 @@ static void startLcdRefresh(lv_disp_drv_t *disp_drv, uint16_t *buffer,
@@ -332,7 +332,7 @@ index b16009fa64d..66021a7b91a 100644
  
  extern "C" void LTDC_IRQHandler(void)
 diff --git a/radio/src/gui/colorlcd/lcd.cpp b/radio/src/gui/colorlcd/lcd.cpp
-index 24d28b40b70..69d812f3b79 100644
+index 24d28b40b7..69d812f3b7 100644
 --- a/radio/src/gui/colorlcd/lcd.cpp
 +++ b/radio/src/gui/colorlcd/lcd.cpp
 @@ -56,12 +56,10 @@ void lcdSetFlushCb(void (*cb)(lv_disp_drv_t*, uint16_t*, const rect_t&))
@@ -406,7 +406,7 @@ index 24d28b40b70..69d812f3b79 100644
    disp_drv.hor_res = LCD_W; /*Set the horizontal resolution in pixels*/
    disp_drv.ver_res = LCD_H; /*Set the vertical resolution in pixels*/
 diff --git a/radio/src/gui/colorlcd/lcd.h b/radio/src/gui/colorlcd/lcd.h
-index c5d64e4ba34..5f9e352e975 100644
+index c5d64e4ba3..5f9e352e97 100644
 --- a/radio/src/gui/colorlcd/lcd.h
 +++ b/radio/src/gui/colorlcd/lcd.h
 @@ -40,9 +40,9 @@ typedef _lv_disp_drv_t lv_disp_drv_t;
@@ -442,7 +442,7 @@ index c5d64e4ba34..5f9e352e975 100644
  // LVGL render rate (capped at refresh rate) and UI task load in %
  void lcdGetPerfStats(uint32_t& fps, uint32_t& taskload);
 diff --git a/radio/src/gui/colorlcd/libui/bitmapbuffer.cpp b/radio/src/gui/colorlcd/libui/bitmapbuffer.cpp
-index 1962e6fefb0..92a09d8b78a 100644
+index 1962e6fefb..ae9b8add57 100644
 --- a/radio/src/gui/colorlcd/libui/bitmapbuffer.cpp
 +++ b/radio/src/gui/colorlcd/libui/bitmapbuffer.cpp
 @@ -98,7 +98,7 @@ void BitmapBuffer::setData(uint16_t *d)
@@ -485,7 +485,7 @@ index 1962e6fefb0..92a09d8b78a 100644
                                        uint8_t pat, LcdFlags flags,
                                        uint8_t opacity)
  {
-@@ -311,12 +307,49 @@ void BitmapBuffer::drawHorizontalLine(coord_t x, coord_t y, coord_t w,
+@@ -311,12 +307,62 @@ void BitmapBuffer::drawHorizontalLine(coord_t x, coord_t y, coord_t w,
    drawHorizontalLineAbs(x, y, w, pat, flags, opacity);
  }
  
@@ -507,6 +507,19 @@ index 1962e6fefb0..92a09d8b78a 100644
 +  }
 +#endif
 +  DMAWaitAndSyncCache();
++  if (w == 1) {
++    // one column (a vertical line, the side of a 1-pixel rectangle): when its first and
++    // last row are in the buffer, so is every row between: step a pointer down the rows
++    // with no check per row. Otherwise the loop below draws it row by row, as before.
++    pixel_t* p = getPixelPtrAbs(x, y);
++    if (p >= data && p + (h - 1) * _width < data_end) {
++      for (coord_t j = 0; j < h; j++) {
++        *p = color;
++        p += _width;
++      }
++      return;
++    }
++  }
 +  const pixel_pair_t pair = color | ((uint32_t)color << 16);
 +  for (coord_t j = 0; j < h; j++) {
 +    pixel_t* p = getPixelPtrAbs(x, y + j);
@@ -536,7 +549,7 @@ index 1962e6fefb0..92a09d8b78a 100644
    if (draw_ctx) {
      x += draw_ctx->buf_area->x1;
      y += draw_ctx->buf_area->y1;
-@@ -350,7 +383,7 @@ void BitmapBuffer::drawHorizontalLineAbs(coord_t x, coord_t y, coord_t w,
+@@ -350,7 +396,7 @@ void BitmapBuffer::drawHorizontalLineAbs(coord_t x, coord_t y, coord_t w,
  #endif
  }
  
@@ -545,7 +558,7 @@ index 1962e6fefb0..92a09d8b78a 100644
                                      uint8_t pat, LcdFlags flags,
                                      uint8_t opacity)
  {
-@@ -361,6 +394,11 @@ void BitmapBuffer::drawVerticalLine(coord_t x, coord_t y, coord_t h,
+@@ -361,6 +407,11 @@ void BitmapBuffer::drawVerticalLine(coord_t x, coord_t y, coord_t h,
    coord_t w = 1;
    if (!applyClippingRect(x, y, w, h)) return;
  
@@ -557,7 +570,7 @@ index 1962e6fefb0..92a09d8b78a 100644
    if (draw_ctx) {
      x += draw_ctx->buf_area->x1;
      y += draw_ctx->buf_area->y1;
-@@ -394,7 +432,7 @@ void BitmapBuffer::drawVerticalLine(coord_t x, coord_t y, coord_t h,
+@@ -394,7 +445,7 @@ void BitmapBuffer::drawVerticalLine(coord_t x, coord_t y, coord_t h,
  #endif
  }
  
@@ -566,7 +579,7 @@ index 1962e6fefb0..92a09d8b78a 100644
                              uint8_t thickness, uint8_t pat, LcdFlags flags,
                              uint8_t opacity)
  {
-@@ -404,19 +442,19 @@ void BitmapBuffer::drawRect(coord_t x, coord_t y, coord_t w, coord_t h,
+@@ -404,19 +455,19 @@ void BitmapBuffer::drawRect(coord_t x, coord_t y, coord_t w, coord_t h,
    drawFilledRect(x, y + h - thickness, w, thickness, pat, flags, opacity);
  }
  
@@ -589,7 +602,7 @@ index 1962e6fefb0..92a09d8b78a 100644
                                    uint8_t pat, LcdFlags flags, uint8_t opacity)
  {
    if (opacity == OPACITY_MAX) return;
-@@ -432,6 +470,11 @@ void BitmapBuffer::drawFilledRect(coord_t x, coord_t y, coord_t w, coord_t h,
+@@ -432,6 +483,11 @@ void BitmapBuffer::drawFilledRect(coord_t x, coord_t y, coord_t w, coord_t h,
      return;
    }
  
@@ -602,7 +615,7 @@ index 1962e6fefb0..92a09d8b78a 100644
    lv_draw_rect_dsc_init(&rect_dsc);
    rect_dsc.bg_opa = ((OPACITY_MAX - opacity) * LV_OPA_COVER) / OPACITY_MAX;
 diff --git a/radio/src/gui/colorlcd/libui/bitmapbuffer.h b/radio/src/gui/colorlcd/libui/bitmapbuffer.h
-index 29d4ee04d23..7e75eda44d3 100644
+index 29d4ee04d2..7e75eda44d 100644
 --- a/radio/src/gui/colorlcd/libui/bitmapbuffer.h
 +++ b/radio/src/gui/colorlcd/libui/bitmapbuffer.h
 @@ -42,6 +42,14 @@ constexpr uint8_t STASHED = 0x33;
@@ -642,7 +655,7 @@ index 29d4ee04d23..7e75eda44d3 100644
 +  static constexpr int FAST_FILL_DMA_PIXELS = 4096;
  };
 diff --git a/radio/src/gui/colorlcd/libui/bitmapbuffer_draw_extra.cpp b/radio/src/gui/colorlcd/libui/bitmapbuffer_draw_extra.cpp
-index 38307bc08a9..24636c6582b 100644
+index 38307bc08a..15744ebcd6 100644
 --- a/radio/src/gui/colorlcd/libui/bitmapbuffer_draw_extra.cpp
 +++ b/radio/src/gui/colorlcd/libui/bitmapbuffer_draw_extra.cpp
 @@ -43,10 +43,7 @@ void BitmapBuffer::invertRect(coord_t x, coord_t y, coord_t w, coord_t h,
@@ -675,7 +688,7 @@ index 38307bc08a9..24636c6582b 100644
                              uint8_t pat, LcdFlags flags)
  {
    // Offsets
-@@ -366,17 +363,21 @@ void BitmapBuffer::drawLine(coord_t x1, coord_t y1, coord_t x2, coord_t y2,
+@@ -366,17 +363,58 @@ void BitmapBuffer::drawLine(coord_t x1, coord_t y1, coord_t x2, coord_t y2,
    int px = x1;
    int py = y1;
  
@@ -684,6 +697,43 @@ index 38307bc08a9..24636c6582b 100644
 -  SCB_CleanInvalidateDCache();
 -#endif
 +  DMAWaitAndSyncCache();
++
++  if (pat == SOLID) {
++    // Solid line: every pixel of it lies in the box [x1..x2] x [y1..y2]. When that box
++    // is inside the buffer, the per-pixel pointer check below passes for every pixel and
++    // the pattern test is always true, so the line is drawn by stepping a pointer: one
++    // store, one or two adds per pixel. (The clipper clips to xmax/ymax inclusive, so a
++    // corner can sit at x == _width or y == _height; the address it gets is the one
++    // getPixelPtrAbs() gives, as before, and a box past data_end takes the loop below.)
++    const coord_t bx0 = x1 < x2 ? x1 : x2, bx1 = x1 < x2 ? x2 : x1;
++    const coord_t by0 = y1 < y2 ? y1 : y2, by1 = y1 < y2 ? y2 : y1;
++    if (bx0 >= 0 && by0 >= 0 && getPixelPtrAbs(bx1, by1) < data_end) {
++      pixel_t* p = getPixelPtrAbs(px, py);
++      const int ystep = sdy * _width;
++      if (dxabs >= dyabs) {
++        for (int i = dxabs; i >= 0; i--) {
++          *p = color;
++          y += dyabs;
++          if (y >= dxabs) {
++            y -= dxabs;
++            p += ystep;
++          }
++          p += sdx;
++        }
++      } else {
++        for (int i = dyabs; i >= 0; i--) {
++          *p = color;
++          x += dxabs;
++          if (x >= dyabs) {
++            x -= dyabs;
++            p += sdx;
++          }
++          p += ystep;
++        }
++      }
++      return;
++    }
++  }
 +
 +  // the clipper keeps the line inside the buffer; the pointer check is a safety net
 +  pixel_t* const lo = data;
@@ -704,7 +754,7 @@ index 38307bc08a9..24636c6582b 100644
        y += dyabs;
        if (y >= dxabs) {
          y -= dxabs;
-@@ -387,9 +388,7 @@ void BitmapBuffer::drawLine(coord_t x1, coord_t y1, coord_t x2, coord_t y2,
+@@ -387,9 +425,7 @@ void BitmapBuffer::drawLine(coord_t x1, coord_t y1, coord_t x2, coord_t y2,
    } else {
      /* the line is more vertical than horizontal */
      for (int i = 0; i <= dyabs; i++) {
@@ -715,7 +765,7 @@ index 38307bc08a9..24636c6582b 100644
        x += dxabs;
        if (x >= dyabs) {
          x -= dyabs;
-@@ -398,6 +397,7 @@ void BitmapBuffer::drawLine(coord_t x1, coord_t y1, coord_t x2, coord_t y2,
+@@ -398,6 +434,7 @@ void BitmapBuffer::drawLine(coord_t x1, coord_t y1, coord_t x2, coord_t y2,
        py += sdy;
      }
    }
@@ -723,7 +773,7 @@ index 38307bc08a9..24636c6582b 100644
  }
  
  /*
-@@ -430,7 +430,7 @@ void BitmapBuffer::drawLine(coord_t x1, coord_t y1, coord_t x2, coord_t y2,
+@@ -430,7 +467,7 @@ void BitmapBuffer::drawLine(coord_t x1, coord_t y1, coord_t x2, coord_t y2,
    ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
    POSSIBILITY OF SUCH DAMAGE.
  */
@@ -732,7 +782,125 @@ index 38307bc08a9..24636c6582b 100644
                                        coord_t y1, coord_t x2, coord_t y2,
                                        LcdFlags flags, uint8_t opacity)
  {
-@@ -665,10 +665,7 @@ void BitmapBuffer::drawBitmapPatternPie(coord_t x, coord_t y,
+@@ -470,31 +507,96 @@ void BitmapBuffer::drawFilledTriangle(coord_t x0, coord_t y0, coord_t x1,
+     return;
+   }
+ 
++  if (opacity == OPACITY_MAX) return;  // every row's drawHorizontalLine() would return
++
+   coord_t dx01 = x1 - x0, dy01 = y1 - y0, dx02 = x2 - x0, dy02 = y2 - y0,
+           dx12 = x2 - x1, dy12 = y2 - y1;
+-  coord_t sa = 0, sb = 0;
+   coord_t last = (y1 == y2) ? y1 : y1 - 1;
+-  coord_t y;
+ 
+-  for (y = y0; y <= last; y++) {
+-    a = x0 + sa / dy01;
+-    b = x0 + sb / dy02;
+-    sa += dx01;
+-    sb += dx02;
+-    if (a > b) SWAP(a, b);
+-    drawHorizontalLine(a, y, b - a + 1, SOLID, flags, opacity);
+-  }
+-
+-  sa = dx12 * (y - y1);
+-  sb = dx02 * (y - y0);
+-
+-  for (; y <= y2; y++) {
+-    a = x1 + sa / dy12;
+-    b = x0 + sb / dy02;
+-    sa += dx12;
+-    sb += dx02;
+-    if (a > b) SWAP(a, b);
+-    drawHorizontalLine(a, y, b - a + 1, SOLID, flags, opacity);
++  // Only the rows drawHorizontalLine() would keep are walked: those with y + offsetY in
++  // [ymin, ymax). The original filler steps every row from y0 to y2, summing dx per row;
++  // the sum after k rows is k * dx (the same value mod 2^32 when it overflows), so a
++  // segment can start at its first visible row. A triangle near the camera in StickTime
++  // reaches thousands of rows past the screen.
++  const coord_t yfirst = ymin - offsetY;
++  const coord_t ylast = ymax - 1 - offsetY;
++
++  // Solid, opaque rows of a Lua tool (fastDraw, no draw context) go straight into the
++  // pixels: this is drawHorizontalLine -> applyClippingRect -> drawHorizontalLineAbs ->
++  // fastFill, written out once instead of called four times per row. The members are
++  // copied to locals so the pixel stores (may_alias) do not force reloads every row.
++  typedef uint32_t __attribute__((may_alias)) pixel_pair_t;
++  const bool direct = fastDraw && !draw_ctx && opacity == 0 && data;
++  const pixel_t color = COLOR_VAL(flags);
++  const pixel_pair_t pair = color | ((uint32_t)color << 16);
++  const coord_t xmin = this->xmin, xmax = this->xmax, offsetX = this->offsetX,
++                offsetY = this->offsetY, width = this->_width;
++  pixel_t* const lo = data;
++  pixel_t* const hi = data_end;
++  bool synced = false;  // DMAWaitAndSyncCache() once, before the first pixel store
++
++  // segment 0: rows y0..last along edges 0-1 and 0-2; segment 1: rows y1..y2 along
++  // edges 1-2 and 0-2 (only when y1 < y2, as in the original)
++  coord_t xa = x0, dxa = dx01, dya = dy01, ys = y0, ye = last;
++  for (int seg = 0; seg < 2; seg++) {
++    if (seg == 1) {
++      if (y1 == y2) break;
++      xa = x1; dxa = dx12; dya = dy12; ys = y1; ye = y2;
++    }
++    coord_t y = ys < yfirst ? yfirst : ys;
++    const coord_t yend = ye > ylast ? ylast : ye;
++    if (y > yend) continue;
++    // the sums the original loop would hold at row y (two's complement, no UB)
++    const uint32_t rows = (uint32_t)y - (uint32_t)ys;
++    coord_t sa = (coord_t)((uint32_t)dxa * rows);
++    coord_t sb = (coord_t)((uint32_t)dx02 * ((uint32_t)y - (uint32_t)y0));
++    for (; y <= yend; y++) {
++      a = xa + sa / dya;
++      b = x0 + sb / dy02;
++      sa += dxa;
++      sb += dx02;
++      if (a > b) SWAP(a, b);
++      if (!direct) {
++        drawHorizontalLine(a, y, b - a + 1, SOLID, flags, opacity);
++        continue;
++      }
++      // drawHorizontalLine(a, y, b - a + 1, SOLID, flags, 0), whose width and x it got
++      // as wrapped two's complement values if the sums overflowed (unsigned here so the
++      // compiler cannot drop the w < 0 case from a <= b)
++      coord_t x = (coord_t)((uint32_t)a + (uint32_t)offsetX);  // APPLY_OFFSET
++      coord_t w = (coord_t)((uint32_t)b - (uint32_t)a + 1u);
++      // applyClippingRect(x, y, w, 1); y + offsetY is inside [ymin, ymax) already
++      if (w < 0) {
++        x += w;
++        w = -w;
++      }
++      if (x >= xmax) continue;
++      if (x < xmin) {
++        w += x - xmin;
++        x = xmin;
++      }
++      if (x + w > xmax) w = xmax - x;
++      if (w <= 0) continue;
++      // drawHorizontalLineAbs -> fastFill(x, y + offsetY, w, 1, color)
++      if (w >= FAST_FILL_DMA_PIXELS) {  // its DMA2D case: let fastFill decide
++        fastFill(x, y + offsetY, w, 1, color);
++        continue;
++      }
++      if (!synced) {
++        DMAWaitAndSyncCache();
++        synced = true;
++      }
++      pixel_t* p = &lo[(y + offsetY) * width + x];  // getPixelPtrAbs()
++      if (p < lo || p + w > hi) continue;
++      coord_t n = w;
++      if ((uintptr_t)p & 2) {
++        *p++ = color;
++        n--;
++      }
++      pixel_pair_t* q = (pixel_pair_t*)p;
++      for (; n >= 2; n -= 2) *q++ = pair;
++      if (n) *(pixel_t*)q = color;
++    }
+   }
+ }
+ 
+@@ -665,10 +767,7 @@ void BitmapBuffer::drawBitmapPatternPie(coord_t x, coord_t y,
    int w2 = width / 2;
    int h2 = height / 2;
  
@@ -745,7 +913,7 @@ index 38307bc08a9..24636c6582b 100644
    for (int y1 = h2 - 1; y1 >= 0; y1--) {
      for (int x1 = w2 - 1; x1 >= 0; x1--) {
 diff --git a/radio/src/gui/colorlcd/libui/mainwindow.cpp b/radio/src/gui/colorlcd/libui/mainwindow.cpp
-index e111b28e16e..b585a6f8e2a 100644
+index e111b28e16..b585a6f8e2 100644
 --- a/radio/src/gui/colorlcd/libui/mainwindow.cpp
 +++ b/radio/src/gui/colorlcd/libui/mainwindow.cpp
 @@ -54,8 +54,16 @@ void MainWindow::emptyTrash()
@@ -766,7 +934,7 @@ index e111b28e16e..b585a6f8e2a 100644
  
  #if defined(DEBUG_WINDOWS)
 diff --git a/radio/src/gui/colorlcd/standalone_lua.cpp b/radio/src/gui/colorlcd/standalone_lua.cpp
-index e9274a07438..1cb83d1cc88 100644
+index e9274a0743..1cb83d1cc8 100644
 --- a/radio/src/gui/colorlcd/standalone_lua.cpp
 +++ b/radio/src/gui/colorlcd/standalone_lua.cpp
 @@ -22,6 +22,9 @@
@@ -1033,10 +1201,10 @@ index e9274a07438..1cb83d1cc88 100644
      lv_obj_set_scroll_dir(lvobj, LV_DIR_NONE);
      errorModal = lv_obj_create(lvobj);
 diff --git a/radio/src/gui/colorlcd/standalone_lua.h b/radio/src/gui/colorlcd/standalone_lua.h
-index 989800765c1..96105b39e74 100644
+index 989800765c..96105b39e7 100644
 --- a/radio/src/gui/colorlcd/standalone_lua.h
 +++ b/radio/src/gui/colorlcd/standalone_lua.h
-@@ -79,6 +79,26 @@ class StandaloneLuaWindow : public Window, public LuaScriptManager
+@@ -79,6 +79,26 @@ protected:
    // GFX
    BitmapBuffer *lcdBuffer = nullptr;
  
@@ -1064,10 +1232,10 @@ index 989800765c1..96105b39e74 100644
    void popupPaint(BitmapBuffer* dc, coord_t x, coord_t y, coord_t w, coord_t h,
                    const char* text, const char* info);
 diff --git a/radio/src/gui/colorlcd/startup_shutdown.cpp b/radio/src/gui/colorlcd/startup_shutdown.cpp
-index 0bd213d6c24..f860439f294 100644
+index 9cc623e62b..08d6a7747e 100644
 --- a/radio/src/gui/colorlcd/startup_shutdown.cpp
 +++ b/radio/src/gui/colorlcd/startup_shutdown.cpp
-@@ -165,6 +165,12 @@ void drawSleepBitmap()
+@@ -162,6 +162,12 @@ void drawSleepBitmap()
    (new StaticIcon(shutdownWindow, 0, 0, ICON_SHUTDOWN, COLOR_THEME_PRIMARY2_INDEX))
        ->center(LCD_W, LCD_H);
  
@@ -1081,7 +1249,7 @@ index 0bd213d6c24..f860439f294 100644
    lv_refr_now(nullptr);
  }
 diff --git a/radio/src/lua/CMakeLists.txt b/radio/src/lua/CMakeLists.txt
-index 47e576c8a11..95835c62475 100644
+index 47e576c8a1..95835c6247 100644
 --- a/radio/src/lua/CMakeLists.txt
 +++ b/radio/src/lua/CMakeLists.txt
 @@ -71,3 +71,18 @@ add_compile_definitions(LUA_COMPAT_5_2)
@@ -1104,7 +1272,7 @@ index 47e576c8a11..95835c62475 100644
 +  endforeach()
 +endif()
 diff --git a/radio/src/lua/api_colorlcd.cpp b/radio/src/lua/api_colorlcd.cpp
-index 2c6451c029e..6db7220ca56 100644
+index 2c6451c029..6db7220ca5 100644
 --- a/radio/src/lua/api_colorlcd.cpp
 +++ b/radio/src/lua/api_colorlcd.cpp
 @@ -32,11 +32,33 @@
@@ -1362,7 +1530,7 @@ index 2c6451c029e..6db7220ca56 100644
    float pitch = luaL_checknumber(L, 1);
    float roll = luaL_checknumber(L, 2);
 diff --git a/radio/src/lua/lua_api.h b/radio/src/lua/lua_api.h
-index f9e66056cfb..134427d45d9 100644
+index f9e66056cf..134427d45d 100644
 --- a/radio/src/lua/lua_api.h
 +++ b/radio/src/lua/lua_api.h
 @@ -61,6 +61,17 @@ extern bool luaLcdAllowed;
@@ -1384,7 +1552,7 @@ index f9e66056cfb..134427d45d9 100644
  void luaInitThemesAndWidgets();
  #endif
 diff --git a/radio/src/targets/common/arm/stm32/dma2d.cpp b/radio/src/targets/common/arm/stm32/dma2d.cpp
-index c5f6e72c850..baca550a04e 100644
+index c5f6e72c85..baca550a04 100644
 --- a/radio/src/targets/common/arm/stm32/dma2d.cpp
 +++ b/radio/src/targets/common/arm/stm32/dma2d.cpp
 @@ -25,6 +25,8 @@
@@ -1468,7 +1636,7 @@ index c5f6e72c850..baca550a04e 100644
  
  }
 diff --git a/radio/src/targets/common/arm/stm32/dma2d.h b/radio/src/targets/common/arm/stm32/dma2d.h
-index d13e69ca0ea..a3e1999ed42 100644
+index d13e69ca0e..a3e1999ed4 100644
 --- a/radio/src/targets/common/arm/stm32/dma2d.h
 +++ b/radio/src/targets/common/arm/stm32/dma2d.h
 @@ -24,7 +24,7 @@
@@ -1503,7 +1671,7 @@ index d13e69ca0ea..a3e1999ed42 100644
  void DMAFillRect(uint16_t * dest, uint16_t destw, uint16_t desth, uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t color);
  void DMACopyBitmap(uint16_t * dest, uint16_t destw, uint16_t desth, uint16_t x, uint16_t y, const uint16_t * src, uint16_t srcw, uint16_t srch, uint16_t srcx, uint16_t srcy, uint16_t w, uint16_t h);
 diff --git a/radio/src/targets/horus/lcd_driver.cpp b/radio/src/targets/horus/lcd_driver.cpp
-index 3f2b2e2f302..e6568922a3f 100644
+index 3f2b2e2f30..e6568922a3 100644
 --- a/radio/src/targets/horus/lcd_driver.cpp
 +++ b/radio/src/targets/horus/lcd_driver.cpp
 @@ -191,6 +191,29 @@ static void startLcdRefresh(lv_disp_drv_t *disp_drv, uint16_t *buffer,
@@ -1547,7 +1715,7 @@ index 3f2b2e2f302..e6568922a3f 100644
  
  extern "C" void LTDC_IRQHandler(void)
 diff --git a/radio/src/targets/pa01/lcd_driver.cpp b/radio/src/targets/pa01/lcd_driver.cpp
-index 055d17ab3b5..6ff52f55217 100644
+index 055d17ab3b..6ff52f5521 100644
 --- a/radio/src/targets/pa01/lcd_driver.cpp
 +++ b/radio/src/targets/pa01/lcd_driver.cpp
 @@ -31,6 +31,19 @@
@@ -1822,7 +1990,7 @@ index 055d17ab3b5..6ff52f55217 100644
    lcdSetFlushCb(startLcdRefresh);
  }
 diff --git a/radio/src/tasks.cpp b/radio/src/tasks.cpp
-index 0c70b79e0a2..49100a0d201 100644
+index 0c70b79e0a..49100a0d20 100644
 --- a/radio/src/tasks.cpp
 +++ b/radio/src/tasks.cpp
 @@ -53,6 +53,19 @@ mutex_handle_t audioMutex;
@@ -1855,7 +2023,7 @@ index 0c70b79e0a2..49100a0d201 100644
    }
  
 diff --git a/radio/src/thirdparty/Lua/src/lapi.c b/radio/src/thirdparty/Lua/src/lapi.c
-index 0a7aaefc59e..1819f5f42d4 100644
+index 0a7aaefc59..1819f5f42d 100644
 --- a/radio/src/thirdparty/Lua/src/lapi.c
 +++ b/radio/src/thirdparty/Lua/src/lapi.c
 @@ -57,7 +57,7 @@ const char lua_ident[] =
@@ -2604,7 +2772,7 @@ index 0a7aaefc59e..1819f5f42d4 100644
    LClosure *f1;
    UpVal **up1 = getupvalref(L, fidx1, n1, &f1);
 diff --git a/radio/src/thirdparty/Lua/src/lauxlib.c b/radio/src/thirdparty/Lua/src/lauxlib.c
-index 6b3d726d8fc..627b3c3bbdc 100644
+index 6b3d726d8f..627b3c3bbd 100644
 --- a/radio/src/thirdparty/Lua/src/lauxlib.c
 +++ b/radio/src/thirdparty/Lua/src/lauxlib.c
 @@ -47,7 +47,7 @@ void etxNormalizePath(const char *in, char *out, size_t outLen);
@@ -3189,7 +3357,7 @@ index 6b3d726d8fc..627b3c3bbdc 100644
    if (sz != LUAL_NUMSIZES)  /* check numeric types */
      luaL_error(L, "core and library have incompatible numeric types");
 diff --git a/radio/src/thirdparty/Lua/src/lbaselib.c b/radio/src/thirdparty/Lua/src/lbaselib.c
-index 9ebebff93d0..5d25c95362b 100644
+index 9ebebff93d..5d25c95362 100644
 --- a/radio/src/thirdparty/Lua/src/lbaselib.c
 +++ b/radio/src/thirdparty/Lua/src/lbaselib.c
 @@ -20,7 +20,7 @@
@@ -3469,7 +3637,7 @@ index 9ebebff93d0..5d25c95362b 100644
    lua_pushliteral(L, LUA_VERSION);  /* set global _VERSION */
    lua_setfield(L, -2, "_VERSION");
 diff --git a/radio/src/thirdparty/Lua/src/ldo.c b/radio/src/thirdparty/Lua/src/ldo.c
-index ae4615b085e..69cc93134ac 100644
+index ae4615b085..69cc93134a 100644
 --- a/radio/src/thirdparty/Lua/src/ldo.c
 +++ b/radio/src/thirdparty/Lua/src/ldo.c
 @@ -88,7 +88,7 @@ struct lua_longjmp {
@@ -3758,7 +3926,7 @@ index ae4615b085e..69cc93134ac 100644
    struct SParser p;
    int status;
 diff --git a/radio/src/thirdparty/Lua/src/lfunc.c b/radio/src/thirdparty/Lua/src/lfunc.c
-index 3512b2c7135..74b60e99c1a 100644
+index 3512b2c713..74b60e99c1 100644
 --- a/radio/src/thirdparty/Lua/src/lfunc.c
 +++ b/radio/src/thirdparty/Lua/src/lfunc.c
 @@ -22,7 +22,7 @@
@@ -3834,7 +4002,7 @@ index 3512b2c7135..74b60e99c1a 100644
    for (i = 0; i<f->sizelocvars && f->locvars[i].startpc <= pc; i++) {
      if (pc < f->locvars[i].endpc) {  /* is variable active? */
 diff --git a/radio/src/thirdparty/Lua/src/lgc.c b/radio/src/thirdparty/Lua/src/lgc.c
-index aeea56534da..7d4b7194b1d 100644
+index aeea56534d..7d4b7194b1 100644
 --- a/radio/src/thirdparty/Lua/src/lgc.c
 +++ b/radio/src/thirdparty/Lua/src/lgc.c
 @@ -122,7 +122,7 @@ static void reallymarkobject (global_State *g, GCObject *o);
@@ -4274,7 +4442,7 @@ index aeea56534da..7d4b7194b1d 100644
    lua_assert(g->gckind == KGC_NORMAL);
    if (isemergency) g->gckind = KGC_EMERGENCY;  /* set flag */
 diff --git a/radio/src/thirdparty/Lua/src/lmathlib.c b/radio/src/thirdparty/Lua/src/lmathlib.c
-index 46ee1b3bbda..4e3834f8f25 100644
+index 46ee1b3bbd..4e635153ad 100644
 --- a/radio/src/thirdparty/Lua/src/lmathlib.c
 +++ b/radio/src/thirdparty/Lua/src/lmathlib.c
 @@ -35,7 +35,7 @@
@@ -4343,7 +4511,7 @@ index 46ee1b3bbda..4e3834f8f25 100644
    lua_Integer n;
    if (lua_numbertointeger(d, &n))  /* does 'd' fit in an integer? */
      lua_pushinteger(L, n);  /* result is integer */
-@@ -101,18 +101,27 @@ static void pushnumint (lua_State *L, lua_Number d) {
+@@ -101,18 +101,26 @@ static void pushnumint (lua_State *L, lua_Number d) {
  }
  
  
@@ -4355,16 +4523,15 @@ index 46ee1b3bbda..4e3834f8f25 100644
 -    lua_Number d = l_mathop(floor)(luaL_checknumber(L, 1));
 -    pushnumint(L, d);
 +    lua_Number d = luaL_checknumber(L, 1);
-+#if defined(LUA_FAST_CODE_ITCM)
-+    /* StickTime build: the common case without a call to floor() */
++    /* StickTime build: the common case without a call to floor(), on every radio (the result
++    ** is the same as below for every float: checked exhaustively on the host) */
 +    if (d > (lua_Number)LUA_MININTEGER && d < -(lua_Number)LUA_MININTEGER) {
 +      lua_Integer n = (lua_Integer)d;  /* truncates towards zero */
 +      if ((lua_Number)n > d) n--;  /* negative and not whole */
 +      lua_pushinteger(L, n);
 +      return 1;
 +    }
-+#endif
-+    pushnumint(L, l_mathop(floor)(d));
++    pushnumint(L, l_floor(d));
    }
    return 1;
  }
@@ -4375,7 +4542,7 @@ index 46ee1b3bbda..4e3834f8f25 100644
    if (lua_isinteger(L, 1))
      lua_settop(L, 1);  /* integer is its own ceil */
    else {
-@@ -123,7 +132,7 @@ static int math_ceil (lua_State *L) {
+@@ -123,7 +131,7 @@ static int math_ceil (lua_State *L) {
  }
  
  
@@ -4384,7 +4551,7 @@ index 46ee1b3bbda..4e3834f8f25 100644
    if (lua_isinteger(L, 1) && lua_isinteger(L, 2)) {
      lua_Integer d = lua_tointeger(L, 2);
      if ((lua_Unsigned)d + 1u <= 1u) {  /* special cases: -1 or 0 */
-@@ -147,7 +156,7 @@ static int math_fmod (lua_State *L) {
+@@ -147,7 +155,7 @@ static int math_fmod (lua_State *L) {
  ** (which is not compatible with 'float*') when lua_Number is not
  ** 'double'.
  */
@@ -4393,7 +4560,7 @@ index 46ee1b3bbda..4e3834f8f25 100644
    if (lua_isinteger(L ,1)) {
      lua_settop(L, 1);  /* number is its own integer part */
      lua_pushnumber(L, 0);  /* no fractional part */
-@@ -164,20 +173,20 @@ static int math_modf (lua_State *L) {
+@@ -164,20 +172,20 @@ static int math_modf (lua_State *L) {
  }
  
  
@@ -4417,7 +4584,7 @@ index 46ee1b3bbda..4e3834f8f25 100644
    lua_Number x = luaL_checknumber(L, 1);
    lua_Number res;
    if (lua_isnoneornil(L, 2))
-@@ -197,23 +206,23 @@ static int math_log (lua_State *L) {
+@@ -197,23 +205,23 @@ static int math_log (lua_State *L) {
    return 1;
  }
  
@@ -4445,7 +4612,7 @@ index 46ee1b3bbda..4e3834f8f25 100644
    int n = lua_gettop(L);  /* number of arguments */
    int imin = 1;  /* index of current minimum value */
    int i;
-@@ -227,7 +236,7 @@ static int math_min (lua_State *L) {
+@@ -227,7 +235,7 @@ static int math_min (lua_State *L) {
  }
  
  
@@ -4454,7 +4621,7 @@ index 46ee1b3bbda..4e3834f8f25 100644
    int n = lua_gettop(L);  /* number of arguments */
    int imax = 1;  /* index of current maximum value */
    int i;
-@@ -245,7 +254,7 @@ static int math_max (lua_State *L) {
+@@ -245,7 +253,7 @@ static int math_max (lua_State *L) {
  ** all bits from 'l_rand' can be represented, and that 'RANDMAX + 1.0'
  ** will keep full precision (ensuring that 'r' is always less than 1.0.)
  */
@@ -4463,7 +4630,7 @@ index 46ee1b3bbda..4e3834f8f25 100644
    lua_Integer low, up;
    double r = (double)l_rand() * (1.0 / ((double)L_RANDMAX + 1.0));
    switch (lua_gettop(L)) {  /* check number of arguments */
-@@ -275,14 +284,14 @@ static int math_random (lua_State *L) {
+@@ -275,14 +283,14 @@ static int math_random (lua_State *L) {
  }
  
  
@@ -4480,7 +4647,7 @@ index 46ee1b3bbda..4e3834f8f25 100644
    if (lua_type(L, 1) == LUA_TNUMBER) {
        if (lua_isinteger(L, 1))
          lua_pushliteral(L, "integer");
-@@ -304,43 +313,43 @@ static int math_type (lua_State *L) {
+@@ -304,43 +312,43 @@ static int math_type (lua_State *L) {
  */
  #if defined(LUA_COMPAT_MATHLIB)
  
@@ -4531,7 +4698,7 @@ index 46ee1b3bbda..4e3834f8f25 100644
    lua_pushnumber(L, l_mathop(log10)(luaL_checknumber(L, 1)));
    return 1;
  }
-@@ -393,7 +402,7 @@ LROT_END(mathlib, NULL, 0)
+@@ -393,7 +401,7 @@ LROT_END(mathlib, NULL, 0)
  /*
  ** Open math library
  */
@@ -4541,7 +4708,7 @@ index 46ee1b3bbda..4e3834f8f25 100644
  }
  
 diff --git a/radio/src/thirdparty/Lua/src/lmem.c b/radio/src/thirdparty/Lua/src/lmem.c
-index 0241cc3bac0..be90fe7dfb7 100644
+index 0241cc3bac..be90fe7dfb 100644
 --- a/radio/src/thirdparty/Lua/src/lmem.c
 +++ b/radio/src/thirdparty/Lua/src/lmem.c
 @@ -45,7 +45,7 @@
@@ -4572,7 +4739,7 @@ index 0241cc3bac0..be90fe7dfb7 100644
    global_State *g = G(L);
    size_t realosize = (block) ? osize : 0;
 diff --git a/radio/src/thirdparty/Lua/src/lobject.c b/radio/src/thirdparty/Lua/src/lobject.c
-index 2218c8cdd77..2988600558a 100644
+index 2218c8cdd7..2988600558 100644
 --- a/radio/src/thirdparty/Lua/src/lobject.c
 +++ b/radio/src/thirdparty/Lua/src/lobject.c
 @@ -38,7 +38,7 @@ LUAI_DDEF const TValue luaO_nilobject_ = {NILCONSTANT};
@@ -4745,7 +4912,7 @@ index 2218c8cdd77..2988600558a 100644
    if (*source == '=') {  /* 'literal' source */
      if (l <= bufflen)  /* small enough? */
 diff --git a/radio/src/thirdparty/Lua/src/lstate.c b/radio/src/thirdparty/Lua/src/lstate.c
-index 6b3a9da6000..e48f9f49710 100644
+index 6b3a9da600..e48f9f4971 100644
 --- a/radio/src/thirdparty/Lua/src/lstate.c
 +++ b/radio/src/thirdparty/Lua/src/lstate.c
 @@ -78,7 +78,7 @@ typedef struct LG {
@@ -4889,7 +5056,7 @@ index 6b3a9da6000..e48f9f49710 100644
    lua_lock(L);
    close_state(L);
 diff --git a/radio/src/thirdparty/Lua/src/lstring.c b/radio/src/thirdparty/Lua/src/lstring.c
-index b9500670956..53379719067 100644
+index b950067095..5337971906 100644
 --- a/radio/src/thirdparty/Lua/src/lstring.c
 +++ b/radio/src/thirdparty/Lua/src/lstring.c
 @@ -36,7 +36,7 @@
@@ -5009,7 +5176,7 @@ index b9500670956..53379719067 100644
    GCObject *o;
    if (s > MAX_SIZE - sizeof(Udata))
 diff --git a/radio/src/thirdparty/Lua/src/ltable.c b/radio/src/thirdparty/Lua/src/ltable.c
-index 66d6299c9fa..fbc1269f738 100644
+index 66d6299c9f..fbc1269f73 100644
 --- a/radio/src/thirdparty/Lua/src/ltable.c
 +++ b/radio/src/thirdparty/Lua/src/ltable.c
 @@ -95,7 +95,7 @@ static const Node dummynode_ = {
@@ -5308,7 +5475,7 @@ index 66d6299c9fa..fbc1269f738 100644
  }
  #endif
 diff --git a/radio/src/thirdparty/Lua/src/ltablib.c b/radio/src/thirdparty/Lua/src/ltablib.c
-index a4dd9d1442b..1895236b0f5 100644
+index a4dd9d1442..1895236b0f 100644
 --- a/radio/src/thirdparty/Lua/src/ltablib.c
 +++ b/radio/src/thirdparty/Lua/src/ltablib.c
 @@ -33,7 +33,7 @@
@@ -5474,7 +5641,7 @@ index a4dd9d1442b..1895236b0f5 100644
  }
  
 diff --git a/radio/src/thirdparty/Lua/src/ltm.c b/radio/src/thirdparty/Lua/src/ltm.c
-index 6b2025303bc..e1cdd3ca85a 100644
+index 6b2025303b..e1cdd3ca85 100644
 --- a/radio/src/thirdparty/Lua/src/ltm.c
 +++ b/radio/src/thirdparty/Lua/src/ltm.c
 @@ -45,7 +45,7 @@ static const char *const luaT_eventname[] = {  /* ORDER TM */
@@ -5559,7 +5726,7 @@ index 6b2025303bc..e1cdd3ca85a 100644
    if (!luaT_callbinTM(L, p1, p2, L->top, event))
      return -1;  /* no metamethod */
 diff --git a/radio/src/thirdparty/Lua/src/luaconf.h b/radio/src/thirdparty/Lua/src/luaconf.h
-index 15c53762d2b..dc9c7ec68e4 100644
+index 15c53762d2..f8e4d5bdec 100644
 --- a/radio/src/thirdparty/Lua/src/luaconf.h
 +++ b/radio/src/thirdparty/Lua/src/luaconf.h
 @@ -150,6 +150,18 @@
@@ -5581,8 +5748,47 @@ index 15c53762d2b..dc9c7ec68e4 100644
  /*
  ** {==================================================================
  ** Compatibility with previous versions
+@@ -238,7 +250,38 @@
+ 
+ /* The following definitions are good for most cases here */
+ 
++/*
++** StickTime build: with single-precision floats (LUA_32BITS) l_floor is computed inline
++** instead of calling floorf(). The radios compile for FPv4-SP (no VRINT instructions, no
++** -ffast-math), so floorf() is a newlib call, made for every float that becomes an integer
++** (every float argument of lcd.*, float table keys, 'for' limits, '//'). The result is bit
++** for bit floorf()'s for every float (checked exhaustively on the host, all 2^32 values):
++** below 2^31 in magnitude a float truncates exactly to an int32 and converts back exactly,
++** and a float of magnitude 2^23 or more is already whole; NaN, the infinities and larger
++** magnitudes go to floorf() itself. LUA_FLOOR_LIBM restores the plain floorf() call. The
++** Lua core is C; the firmware's C++ includes lua.h inside extern "C", where <math.h> is
++** best left alone, and never uses l_floor.
++*/
++#if LUA_FLOAT_TYPE == LUA_FLOAT_FLOAT && !defined(LUA_FLOOR_LIBM) && !defined(__cplusplus)
++#include <math.h>
++#if defined(__GNUC__)
++#define LUAI_FLOORINLINE	static inline __attribute__((always_inline))
++#else
++#define LUAI_FLOORINLINE	static inline
++#endif
++LUAI_FLOORINLINE float luai_floorf (float x) {
++  if (fabsf(x) < 2147483648.0f) {  /* |x| < 2^31 (false for NaN too) */
++    int32_t i = (int32_t)x;  /* truncates towards zero */
++    float f = (float)i;  /* exact: a whole x converts back to itself, else |x| < 2^23 */
++    if (f > x) return f - 1.0f;  /* negative and not whole: one below the truncation */
++    return (f < x) ? f : x;  /* 'x' when whole: keeps the sign of a zero (floorf(-0.0) is -0.0) */
++  }
++  return floorf(x);
++}
++#define l_floor(x)		(luai_floorf(x))
++#else
+ #define l_floor(x)		(l_mathop(floor)(x))
++#endif
+ 
+ #define lua_number2str(s,sz,n)  \
+ 	l_sprintf((s), sz, LUA_NUMBER_FMT, (LUAI_UACNUMBER)(n))
 diff --git a/radio/src/thirdparty/Lua/src/lvm.c b/radio/src/thirdparty/Lua/src/lvm.c
-index 7a2d5a6ed39..e7aa93ac744 100644
+index 7a2d5a6ed3..0317466d77 100644
 --- a/radio/src/thirdparty/Lua/src/lvm.c
 +++ b/radio/src/thirdparty/Lua/src/lvm.c
 @@ -69,7 +69,7 @@
@@ -5594,7 +5800,7 @@ index 7a2d5a6ed39..e7aa93ac744 100644
    TValue v;
    if (ttisinteger(obj)) {
      *n = cast_num(ivalue(obj));
-@@ -91,7 +91,7 @@ int luaV_tonumber_ (const TValue *obj, lua_Number *n) {
+@@ -91,12 +91,29 @@ int luaV_tonumber_ (const TValue *obj, lua_Number *n) {
  ** mode == 1: takes the floor of the number
  ** mode == 2: takes the ceil of the number
  */
@@ -5603,7 +5809,30 @@ index 7a2d5a6ed39..e7aa93ac744 100644
    TValue v;
   again:
    if (ttisfloat(obj)) {
-@@ -132,7 +132,7 @@ int luaV_tointeger (const TValue *obj, lua_Integer *p, int mode) {
+     lua_Number n = fltvalue(obj);
+-    lua_Number f = l_floor(n);
++    lua_Number f;
++    /* StickTime build: a float in the integer range (the case of every lcd.* argument)
++    ** without floor() and without the range checks of lua_numbertointeger: the result is
++    ** the same as below for every float and mode (checked exhaustively on the host). The
++    ** truncation is exact; a float that is not whole has a magnitude below 2^23, so the
++    ** correction by one cannot leave the range. */
++    if (l_mathop(fabs)(n) < -(lua_Number)LUA_MININTEGER) {  /* |n| < 2^31 (false for NaN) */
++      lua_Integer i = (lua_Integer)n;  /* truncates towards zero */
++      f = (lua_Number)i;
++      if (f != n) {  /* not an integral value? */
++        if (mode == 0) return 0;  /* fails if mode demands integral value */
++        if (f > n) i--;  /* negative: the truncation is one above the floor */
++        if (mode > 1) i++;  /* needs ceil? (remember: n != f) */
++      }
++      *p = i;
++      return 1;
++    }
++    f = l_floor(n);  /* NaN, an infinity, -2^31 itself or beyond the integers */
+     if (n != f) {  /* not an integral value? */
+       if (mode == 0) return 0;  /* fails if mode demands integral value */
+       else if (mode > 1)  /* needs ceil? */
+@@ -132,7 +149,7 @@ int luaV_tointeger (const TValue *obj, lua_Integer *p, int mode) {
  ** the extreme case when the initial value is LUA_MININTEGER, in which
  ** case the LUA_MININTEGER limit would still run the loop once.
  */
@@ -5612,7 +5841,7 @@ index 7a2d5a6ed39..e7aa93ac744 100644
                       int *stopnow) {
    *stopnow = 0;  /* usually, let loops run */
    if (!luaV_tointeger(obj, p, (step < 0 ? 2 : 1))) {  /* not fit in integer? */
-@@ -157,7 +157,7 @@ static int forlimit (const TValue *obj, lua_Integer *p, lua_Integer step,
+@@ -157,7 +174,7 @@ static int forlimit (const TValue *obj, lua_Integer *p, lua_Integer step,
  ** if 'slot' is NULL, 't' is not a table; otherwise, 'slot' points to
  ** t[k] entry (which must be nil).
  */
@@ -5621,7 +5850,7 @@ index 7a2d5a6ed39..e7aa93ac744 100644
                        const TValue *slot) {
    int loop;  /* counter to avoid infinite loops */
    const TValue *tm;  /* metamethod */
-@@ -200,7 +200,7 @@ void luaV_finishget (lua_State *L, const TValue *t, TValue *key, StkId val,
+@@ -200,7 +217,7 @@ void luaV_finishget (lua_State *L, const TValue *t, TValue *key, StkId val,
  ** entry.  (The value at 'slot' must be nil, otherwise 'luaV_fastset'
  ** would have done the job.)
  */
@@ -5630,7 +5859,7 @@ index 7a2d5a6ed39..e7aa93ac744 100644
                       StkId val, const TValue *slot) {
    int loop;  /* counter to avoid infinite loops */
    for (loop = 0; loop < MAXTAGLOOP; loop++) {
-@@ -243,7 +243,7 @@ void luaV_finishset (lua_State *L, const TValue *t, TValue *key,
+@@ -243,7 +260,7 @@ void luaV_finishset (lua_State *L, const TValue *t, TValue *key,
  ** -larger than zero if 'ls' is smaller-equal-larger than 'rs'.
  ** Stripped down version for NodeMCU without locales support
  */
@@ -5639,7 +5868,7 @@ index 7a2d5a6ed39..e7aa93ac744 100644
    const char *l = getstr(ls);
    const char *r = getstr(rs);
    if (l == r) {
-@@ -268,7 +268,7 @@ static int l_strcmp (const TString *ls, const TString *rs) {
+@@ -268,7 +285,7 @@ static int l_strcmp (const TString *ls, const TString *rs) {
  ** truncated is irrelevant.) When 'f' is NaN, comparisons must result
  ** in false.
  */
@@ -5648,7 +5877,7 @@ index 7a2d5a6ed39..e7aa93ac744 100644
  #if defined(l_intfitsf)
    if (!l_intfitsf(i)) {
      if (f >= -cast_num(LUA_MININTEGER))  /* -minint == maxint + 1 */
-@@ -287,7 +287,7 @@ static int LTintfloat (lua_Integer i, lua_Number f) {
+@@ -287,7 +304,7 @@ static int LTintfloat (lua_Integer i, lua_Number f) {
  ** Check whether integer 'i' is less than or equal to float 'f'.
  ** See comments on previous function.
  */
@@ -5657,7 +5886,7 @@ index 7a2d5a6ed39..e7aa93ac744 100644
  #if defined(l_intfitsf)
    if (!l_intfitsf(i)) {
      if (f >= -cast_num(LUA_MININTEGER))  /* -minint == maxint + 1 */
-@@ -305,7 +305,7 @@ static int LEintfloat (lua_Integer i, lua_Number f) {
+@@ -305,7 +322,7 @@ static int LEintfloat (lua_Integer i, lua_Number f) {
  /*
  ** Return 'l < r', for numbers.
  */
@@ -5666,7 +5895,7 @@ index 7a2d5a6ed39..e7aa93ac744 100644
    if (ttisinteger(l)) {
      lua_Integer li = ivalue(l);
      if (ttisinteger(r))
-@@ -328,7 +328,7 @@ static int LTnum (const TValue *l, const TValue *r) {
+@@ -328,7 +345,7 @@ static int LTnum (const TValue *l, const TValue *r) {
  /*
  ** Return 'l <= r', for numbers.
  */
@@ -5675,7 +5904,7 @@ index 7a2d5a6ed39..e7aa93ac744 100644
    if (ttisinteger(l)) {
      lua_Integer li = ivalue(l);
      if (ttisinteger(r))
-@@ -351,7 +351,7 @@ static int LEnum (const TValue *l, const TValue *r) {
+@@ -351,7 +368,7 @@ static int LEnum (const TValue *l, const TValue *r) {
  /*
  ** Main operation less than; return 'l < r'.
  */
@@ -5684,7 +5913,7 @@ index 7a2d5a6ed39..e7aa93ac744 100644
    int res;
    if (ttisnumber(l) && ttisnumber(r))  /* both operands are numbers? */
      return LTnum(l, r);
-@@ -371,7 +371,7 @@ int luaV_lessthan (lua_State *L, const TValue *l, const TValue *r) {
+@@ -371,7 +388,7 @@ int luaV_lessthan (lua_State *L, const TValue *l, const TValue *r) {
  ** about it (to negate the result of r<l); bit CIST_LEQ in the call
  ** status keeps that information.
  */
@@ -5693,7 +5922,7 @@ index 7a2d5a6ed39..e7aa93ac744 100644
    int res;
    if (ttisnumber(l) && ttisnumber(r))  /* both operands are numbers? */
      return LEnum(l, r);
-@@ -394,7 +394,7 @@ int luaV_lessequal (lua_State *L, const TValue *l, const TValue *r) {
+@@ -394,7 +411,7 @@ int luaV_lessequal (lua_State *L, const TValue *l, const TValue *r) {
  ** Main operation for equality of Lua values; return 't1 == t2'.
  ** L == NULL means raw equality (no metamethods)
  */
@@ -5702,7 +5931,7 @@ index 7a2d5a6ed39..e7aa93ac744 100644
    const TValue *tm;
    if (ttype(t1) != ttype(t2)) {  /* not the same variant? */
      if (ttnov(t1) != ttnov(t2) || ttnov(t1) != LUA_TNUMBER)
-@@ -448,7 +448,7 @@ int luaV_equalobj (lua_State *L, const TValue *t1, const TValue *t2) {
+@@ -448,7 +465,7 @@ int luaV_equalobj (lua_State *L, const TValue *t1, const TValue *t2) {
  #define isemptystr(o)	(ttisshrstring(o) && getshrlen(tsvalue(o)) == 0)
  
  /* copy strings in stack from top - n up to top - 1 to buffer */
@@ -5711,7 +5940,7 @@ index 7a2d5a6ed39..e7aa93ac744 100644
    size_t tl = 0;  /* size already copied */
    do {
      size_t l = vslen(top - n);  /* length of string being copied */
-@@ -462,7 +462,7 @@ static void copy2buff (StkId top, int n, char *buff) {
+@@ -462,7 +479,7 @@ static void copy2buff (StkId top, int n, char *buff) {
  ** Main operation for concatenation: concat 'total' values in the stack,
  ** from 'L->top - total' up to 'L->top - 1'.
  */
@@ -5720,7 +5949,7 @@ index 7a2d5a6ed39..e7aa93ac744 100644
    lua_assert(total >= 2);
    do {
      StkId top = L->top;
-@@ -505,7 +505,7 @@ void luaV_concat (lua_State *L, int total) {
+@@ -505,7 +522,7 @@ void luaV_concat (lua_State *L, int total) {
  /*
  ** Main operation 'ra' = #rb'.
  */
@@ -5729,7 +5958,7 @@ index 7a2d5a6ed39..e7aa93ac744 100644
    const TValue *tm;
    switch (ttype(rb)) {
      case LUA_TTABLE: {
-@@ -540,7 +540,7 @@ void luaV_objlen (lua_State *L, StkId ra, const TValue *rb) {
+@@ -540,7 +557,7 @@ void luaV_objlen (lua_State *L, StkId ra, const TValue *rb) {
  ** 'floor(q) == trunc(q)' when 'q >= 0' or when 'q' is integer,
  ** otherwise 'floor(q) == trunc(q) - 1'.
  */
@@ -5738,7 +5967,7 @@ index 7a2d5a6ed39..e7aa93ac744 100644
    if (l_castS2U(n) + 1u <= 1u) {  /* special cases: -1 or 0 */
      if (n == 0)
        luaG_runerror(L, "attempt to divide by zero");
-@@ -560,7 +560,7 @@ lua_Integer luaV_div (lua_State *L, lua_Integer m, lua_Integer n) {
+@@ -560,7 +577,7 @@ lua_Integer luaV_div (lua_State *L, lua_Integer m, lua_Integer n) {
  ** negative operands follows C99 behavior. See previous comment
  ** about luaV_div.)
  */
@@ -5747,7 +5976,7 @@ index 7a2d5a6ed39..e7aa93ac744 100644
    if (l_castS2U(n) + 1u <= 1u) {  /* special cases: -1 or 0 */
      if (n == 0)
        luaG_runerror(L, "attempt to perform 'n%%0'");
-@@ -581,7 +581,7 @@ lua_Integer luaV_mod (lua_State *L, lua_Integer m, lua_Integer n) {
+@@ -581,7 +598,7 @@ lua_Integer luaV_mod (lua_State *L, lua_Integer m, lua_Integer n) {
  /*
  ** Shift left operation. (Shift right just negates 'y'.)
  */
@@ -5756,7 +5985,7 @@ index 7a2d5a6ed39..e7aa93ac744 100644
    if (y < 0) {  /* shift right? */
      if (y <= -NBITS) return 0;
      else return intop(>>, x, -y);
-@@ -599,7 +599,7 @@ lua_Integer luaV_shiftl (lua_Integer x, lua_Integer y) {
+@@ -599,7 +616,7 @@ lua_Integer luaV_shiftl (lua_Integer x, lua_Integer y) {
  ** already black (which means that 'cache' was already cleared by the
  ** GC).
  */
@@ -5765,7 +5994,7 @@ index 7a2d5a6ed39..e7aa93ac744 100644
                           StkId ra) {
    int nup = p->sizeupvalues;
    Upvaldesc *uv = p->upvalues;
-@@ -621,7 +621,7 @@ static void pushclosure (lua_State *L, Proto *p, UpVal **encup, StkId base,
+@@ -621,7 +638,7 @@ static void pushclosure (lua_State *L, Proto *p, UpVal **encup, StkId base,
  /*
  ** finish execution of an opcode interrupted by an yield
  */
@@ -5774,7 +6003,7 @@ index 7a2d5a6ed39..e7aa93ac744 100644
    CallInfo *ci = L->ci;
    StkId base = ci->u.l.base;
    Instruction inst = *(ci->u.l.savedpc - 1);  /* interrupted instruction */
-@@ -751,7 +751,7 @@ void luaV_finishOp (lua_State *L) {
+@@ -751,7 +768,7 @@ void luaV_finishOp (lua_State *L) {
  
  
  

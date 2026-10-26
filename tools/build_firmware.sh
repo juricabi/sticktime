@@ -23,10 +23,13 @@ if [ ! -d "$SRC/radio" ]; then
     https://github.com/EdgeTX/edgetx.git "$SRC"
 fi
 cd "$SRC"
+if [ -z "$EDGETX_SRC" ] && ! git diff --quiet -- radio; then
+  git checkout -q -- radio             # the script's own clone: an older patch applied, dropped
+fi
 if git apply --check "$PATCH" 2>/dev/null; then
   git apply "$PATCH"
 elif ! git apply --reverse --check "$PATCH" 2>/dev/null; then
-  echo "firmware/edgetx-fast-lua.patch does not apply to $SRC" >&2
+  echo "firmware/edgetx-fast-lua.patch does not apply to $SRC (an older patch applied there? git checkout -- radio)" >&2
   exit 1
 fi
 
