@@ -1205,6 +1205,16 @@ do
   if pz_ > 70 then fail(string.format("scenery: through the banner (z %.1f)", pz_)) end
   _, _, pz_ = fly(0, 0.6, 68, 0, 0, 0, 6, 0.8, thr)
   if pz_ < 71 then fail(string.format("scenery: under the banner should pass (z %.1f)", pz_)) end
+  -- against the fence, the quad flies away from it again: flown into it and turned round where
+  -- it is, and half over its top wire (it used to stay stuck there: every move hit the wire)
+  local fx_ = fly(-19.2, 1, 30, -90, -6, 0, 0, 0.4, thr)
+  L.vel(6, 0, 0) run(8)
+  local gx_ = L.get()
+  if gx_ - fx_ < 1 then fail(string.format("scenery: from against the fence (x %.2f) the quad should fly away (x %.2f)", fx_, gx_)) end
+  gx_ = fly(-19.9, 2.1, 30, -90, 6, 0, 0, 0.4, thr)
+  if gx_ < -18.8 then fail(string.format("scenery: from the fence's top wire the quad should fly away (x %.2f)", gx_)) end
+  local _, gy_ = fly(-19.9, 2.1, 30, -90, 0, 3, 0, 0.4, thr)
+  if gy_ < 2.8 then fail(string.format("scenery: from the fence's top wire the quad should climb away (y %.2f)", gy_)) end
   -- at race speed too (35 m/s: a substep is 0.35 m, more than the fence is thick), from start points
   -- a few cm apart: the fence, the banner and a wire stop it, none is flown through
   for _, r in ipairs({ { "fence", -20, 1, -90, 1 }, { "banner", 70, 1.75, 0, 3 }, { "power line wire", 48, 11.1, 0, 2 } }) do

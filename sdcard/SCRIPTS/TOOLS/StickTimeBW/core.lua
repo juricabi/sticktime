@@ -618,15 +618,18 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     -- (no '~= 0' on floats: EdgeTX 2.11/2.12 floors floats in int/float equality, so 0.02 ~= 0 is false there)
     if ar > 1e-7 or ar < -1e-7 then  -- roll right
       local c, s = cos(ar), sin(ar)
-      rx, ry, rz, ux, uy, uz = rx * c - ux * s, ry * c - uy * s, rz * c - uz * s, ux * c + rx * s, uy * c + ry * s, uz * c + rz * s
+      local x, y, z, a, b, d = rx, ry, rz, ux, uy, uz
+      rx, ry, rz, ux, uy, uz = x * c - a * s, y * c - b * s, z * c - d * s, a * c + x * s, b * c + y * s, d * c + z * s
     end
     if ap > 1e-7 or ap < -1e-7 then  -- pitch nose up
       local c, s = cos(ap), sin(ap)
-      fx, fy, fz, ux, uy, uz = fx * c + ux * s, fy * c + uy * s, fz * c + uz * s, ux * c - fx * s, uy * c - fy * s, uz * c - fz * s
+      local x, y, z, a, b, d = fx, fy, fz, ux, uy, uz
+      fx, fy, fz, ux, uy, uz = x * c + a * s, y * c + b * s, z * c + d * s, a * c - x * s, b * c - y * s, d * c - z * s
     end
     if ay > 1e-7 or ay < -1e-7 then  -- yaw right
       local c, s = cos(ay), sin(ay)
-      fx, fy, fz, rx, ry, rz = fx * c + rx * s, fy * c + ry * s, fz * c + rz * s, rx * c - fx * s, ry * c - fy * s, rz * c - fz * s
+      local x, y, z, a, b, d = fx, fy, fz, rx, ry, rz
+      fx, fy, fz, rx, ry, rz = x * c + a * s, y * c + b * s, z * c + d * s, a * c - x * s, b * c - y * s, d * c - z * s
     end
   end
 
@@ -956,27 +959,33 @@ local readSticks, rotate, placeDrone, respawn, physics, rnd, trick, tricks, rush
     -- broad phase once per frame: only objects within reach get tested per substep
     local reach = speed * dt + 7
     local ng, np, nb = 0, 0, 0
-    for i = 1, NG do
-      local dx, dy, dz = px - gx[i], py - gy[i], pz - gz[i]
-      local r = GSH[gk[i]] == 3 and reach + 6 or reach
-      if dx < r and dx > -r and dy < r and dy > -r and dz < r and dz > -r then
-        ng = ng + 1
-        nearG[ng] = i
-      else
-        gd[i] = dx * gnx[i] + dy * gny[i] + dz * gnz[i]   -- keep the side-of-plane fresh
+    do
+      local x, y, z = px, py, pz
+      for i = 1, NG do
+        local dx, dy, dz = x - gx[i], y - gy[i], z - gz[i]
+        local r = GSH[gk[i]] == 3 and reach + 6 or reach
+        if dx < r and dx > -r and dy < r and dy > -r and dz < r and dz > -r then
+          ng = ng + 1
+          nearG[ng] = i
+        else
+          gd[i] = dx * gnx[i] + dy * gny[i] + dz * gnz[i]   -- keep the side-of-plane fresh
+        end
       end
-    end
-    for i = 1, NP do
-      local dx, dz, r = px - qx[i], pz - qz[i], reach + qr[i]
-      if dx < r and dx > -r and dz < r and dz > -r then
-        np = np + 1
-        nearP[np] = i
+      for i = 1, NP do
+        local dx, r = x - qx[i], reach + qr[i]
+        if dx < r and dx > -r then
+          local dz = z - qz[i]
+          if dz < r and dz > -r then
+            np = np + 1
+            nearP[np] = i
+          end
+        end
       end
-    end
-    for i = 1, BX.n do
-      if px > bx0[i] - reach and px < bx1[i] + reach and pz > bz0[i] - reach and pz < bz1[i] + reach and py < by1[i] + reach then
-        nb = nb + 1
-        nearB[nb] = i
+      for i = 1, BX.n do
+        if x > bx0[i] - reach and x < bx1[i] + reach and z > bz0[i] - reach and z < bz1[i] + reach and y < by1[i] + reach then
+          nb = nb + 1
+          nearB[nb] = i
+        end
       end
     end
     -- the surface under the quad, for ground effect: the ground, or the top of a structure
@@ -1481,10 +1490,9 @@ local collectObjects
 do
 
   collectObjects = function(maxZ)
-    nOrd = 0
     local n1 = NG + NP
     local n2 = n1 + BX.n
-    local boxes = false
+    local kpx, kpy, kpz, kfx, kfy, kfz, krx, kry, krz, tanH, no = kpx, kpy, kpz, kfx, kfy, kfz, krx, kry, krz, tanH, 0
     for n = 1, n2 + (gmode == 1 and AI.n or 0) do
       local id, X, Y, Z, rad = n, 0, 0, 0, 4
       if n <= NG then
@@ -1516,14 +1524,14 @@ do
       if z > -rad and z < maxZ then
         local x = X * krx + Y * kry + Z * krz
         if (x < 0 and -x or x) < z * tanH + rad or z < 4 then
-          local o = nOrd + 1
-          nOrd = o
-          ordZ[o], ordI[o] = z, id
+          no = no + 1
+          ordZ[no], ordI[no] = z, id
         end
       end
     end
+    nOrd = no
     -- plain depth order (insertion sort)
-    for o = 1, nOrd do
+    for o = 1, no do
       local z, j = ordZ[o], o - 1
       while j > 0 and ordZ[ordP[j]] < z do
         ordP[j + 1] = ordP[j]
@@ -1553,6 +1561,7 @@ local line2
 
   -- the B&W drawLine refuses off-screen points: clip in Lua (slab method)
   line2 = function(x1, y1, x2, y2, pat, fl)
+    local XM, YM = XM, YM
     if x1 >= 0 and x1 <= XM and x2 >= 0 and x2 <= XM and y1 >= 0 and y1 <= YM and y2 >= 0 and y2 <= YM then
       drawLine(x1, y1, x2, y2, pat, fl)
       return
@@ -1580,16 +1589,17 @@ local line2
   end
 
   local function line3(X1, Y1, Z1, X2, Y2, Z2, pat, fl)
-    if Z1 < NEAR then
-      if Z2 < NEAR then return end
-      local t = (NEAR - Z1) / (Z2 - Z1)
-      X1, Y1, Z1 = X1 + (X2 - X1) * t, Y1 + (Y2 - Y1) * t, NEAR
-    elseif Z2 < NEAR then
-      local t = (NEAR - Z2) / (Z1 - Z2)
-      X2, Y2, Z2 = X2 + (X1 - X2) * t, Y2 + (Y1 - Y2) * t, NEAR
+    if Z1 < 0.2 then                                    -- (NEAR)
+      if Z2 < 0.2 then return end
+      local t = (0.2 - Z1) / (Z2 - Z1)
+      X1, Y1, Z1 = X1 + (X2 - X1) * t, Y1 + (Y2 - Y1) * t, 0.2
+    elseif Z2 < 0.2 then
+      local t = (0.2 - Z2) / (Z1 - Z2)
+      X2, Y2, Z2 = X2 + (X1 - X2) * t, Y2 + (Y1 - Y2) * t, 0.2
     end
+    local F, CX, CY = F, CX, CY
     local s1, s2 = F / Z1, F / Z2
-    line2(CX + X1 * s1, CY - Y1 * s1, CX + X2 * s2, CY - Y2 * s2, pat, fl)
+    return line2(CX + X1 * s1, CY - Y1 * s1, CX + X2 * s2, CY - Y2 * s2, pat, fl)
   end
 
   -- parallelogram a, a+u, a+u+v, a+v (camera space)
@@ -1608,6 +1618,7 @@ local line2
     local A, B = a < 0 and -a or a, b < 0 and -b or b
     if GRAYS then
       -- greyscale screens: fill the ground row by row (64 short calls)
+      local CX, CY, XM = CX, CY, XM
       for y = 0, YM do
         local e = c - (y - CY) * b
         if A < 1e-5 then
@@ -1631,26 +1642,56 @@ local line2
   end
 
   local function drawGrid()
+    local krx, kux, kfx, krz, kuz, kfz = krx, kux, kfx, krz, kuz, kfz
     local bX = -kpx * krx - kpy * kry - kpz * krz
     local bY = -kpx * kux - kpy * kuy - kpz * kuz
     local bZ = -kpx * kfx - kpy * kfy - kpz * kfz
-    local gs, gr = 10, 35
+    local gs, gr = 10, 60
     local cxw, czw = floor(kpx / gs) * gs, floor(kpz / gs) * gs
     local pat, fl = DOTTED, BLK
     if GRAYS then pat, fl = SOLID, GRD2 end
-    for i = -3, 4 do
+    -- the ends of the lines across: the same for all of them
+    local z1, z2, x1, x2 = czw - gr, czw + gr, cxw - gr, cxw + gr
+    local a1, a2, a3, b1, b2, b3 = z1 * krz, z1 * kuz, z1 * kfz, z2 * krz, z2 * kuz, z2 * kfz
+    local c1, c2, c3, d1, d2, d3 = x1 * krx, x1 * kux, x1 * kfx, x2 * krx, x2 * kux, x2 * kfx
+    for i = -6, 6 do
       local x = cxw + i * gs
       local X0, Y0, Z0 = bX + x * krx, bY + x * kux, bZ + x * kfx
-      local z1, z2 = czw - gr, czw + gr
-      line3(X0 + z1 * krz, Y0 + z1 * kuz, Z0 + z1 * kfz, X0 + z2 * krz, Y0 + z2 * kuz, Z0 + z2 * kfz, pat, fl)
+      line3(X0 + a1, Y0 + a2, Z0 + a3, X0 + b1, Y0 + b2, Z0 + b3, pat, fl)
       local z = czw + i * gs
       X0, Y0, Z0 = bX + z * krz, bY + z * kuz, bZ + z * kfz
-      local x1, x2 = cxw - gr, cxw + gr
-      line3(X0 + x1 * krx, Y0 + x1 * kux, Z0 + x1 * kfx, X0 + x2 * krx, Y0 + x2 * kux, Z0 + x2 * kfx, pat, fl)
+      line3(X0 + c1, Y0 + c2, Z0 + c3, X0 + d1, Y0 + d2, Z0 + d3, pat, fl)
+    end
+    -- higher up, a coarser one (30 m) beyond it, out to 16 times the height (180 m at most): its
+    -- edge stays near the horizon (a line across the fine one: only its two ends beyond it)
+    local n = floor((kpy < 11.3 and kpy or 11.3) * 16 / 30)
+    if n > 2 then
+      local cx, cz = floor(kpx / 30) * 30, floor(kpz / 30) * 30
+      local u, v = cz - n * 30, cz + n * 30
+      local e1, e2, e3, f1, f2, f3 = u * krz, u * kuz, u * kfz, v * krz, v * kuz, v * kfz
+      u, v = cx - n * 30, cx + n * 30
+      local g1, g2, g3, h1, h2, h3 = u * krx, u * kux, u * kfx, v * krx, v * kux, v * kfx
+      for i = -n, n do
+        -- in two pieces: to the fine one's near edge, and from its far edge (from the near one
+        -- again for a line beside it)
+        local x = cx + i * 30
+        local X0, Y0, Z0 = bX + x * krx, bY + x * kux, bZ + x * kfx
+        local q1, q2, q3 = b1, b2, b3
+        if x < x1 or x > x2 then q1, q2, q3 = a1, a2, a3 end
+        line3(X0 + e1, Y0 + e2, Z0 + e3, X0 + a1, Y0 + a2, Z0 + a3, pat, fl)
+        line3(X0 + q1, Y0 + q2, Z0 + q3, X0 + f1, Y0 + f2, Z0 + f3, pat, fl)
+        local z = cz + i * 30
+        X0, Y0, Z0 = bX + z * krz, bY + z * kuz, bZ + z * kfz
+        q1, q2, q3 = d1, d2, d3
+        if z < z1 or z > z2 then q1, q2, q3 = c1, c2, c3 end
+        line3(X0 + g1, Y0 + g2, Z0 + g3, X0 + c1, Y0 + c2, Z0 + c3, pat, fl)
+        line3(X0 + q1, Y0 + q2, Z0 + q3, X0 + h1, Y0 + h2, Z0 + h3, pat, fl)
+      end
     end
   end
 
   local function drawGate(i, z)
+    local krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz = krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz
     local nxt = i == nextGate and gmode ~= 3
     local pat = (nxt or z < 12) and SOLID or DOTTED
     local k = gk[i]
@@ -1725,12 +1766,13 @@ local line2
   end
 
   local function drawTree(i, z)
+    local krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz = krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz
     local h = qh[i]
     local dx, dy, dz = qx[i] - kpx, -kpy, qz[i] - kpz
     local bX, bY, bZ = dx * krx + dy * kry + dz * krz, dx * kux + dy * kuy + dz * kuz, dx * kfx + dy * kfy + dz * kfz
     local tX, tY, tZ = bX + kry * h, bY + kuy * h, bZ + kfy * h
     line3(bX, bY, bZ, tX, tY, tZ, SOLID, BLK)
-    if z < 40 then
+    if z < 90 then
       local w = h * 0.24
       local q = h * 0.25
       local mX, mY, mZ = bX + kry * q, bY + kuy * q, bZ + kfy * q
@@ -1743,6 +1785,7 @@ local line2
 
   -- structures: the edges of the faces turned to the camera
   local function drawBox(b, z)
+    local krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz = krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz
     local x0, x1, y0, y1, z0, z1 = BX.x0[b], BX.x1[b], BX.y0[b], BX.y1[b], BX.z0[b], BX.z1[b]
     local dx, dy, dz = x0 - kpx, y0 - kpy, z0 - kpz
     local ox, oy, oz = dx * krx + dy * kry + dz * krz, dx * kux + dy * kuy + dz * kuz, dx * kfx + dy * kfy + dz * kfz
@@ -1770,22 +1813,19 @@ local line2
     end
   end
 
-  -- a point on the ground or up from it (world x, y, z) in camera space
-  local function cam(x, y, z)
-    x, y, z = x - kpx, y - kpy, z - kpz
-    return x * krx + y * kry + z * krz, x * kux + y * kuy + z * kuz, x * kfx + y * kfy + z * kfz
-  end
-
   -- the start pad (two squares), and a windsock behind it to the left (lines, as the Lite's): downwind,
-  -- limp without wind
+  -- limp without wind. Points straight to camera space (y: the ground's, from the camera).
   local function drawPad()
-    local hx, hz = TR.hx, TR.hz
+    local kpx, kpz, krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz = kpx, kpz, krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz
+    local hx, hz, y = TR.hx, TR.hz, 0 - kpy
     for s = 1, 2 do
       local e = s == 1 and 1.5 or 0.9
-      local pX, pY, pZ = cam(TR.px + (hx - hz) * e, 0, TR.pz + (hz + hx) * e)
+      local x, z = TR.px + (hx - hz) * e - kpx, TR.pz + (hz + hx) * e - kpz
+      local pX, pY, pZ = x * krx + y * kry + z * krz, x * kux + y * kuy + z * kuz, x * kfx + y * kfy + z * kfz
       for j = 1, 4 do
         local a, b = (j == 1 or j == 4) and 1 or -1, j <= 2 and 1 or -1
-        local X, Y, Z = cam(TR.px + (hx * a + hz * b) * e, 0, TR.pz + (hz * a - hx * b) * e)
+        x, z = TR.px + (hx * a + hz * b) * e - kpx, TR.pz + (hz * a - hx * b) * e - kpz
+        local X, Y, Z = x * krx + y * kry + z * krz, x * kux + y * kuy + z * kuz, x * kfx + y * kfy + z * kfz
         line3(pX, pY, pZ, X, Y, Z, SOLID, BLK)
         pX, pY, pZ = X, Y, Z
       end
@@ -1793,9 +1833,11 @@ local line2
     local x, z = TR.px - hx * 7 - hz * 4, TR.pz - hz * 7 + hx * 4
     local e = S.wind > 0 and (S.wind == 1 and 3 or 7) * (1 + 0.3 * sin(gt * 0.009) + 0.2 * sin(gt * 0.031)) / 7.5 or 0
     if e > 1 then e = 1 end
-    local bX, bY, bZ = cam(x, 0, z)
-    local tX, tY, tZ = cam(x, 4, z)
-    local eX, eY, eZ = cam(x + TR.wx * e * 1.4, 3.9 - (1 - e) * 1.3, z + TR.wz * e * 1.4)
+    local a, b, c = x - kpx, 4 - kpy, z - kpz
+    local bX, bY, bZ = a * krx + y * kry + c * krz, a * kux + y * kuy + c * kuz, a * kfx + y * kfy + c * kfz
+    local tX, tY, tZ = a * krx + b * kry + c * krz, a * kux + b * kuy + c * kuz, a * kfx + b * kfy + c * kfz
+    a, b, c = x + TR.wx * e * 1.4 - kpx, 3.9 - (1 - e) * 1.3 - kpy, z + TR.wz * e * 1.4 - kpz
+    local eX, eY, eZ = a * krx + b * kry + c * krz, a * kux + b * kuy + c * kuz, a * kfx + b * kfy + c * kfz
     line3(bX, bY, bZ, tX, tY, tZ, SOLID, BLK)
     line3(tX, tY, tZ, eX, eY, eZ, SOLID, BLK)
     line3(tX - kry * 0.4, tY - kuy * 0.4, tZ - kfy * 0.4, eX, eY, eZ, SOLID, BLK)
@@ -1806,6 +1848,7 @@ local line2
   -- more toward a rolled view's corners; the azimuth from atan(t) ~ t * (0.7854 + 0.273 * (1 -
   -- t)), within 0.3 deg), dotted
   local function drawRidge()
+    local krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz, F = krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz, F
     local ax_, az_ = kfx < 0 and -kfx or kfx, kfz < 0 and -kfz or kfz
     if ax_ + az_ < 0.05 then return end
     local a
@@ -1820,14 +1863,16 @@ local line2
     if kfx < 0 then a = 6.2832 - a end
     local j0 = floor(a / 0.174533) - 8
     local px_, py_
+    local pat, fl = GRAYS and SOLID or DOTTED, GRAYS and GRD2 or BLK
     for j = j0, j0 + 17 do
       local b = j * 0.174533
       local e = (1.6 + 2.2 * sin(b * 3 + 0.7) ^ 2 + 1.2 * sin(b * 7 + 1.9) ^ 2) * 0.0174533
-      local x, y, z = sin(b) * cos(e), sin(e), cos(b) * cos(e)
+      local c = cos(e)
+      local x, y, z = sin(b) * c, sin(e), cos(b) * c
       local Z = x * kfx + y * kfy + z * kfz
       if Z > 0.3 then
         local X, Y = CX + (x * krx + y * kry + z * krz) * F / Z, CY - (x * kux + y * kuy + z * kuz) * F / Z
-        if px_ then line2(px_, py_, X, Y, GRAYS and SOLID or DOTTED, GRAYS and GRD2 or BLK) end
+        if px_ then line2(px_, py_, X, Y, pat, fl) end
         px_, py_ = X, Y
       else
         px_ = nil
