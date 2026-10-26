@@ -41,18 +41,26 @@ def fnv1a(s):
 
 # format 1, for every edition: gates, structures, bytes at most; format 2, a bigger track, for the
 # color edition only (StickTime BW and earlier versions list format 1 only): the editor writes it
-# only for a track that doesn't fit format 1
+# only for a track that doesn't fit format 1. Formats 3 and 4 (StickTime 1.10.0 on) are 1 and 2 with
+# the scenery (props, rails, decals; structure kinds 4 to 9 too): gates, structures, props, rails,
+# decals, bytes at most; the editor writes them only for a track with scenery, 4 when it doesn't fit 3
 F1 = (24, 16, 999)
 F2 = (48, 64, 5999)
+F3 = (24, 16, 32, 12, 8, 1599)
+F4 = (48, 64, 128, 32, 32, 9999)
+MOST = {"1": F1[2], "2": F2[2], "3": F3[5], "4": F4[5]}
 
 
 def track_problems(text):
     """what is wrong with a track file, as the editor's Save file writes it: the name (16 plain
-    characters), then the format (1, or 2 when it doesn't fit 1) <id> <seed> <trees> <gates: x z
-    type yaw height> [/ <structures: x z half-x half-z bottom top kind>], the id the FNV-1a of the
-    numbers after it, at most 999 bytes (format 1) or 5999 (format 2)"""
+    characters), then the format <id> <seed> <trees> <gates: x z type yaw height> [/ <structures: x z
+    half-x half-z bottom top kind>], and in formats 3 and 4 always four '/' and then <props: x z kind
+    height> / <rails: x1 z1 x2 z2 kind height> / <decals: x z half-length half-width yaw kind>; the
+    id the FNV-1a of the numbers after it; the smallest format the track fits (1 or 2 without
+    scenery, 3 or 4 with), at most 999, 5999, 1599 or 9999 bytes"""
     p = []
-    most = F2[2] if text.split("\n")[1:2] and text.split("\n")[1].startswith("2 ") else F1[2]
+    fmt = text.split("\n")[1][:1] if len(text.split("\n")) > 1 else ""
+    most = MOST.get(fmt, F1[2])
     if len(text.encode()) > most:
         p.append(f"{len(text.encode())} bytes: {most} at most")
     lines = text.split("\n")
@@ -64,44 +72,77 @@ def track_problems(text):
     elif name.lower() in TAKEN:
         p.append(f"the name {name!r} is a built-in track's or the editor's name for a new track: give the track a name of its own")
     tok = line.split(" ")
-    if len(tok) < 4 or tok[0] not in ("1", "2") or not re.fullmatch(r"[1-9][0-9]*", tok[1]):
-        return p + ["the numbers line starts with the format (1 or 2), the id, the tree seed and the trees"]
+    if len(tok) < 4 or tok[0] not in MOST or not re.fullmatch(r"[1-9][0-9]*", tok[1]):
+        return p + ["the numbers line starts with the format (1 to 4), the id, the tree seed and the trees"]
     nums = line[len(tok[0]) + len(tok[1]) + 2:]
     if int(tok[1]) != fnv1a(nums) % 999999 + 1:
         p.append(f"the id {tok[1]} isn't the one the editor gives these numbers ({fnv1a(nums) % 999999 + 1}): "
                  "save the track from the editor again")
-    g, sep, b = nums.partition(" / ")
-    gt, bt = g.split(" "), (b.split(" ") if sep else [])
-    bad = [t for t in gt + bt if not NUM.match(t)]
+    scene = tok[0] in ("3", "4")
+    # the sections: gates [/ structures] (formats 1 and 2); gates / structures / props / rails /
+    # decals, an empty one as nothing between its '/' (3 and 4)
+    secs = nums.split(" /")
+    if len(secs) != (5 if scene else 1 + (" / " in nums)) or any(s and not s.startswith(" ") for s in secs[1:]):
+        return p + ["format 3 and 4 have gates / structures / props / rails / decals, 1 and 2 gates [/ structures]" if scene
+                    else "format 1 and 2 have gates [/ structures]: props, rails and decals are format 3 or 4"]
+    toks = [s.split() for s in secs] + [[]] * (5 - len(secs))
+    gt = toks[0]
+    bad = [t for t in sum(toks, []) if not NUM.match(t)]
     if bad:
         return p + [f"{bad[0]!r} is not a number as the editor writes it (plain, at most 2 decimals)"]
     v = [float(t) for t in gt]
     if not (1 <= v[0] <= 99 and v[0] == int(v[0])) or not (0 <= v[1] <= 30 and v[1] == int(v[1])):
         p.append(f"tree seed {gt[0]} (1 to 99) and trees {gt[1]} (0 to 30)")
-    G, B = v[2:], [float(t) for t in bt]
-    if len(G) % 5 or len(B) % 7:
-        return p + ["gates are 5 numbers each, structures 7"]
-    ng, nb = len(G) // 5, len(B) // 7
+    G, B, P, R, D = v[2:], *[[float(t) for t in s] for s in toks[1:]]
+    if len(G) % 5 or len(B) % 7 or len(P) % 4 or len(R) % 6 or len(D) % 6:
+        return p + ["gates are 5 numbers each, structures 7, props 4, rails 6, decals 6"]
+    ng, nb, npr, nr, nd = len(G) // 5, len(B) // 7, len(P) // 4, len(R) // 6, len(D) // 6
     if not 2 <= ng <= F2[0]:
         p.append(f"{ng} gates: 2 to {F2[0]}")
-    if nb > F2[1]:
-        p.append(f"{nb} structures: {F2[1]} at most")
-    fits = ng <= F1[0] and nb <= F1[1] and len(text.encode()) <= F1[2]
-    if tok[0] == "1" and not fits:
-        p.append(f"more than {F1[0]} gates, {F1[1]} structures or {F1[2]} bytes is format 2: save the track from the editor again")
-    elif tok[0] == "2" and fits:
-        p.append("it fits format 1 (color and B&W radios): save the track from the editor again")
+    for n, most_, what in ((nb, F4[1], "structures"), (npr, F4[2], "props"), (nr, F4[3], "rails"), (nd, F4[4], "decals")):
+        if n > most_:
+            p.append(f"{n} {what}: {most_} at most")
+    size = len(text.encode())
+    kinds = any(B[i * 7 + 6] > 3 for i in range(nb))
+    if scene:
+        if not (npr or nr or nd or kinds):
+            p.append("no scenery (props, rails, decals, structures of kinds 4 to 9) is format 1 or 2: save the track from the editor again")
+        fits3 = ng <= F3[0] and nb <= F3[1] and npr <= F3[2] and nr <= F3[3] and nd <= F3[4] and size <= F3[5]
+        if tok[0] == "3" and not fits3:
+            p.append(f"more than {F3[0]} gates, {F3[1]} structures, {F3[2]} props, {F3[3]} rails, {F3[4]} decals or {F3[5]} bytes "
+                     "is format 4: save the track from the editor again")
+        elif tok[0] == "4" and fits3:
+            p.append("it fits format 3 (color and B&W radios): save the track from the editor again")
+    else:
+        fits = ng <= F1[0] and nb <= F1[1] and size <= F1[2]
+        if tok[0] == "1" and not fits:
+            p.append(f"more than {F1[0]} gates, {F1[1]} structures or {F1[2]} bytes is format 2: save the track from the editor again")
+        elif tok[0] == "2" and fits:
+            p.append("it fits format 1 (color and B&W radios): save the track from the editor again")
     for i in range(ng):
         x, z, k, yaw, h = G[i * 5:i * 5 + 5]
         if not (abs(x) <= 999 and abs(z) <= 999 and k in range(1, 9) and yaw in range(360) and 0 <= h <= 100):
             p.append(f"gate {i + 1}: x and z within 999 m, type 1 to 8, yaw 0 to 359, height 0 to 100")
         if i == 0 and k == 3:
             p.append("gate 1 can't be a dive gate")
+    kmax = 9 if scene else 3
     for i in range(nb):
         x, z, hx, hz, y0, y1, k = B[i * 7:i * 7 + 7]
         if not (abs(x) <= 999 and abs(z) <= 999 and 0.05 <= hx <= 200 and 0.05 <= hz <= 200 and 0 <= y0 <= 200
-                and 0.1 <= y1 <= 300 and y0 < y1 and k in (1, 2, 3)):
-            p.append(f"structure {i + 1}: within 999 m, half sizes 0.05 to 200, bottom 0 to 200 below top 0.1 to 300, kind 1 to 3")
+                and 0.1 <= y1 <= 300 and y0 < y1 and k in range(1, kmax + 1)):
+            p.append(f"structure {i + 1}: within 999 m, half sizes 0.05 to 200, bottom 0 to 200 below top 0.1 to 300, kind 1 to {kmax}")
+    for i in range(npr):
+        x, z, k, h = P[i * 4:i * 4 + 4]
+        if not (abs(x) <= 999 and abs(z) <= 999 and k in range(1, 11) and 0 <= h <= 40):
+            p.append(f"prop {i + 1}: within 999 m, kind 1 to 10, height 0 to 40")
+    for i in range(nr):
+        x1, z1, x2, z2, k, h = R[i * 6:i * 6 + 6]
+        if not (max(abs(x1), abs(z1), abs(x2), abs(z2)) <= 999 and k in range(1, 6) and 0 <= h <= 40 and (x2 - x1) ** 2 + (z2 - z1) ** 2 > 0.25):
+            p.append(f"rail {i + 1}: within 999 m, kind 1 to 5, height 0 to 40, its ends more than 0.5 m apart")
+    for i in range(nd):
+        x, z, a, b, yaw, k = D[i * 6:i * 6 + 6]
+        if not (abs(x) <= 999 and abs(z) <= 999 and 0.05 <= a <= 200 and 0.05 <= b <= 200 and yaw in range(360) and k in range(1, 7)):
+            p.append(f"decal {i + 1}: within 999 m, half length and half width 0.05 to 200, yaw 0 to 359, kind 1 to 6")
     return p
 
 

@@ -84,8 +84,29 @@ def checker_tests():
     assert " / " not in nums                   # (the cases below add the structures)
     check(gallery.track_problems(with_boxes(20, 2)) == [], "checker: a format 2 track of 20 structures passes")
     for what, text in {"format 2 for a track that fits format 1": with_boxes(5, 2), "format 1 with 17 structures": with_boxes(17, 1),
-                       "65 structures": with_boxes(65, 2), "format 3": with_boxes(20, 3)}.items():
+                       "65 structures": with_boxes(65, 2), "format 9": with_boxes(20, 9), "format 3 without scenery": with_boxes(20, 3)}.items():
         check(gallery.track_problems(text) != [], f"checker: refuses {what}")
+    # formats 3 and 4 (1.10.0): the scenery after the structures, every section there, empty or not
+    def scene(boxes, props, rails, decals, fmt, kind=1):
+        more = (nums + " /" + "".join(f" {200 + 10 * i} 0 1 1 0 3 {kind}" for i in range(boxes)) +
+                " /" + "".join(f" {-100 - 5 * i} 50 {i % 10 + 1} 0" for i in range(props)) +
+                " /" + "".join(f" -200 {10 * i} -150 {10 * i} {i % 5 + 1} 0" for i in range(rails)) +
+                " /" + "".join(f" 300 {20 * i} 8 2.5 {i * 10 % 360} {i % 6 + 1}" for i in range(decals)))
+        return name + f"\n{fmt} " + str(gallery.fnv1a(more) % 999999 + 1) + " " + more + "\n"
+    check(gallery.track_problems(scene(0, 10, 3, 2, 3)) == [], f"checker: a format 3 track with props, rails and decals passes: {gallery.track_problems(scene(0, 10, 3, 2, 3))}")
+    check(gallery.track_problems(scene(2, 0, 0, 0, 3, kind=8)) == [], "checker: format 3 for structures of a new kind (8) passes")
+    check(gallery.track_problems(scene(4, 40, 0, 0, 4)) == [], f"checker: a format 4 track of 40 props passes: {gallery.track_problems(scene(4, 40, 0, 0, 4))}")
+    def reid(text, old, new):          # (a change, with the id the editor would give it)
+        n, ln = text.split("\n")[:2]
+        fmt, _, more = ln.split(" ", 2)
+        more = more.replace(old, new, 1)
+        assert old != new and new in more
+        return n + f"\n{fmt} " + str(gallery.fnv1a(more) % 999999 + 1) + " " + more + "\n"
+    for what, text in {"format 4 for a track that fits format 3": scene(0, 10, 3, 2, 4), "format 3 with 33 props": scene(0, 33, 0, 0, 3),
+                       "format 1 with props": scene(0, 3, 0, 0, 1), "a structure of kind 8 in format 2": reid(with_boxes(20, 2), " 0 3 1", " 0 3 8"),
+                       "129 props": scene(0, 129, 0, 0, 4), "a prop of kind 11": reid(scene(0, 11, 0, 0, 3), " 50 10 0", " 50 11 0"),
+                       "a rail of no length": reid(scene(0, 0, 1, 0, 3), " -150 0 1", " -200 0 1")}.items():
+        check(gallery.track_problems(text) != [], f"checker: refuses {what}: {gallery.track_problems(text)}")
     # 24 gates and 16 structures over 999 bytes (2 decimals each): format 2 by its size alone
     def long16(fmt):
         more = (" ".join(nums.split(" ")[:2]) + "".join(f" {10 * i}.25 -10.25 1 0 2.25" for i in range(24)) + " /" +

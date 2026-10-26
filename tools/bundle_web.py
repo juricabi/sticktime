@@ -64,21 +64,66 @@ def lua_table(text):
     return value()
 
 
+LUA_STRING = r'"(?:[^"\\]|\\.)*"'
+
+
+def deco_table(src):
+    """buildTrack's DECO: the built-in tracks' scenery, one string each (string literals joined by
+    '..'), as the game reads it: props / rails / decals"""
+    start = src.index("local DECO = {") + len("local DECO = {")
+    body, depth, i = [], 1, start
+    while depth:                                       # (to its closing brace, past strings)
+        m = re.compile(LUA_STRING).match(src, i)
+        if m:
+            body.append(m.group(0))
+            i = m.end()
+            continue
+        c = src[i]
+        if c == "-" and src.startswith("--", i):
+            i = src.index("\n", i)
+            continue
+        depth += c == "{"
+        depth -= c == "}"
+        body.append(c)
+        i += 1
+    entries = re.findall(rf"({LUA_STRING}(?:\s*\.\.\s*{LUA_STRING})*)\s*,", "".join(body[:-1]) + ",")
+    return ["".join(json.loads(s) for s in re.findall(LUA_STRING, e)) for e in entries]
+
+
+def scenery(s, name):
+    """a scenery string (props / rails / decals) as the editor's lists, checked as the game's
+    section() takes them: whole groups (4, 6, 6 numbers), known kinds"""
+    parts = s.split("/")
+    assert len(parts) <= 3, f"DECO of {name}: props / rails / decals"
+    parts += [""] * (3 - len(parts))
+    out = {}
+    for key, part, m, k, km in (("props", parts[0], 4, 2, 10), ("rails", parts[1], 6, 4, 5), ("decals", parts[2], 6, 5, 6)):
+        v = [float(t) if "." in t else int(t) for t in part.split()]
+        assert len(v) % m == 0, f"DECO of {name}: {key} in groups of {m}"
+        groups = [v[i:i + m] for i in range(0, len(v), m)]
+        assert all(g[k] in range(1, km + 1) for g in groups), f"DECO of {name}: {key}' kinds 1 to {km}"
+        out[key] = groups
+    return out
+
+
 def track_data():
     """What the track editor (web/src/editor.js) needs from the game: the built-in tracks
-    (src/sticktime.lua's TRACKS, with their structures' kinds) as templates, and the gate sizes
-    and default heights, so the map draws what the game builds"""
+    (src/sticktime.lua's TRACKS, with their structures' kinds, and DECO, their scenery) as
+    templates, the gate sizes and default heights, the props' heights and radii and the rails'
+    heights, so the map draws what the game builds"""
     src = read(ROOT / "src/sticktime.lua")
     table = lua_table(src[src.index("local TRACKS = {") + len("local TRACKS = "):])
+    deco = deco_table(src)
+    assert len(deco) == len(table), f"DECO has {len(deco)} entries for {len(table)} tracks"
     tracks = []
-    for t in table:
+    for t, d in zip(table, deco):
         name, seed, gates = t[0], t[1], t[2]
         boxes = t[3] if len(t) > 3 and t[3] else []
         mult = t[4] if len(t) > 4 else 1
         assert len(gates) % 5 == 0 and len(boxes) % 7 == 0, f"track {name}: gates of 5, structures of 7 numbers"
         tracks.append({"name": name, "seed": seed, "trees": round(mult * 9),
                        "gates": [gates[i:i + 5] for i in range(0, len(gates), 5)],
-                       "boxes": [boxes[i:i + 7] for i in range(0, len(boxes), 7)]})
+                       "boxes": [boxes[i:i + 7] for i in range(0, len(boxes), 7)], **scenery(d, name)})
     assert len(tracks) == 8, "the editor's templates expect the 8 built-in tracks"
 
     def nums(pattern):
@@ -90,8 +135,10 @@ def track_data():
     trees = int(re.search(r'"COLOR": \{.*?"TREES": "(\d+)"', read(ROOT / "build.py"), re.S).group(1))
     data = {"tracks": tracks, "GT": gt, "FLAGH": flagh, "TREES": trees,
             "GHW": nums(r"local GHW = \{([^}]*)\}"), "GHH": nums(r"local GHH = \{([^}]*)\}"),
-            "GCY": nums(r"local GCY = \{([^}]*)\}")}
+            "GCY": nums(r"local GCY = \{([^}]*)\}"),
+            "PH": nums(r"local PH = \{([^}]*)\}"), "PR": nums(r"local PR = \{([^}]*)\}"), "RH": nums(r"local RH = \{([^}]*)\}")}
     assert len(data["GHW"]) == len(data["GHH"]) == len(data["GCY"]) == 8
+    assert len(data["PH"]) == len(data["PR"]) == 10 and len(data["RH"]) == 5
     return json.dumps(data, separators=(",", ":"))
 
 
