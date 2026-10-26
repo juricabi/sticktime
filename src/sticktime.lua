@@ -1,6 +1,6 @@
 local toolName = "TNS|@TOOLNAME@|TNE"
 --[[ ======================================================================
-  @TITLE@ v1.9.0  -  a real 3D FPV quad simulator that runs on your radio
+  @TITLE@ v1.10.0  -  a real 3D FPV quad simulator that runs on your radio
   @VARIANT@
 
   Install : @INSTALL@
@@ -298,8 +298,8 @@ do
     "-14 10 8 0 -14 18 8 0 110 40 5 0 112 47 5 0 114 54 5 0 -16 60 7 0 60 112 7 0 122 20 7 0 40 30 7 0 / " ..
     "-10 28 -10 54 5 0 15 28 15 54 5 0 -30 132 130 132 4 0 / 0 23 34 5 0 2 0 0 5 0.15 90 4 5 23 34 0.08 0 4 " ..
     "-5 23 34 0.08 0 4",
-    -- Bando: tyres and posts round the site, a power line beyond it, gravel and mud
-    "-24 0 5 0 -26 4 5 0 30 -28 5 0 64 -6 10 0 64 4 10 0 / -80 -52 104 -52 4 0 / 20 40 30 22 0 3 46 80 8 5 40 1",
+    -- Bando: tyres and posts round the site, a power line beyond it, mud and gravel
+    "-24 0 5 0 -26 4 5 0 30 -28 5 0 64 -6 10 0 64 4 10 0 / -80 -52 104 -52 4 0 / 46 80 8 5 40 1 -30 30 6 4 0 3",
     -- Pro Track: nets behind the far end, tents and banners by the start, masts at the corners
     "-16 12 8 0 -16 20 8 0 64 72 7 0 64 -32 7 0 -18 -32 7 0 -18 72 7 0 / -12 82 62 82 2 0 -12 30 -12 54 5 0 / " ..
     "-16 16 8 4 0 1",

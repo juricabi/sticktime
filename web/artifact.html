@@ -1764,7 +1764,7 @@ if (typeof module !== 'undefined') module.exports = EdgeTX;
 <script type="text/plain" id="lua-color">
 local toolName = "TNS|StickTime|TNE"
 --[[ ======================================================================
-  StickTime v1.9.0  -  a real 3D FPV quad simulator that runs on your radio
+  StickTime v1.10.0  -  a real 3D FPV quad simulator that runs on your radio
   Color version - every EdgeTX color radio (480x272, 480x320, 320x480, 320x240, 800x480)
 
   Install : copy this file to /SCRIPTS/TOOLS/ on the radio SD card and
@@ -2027,8 +2027,8 @@ do
     "-14 10 8 0 -14 18 8 0 110 40 5 0 112 47 5 0 114 54 5 0 -16 60 7 0 60 112 7 0 122 20 7 0 40 30 7 0 / " ..
     "-10 28 -10 54 5 0 15 28 15 54 5 0 -30 132 130 132 4 0 / 0 23 34 5 0 2 0 0 5 0.15 90 4 5 23 34 0.08 0 4 " ..
     "-5 23 34 0.08 0 4",
-    -- Bando: tyres and posts round the site, a power line beyond it, gravel and mud
-    "-24 0 5 0 -26 4 5 0 30 -28 5 0 64 -6 10 0 64 4 10 0 / -80 -52 104 -52 4 0 / 20 40 30 22 0 3 46 80 8 5 40 1",
+    -- Bando: tyres and posts round the site, a power line beyond it, mud and gravel
+    "-24 0 5 0 -26 4 5 0 30 -28 5 0 64 -6 10 0 64 4 10 0 / -80 -52 104 -52 4 0 / 46 80 8 5 40 1 -30 30 6 4 0 3",
     -- Pro Track: nets behind the far end, tents and banners by the start, masts at the corners
     "-16 12 8 0 -16 20 8 0 64 72 7 0 64 -32 7 0 -18 -32 7 0 -18 72 7 0 / -12 82 62 82 2 0 -12 30 -12 54 5 0 / " ..
     "-16 16 8 4 0 1",
@@ -6237,6 +6237,7 @@ local function init()
     TEST.bat = function(k, v) if v then BAT[k] = v end return BAT[k], R.why end   -- a battery value; the crash's why
     TEST.box = function(b) return BX.x0[b], BX.x1[b], BX.y0[b], BX.y1[b], BX.z0[b], BX.z1[b] end
     TEST.scenery = function() return NP, qx, qz, qr, qh, qk, SCN end   -- the pillars (props among them), rails and decals
+    TEST.msg = function() return R.msg end                               -- the message on the screen (a trick's name)
     TEST.S = S
     -- the simulation time and the clock (ticks), the frame interval, the host-timed offset; t: the
     -- clock jumps to t ticks (hours of uptime)
@@ -6313,7 +6314,7 @@ return { init = init, run = run }
 <script type="text/plain" id="lua-bw">
 local toolName = "TNS|StickTime BW|TNE"
 --[[ ======================================================================
-  StickTime BW v1.9.0  -  a real 3D FPV quad simulator that runs on your radio
+  StickTime BW v1.10.0  -  a real 3D FPV quad simulator that runs on your radio
   Black & white version - 128x64 and 212x64 radios with an STM32F4 (TX12 MkII, Zorro, Boxer,
   Pocket, MT12, GX12, X9D+ 2019, X9E, T14, T20 ...)
 
@@ -6563,8 +6564,8 @@ do
     "-14 10 8 0 -14 18 8 0 110 40 5 0 112 47 5 0 114 54 5 0 -16 60 7 0 60 112 7 0 122 20 7 0 40 30 7 0 / " ..
     "-10 28 -10 54 5 0 15 28 15 54 5 0 -30 132 130 132 4 0 / 0 23 34 5 0 2 0 0 5 0.15 90 4 5 23 34 0.08 0 4 " ..
     "-5 23 34 0.08 0 4",
-    -- Bando: tyres and posts round the site, a power line beyond it, gravel and mud
-    "-24 0 5 0 -26 4 5 0 30 -28 5 0 64 -6 10 0 64 4 10 0 / -80 -52 104 -52 4 0 / 20 40 30 22 0 3 46 80 8 5 40 1",
+    -- Bando: tyres and posts round the site, a power line beyond it, mud and gravel
+    "-24 0 5 0 -26 4 5 0 30 -28 5 0 64 -6 10 0 64 4 10 0 / -80 -52 104 -52 4 0 / 46 80 8 5 40 1 -30 30 6 4 0 3",
     -- Pro Track: nets behind the far end, tents and banners by the start, masts at the corners
     "-16 12 8 0 -16 20 8 0 64 72 7 0 64 -32 7 0 -18 -32 7 0 -18 72 7 0 / -12 82 62 82 2 0 -12 30 -12 54 5 0 / " ..
     "-16 16 8 4 0 1",
@@ -9081,6 +9082,7 @@ local function init()
     TEST.bat = function(k, v) if v then BAT[k] = v end return BAT[k], R.why end   -- a battery value; the crash's why
     TEST.box = function(b) return BX.x0[b], BX.x1[b], BX.y0[b], BX.y1[b], BX.z0[b], BX.z1[b] end
     TEST.scenery = function() return NP, qx, qz, qr, qh, qk, SCN end   -- the pillars (props among them), rails and decals
+    TEST.msg = function() return R.msg end                               -- the message on the screen (a trick's name)
     TEST.S = S
     -- the simulation time and the clock (ticks), the frame interval, the host-timed offset; t: the
     -- clock jumps to t ticks (hours of uptime)
@@ -9129,7 +9131,7 @@ return { init = init, run = run }
 <script type="text/plain" id="lua-lite">
 local toolName = "TNS|StickTime Lite|TNE"
 --[[ ======================================================================
-StickTime Lite v1.9.0  -  the small edition of StickTime for B&W radios.
+StickTime Lite v1.10.0  -  the small edition of StickTime for B&W radios.
 Made for radios with little memory (STM32F2: X7, X9D, X9D+, X9 Lite,
 X-Lite, TX12 MkI, T12, T8, T-Lite, T-Pro, LR3 Pro). Runs on every
 black & white EdgeTX radio with EdgeTX 2.11 or newer.

@@ -27,6 +27,7 @@ A few rules:
 - The name (the file's first line, 16 characters at most) is what the game's track menu shows, so it must be different from the names already in the gallery and from the game's own tracks (and the editor's names for a new track: My Track, My Meadow, ...).
 - Send your own work, or the layout of a real track with its source linked.
 - A track with more than 24 gates, 16 structures or 999 bytes is a bigger track (format 2: up to 48 gates, 64 structures and 5999 bytes). Only StickTime 1.8.0 or later on a color radio flies it; StickTime BW and older versions don't list it. Keep it light enough for a TX16S: fly it in the emulator on the TX16S with **Radio load** on, and keep the busiest views near 50 ms.
+- A track with scenery (props, rails, decals, or structures in the colors added in 1.10.0) is format 3: up to 24 gates, 16 structures, 32 props, 12 rails, 8 decals and 1599 bytes, for StickTime 1.10.0 or later on color and B&W radios. A bigger one is format 4: up to 48 gates, 64 structures, 128 props, 32 rails, 32 decals and 9999 bytes, for StickTime 1.10.0 or later on a color radio. Earlier versions don't list either. Keep props and rails off the racing line: the editor's **Check** says where they're in the way.
 
 ## The MultiGP tracks
 
