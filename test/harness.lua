@@ -262,7 +262,7 @@ local function idleSticks() sticks.ail, sticks.ele, sticks.rud, sticks.thr = 0, 
 
 -- ------------------------------------------------------------ scenarios
 -- 1. menus: walk every item, open settings, change every option both ways
-local OPTN = GAME_COLOR and 26 or 21
+local OPTN = GAME_COLOR and 27 or 21
 steps(20)
 for i = 1, 9 do frame(EVT_VIRTUAL_NEXT) frame(0) end
 for i = 1, 9 do frame(EVT_VIRTUAL_PREV) frame(0) end
@@ -1256,12 +1256,12 @@ do
   L.start(3) run(2)
   fly(0, 0.6, 67, 0, 0, 0, 8, 0.5, thr)
   if L.msg() == nil or not string.find(L.msg(), "UNDER", 1, true) then fail("scenery: Freestyle under the banner should be UNDER (" .. tostring(L.msg()) .. ")") end
-  -- Night and Sky detail, every look
+  -- Night, Sky detail and Detail Low, every look
   for c = 0, 5 do
-    L.set("colors", c) L.set("sky", c % 2)
+    L.set("colors", c) L.set("sky", c % 2) L.set("detail", 2)
     fly(0, 3, -10, 0, 0, 0, 5, 0.3)
   end
-  L.set("colors", 0) L.set("sky", 1)
+  L.set("colors", 0) L.set("sky", 1) L.set("detail", 1)
   -- the built-in tracks: a windsock each, a tent (theirs or the pilots' area's), trees off the scenery
   local function sd(x, z, ax, az, bx, bz)
     local dx, dz = bx - ax, bz - az

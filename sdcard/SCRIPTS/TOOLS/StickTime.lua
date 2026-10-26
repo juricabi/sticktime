@@ -1,6 +1,6 @@
 local toolName = "TNS|StickTime|TNE"
 --[[ ======================================================================
-  StickTime v1.10.0  -  a real 3D FPV quad simulator that runs on your radio
+  StickTime v1.11.0  -  a real 3D FPV quad simulator that runs on your radio
   Color version - every EdgeTX color radio (480x272, 480x320, 320x480, 320x240, 800x480)
 
   Install : copy this file to /SCRIPTS/TOOLS/ on the radio SD card and
@@ -43,6 +43,7 @@ local S = { track = 1, quad = 1, twr = 0, mode = 1, rates = 2, rc = 100, rm = 60
             map = 1, sticks = 0, fps = 0 }
 S.colors = 0          -- 0 Auto (Summer on analog video, else Classic), 1 Classic, 2 Summer, 3 Evening, 4 Overcast, 5 Night
 S.sky = 1             -- Sky detail: clouds, sun, moon and stars
+S.detail = 1          -- Detail: 1 High, 2 Low (simpler drawing on a slow radio; the game itself the same)
 -- rows: label, key, then either a value list (+ names, suffix) or nil, nil, suffix, min, max, step
 local OPTS = {
   { "Quad", "quad", { 1, 2, 3, 4, 5 }, { 'Racer 5"', 'Freestyle 5"', '3" toothpick', 'Whoop 65mm', 'Whoop 75mm' } },
@@ -68,6 +69,7 @@ local OPTS = {
   { "Vibration", "vib", { 0, 1 }, { "Off", "On" } },
   { "Colors", "colors", { 0, 1, 2, 3, 4, 5 }, { "Auto", "Classic", "Summer", "Evening", "Overcast", "Night" } },
   { "Sky detail", "sky", { 0, 1 }, { "Off", "On" } },
+  { "Detail", "detail", { 1, 2 }, { "High", "Low" } },
   { "Minimap", "map", { 0, 1 }, { "Off", "On" } },
   { "Stick view", "sticks", { 0, 1 }, { "Off", "On" } },
   { "Show FPS", "fps", { 0, 1 }, { "Off", "On" } },
@@ -2809,6 +2811,14 @@ local AV = STICKTIME_AV == true
 
   local function drawMountains()
     local krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz, F, CX, CY = krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz, F, CX, CY
+    -- Detail Low: the haze paints over their bases again (HZN steps up from the horizon, HZ2 + 1
+    -- on a natural look): the rows under it, less a step, are not drawn, the outline above the
+    -- same. hz: that height as the ground's c + (x-CX)*a - (y-CY)*b measures it (per px step)
+    local hz
+    if S.detail == 2 then
+      local A, B = kry < 0 and -kry or kry, kuy < 0 and -kuy or kuy
+      hz = (NAT and HZ2 - 1 or HZN - 2) * (A <= B and B or A)
+    end
     for i = 1, NMT, 9 do
       local ax, ay, az = MT[i], MT[i + 1], MT[i + 2]
       local Za = ax * kfx + ay * kfy + az * kfz
@@ -2822,8 +2832,18 @@ local AV = STICKTIME_AV == true
           local Xl, Yl = CX + (lx * krx + lz * krz) * s, CY - (lx * kux + lz * kuz) * s
           s = F / Zr
           local Xr, Yr = CX + (mx * krx + mz * krz) * s, CY - (mx * kux + mz * kuz) * s
-          fillTri(Xa, Ya, Xl, Yl, Xr, Yr, cMtn)
-          fillTri(Xa, Ya, Xa + (Xl - Xa) * 0.3, Ya + (Yl - Ya) * 0.3, Xa + (Xr - Xa) * 0.3, Ya + (Yr - Ya) * 0.3, cSnow)
+          if not hz then
+            fillTri(Xa, Ya, Xl, Yl, Xr, Yr, cMtn)
+            fillTri(Xa, Ya, Xa + (Xl - Xa) * 0.3, Ya + (Yl - Ya) * 0.3, Xa + (Xr - Xa) * 0.3, Ya + (Yr - Ya) * 0.3, cSnow)
+          else
+            -- (the base moved f of the way up to the top; all under the haze: nothing)
+            local f = hz / (F * kfy + (Xa - CX) * kry - (Ya - CY) * kuy)
+            if f < 1 then
+              fillTri(Xa, Ya, Xl + (Xa - Xl) * f, Yl + (Ya - Yl) * f, Xr + (Xa - Xr) * f, Yr + (Ya - Yr) * f, cMtn)
+              if f < 0.7 then f = 0.7 end
+              fillTri(Xa, Ya, Xl + (Xa - Xl) * f, Yl + (Ya - Yl) * f, Xr + (Xa - Xr) * f, Yr + (Ya - Yr) * f, cSnow)
+            end
+          end
         end
       end
     end
@@ -3027,18 +3047,22 @@ local AV = STICKTIME_AV == true
       sx, sy = a > 0 and 1 or -1, 0
     end
     -- natural looks: the sky fades from the haze at the horizon to its color ~18 deg up,
-    -- under the mountains (its first HZ2 + 1 steps painted again below, over their bases)
+    -- under the mountains (its first HZ2 + 1 steps painted again below, over their bases);
+    -- a line a row. Detail Low leaves the fade's faint top quarter (under 7% haze) to the
+    -- sky, and the far ground's last eighth to the grass: each a shade off its fill
     local ns = (NAT and hx0) and floor(F * 0.325 + 0.5) or 0
+    local low = S.detail == 2
+    local nt = low and floor(ns * 0.75) or ns
     if f > 0.5 then
       lcd.clear(cGround)
       fillSide(-a, -b, -c, cSky)
-      if ns > 0 then bands(hx0, hy0, hx1, hy1, sx, sy, 0, ns - 1, hazeS, 16, ns, HZ2 + 1) end
+      if nt > 0 then bands(hx0, hy0, hx1, hy1, sx, sy, 0, nt - 1, hazeS, 16, ns, HZ2 + 1) end
       drawSky()
       drawMountains()
       fillSide(a, b, c, cGround, 2)
     else
       lcd.clear(cSky)
-      if ns > 0 then bands(hx0, hy0, hx1, hy1, sx, sy, 0, ns - 1, hazeS, 16, ns, HZ2 + 1) end
+      if nt > 0 then bands(hx0, hy0, hx1, hy1, sx, sy, 0, nt - 1, hazeS, 16, ns, HZ2 + 1) end
       drawSky()
       drawMountains()
       fillSide(a, b, c, cGround)
@@ -3048,8 +3072,8 @@ local AV = STICKTIME_AV == true
     -- ground fading into it
     if NAT then
       local ng = floor(F * 0.105 + 0.5)
-      bands(hx0, hy0, hx1, hy1, sx, sy, 0, HZ2 < ns and HZ2 or ns - 1, hazeS, 16, ns)
-      bands(hx0, hy0, hx1, hy1, -sx, -sy, 1, ng, hazeG, 8, ng)
+      bands(hx0, hy0, hx1, hy1, sx, sy, 0, HZ2 < nt and HZ2 or nt - 1, hazeS, 16, ns)
+      bands(hx0, hy0, hx1, hy1, -sx, -sy, 1, low and floor(ng * 0.875) or ng, hazeG, 8, ng)
     else
       bands(hx0, hy0, hx1, hy1, sx, sy, 0, HZN - 1, hazeS, 8, HZN)
       bands(hx0, hy0, hx1, hy1, -sx, -sy, 1, HZ2, hazeG, 8, HZN)
@@ -3200,6 +3224,10 @@ local AV = STICKTIME_AV == true
     local n = floor((kpy < 19 and kpy or 19) * 16 / 30)
     local cx, cz = floor(kpx / 30) * 30, floor(kpz / 30) * 30
     local GC = SCN.nd > 0 and SCN.gc
+    -- Detail Low: every other fine line, those on 20 m (xo, zo: the i parity left out), and the
+    -- coarse lines not on 20 m go on across the fine grid
+    local low, xo, zo = S.detail == 2, 2, 2
+    if low then xo, zo = (floor(kpx / gs) + 1) % 2, (floor(kpz / gs) + 1) % 2 end
     -- (the lines' ends turned with the camera: the same for every line along z, and along x. A
     -- line whose far end, in depth, is behind the near plane is all behind it: not drawn)
     local zaR, zaU, zaF, zbR, zbU, zbF = za * krz, za * kuz, za * kfz, zb * krz, zb * kuz, zb * kfz
@@ -3216,15 +3244,16 @@ local AV = STICKTIME_AV == true
         if not (Z0 + zF < NEAR) then
           local X0, Y0 = bX + x * krx, bY + x * kux
           local E = GC and (GC[1000 + x / 10] or gridE(1, x, 1000 + x / 10))
+          local thru = x < xa or x > xb or (low and x % 20 ~= 0)
           if E and E[1] then
             gX, gY, gZ, gU, gV, gW = X0, Y0, Z0, krz, kuz, kfz
-            if x < xa or x > xb then
+            if thru then
               gridLine(E, z1, z2, cGridF)
             else
               gridLine(E, z1, za, cGridF)
               gridLine(E, zb, z2, cGridF)
             end
-          elseif x < xa or x > xb then
+          elseif thru then
             line3(X0 + z1R, Y0 + z1U, Z0 + z1F, X0 + z2R, Y0 + z2U, Z0 + z2F, cGridF)
           else
             line3(X0 + z1R, Y0 + z1U, Z0 + z1F, X0 + zaR, Y0 + zaU, Z0 + zaF, cGridF)
@@ -3236,15 +3265,16 @@ local AV = STICKTIME_AV == true
         if not (Z0 + xF < NEAR) then
           local X0, Y0 = bX + z * krz, bY + z * kuz
           local E = GC and (GC[3000 + z / 10] or gridE(2, z, 3000 + z / 10))
+          local thru = z < za or z > zb or (low and z % 20 ~= 0)
           if E and E[1] then
             gX, gY, gZ, gU, gV, gW = X0, Y0, Z0, krx, kux, kfx
-            if z < za or z > zb then
+            if thru then
               gridLine(E, x1, x2, cGridF)
             else
               gridLine(E, x1, xa, cGridF)
               gridLine(E, xb, x2, cGridF)
             end
-          elseif z < za or z > zb then
+          elseif thru then
             line3(X0 + x1R, Y0 + x1U, Z0 + x1F, X0 + x2R, Y0 + x2U, Z0 + x2F, cGridF)
           else
             line3(X0 + x1R, Y0 + x1U, Z0 + x1F, X0 + xaR, Y0 + xaU, Z0 + xaF, cGridF)
@@ -3262,7 +3292,7 @@ local AV = STICKTIME_AV == true
       local near = i >= -3 and i <= 4
       local x = cxw + i * gs
       local Z0 = bZ + x * kfx
-      if not (Z0 + zF < NEAR) then
+      if not (Z0 + zF < NEAR) and i % 2 ~= xo then
         local X0, Y0 = bX + x * krx, bY + x * kux
         local E = GC and (GC[1000 + x / 10] or gridE(1, x, 1000 + x / 10))
         if E and E[1] then
@@ -3278,7 +3308,7 @@ local AV = STICKTIME_AV == true
       end
       local z = czw + i * gs
       Z0 = bZ + z * kfz
-      if not (Z0 + xF < NEAR) then
+      if not (Z0 + xF < NEAR) and i % 2 ~= zo then
         local X0, Y0 = bX + z * krz, bY + z * kuz
         local E = GC and (GC[3000 + z / 10] or gridE(2, z, 3000 + z / 10))
         if E and E[1] then
@@ -3559,6 +3589,10 @@ local AV = STICKTIME_AV == true
     local a1, a2, a3 = gax[i], gay[i], gaz[i]
     local Ax, Ay, Az = a1 * rx_ + a2 * ry_ + a3 * rz_, a1 * ux_ + a2 * uy_ + a3 * uz_, a1 * fx_ + a2 * fy_ + a3 * fz_
     local iw, ih = GHW[k], GHH[k]
+    -- far detail: half a ring's segments past zh, an outline only past zo (sooner at Detail Low,
+    -- but an arch, twice a hoop's size, keeps its whole ring to 35 m)
+    local zh, zo = 35, 70
+    if S.detail == 2 then zh, zo = k == 4 and 18 or 35, 45 end
     if sh == 3 then
       -- flag: pole plus a cloth on the outer side; pass on the zone side
       local sd = k == 6 and 1 or -1
@@ -3595,13 +3629,13 @@ local AV = STICKTIME_AV == true
       -- hoop (on a stand) or arch: a ring of bar segments
       local ro = iw + GT
       local ns, st = k == 4 and 12 or 6, 1
-      if z > 35 then ns, st = ns / 2, 2 end
+      if z > zh then ns, st = ns / 2, 2 end
       if k == 4 then
         local h = gy[i] - ro
         local X, Y, Z = cx - Ax * ro, cy - Ay * ro, cz - Az * ro
         line3(X, Y, Z, X - ry_ * h, Y - uy_ * h, Z - fy_ * h, fPole[fi])
       end
-      if z > 70 then
+      if z > zo then
         local rm = iw + GT * 0.5
         local oX, oY, oZ = cx + Rx * rm, cy + Ry * rm, cz + Rz * rm
         for j = st, ns * st, st do
@@ -3649,7 +3683,7 @@ local AV = STICKTIME_AV == true
         end
       end
     end
-    if z > 70 then
+    if z > zo then
       -- far away: a single outline is enough
       local mw, mh = (iw + ow) * 0.5, (ih + oh) * 0.5
       local wx, wy, wz, hx, hy, hz = Rx * mw, Ry * mw, Rz * mw, Ax * mh, Ay * mh, Az * mh
@@ -3715,8 +3749,8 @@ local AV = STICKTIME_AV == true
       end
     end
     tri(x1, y1, cx + nx, cy + ny, cx - nx, cy - ny, fTree[fi])
-    -- lit half only on near trees, where it reads as a cone
-    if l > 28 and z < 55 then tri(x1, y1, cx, cy, cx - nx, cy - ny, fTreeH[fi]) end
+    -- lit half only on near trees, where it reads as a cone (none at Detail Low)
+    if l > 28 and z < 55 and S.detail ~= 2 then tri(x1, y1, cx, cy, cx - nx, cy - ny, fTreeH[fi]) end
   end
 
   -- a box's faces turned to the camera: x faces cx, z faces cz, top ct, bottom cb, edges ec
@@ -3862,8 +3896,8 @@ local AV = STICKTIME_AV == true
       local n = (cr > 12 or cv > 12) and 12 or 6
       local mx, my = x0 + ex * cc, y0 + ey * cc
       blob(mx, my, nx * cr, ny * cr, ux_ * cv, uy_ * cv, n, (k == 4 and FC.leaf or FC.bush)[fi])
-      if cv > 12 and z < 55 then
-        -- the side the light falls on, round as the crown (only near ones get it)
+      if cv > 12 and z < 55 and S.detail ~= 2 then
+        -- the side the light falls on, round as the crown (only near ones get it, none at Detail Low)
         local q = 0.55
         blob(mx + ux_ * cv * 0.3 - nx * cr * 0.2, my + uy_ * cv * 0.3 - ny * cr * 0.2, nx * cr * q, ny * cr * q, ux_ * cv * q, uy_ * cv * q,
              12, (k == 4 and FC.leafH or FC.bushH)[fi])
