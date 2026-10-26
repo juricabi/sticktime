@@ -262,7 +262,7 @@ local function idleSticks() sticks.ail, sticks.ele, sticks.rud, sticks.thr = 0, 
 
 -- ------------------------------------------------------------ scenarios
 -- 1. menus: walk every item, open settings, change every option both ways
-local OPTN = GAME_COLOR and 25 or 21
+local OPTN = GAME_COLOR and 26 or 21
 steps(20)
 for i = 1, 9 do frame(EVT_VIRTUAL_NEXT) frame(0) end
 for i = 1, 9 do frame(EVT_VIRTUAL_PREV) frame(0) end
@@ -1013,7 +1013,7 @@ do
   local CT = "/SCRIPTS/TOOLS/StickTimeTracks/c"
   SD[CT .. "1.txt"] = "Test Loop\n1 4242 7 9  0 0 1 0 0  0 40 1 0 0  30 60 4 90 3  40 20 1 180 0 / 20 30 3 3 0 4 2\n"
   SD[CT .. "3.txt"] = "Hoops\r\n1 77 3 18  0 0 4 0 2.5  20 30 4 45 2  0 60 4 180 3\r\n"
-  SD[CT .. "5.txt"] = "Broken\n3 1 1 9 0 0 1 0 0\n"                       -- a format this version can't read
+  SD[CT .. "5.txt"] = "Broken\n9 1 1 9 0 0 1 0 0\n"                       -- a format this version can't read
   -- format 2 (over 1000 bytes): 49 gates on a circle and 65 structures in a row, one more of each
   -- than the game takes (it builds 48 and 64)
   local big = { "Big One\n2 4321 5 9" }
