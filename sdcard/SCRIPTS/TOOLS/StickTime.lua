@@ -2976,29 +2976,6 @@ local AV = STICKTIME_AV == true
     if sx == 0 and hx0 <= XL and hx1 > XL then
       -- across the view (the usual case): ln's cut at the right edge, its ends the same for all
       local XL, YL, e, d = XL, YL, XL - hx1, hx0 - hx1
-      if hy0 == hy1 then
-        -- level (the menu's camera, a quad at rest): the lines are rows, and the rows of one
-        -- color one rectangle, the same pixels. Step k's line is at hy0 + sy * k, on the row
-        -- floor(hy0) + sy * k: the sum is off by under 1/4000 on the radio (32-bit, below
-        -- 8192), too little to pass a whole number with hy0 this far from one; so it is over
-        -- YL (not drawn) when its row is YL or more, and under 0 is clipped away
-        local Y0 = floor(hy0)
-        local fr = hy0 - Y0
-        if fr > 0.001 and fr < 0.999 then
-          local w, k = XL - hx0 + 1, lo
-          while k <= hi do
-            local col, kb = bc[k], k
-            while kb < hi and bc[kb + 1] == col do kb = kb + 1 end
-            local ya, yb = Y0 + sy * k, Y0 + sy * kb
-            if ya > yb then ya, yb = yb, ya end
-            if ya < 0 then ya = 0 end
-            if yb >= YL then yb = YL - 1 end
-            if ya <= yb then fillRect(hx0, ya, w, yb - ya + 1, col) end
-            k = kb + 1
-          end
-          return
-        end
-      end
       for k = lo, hi do
         local y1, y2 = hy0 + sy * k, hy1 + sy * k
         y2 = y2 + (y1 - y2) * e / d
@@ -4474,7 +4451,7 @@ local render, hitTest, pauseHit, initUI
   -- out for each track and map box, then drawn from these lists every frame
   local mapN, mapS, mapOX, mapOZ = -1, 0, 0, 0
   local MB = { n = 0, {}, {}, {}, {}, {}, {}, {}, {} }  -- structures: x, y, w, h (5-8: their pixels' bounds)
-  local MW = { n = 0, {}, {}, {} }                      -- ponds: a line per row, x1, x2, y
+  local MW = { n = 0, {}, {}, {} }                      -- ponds: a rect a row, x1, x2, y
   local MR = { n = 0, {}, {}, {}, {} }                  -- rails: lines
   local ML = { {}, {}, {}, {} }                         -- the track: a line per leg
   local MGT = { {}, {}, {}, {}, {}, {}, f = {} }        -- gates: a bar's line (5, 6: the second's rows, 1 px lower), a flag's dot (f)
@@ -4528,7 +4505,8 @@ local render, hitTest, pauseHit, initUI
     -- structures: solid, in the colour they had blended over the panel (a blended fill is one
     -- slow call each on the radio). One within another's pixels (a stack of containers, the
     -- parts of a building) adds nothing: left out. The screen rounds x, y, w and h down; only
-    -- rects at x, y >= 0 take part (the same whole pixels on the radio)
+    -- rects at x, y >= 0 and at least a pixel each way take part (the same whole pixels on the
+    -- radio; a hand-made track's negative size draws mirrored)
     local t1, t2, t3, t4, t5, t6, t7, t8 = MB[1], MB[2], MB[3], MB[4], MB[5], MB[6], MB[7], MB[8]
     for b = 1, BX.n do
       local bx, by, bw, bh = ox + BX.x0[b] * s, oz - BX.z1[b] * s, (BX.x1[b] - BX.x0[b]) * s + 1, (BX.z1[b] - BX.z0[b]) * s + 1
@@ -4539,10 +4517,11 @@ local render, hitTest, pauseHit, initUI
     for b = 1, BX.n do
       local bx, by, bx2, by2 = t5[b], t6[b], t7[b], t8[b]
       local keep = true
-      if bx >= 0 and by >= 0 then
+      if bx >= 0 and by >= 0 and bx2 > bx and by2 > by then
         for a = 1, BX.n do
           local ax, ay, ax2, ay2 = t5[a], t6[a], t7[a], t8[a]
-          if a ~= b and ax >= 0 and ay >= 0 and ax <= bx and ay <= by and ax2 >= bx2 and ay2 >= by2
+          if a ~= b and ax >= 0 and ay >= 0 and ax2 > ax and ay2 > ay and ax <= bx and ay <= by
+             and ax2 >= bx2 and ay2 >= by2
              and (a < b or ax < bx or ay < by or ax2 > bx2 or ay2 > by2) then keep = false break end
         end
       end
@@ -4554,7 +4533,8 @@ local render, hitTest, pauseHit, initUI
     MB.n = n
     -- the ponds (ellipses of 12 corners) and the rails, within the map (the scenery can reach
     -- past the track's bounds the map is fitted to). A pond is a fan of 12 triangles: drawn as
-    -- one line per row of their pixels instead (the same pixels, a fraction of the calls)
+    -- one rectangle a row of their pixels instead (the same pixels on every screen, a fraction
+    -- of the calls; not lines: a host may draw those thicker)
     local x1, y1 = x + w - 1, y + h - 1
     QN = 0
     for i = 1, SCN.nd do
@@ -4656,7 +4636,7 @@ local render, hitTest, pauseHit, initUI
     for k = 1, MB.n do fillRect(t1[k], t2[k], t3[k], t4[k], c) end
     t1, t2, t3 = MW[1], MW[2], MW[3]
     c = C.mapWater
-    for k = 1, MW.n do drawLine(t1[k], t3[k], t2[k], t3[k], SOLID, c) end
+    for k = 1, MW.n do fillRect(t1[k], t3[k], t2[k] - t1[k] + 1, 1, c) end
     t1, t2, t3, t4 = MR[1], MR[2], MR[3], MR[4]
     c = C.mapBox
     for k = 1, MR.n do drawLine(t1[k], t2[k], t3[k], t4[k], SOLID, c) end
