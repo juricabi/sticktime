@@ -5005,8 +5005,8 @@ local AV = STICKTIME_AV == true
     local n = floor((kpy < 19 and kpy or 19) * 16 / 30)
     local cx, cz = floor(kpx / 30) * 30, floor(kpz / 30) * 30
     local GC = SCN.nd > 0 and SCN.gc
-    -- Detail Low: every other fine line, those on 20 m (xo, zo: the i parity left out), and the
-    -- coarse lines not on 20 m go on across the fine grid
+    -- Detail Low: every other fine line, those on 20 m (xo, zo: the i parity left out), and every
+    -- other coarse one, those on 60 m: as at High, every third fine line goes on beyond the fine grid
     local low, xo, zo = S.detail == 2, 2, 2
     if low then xo, zo = (floor(kpx / gs) + 1) % 2, (floor(kpz / gs) + 1) % 2 end
     -- (the lines' ends turned with the camera: the same for every line along z, and along x. A
@@ -5022,10 +5022,10 @@ local AV = STICKTIME_AV == true
         -- (a line across the fine grid: only its two ends beyond it)
         local x = cx + i * 30
         local Z0 = bZ + x * kfx
-        if not (Z0 + zF < NEAR) then
+        if not (Z0 + zF < NEAR or low and x % 60 ~= 0) then
           local X0, Y0 = bX + x * krx, bY + x * kux
           local E = GC and (GC[1000 + x / 10] or gridE(1, x, 1000 + x / 10))
-          local thru = x < xa or x > xb or (low and x % 20 ~= 0)
+          local thru = x < xa or x > xb
           if E and E[1] then
             gX, gY, gZ, gU, gV, gW = X0, Y0, Z0, krz, kuz, kfz
             if thru then
@@ -5043,10 +5043,10 @@ local AV = STICKTIME_AV == true
         end
         local z = cz + i * 30
         Z0 = bZ + z * kfz
-        if not (Z0 + xF < NEAR) then
+        if not (Z0 + xF < NEAR or low and z % 60 ~= 0) then
           local X0, Y0 = bX + z * krz, bY + z * kuz
           local E = GC and (GC[3000 + z / 10] or gridE(2, z, 3000 + z / 10))
-          local thru = z < za or z > zb or (low and z % 20 ~= 0)
+          local thru = z < za or z > zb
           if E and E[1] then
             gX, gY, gZ, gU, gV, gW = X0, Y0, Z0, krx, kux, kfx
             if thru then
