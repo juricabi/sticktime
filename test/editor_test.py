@@ -55,24 +55,29 @@ def fnv1a(s):
 NUM = re.compile(r"^-?(0|[1-9]\d*)(\.\d?[1-9])?$")
 
 
-def check_file(text, gates, boxes, what):
-    """the format the game reads: the name, then 1 <id> <seed> <trees> <gates...> [/ <boxes...>]"""
-    check(len(text.encode()) <= 999, f"{what}: {len(text.encode())} bytes (999 at most)")
+def check_file(text, gates, boxes, what, fmt=1, scene=(0, 0, 0)):
+    """the format the game reads: the name, then <format> <id> <seed> <trees> <gates...> [/ <boxes...>],
+    in formats 3 and 4 always followed by / <props> / <rails> / <decals> (scene: their counts)"""
+    most = {1: 999, 2: 5999, 3: 1599, 4: 9999}[fmt]
+    check(len(text.encode()) <= most, f"{what}: {len(text.encode())} bytes ({most} at most)")
     check(text.endswith("\n") and text.count("\n") == 2 and "\r" not in text, f"{what}: a name line and a numbers line, LF")
     name, line = text.split("\n")[:2]
     check(1 <= len(name) <= 16 and name == name.strip() and "/" not in name and all(32 <= ord(c) < 127 for c in name),
           f"{what}: name {name!r}")
     tok = line.split(" ")
-    check(tok[0] == "1", f"{what}: format 1")
-    nums = line[len("1 " + tok[1] + " "):]
+    check(tok[0] == str(fmt), f"{what}: format {fmt}")
+    nums = line[len(tok[0] + " " + tok[1] + " "):]
     check(tok[1].isdigit() and 1 <= int(tok[1]) <= 999999 and int(tok[1]) == fnv1a(nums) % 999999 + 1,
           f"{what}: id {tok[1]} = FNV-1a of the numbers part mod 999999 + 1")
     check("e" not in nums.lower(), f"{what}: no 'e' in the numbers")
-    g, _, b = nums.partition(" / ")
-    gt, bt = g.split(" "), (b.split(" ") if b else [])
-    check(all(NUM.match(t) for t in gt + bt), f"{what}: plain decimals, 0.01 m at most")
+    secs = [s.split() for s in nums.split(" /")]
+    check(len(secs) == (5 if fmt > 2 else 2 if boxes else 1), f"{what}: {len(secs)} sections")
+    secs += [[]] * (5 - len(secs))
+    gt, bt = secs[0], secs[1]
+    check(all(NUM.match(t) for t in sum(secs, [])), f"{what}: plain decimals, 0.01 m at most")
     check(1 <= int(gt[0]) <= 99 and 0 <= int(gt[1]) <= 30, f"{what}: seed {gt[0]}, trees {gt[1]}")
     check(len(gt) - 2 == gates * 5 and len(bt) == boxes * 7, f"{what}: {gates} gates, {boxes} structures")
+    check([len(secs[2]) // 4, len(secs[3]) // 6, len(secs[4]) // 6] == list(scene), f"{what}: {scene} props, rails, decals")
     return name, nums
 
 
@@ -221,9 +226,20 @@ def dec(v):
 
 
 def numbers_of(t):
-    """the numbers line after the id, for a built-in track without structures"""
-    return " ".join([str(t["seed"]), str(t["trees"])] +
-                    [f"{dec(x)} {dec(z)} {k} {round(yaw) % 360} {dec(h)}" for x, z, k, yaw, h in t["gates"]])
+    """the numbers line after the id, for a built-in track without structures (with its scenery:
+    the sections of format 3, structures empty)"""
+    s = " ".join([str(t["seed"]), str(t["trees"])] +
+                 [f"{dec(x)} {dec(z)} {k} {round(yaw) % 360} {dec(h)}" for x, z, k, yaw, h in t["gates"]])
+    if not (t["props"] or t["rails"] or t["decals"]):
+        return s
+    secs = ["", " ".join(f"{dec(x)} {dec(z)} {k} {dec(h)}" for x, z, k, h in t["props"]),
+            " ".join(f"{dec(a)} {dec(b)} {dec(c)} {dec(d)} {k} {dec(h)}" for a, b, c, d, k, h in t["rails"]),
+            " ".join(f"{dec(x)} {dec(z)} {dec(a)} {dec(b)} {round(yaw) % 360} {k}" for x, z, a, b, yaw, k in t["decals"])]
+    return s + "".join(" /" + (" " + p if p else "") for p in secs)
+
+
+# what the Grand Prix template has besides its gates (props, rails, decals): format 3
+GP_SCENE = (len(TEMPLATES["Grand Prix"]["props"]), len(TEMPLATES["Grand Prix"]["rails"]), len(TEMPLATES["Grand Prix"]["decals"]))
 
 
 def served(ctx):
@@ -396,10 +412,11 @@ def radio_tests(br, errors):
     radio_done(page)
     big = page.evaluate("sim.editor.file()")
     msg = page.inner_text("#edStatus")
-    note = ' "My Bando" is a bigger track: StickTime 1.7.2 on the card doesn\'t list it, 1.8.0 and later do. Install updates it.'
-    check(big.split("\n")[1].startswith("2 ") and page.evaluate(CARD_FILE, TRACKS + "6.txt") == big
+    # (the Bando's copy has its scenery: with a 17th structure, a bigger track with scenery, format 4)
+    note = ' "My Bando" is a bigger track with scenery: StickTime 1.7.2 on the card doesn\'t list it, 1.10.0 and later do. Install updates it.'
+    check(big.split("\n")[1].startswith("4 ") and page.evaluate(CARD_FILE, TRACKS + "6.txt") == big
           and msg == "Sent to the radio as track 14 (c6.txt)." + note
-          and "bad" in page.get_attribute("#edStatus", "class"), f"radio: a bigger track sent to StickTime 1.7.2 says it needs 1.8.0: {msg!r}")
+          and "bad" in page.get_attribute("#edStatus", "class"), f"radio: a bigger track with scenery sent to StickTime 1.7.2 says it needs 1.10.0: {msg!r}")
     page.select_option("#edSlot", "7")
     page.click("#edSend")
     radio_done(page)
@@ -407,11 +424,11 @@ def radio_tests(br, errors):
     check(msg.startswith("The radio has this track already, in c6") and msg.endswith(note) and page.evaluate(CARD_FILE, TRACKS + "7.txt") is None,
           f"radio: ... and says so again when the radio has it already: {msg!r}")
     page.select_option("#edSlot", "6")
-    page.evaluate(CARD_WRITE, [game, "local toolName = \"TNS|StickTime|TNE\"\n--[[\n  StickTime v1.8.0  -  a real 3D FPV quad simulator\n"])
+    page.evaluate(CARD_WRITE, [game, "local toolName = \"TNS|StickTime|TNE\"\n--[[\n  StickTime v1.10.0  -  a real 3D FPV quad simulator\n"])
     page.click("#edSend")
     radio_done(page)
     check(page.inner_text("#edStatus") == "Sent to the radio as track 14 (c6.txt). On the radio: restart StickTime, the track is in the Track list."
-          and "ok" in page.get_attribute("#edStatus", "class"), "radio: ... and to StickTime 1.8.0, nothing more")
+          and "ok" in page.get_attribute("#edStatus", "class"), "radio: ... and to StickTime 1.10.0, nothing more")
     page.evaluate(CARD_WRITE, [game, "-- the game\n"])
 
     # SCRIPTS/TOOLS or StickTimeTracks picked instead of the drive
@@ -793,9 +810,9 @@ def emu(page, n):
 
 
 def track_text(name, t):
-    """a built-in track (no structures) as a track file"""
+    """a built-in track (no structures) as a track file: format 3 with its scenery, else 1"""
     nums = numbers_of(t)
-    return f"{name}\n1 {fnv1a(nums) % 999999 + 1} {nums}\n"
+    return f"{name}\n{3 if ' /' in nums else 1} {fnv1a(nums) % 999999 + 1} {nums}\n"
 
 
 JUNK = "Junk\nnot numbers\n"                        # a file the editor (and the game) can't read
@@ -990,6 +1007,156 @@ def manifest_checks():
     check("versions differ" in (refused(bw) or ""), "sd_manifest: a B&W loader of another version refused")
 
 
+def file_text(name, fmt, nums):
+    return f"{name}\n{fmt} {fnv1a(nums) % 999999 + 1} {nums}\n"
+
+
+# a lap of four gates, and scenery of every kind well off its racing line: structures of the new
+# kinds 4-9 (west), props of kinds 1-10 (west), rails of kinds 1-5 (east), decals of kinds 1-6 (far west)
+GATES4 = "0 0 1 0 0 0 50 1 0 0 40 50 1 180 0 40 0 1 180 0"
+
+
+def everything(props=10):
+    boxes = " ".join(f"-60 {6 * i} 1.5 1.5 0 3 {k}" for i, k in enumerate(range(4, 10)))
+    ps = " ".join(f"-30 {5 * i} {i % 10 + 1} 0" for i in range(props))
+    rails = " ".join(f"{80 + 4 * i} 0 {80 + 4 * i} 30 {i + 1} 0" for i in range(5))
+    decals = " ".join(f"-100 {10 * i} 4 2 {15 * i} {i + 1}" for i in range(6))
+    return f"7 9 {GATES4} / {boxes} / {ps} / {rails} / {decals}"
+
+
+def scenery_tests(br, errors, tmp):
+    """formats 3 and 4 (1.10.0): every kind of scenery read and written back unchanged, the smallest
+    format chosen (1 and 2 as before, their files and ids the same), the sets, the checks against the
+    racing line and the start, flown in the color game and in StickTime BW, an older work in progress"""
+    import gallery                                       # (tools/: the gallery's checker, the same rules)
+    ctx = br.new_context(viewport={"width": 1400, "height": 1000})
+    offline(ctx)
+    page = ctx.new_page()
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    page.on("dialog", lambda d: d.accept())
+    page.goto(SIM)
+    wait_sim(page)
+    editor(page)
+    fmt = lambda: page.evaluate("sim.editor.file()").split("\n")[1][0]
+    every = file_text("Everything", 3, everything())
+    (tmp / "everything.txt").write_text(every, encoding="ascii", newline="\n")
+    say = open_file(page, tmp / "everything.txt")
+    t = page.evaluate("sim.editor.track()")
+    check(page.evaluate("sim.editor.file()") == every and [len(t[k]) for k in ("boxes", "props", "rails", "decals")] == [6, 10, 5, 6]
+          and "10 props, 5 rails, 6 decals" in say, f"scenery: a format 3 file of every kind opens and saves unchanged: {say!r}")
+    check(sorted(b["k"] for b in t["boxes"]) == list(range(4, 10)) and sorted(p["k"] for p in t["props"]) == list(range(1, 11))
+          and sorted(r["k"] for r in t["rails"]) == list(range(1, 6)) and sorted(d["k"] for d in t["decals"]) == list(range(1, 7)),
+          "scenery: structure kinds 4-9, props 1-10, rails 1-5, decals 1-6")
+    check(page.evaluate("sim.editor.problems()") == [] and gallery.track_problems(every) == [],
+          f"scenery: the editor's Check and the gallery's checker take it: {page.evaluate('sim.editor.problems()')} {gallery.track_problems(every)}")
+    check("scenery: StickTime 1.10.0" in page.inner_text("#edSize") and "color radios" not in page.inner_text("#edSize"),
+          f"scenery: format 3, for color and B&W radios ({page.inner_text('#edSize')!r})")
+    shot_clip(page, OUT / "editor_scenery.png")
+    big = file_text("Everything Big", 4, everything(33))
+    (tmp / "big.txt").write_text(big, encoding="ascii", newline="\n")
+    open_file(page, tmp / "big.txt")
+    check(page.evaluate("sim.editor.file()") == big and "color radios" in page.inner_text("#edSize") and gallery.track_problems(big) == [],
+          f"scenery: 33 props: format 4, color radios ({page.inner_text('#edSize')!r})")
+
+    # the tracks of before: their files and ids unchanged; one prop more makes format 3, undo goes back
+    for f in ("multigp-2020-gq.txt", "bjelovar-stonehenge.txt"):
+        text = (ROOT / "tracks" / f).read_bytes().replace(b"\r\n", b"\n").decode()
+        (tmp / f).write_text(text, encoding="ascii", newline="\n")
+        open_file(page, tmp / f)
+        check(page.evaluate("sim.editor.file()") == text, f"scenery: {f} (format {text.split(chr(10))[1][0]}) opens and saves unchanged, its id too")
+    old = (ROOT / "tracks" / "multigp-2020-gq.txt").read_bytes().replace(b"\r\n", b"\n").decode()
+    open_file(page, tmp / "multigp-2020-gq.txt")
+    page.select_option("#edPropKind", "4")
+    page.click("#edAddProp")
+    t = page.evaluate("sim.editor.track()")
+    check(fmt() == "3" and len(t["props"]) == 1 and t["props"][0]["k"] == 4, "scenery: Add prop (a hay bale) makes it format 3")
+    page.click("#edUndo")
+    check(page.evaluate("sim.editor.file()") == old, "scenery: ... and Undo gives the format 1 file back")
+
+    # the sets: grouped and selected
+    for v, key, n, k in (("pilots", "props", 4, None), ("lane", "rails", 2, 3), ("fence", "rails", 4, 1)):
+        page.select_option("#edPreset", v)
+        before = page.evaluate("sim.editor.track()")
+        page.click("#edAddPreset")
+        t, sel = page.evaluate("sim.editor.track()"), page.evaluate("sim.editor.selected()")
+        new = [o for o in t[key] if o["id"] in sel]
+        check(len(t[key]) == len(before[key]) + n and len(sel) == n and len({o["g"] for o in new}) == 1 and new[0]["g"]
+              and (k is None or all(o["k"] == k for o in new)), f"scenery: Add set {v}: {n} {key}, grouped, selected")
+        if v == "pilots":
+            check(sorted(o["k"] for o in new) == [4, 4, 8, 9], "scenery: the pilots' area is a tent, a windsock and two hay bales")
+        page.click("#edUndo")
+
+    # the checks: a fence across the racing line is a problem, a power line 12 m above it isn't; a
+    # pond under the start pad is
+    open_file(page, tmp / "everything.txt")
+    def rail_to(i, x1, z1, x2, z2):
+        click_map(page, 80 + 4 * i, 15)
+        for f, v in (("x1", x1), ("z1", z1), ("x2", x2), ("z2", z2)):
+            page.fill(f'#edSel [data-f="{f}"]', str(v))
+            page.press(f'#edSel [data-f="{f}"]', "Tab")
+    rail_to(0, -10, 25, 10, 25)
+    probs = page.evaluate("sim.editor.problems()")
+    check(any("Fence (rail 1)" in m and "racing line" in m for m in probs) and page.is_disabled("#edSendEmu"),
+          f"scenery: a fence across the racing line is a problem: {probs}")
+    for _ in range(4):
+        page.click("#edUndo")
+    rail_to(3, -10, 25, 10, 25)
+    check(page.evaluate("sim.editor.problems()") == [], f"scenery: a power line 12 m over the racing line isn't: {page.evaluate('sim.editor.problems()')}")
+    page.fill('#edSel [data-f="h"]', "2")
+    page.press('#edSel [data-f="h"]', "Tab")
+    check(any("Power line" in m for m in page.evaluate("sim.editor.problems()")), "scenery: ... at 2 m it is")
+    for _ in range(5):
+        page.click("#edUndo")
+    check(page.evaluate("sim.editor.file()") == every, "scenery: undo puts the track back as it was")
+    click_map(page, -100, 40)                                    # the pond (decal 5)
+    for f, v in (("x", "0"), ("z", "-14")):
+        page.fill(f'#edSel [data-f="{f}"]', v)
+        page.press(f'#edSel [data-f="{f}"]', "Tab")
+    check(any("Pond (decal 5)" in m and "start pad" in m for m in page.evaluate("sim.editor.problems()")),
+          f"scenery: a pond under the start pad is a problem: {page.evaluate('sim.editor.problems()')}")
+    page.click("#edUndo")
+    page.click("#edUndo")
+
+    # flown: in the color game, then in StickTime BW (format 3 is for both editions; 4 isn't)
+    page.select_option("#edSlot", "4")
+    send_fly(page)
+    info = page.evaluate("sim.test('info')")
+    page.wait_for_timeout(800)
+    check(info[0] == 12 and info[10] == "Everything" and info[9] == 6 and not page.evaluate("sim.engine.error"),
+          f"scenery: the color game flies it as track 12, its 6 structures: {info} {page.evaluate('sim.engine.error')}")
+    page.evaluate("sim.radio('tx12')")
+    editor(page)
+    page.select_option("#edSlot", "4")
+    check(page.is_enabled("#edFly"), "scenery: on a TX12 (StickTime BW) Fly is on for format 3")
+    page.click("#edFly")
+    page.wait_for_timeout(800)
+    info = page.evaluate("sim.test('info')")
+    check(info[0] == 12 and info[10] == "Everything" and not page.evaluate("sim.engine.error"),
+          f"scenery: StickTime BW flies it as track 12: {info} {page.evaluate('sim.engine.error')}")
+    editor(page)
+    open_file(page, tmp / "big.txt")
+    page.select_option("#edSlot", "5")
+    page.click("#edSendEmu")
+    check(page.is_disabled("#edFly") and "StickTime BW doesn't list bigger tracks" in page.inner_text("#edStatus"),
+          f"scenery: format 4 on a TX12: sent, no Fly: {page.inner_text('#edStatus')!r}")
+    page.evaluate("sim.radio('tx16s')")
+
+    # a work in progress kept by an earlier version (no scenery in it) still opens, as format 1 (put
+    # there before the page starts: leaving a page keeps its own work in progress there)
+    page.close()
+    page = ctx.new_page()
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    page.add_init_script("""localStorage.setItem('fpvsim.editor', JSON.stringify({ v: 1, slot: 2, trees: false, kept: false, versions: [],
+      T: { name: 'Old Work', seed: 5, trees: 9, gates: [{ id: 1, g: 0, x: 0, z: 0, t: 1, yaw: 0, h: 0 }, { id: 2, g: 0, x: 10, z: 40, t: 1, yaw: 180, h: 0 }],
+      boxes: [{ id: 3, g: 0, x: 30, z: 20, hx: 2, hz: 2, y0: 0, y1: 4, k: 2 }] } }))""")
+    page.goto(SIM)
+    wait_sim(page)
+    editor(page)
+    check(page.input_value("#edName") == "Old Work" and fmt() == "1" and page.evaluate("sim.editor.track()")["props"] == [],
+          "scenery: a work in progress from before 1.10.0 opens (format 1, no scenery)")
+    ctx.close()
+
+
 def main():
     tmp = pathlib.Path(tempfile.mkdtemp(prefix="sticktime-editor-"))
     errors = []
@@ -1015,8 +1182,8 @@ def main():
             page.click("#edSave")
         check(d.value.suggested_filename == "c1.txt", "Save file downloads c1.txt")
         text = pathlib.Path(d.value.path()).read_bytes().decode("ascii")
-        name, nums = check_file(text, NGP, 0, "the Grand Prix's c1.txt")
-        check(name == "My Grand Prix" and nums == numbers_of(GP), "its numbers are the Grand Prix's: seed, trees, every gate as in TRACKS")
+        name, nums = check_file(text, NGP, 0, "the Grand Prix's c1.txt", 3, GP_SCENE)
+        check(name == "My Grand Prix" and nums == numbers_of(GP), "its numbers are the Grand Prix's: seed, trees, every gate and its scenery as in TRACKS and DECO")
         check(page.evaluate("sim.editor.file()") == text, "the download is the editor's file")
 
         # ---- Fly it: slot 1 is track 9, in Practice
@@ -1059,13 +1226,13 @@ def main():
         # ---- the checks
         start_from(page, "Bando")
         check(page.evaluate("sim.editor.problems()") == [], "the Bando passes the checks (16 structures, walls touching)")
-        check(page.evaluate("sim.editor.file()").split("\n")[1].startswith("1 ") and "color radios" not in page.inner_text("#edSize"),
-              "16 structures: format 1, every edition's")
+        check(page.evaluate("sim.editor.file()").split("\n")[1].startswith("3 ") and "color radios" not in page.inner_text("#edSize")
+              and "scenery" in page.inner_text("#edSize"), "16 structures and its scenery: format 3, color and B&W radios")
         page.click("#edAddBox")
-        check(page.evaluate("sim.editor.file()").split("\n")[1].startswith("2 ") and "color radios" in page.inner_text("#edSize"),
-              f"a 17th: a bigger track, format 2, color radios ({page.inner_text('#edSize')!r})")
+        check(page.evaluate("sim.editor.file()").split("\n")[1].startswith("4 ") and "color radios" in page.inner_text("#edSize"),
+              f"a 17th: a bigger track with scenery, format 4, color radios ({page.inner_text('#edSize')!r})")
         page.click("#edUndo")
-        check(page.evaluate("sim.editor.file()").split("\n")[1].startswith("1 "), "and format 1 again without it")
+        check(page.evaluate("sim.editor.file()").split("\n")[1].startswith("3 "), "and format 3 again without it")
         click_map(page, -36, 50)                                 # structure 16, onto the blue container
         page.fill('#edSel [data-f="x"]', "-30")
         page.press('#edSel [data-f="x"]', "Tab")
@@ -1122,6 +1289,10 @@ def main():
         check(len(asked) == 1 and asked[0].startswith('Replace "My Bando') and "isn't in a slot" in asked[0],
               f"Start from over the turned Bando asks first: {asked}")
         page.click("#edAddWall")
+        # (the middle of the Meadow has its hay bales: the wall goes west of its farm track)
+        for f, v in (("x", "-60"), ("z", "60")):
+            page.fill(f'#edSel [data-f="{f}"]', v)
+            page.press(f'#edSel [data-f="{f}"]', "Tab")
         sel = page.evaluate("sim.editor.selected()")
         t = page.evaluate("sim.editor.track()")
         check(len(sel) == 4 and len(t["boxes"]) == 3 and sum(g["t"] == 8 for g in t["gates"]) == 1, "Wall with gap: a gap gate and 3 structures, selected")
@@ -1166,7 +1337,7 @@ def main():
         page.select_option("#edSlot", "5")
         page.click("#edSendEmu")
         sent = page.inner_text("#edStatus")
-        check(page.evaluate("sim.editor.file()").split("\n")[1].startswith("2 ") and "StickTime BW doesn't list bigger tracks" in sent
+        check(page.evaluate("sim.editor.file()").split("\n")[1].startswith("4 ") and "StickTime BW doesn't list bigger tracks" in sent
               and page.is_disabled("#edFly") and page.is_visible("#edLite") and "StickTime BW doesn't list bigger tracks" in page.inner_text("#edLite"),
               f"a bigger track on a TX12: sent, Fly off, the editor says StickTime BW doesn't list it: {sent!r}")
         page.evaluate("sim.radio('tx16s')")
@@ -1195,6 +1366,7 @@ def main():
         page.tap("#tracksBtn")
         start_from(page, "Grand Prix")
         check(page.evaluate("document.documentElement.scrollWidth <= innerWidth"), "phone width: nothing sticks out sideways")
+        page.locator("#edMap").scroll_into_view_if_needed()     # (the toolbar takes a few rows here)
         px, py = page.evaluate("([x, z]) => sim.editor.at(x, z)", GP["gates"][2][:2])   # gate 3
         page.touchscreen.tap(px, py)
         check(len(page.evaluate("sim.editor.selected()")) == 1, "a tap selects a gate")
@@ -1223,6 +1395,7 @@ def main():
         panel_tests(br, errors)
         slot_tests(br, errors, tmp)
         bad_slot_tests(br, errors)
+        scenery_tests(br, errors, tmp)
         manifest_checks()
         br.close()
     for e in errors:

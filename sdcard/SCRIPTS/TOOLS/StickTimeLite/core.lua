@@ -1,6 +1,6 @@
 local toolName = "TNS|StickTime Lite|TNE"
 --[[ ======================================================================
-StickTime Lite v1.9.0  -  the small edition of StickTime for B&W radios.
+StickTime Lite v1.10.0  -  the small edition of StickTime for B&W radios.
 Made for radios with little memory (STM32F2: X7, X9D, X9D+, X9 Lite,
 X-Lite, TX12 MkI, T12, T8, T-Lite, T-Pro, LR3 Pro). Runs on every
 black & white EdgeTX radio with EdgeTX 2.11 or newer.
@@ -457,11 +457,12 @@ ch, AM = ch > 0 and sqrt(ch) or 0, AM > 0 and sqrt(AM) or 0
 AM = 1 - ch + AM
 if AM < 0.3 then AM = 0.3 end
 AM = (P[48] or 0) * AM * h                                                   -- (an old class file: none)
-local fl = 0
+local fl, reach, ng, np = 0, speed * dt + 7, 0, 0
+do
+local px, py, pz = px, py, pz
 for i = 1, NB do
 if px > bx0[i] and px < bx1[i] and pz > bz0[i] and pz < bz1[i] and py > by1[i] and by1[i] > fl then fl = by1[i] end
 end
-local reach, ng, np = speed * dt + 7, 0, 0
 for i = 1, NG do
 local dx, dy, dz, r = px - gx[i], py - gy[i], pz - gz[i], gk[i] > 5 and reach + 6 or reach
 if dx < r and dx > -r and dy < r and dy > -r and dz < r and dz > -r then
@@ -476,6 +477,7 @@ local dx, dz = px - qx[i], pz - qz[i]
 if dx * dx + dz * dz < (reach + qr[i]) ^ 2 then
 np = np + 1
 nearP[np] = i
+end
 end
 end
 for _ = 1, n do
@@ -700,7 +702,11 @@ local RC, RS = {}, {}                              -- ring points every 30 deg
 for j = 1, 12 do RC[j], RS[j] = cos(j * 0.5236), sin(j * 0.5236) end
 local kx, ky, kz, krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz = 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1
 local function line2(x1, y1, x2, y2, pat, fl)
-local dx, dy, t0_, t1 = x2 - x1, y2 - y1, 0, 1
+local dx, dy, t0_, t1, XM, YM = x2 - x1, y2 - y1, 0, 1, XM, YM
+if x1 >= 0 and x1 <= XM and x2 >= 0 and x2 <= XM and y1 >= 0 and y1 <= YM and y2 >= 0 and y2 <= YM then
+drawLine(floor(x1 + 0.5), floor(y1 + 0.5), floor(x1 + dx + 0.5), floor(y1 + dy + 0.5), pat, fl)
+return
+end
 if dx > 1e-6 or dx < -1e-6 then
 local ta, tb = -x1 / dx, (XM - x1) / dx
 if ta > tb then ta, tb = tb, ta end
@@ -717,10 +723,13 @@ if t0_ <= t1 then
 drawLine(floor(x1 + dx * t0_ + 0.5), floor(y1 + dy * t0_ + 0.5), floor(x1 + dx * t1 + 0.5), floor(y1 + dy * t1 + 0.5), pat, fl)
 end
 end
-local function line3(x1, y1, z1, x2, y2, z2, pat, fl)
-x1, y1, z1, x2, y2, z2 = x1 - kx, y1 - ky, z1 - kz, x2 - kx, y2 - ky, z2 - kz
-local X1, Y1, Z1 = x1 * krx + y1 * kry + z1 * krz, x1 * kux + y1 * kuy + z1 * kuz, x1 * kfx + y1 * kfy + z1 * kfz
-local X2, Y2, Z2 = x2 * krx + y2 * kry + z2 * krz, x2 * kux + y2 * kuy + z2 * kuz, x2 * kfx + y2 * kfy + z2 * kfz
+local function line3(X1, Y1, Z1, X2, Y2, Z2, pat, fl, cam)
+if not cam then
+local kx, ky, kz, krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz = kx, ky, kz, krx, kry, krz, kux, kuy, kuz, kfx, kfy, kfz
+local a1, a2, a3, b1, b2, b3 = X1 - kx, Y1 - ky, Z1 - kz, X2 - kx, Y2 - ky, Z2 - kz
+X1, Y1, Z1 = a1 * krx + a2 * kry + a3 * krz, a1 * kux + a2 * kuy + a3 * kuz, a1 * kfx + a2 * kfy + a3 * kfz
+X2, Y2, Z2 = b1 * krx + b2 * kry + b3 * krz, b1 * kux + b2 * kuy + b3 * kuz, b1 * kfx + b2 * kfy + b3 * kfz
+end
 if Z1 < 0.2 then
 if Z2 < 0.2 then return end
 local t = (0.2 - Z1) / (Z2 - Z1)
@@ -729,7 +738,8 @@ elseif Z2 < 0.2 then
 local t = (0.2 - Z2) / (Z1 - Z2)
 X2, Y2, Z2 = X2 + (X1 - X2) * t, Y2 + (Y1 - Y2) * t, 0.2
 end
-line2(CX + X1 * F / Z1, CY - Y1 * F / Z1, CX + X2 * F / Z2, CY - Y2 * F / Z2, pat, fl)
+local F, CX, CY = F, CX, CY
+return line2(CX + X1 * F / Z1, CY - Y1 * F / Z1, CX + X2 * F / Z2, CY - Y2 * F / Z2, pat, fl)
 end
 local function quad(a1, a2, a3, b1, b2, b3, c1, c2, c3, d1, d2, d3, p)
 line3(a1, a2, a3, b1, b2, b3, p, BLK)
@@ -794,10 +804,14 @@ krx, kry, krz = rx, ry, rz
 kfx, kfy, kfz = fx * tc + ux * ts, fy * tc + uy * ts, fz * tc + uz * ts
 kux, kuy, kuz = ux * tc - fx * ts, uy * tc - fy * ts, uz * tc - fz * ts
 rx, ry, rz, ux, uy, uz, fx, fy, fz = a1, a2, a3, b1, b2, b3, e1, e2, e3
+end
+local kx, ky, kz, krx, kry, krz, kfx, kfy, kfz = kx, ky, kz, krx, kry, krz, kfx, kfy, kfz
+do
 lcd.clear()
 local a, b, c = kry, kuy, F * kfy
 local A, B = a < 0 and -a or a, b < 0 and -b or b
 if GREYS then
+local CX, CY, XM = CX, CY, XM
 for y = 0, YM do
 local e = c - (y - CY) * b
 if A < 1e-5 then
@@ -818,32 +832,57 @@ else
 line2(CX + (-CY * b - c) / a, 0, CX + ((YM - CY) * b - c) / a, YM, SOLID, GRY)
 end
 local gx0, gz0 = floor(kx / 10) * 10, floor(kz / 10) * 10
-for i = -3, 4 do
-line3(gx0 + i * 10, 0, gz0 - 35, gx0 + i * 10, 0, gz0 + 35, DOTTED, GRY)
-line3(gx0 - 35, 0, gz0 + i * 10, gx0 + 35, 0, gz0 + i * 10, DOTTED, GRY)
+for i = -6, 6 do
+line3(gx0 + i * 10, 0, gz0 - 60, gx0 + i * 10, 0, gz0 + 60, DOTTED, GRY)
+line3(gx0 - 60, 0, gz0 + i * 10, gx0 + 60, 0, gz0 + i * 10, DOTTED, GRY)
+end
+local n = floor((ky < 11.3 and ky or 11.3) * 16 / 30)
+if n > 2 then
+local cx, cz, r = floor(kx / 30) * 30, floor(kz / 30) * 30, n * 30
+for i = -n, n do
+local x, z = cx + i * 30, cz + i * 30
+line3(x, 0, cz - r, x, 0, gz0 - 60, DOTTED, GRY)
+line3(x, 0, (x < gx0 - 60 or x > gx0 + 60) and gz0 - 60 or gz0 + 60, x, 0, cz + r, DOTTED, GRY)
+line3(cx - r, 0, z, gx0 - 60, 0, z, DOTTED, GRY)
+line3((z < gz0 - 60 or z > gz0 + 60) and gx0 - 60 or gx0 + 60, 0, z, cx + r, 0, z, DOTTED, GRY)
+end
+end
+local hx, hz = shx * 1.5, shz * 1.5
+quad(spx + hx + hz, 0, spz + hz - hx, spx + hx - hz, 0, spz + hz + hx, spx - hx - hz, 0, spz - hz + hx, spx - hx + hz, 0, spz - hz - hx, SOLID)
+hx, hz = spx - shx * 7 - shz * 4, spz - shz * 7 + shx * 4
+line3(hx, 0, hz, hx, 4, hz, SOLID, BLK)
+local e = S.wind > 0 and (S.wind == 1 and 3 or 7) * (1 + 0.3 * sin(gt * 0.009) + 0.2 * sin(gt * 0.031)) / 7.5 or 0
+if e > 1 then e = 1 end
+local x, y, z = hx + wdx * e * 1.4, 3.9 - (1 - e) * 1.3, hz + wdz * e * 1.4
+line3(hx, 4, hz, x, y, z, SOLID, BLK)
+line3(hx, 3.6, hz, x, y, z, SOLID, BLK)
 end
 for i = 1, NG do
-local k = gk[i]
-local dx, dy, dz, r = gx[i] - kx, gy[i] - ky, gz[i] - kz, k > 5 and 10 or 4
+local k, cx, cy, cz = gk[i], gx[i], gy[i], gz[i]
+local dx, dy, dz, r = cx - kx, cy - ky, cz - kz, k > 5 and 10 or 4
 local z, x = dx * kfx + dy * kfy + dz * kfz, dx * krx + dy * kry + dz * krz
 if z > -r and z < 90 and (x < 0 and -x or x) < z * 1.19 + r then
 local nxt = i == nextGate and gm ~= 3
 local p, w, h = (nxt or z < 12) and SOLID or DOTTED, GW[k], GH[k]
+local r1, r3, a1, a2, a3 = grx[i], grz[i], gax[i], gay[i], gaz[i]
 if k == 6 or k == 7 then
 local s = k == 6 and w or -w
-local x1, z1 = gx[i] - grx[i] * s, gz[i] - grz[i] * s
-local x2, z2 = x1 - grx[i] * s * 0.15, z1 - grz[i] * s * 0.15
+local x1, z1 = cx - r1 * s, cz - r3 * s
+local x2, z2 = x1 - r1 * s * 0.15, z1 - r3 * s * 0.15
 line3(x1, 3.4, z1, x2, 2.9, z2, SOLID, BLK)
 line3(x2, 2.9, z2, x1, 1.7, z1, SOLID, BLK)
 if nxt then line3(x1, 2.9, z1, x2, 2.9, z2, SOLID, BLK) end
 elseif k == 4 or k == 5 then
+local kux, kuy, kuz = kux, kuy, kuz
 w = w + 0.28
 for _ = 1, (nxt or z < 30) and 2 or 1 do
-local X, Y, Z = gx[i] + grx[i] * w, gy[i], gz[i] + grz[i] * w
+local X, Y, Z = cx + r1 * w - kx, cy - ky, cz + r3 * w - kz
+X, Y, Z = X * krx + Y * kry + Z * krz, X * kux + Y * kuy + Z * kuz, X * kfx + Y * kfy + Z * kfz
 for j = 1, k == 4 and 12 or 6 do
 local c_, s_ = RC[j] * w, RS[j] * w
-local X2, Y2, Z2 = gx[i] + grx[i] * c_ + gax[i] * s_, gy[i] + gay[i] * s_, gz[i] + grz[i] * c_ + gaz[i] * s_
-line3(X, Y, Z, X2, Y2, Z2, p, BLK)
+local X2, Y2, Z2 = cx + r1 * c_ + a1 * s_ - kx, cy + a2 * s_ - ky, cz + r3 * c_ + a3 * s_ - kz
+X2, Y2, Z2 = X2 * krx + Y2 * kry + Z2 * krz, X2 * kux + Y2 * kuy + Z2 * kuz, X2 * kfx + Y2 * kfy + Z2 * kfz
+line3(X, Y, Z, X2, Y2, Z2, p, BLK, true)
 X, Y, Z = X2, Y2, Z2
 end
 w = GW[k]
@@ -851,9 +890,9 @@ end
 elseif k < 4 or nxt then
 if k < 4 then w, h = w + 0.28, h + 0.28 end
 for _ = 1, (k < 4 and (nxt or z < 30)) and 2 or 1 do
-local Rx, Rz, Ax, Ay, Az = grx[i] * w, grz[i] * w, gax[i] * h, gay[i] * h, gaz[i] * h
-quad(gx[i] - Rx - Ax, gy[i] - Ay, gz[i] - Rz - Az, gx[i] + Rx - Ax, gy[i] - Ay, gz[i] + Rz - Az,
-gx[i] + Rx + Ax, gy[i] + Ay, gz[i] + Rz + Az, gx[i] - Rx + Ax, gy[i] + Ay, gz[i] - Rz + Az, p)
+local Rx, Rz, Ax, Ay, Az = r1 * w, r3 * w, a1 * h, a2 * h, a3 * h
+quad(cx - Rx - Ax, cy - Ay, cz - Rz - Az, cx + Rx - Ax, cy - Ay, cz + Rz - Az,
+cx + Rx + Ax, cy + Ay, cz + Rz + Az, cx - Rx + Ax, cy + Ay, cz - Rz + Az, p)
 w, h = GW[k], GH[k]
 end
 end
@@ -875,18 +914,17 @@ end
 end
 for i = 1, NP do
 local x, z, h = qx[i], qz[i], qh[i]
-local dx, dz = x - kx, z - kz
-local d = dx * kfx + (h * 0.5 - ky) * kfy + dz * kfz
-local l = dx * krx + (h * 0.5 - ky) * kry + dz * krz
+local dx, dy, dz = x - kx, h * 0.5 - ky, z - kz
+local d = dx * kfx + dy * kfy + dz * kfz
+local l = dx * krx + dy * kry + dz * krz
 if d > -h and d < 90 and (l < 0 and -l or l) < d * 1.19 + 6 then
 line3(x, 0, z, x, h, z, SOLID, BLK)
-if qr[i] > 0.5 and d < 45 then
+if qr[i] > 0.5 and d < 90 then
 l = h * 0.24 / (sqrt(dx * dx + dz * dz) + 0.01)
 dx, dz, d = dz * l, -dx * l, h * 0.25
 line3(x - dx, d, z - dz, x, h, z, SOLID, BLK)
 line3(x + dx, d, z + dz, x, h, z, SOLID, BLK)
 line3(x - dx, d, z - dz, x + dx, d, z + dz, SOLID, BLK)
-end
 end
 end
 end

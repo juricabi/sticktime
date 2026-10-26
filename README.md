@@ -9,6 +9,8 @@ A real 3D FPV quad simulator that runs **on your radio** as an EdgeTX Lua tool. 
 | ![Race with AI pilots](docs/tx16s-race.png) | ![Bando](docs/tx16s-bando.png) | ![Freestyle](docs/tx16s-freestyle.png) |
 | **TX16S MK3 (800×480) · tower and dive gate** | **TX12 MkII (128×64) · StickTime BW** | **X9D (212×64 grey) · StickTime Lite** |
 | ![TX16S MK3](docs/mk3-bando.png) | ![TX12](docs/tx12-race.png) | ![Lite on X9D](docs/lite-x9d.png) |
+| **TX16S · Night on the Pro Track** | **TX16S · Farm Field (gallery)** | **TX16S · Power Line (gallery)** |
+| ![Night](docs/tx16s-night.png) | ![Farm Field](docs/tx16s-farm-field.png) | ![Power Line](docs/tx16s-power-line.png) |
 
 ## In your goggles: StickTime Pi
 
@@ -30,7 +32,7 @@ Download `StickTime-<version>-sdcard.zip` from the [latest release](https://gith
 | Older B&W, STM32F2 (TX12 MkI, X7, X9D, X9D+, X9 Lite, X-Lite, T12, T8, ...) | `StickTimeLite.lua`, `StickTimeLite/` | 2.11 (their last) |
 
 - **Updating:** replace the `StickTimeBW` folder whole; replace `StickTimeLite` but keep its `data.txt` (your Lite saves). Install does both for you.
-- **Your own tracks** go in `StickTimeTracks/` as `c1.txt` to `c8.txt` (tracks 9-16, color and BW; a bigger track needs StickTime 1.8.0 or later on a color radio). Restart the game after adding one. The [track gallery](tracks/) has more to fly, the MultiGP qualifier tracks of 2017 to 2026 among them.
+- **Your own tracks** go in `StickTimeTracks/` as `c1.txt` to `c8.txt` (tracks 9-16, color and BW; a bigger track needs StickTime 1.8.0 or later on a color radio, a track with scenery 1.10.0 or later). Restart the game after adding one. The [track gallery](tracks/) has more to fly, the MultiGP qualifier tracks of 2017 to 2026 among them.
 - The B&W versions need EdgeTX 2.11 ("Needs EdgeTX 2.11 or newer" on older). They also run on color radios, in B&W style.
 
 > **Safety:** the radio keeps transmitting your sticks while the sim runs. Unplug the quad's battery or switch the RF module off first.
@@ -40,12 +42,13 @@ Download `StickTime-<version>-sdcard.zip` from the [latest release](https://gith
 - **Flight model:** each quad class fitted to a detailed per-prop model (within 0.2-0.5 m/s in steady flight): Betaflight-style throttle curves, thrust loss climbing, translational lift, a cushion when you drop, ground effect, frame downforce, the airmode mixer in flips, 6 ms motors, 80 Hz physics. Details in [docs/flight-model.md](docs/flight-model.md).
 - **Quads:** Racer 5", Freestyle 5", 3" toothpick, Whoop 65mm, Whoop 75mm; Power Stock or the range quads of their kind have; Acro or Angle. **Rates:** Betaflight Actual (Soft, Normal, Fast or Custom, in Betaflight's own steps).
 - **Tracks:** Meadow, Figure 8, Dive Tower, Slalom, Hoop Forest, Grand Prix, the Bando (an open-roof ruin with a 36 m tower) and Pro Track, with gates, high gates, dive gates, hoops, arches, flags and gaps in walls; plus 8 of your own from the emulator's track editor or the [track gallery](tracks/): up to 24 gates and 16 structures on color and B&W radios, or up to 48 gates and 64 structures on color radios (StickTime 1.8.0 and later).
-- **Modes:** **Race** up to 3 AI pilots (Easy, Medium, Hard) · **Practice** against your best, with a **ghost** of your fastest lap (color edition) · **Freestyle** tricks and combos · **Gate Rush** against the clock.
+- **Scenery** (color screens, StickTime 1.10.0 and later): props (conifers, leafy trees, bushes, hay bales, tyre stacks, traffic cones, light masts, tents, windsocks, posts), rails between two points (fences, safety nets, race tape, power lines on pylons, banners), the ground's decals (dirt roads, tarmac, gravel, painted lines, ponds, sand) and structures in wood, brick, dark steel, white, yellow and green. The eight tracks have their own, such as Meadow's hay bales and pond, a car park round Figure 8 and the Grand Prix's tarmac start straight with tents and banners. Every track has a pilots' area by the start pad, a tent and a **windsock** that shows the wind and its gusts. Fences, nets, banners, race tape and the wires stop the quad like a wall (a hard hit edge-on is a prop strike), landing in a pond is a **SPLASH**. Your own tracks get all of it too (up to 32 props, 12 rails and 8 decals, or 128, 32 and 32 in a bigger track). B&W radios have no memory for the scenery: they fly such a track's gates and structures.
+- **Modes:** **Race** up to 3 AI pilots (Easy, Medium, Hard) · **Practice** against your best, with a **ghost** of your fastest lap (color edition) · **Freestyle** tricks and combos (UNDER: beneath a power line or banner) · **Gate Rush** against the clock.
 - **Medals:** Gold, Silver and Bronze are the Hard, Medium and Easy AI's lap at the Power you fly; shown in the menu, the Practice OSD and the results.
 - **Hits:** the quad stops against what it hits and flies on. A hard hit edge-on is a prop strike: half a second of tumbling to fly out of. Upside down on the ground: **turtle mode**, roll or pitch to flip back. **Pause → Respawn** puts you at the last gate.
 - **Battery** (Off, Real, 1.5x, 2x): each class's real pack sags and runs down (about 2 min of hard racing on a 5"); a fresh pack flies exactly like no battery. Beeps and a yellow/red battery below 3.5 / 3.3 V a cell, then EMPTY and a fresh pack. Respawn also brings a fresh pack.
 - **Also:** wind with gusts, prop wash (Off, Stock, Max), Grip (rotor drag), vibration on hits and laps. On color screens the marker over the next gate shows where to come in from, a guide on a track you're learning: green on its way-in side (within 70° of its axis) or heading straight into it, yellow when you need to go round (a dive gate: green above it; a flag: before it, on or heading to the side you pass it).
-- **Colors** (color screens, StickTime 1.9.0 and later): Classic, or a natural sky that fades into the haze at the horizon over duller grass, with calmer object and text colors: **Summer**, **Evening** or **Overcast**. Kinder to the eyes in FPV goggles, and clean on analog video (it carries detail in brightness, not color). **Auto** is Classic on a radio and Summer on [StickTime Pi](https://github.com/juricabi/sticktime-pi)'s analog video output.
+- **Colors** (color screens, StickTime 1.9.0 and later): Classic, or a natural sky that fades into the haze at the horizon over duller grass, with calmer object and text colors: **Summer**, **Evening** or **Overcast**, and **Night** (1.10.0): stars, the moon, LED gates. Kinder to the eyes in FPV goggles, and clean on analog video (it carries detail in brightness, not color). **Auto** is Classic on a radio and Summer on [StickTime Pi](https://github.com/juricabi/sticktime-pi)'s analog video output. **Sky detail** (1.10.0, On by default) draws clouds drifting slowly round, the sun (low and orange in the Evening), and at Night the moon and stars; under 1 ms a frame on a TX16S, and off in a moment on a slow radio. StickTime BW draws a ridge of mountains on the horizon.
 - **Saving:** bests and the ghost are saved the moment you set them, so switching the radio off keeps them. (A lap that sets a new ghost writes a 5 KB file, which can pause the radio for a moment; races never write a ghost.)
 
 | What each edition has | Color | BW | Lite |
@@ -60,9 +63,11 @@ Download `StickTime-<version>-sdcard.zip` from the [latest release](https://gith
 | Battery | yes (battery icon and cell voltage; flight time, mAh and pack voltage when paused) | yes (cell voltage and gauge, LAND below 3.3 V; flight time and mAh when paused) | no |
 | Your own tracks 9-16 | yes | yes | no |
 | Bigger tracks of your own (up to 48 gates, 64 structures) | yes | no (24 gates, 16 structures) | no |
+| Scenery: props, rails, decals, structure colors; on the eight tracks and your own | yes | no (no memory for it: a track of your own with scenery flies with its gates and structures) | no |
+| The start pad, a windsock, mountains on the horizon | yes | yes (in lines) | the pad and the windsock (in lines) |
 | Ghost | yes | no (not enough memory on B&W radios) | no |
 | Minimap, stick view, touch | yes | no | no |
-| Colors: Classic, Summer, Evening, Overcast | yes | no (B&W) | no (B&W) |
+| Colors: Classic, Summer, Evening, Overcast, Night; Sky detail | yes | no (B&W) | no (B&W) |
 | The next gate's marker turns green where you can come in from | yes | no | no |
 
 | Files in `/SCRIPTS/TOOLS/` | |
@@ -115,7 +120,7 @@ Play at **[juricabi.github.io/sticktime](https://juricabi.github.io/sticktime/)*
 
 - Any radio screen or a **PC screen** (1280×720, 1920×1080 at 60 fps); keyboard, on-screen gimbals or your radio as a USB joystick.
 - Synthesized motor sound tuned against real quads, and live-composed music (or your own songs).
-- **Tracks:** the track editor. Lay out gates, hoops, flags, dive gates, structures and walls on a map. **Open** picks a track to edit: one of yours, a new one, a file or one from the gallery of [tracks/](tracks/). The editor works on a copy: **To slot** picks c1 to c8, **Send to emulator** or **Send to radio** (Chrome/Edge, radio in USB Storage mode) puts it in that slot, **Fly c1** flies the emulator's slot, and **Save file** downloads it as `c1.txt`. A track with more than 24 gates, 16 structures or 999 bytes is saved as a bigger track (format 2). Only StickTime 1.8.0 or later on a color radio flies it. Many structures in view at once slow a radio down, so check **Radio load**. **My tracks** shows the emulator's and the radio's slots side by side: remove a track, or copy it from one to the other. Made a good one? [Add it](tracks/README.md#add-your-track) with a pull request.
+- **Tracks:** the track editor. Lay out gates, hoops, flags, dive gates, structures, walls and the scenery (props, rails and decals, or a pilots' area, a taped lane or a fence round the track in one go) on a map. **Open** picks a track to edit: one of yours, a new one, a file or one from the gallery of [tracks/](tracks/). The editor works on a copy: **To slot** picks c1 to c8, **Send to emulator** or **Send to radio** (Chrome/Edge, radio in USB Storage mode) puts it in that slot, **Fly c1** flies the emulator's slot, and **Save file** downloads it as `c1.txt`. A track with more than 24 gates, 16 structures or 999 bytes is saved as a bigger track (format 2). Only StickTime 1.8.0 or later on a color radio flies it. A track with scenery is saved as format 3 (StickTime 1.10.0 or later; StickTime BW flies its gates and structures), or format 4 when it's bigger (color radios). Many structures in view at once slow a radio down, so check **Radio load**. **My tracks** shows the emulator's and the radio's slots side by side: remove a track, or copy it from one to the other. Made a good one? [Add it](tracks/README.md#add-your-track) with a pull request.
 - **Install:** connect the radio's SD card (Chrome or Edge on a computer) to install or update StickTime (hosted site only), and where to get the faster firmware. The tracks on the radio are under **Tracks** → **My tracks**.
 - **Radio load** estimates the frame time on F2, F4 and H7 radios; **Open .lua** runs any EdgeTX tool script.
 
@@ -128,12 +133,12 @@ B&W radios have no external RAM, and compiling a script on the radio takes far m
 
 Measured on EdgeTX 2.11's own Lua core (the tests also run main's, which packs values tighter and needs about 10% less) with a model of the radio's allocator (newlib-nano malloc with its fragmentation, EdgeTX's small-block pools or CCM pool), loading through the loader and playing every track and mode:
 
-| | Heap for Lua (EdgeTX 2.11.3) | Lua memory while playing | Peak heap use |
+| | Heap for Lua (EdgeTX 2.11.4) | Lua memory while playing | Peak heap use |
 |---|---|---|---|
-| StickTime BW on STM32F4 | 114–121 KB + 34 KB CCM | about 105 KB | 101 KB + 34 KB CCM |
-| StickTime Lite on STM32F2 | 63–73 KB + 10 KB pools | about 52 KB | 59 KB + 10 KB pools |
+| StickTime BW on STM32F4 | 114–121 KB + 34 KB CCM | about 108 KB | 108 KB + 34 KB CCM (105 without a format 3 track of your own) |
+| StickTime Lite on STM32F2 | 63–73 KB + 10 KB pools | about 53 KB | 60 KB + 10 KB pools |
 
-The Lite runs on a heap down to 60.5 KB, so about 3 KB of an X9D+ stays free (the memory test passes on every heap from there up, with no emergency garbage collection). Its quads and tracks are files in its folder (`StickTimeLite/q1.txt` to `q5.txt`, `t1.txt` to `t8.txt`), read only when you pick one; it parses numbers without making a string for each, collects garbage before it builds a track and before the flight starts, and writes its save file piece by piece. The loaders collect what compiling them left behind before they load the game, and keep their error screen in `why.lua`, so the game loads into a clean heap.
+The Lite runs on a heap down to 61.6 KB on EdgeTX 2.11.4, so about 1.7 KB of an X9D+ stays free (the memory test passes on every heap from there up, with no emergency garbage collection; 1.9.0 ran down to 61.0 KB there). That is also why the Lite has the start pad and a windsock but no mountains on its horizon, and StickTime BW no scenery: the code for them didn't fit. Its quads and tracks are files in its folder (`StickTimeLite/q1.txt` to `q5.txt`, `t1.txt` to `t8.txt`), read only when you pick one; it parses numbers without making a string for each, collects garbage before it builds a track and before the flight starts, and writes its save file piece by piece. The loaders collect what compiling them left behind before they load the game, and keep their error screen in `why.lua`, so the game loads into a clean heap.
 </details>
 
 <details>
@@ -142,7 +147,8 @@ The Lite runs on a heap down to 60.5 KB, so about 3 KB of an X9D+ stays free (th
 - **Fills.** Sky and ground are one rectangle plus one thin wedge triangle at any roll. Walls and structures are two filled triangles per face, filled row by row in C by the firmware. Upright bars and hoop segments are 1 px "ruled" lines. Faces cut by the near plane go through a polygon clipper.
 - **Lua side.** World data lives in arrays of numbers, hot values in locals and upvalues, no tables are made per frame, and collisions use a per-frame broad phase. Far gates switch to an outline and far hoops to six segments.
 - **Draw order.** Depth order alone fails with long walls, so for each pair that overlaps on screen and involves a structure, the script finds a plane separating their bounding boxes and draws the far side first, then sorts topologically. A ray-cast test over hundreds of camera poses at the Bando finds no pair out of order.
-- **Per frame:** about 15–65k Lua VM instructions on color screens and 7–28k on B&W. The emulator estimates 15–17 ms on a TX16S-class radio on open tracks and 27–35 ms in the busiest Bando views, and 4–11 ms for the Lite on an STM32F2 with no FPU, all inside the 50 ms budget. The natural Colors draw their sky as about 60 more lines: the emulator estimates 4–5 ms more a frame on a TX16S in the Bando.
+- **Per frame:** about 20–60k Lua VM instructions on color screens and 10–27k on B&W. The emulator estimates about 22 ms on average on a TX16S-class radio over the eight tracks with their scenery and Sky detail (21 ms with Sky detail off), at most 34 ms in the busiest Bando view, and 5–13 ms for the Lite on an STM32F2 with no FPU, all inside the 50 ms budget. The natural Colors draw their sky as about 60 more lines: the emulator estimates 4–5 ms more a frame on a TX16S (39 ms in the busiest Bando view, where 1.9.0 took 38).
+- **Scenery.** Props are drawn from their foot and top on the screen (the tent in 3D), the rails go into the draw order in pieces (12 m for a banner, 16 m for a fence, 36 m for a power line's wires high up), decals lie under everything and need no order. The sky's details are directions at infinity, like the mountains: only the clouds ahead are worked out.
 - **Latency.** Color screens show each frame one UI cycle after it is drawn, so the camera is drawn where the quad will be when the frame appears, and a third of that ahead in its turn; more would make a fast roll overshoot when the stick centers.
 </details>
 

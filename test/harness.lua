@@ -109,7 +109,7 @@ function lcd.RGB(r, g, b) return ((floor(r) * 0 + 1) * 0x10000) + 0x8000 end
 STICKTIME_TEST = {}
 -- AV=1: the picture goes to analog video (StickTime Pi's composite output: outlined text, Auto
 -- colors = Summer); HOST_DT=1: the host gives each frame's display interval (STICKTIME_DT);
--- COLORS=n: Settings > Colors for the flights (0 Auto, 1 Classic, 2 Summer, 3 Evening, 4 Overcast);
+-- COLORS=n: Settings > Colors for the flights (0 Auto, 1 Classic, 2 Summer, 3 Evening, 4 Overcast, 5 Night);
 -- LONG=t: the game's clock starts at t ticks, as after hours of uptime (with HOST_DT)
 local function env(k) return os.getenv and os.getenv(k) end
 if env("AV") then STICKTIME_AV = true end
@@ -262,7 +262,7 @@ local function idleSticks() sticks.ail, sticks.ele, sticks.rud, sticks.thr = 0, 
 
 -- ------------------------------------------------------------ scenarios
 -- 1. menus: walk every item, open settings, change every option both ways
-local OPTN = GAME_COLOR and 25 or 21
+local OPTN = GAME_COLOR and 26 or 21
 steps(20)
 for i = 1, 9 do frame(EVT_VIRTUAL_NEXT) frame(0) end
 for i = 1, 9 do frame(EVT_VIRTUAL_PREV) frame(0) end
@@ -1013,7 +1013,7 @@ do
   local CT = "/SCRIPTS/TOOLS/StickTimeTracks/c"
   SD[CT .. "1.txt"] = "Test Loop\n1 4242 7 9  0 0 1 0 0  0 40 1 0 0  30 60 4 90 3  40 20 1 180 0 / 20 30 3 3 0 4 2\n"
   SD[CT .. "3.txt"] = "Hoops\r\n1 77 3 18  0 0 4 0 2.5  20 30 4 45 2  0 60 4 180 3\r\n"
-  SD[CT .. "5.txt"] = "Broken\n3 1 1 9 0 0 1 0 0\n"                       -- a format this version can't read
+  SD[CT .. "5.txt"] = "Broken\n9 1 1 9 0 0 1 0 0\n"                       -- a format this version can't read
   -- format 2 (over 1000 bytes): 49 gates on a circle and 65 structures in a row, one more of each
   -- than the game takes (it builds 48 and 64)
   local big = { "Big One\n2 4321 5 9" }
@@ -1111,6 +1111,174 @@ do
   for i = 1, 8 do SD[CT .. i .. ".txt"] = nil end
 end
 
+-- 11. scenery (1.10.0): formats 3 and 4 with structure kinds 4-9, props, rails and decals (a section
+-- that can't be read is left out on its own); fences, wires and banners stop the quad, a pond landing
+-- is a SPLASH, Freestyle's UNDER; the pilots' area on every track; the trees keep off the scenery;
+-- Night and Sky detail draw. StickTime BW (no memory for the scenery) lists format 3 and flies its
+-- gates and structures
+do
+  local CT = "/SCRIPTS/TOOLS/StickTimeTracks/c"
+  SD[CT .. "1.txt"] = "Scenery Test\n3 7 3 0  0 0 1 0 0  0 60 1 0 0 / 30 30 2 2 0 3 5 / 10 20 4 0  -10 20 9 0  12 40 6 0" ..
+    " / -20 0 -20 60 1 2  20 50 50 50 4 12  -30 70 30 70 5 2.2 / 0 30 4 0.1 0 4  40 0 6 5 0 5\n"
+  SD[CT .. "4.txt"] = "Big Scenery\n4 8 3 0  0 0 1 0 0  0 40 1 0 0 / / 5 5 4 0 / / 20 20 10 10 0 2\n"   -- color only: the last
+  SD[CT .. "3.txt"] = "Bad Props\n3 9 3 0  0 0 1 0 0  0 40 1 0 0 / / 5 5 11 0 / -10 10 10 10 1 0 / 20 20 3 3 0 6\n"
+  STICKTIME_TEST = {}
+  local inst = chunk()
+  inst.init()
+  local L = STICKTIME_TEST
+  local function run(n)
+    for _ = 1, n do
+      clock = clock + 50
+      local ok, e = pcall(inst.run, 0)
+      if not ok then fail("scenery: run error " .. tostring(e)) return end
+    end
+  end
+  local function props(k)                               -- pillars of kind k (or all props: k nil)
+    local np, _, _, _, _, qk = L.scenery()
+    local n = 0
+    for i = 1, np do
+      if (k and qk[i] == k) or (not k and qk[i] >= 4) then n = n + 1 end
+    end
+    return n
+  end
+  -- (c4, format 4, is the last track on color radios; StickTime BW leaves it out, and c3 is its last)
+  if L.info() ~= (GAME_COLOR and 12 or 11) then
+    fail("scenery: the last track should be " .. (GAME_COLOR and "12 (c4, format 4)" or "11 (c3: format 4 left out)") .. ", is " .. tostring(L.info()))
+  end
+  if not GAME_COLOR then
+    L.track(9)
+    local x0, x1 = L.box(1)
+    if select(10, L.info()) ~= 1 or x1 - x0 ~= 4 or select(19, L.get()) ~= 2 then
+      fail(string.format("scenery: StickTime BW should build a format 3 track's 2 gates and its structure of kind 5 (%s gates, %s structures)",
+        tostring(select(19, L.get())), tostring(select(10, L.info()))))
+    end
+    L.track(11)
+    if select(19, L.get()) ~= 2 then fail("scenery: StickTime BW should build a format 3 track with a broken props section") end
+    L.track(9) L.set("ai", 2) L.start(1)
+    sticks.thr = 300
+    run(200)
+    local st = select(16, L.get())
+    if st ~= 4 and st ~= 5 and st ~= 6 then fail("scenery: the race on a format 3 track isn't flying on StickTime BW (state " .. tostring(st) .. ")") end
+    print("scenery: StickTime BW lists format 3 (4: left out) and flies its gates and structures, kinds 4-9 too, without the scenery")
+  else
+  L.track(9)
+  local _, _, _, _, _, _, SCN = L.scenery()
+  local x0, x1 = L.box(1)
+  if props() ~= 4 or props(11) ~= 1 or props(10) ~= 1 or SCN.nr ~= 3 or SCN.nd ~= 2 or SCN.dk[1] ~= 5 or select(10, L.info()) ~= 1 or x1 - x0 ~= 4 then
+    fail(string.format("scenery: format 3 track built wrong (%d props, %d tents, %d windsocks, %d rails, %d decals, first %s, %s structures)",
+      props(), props(10), props(11), SCN.nr, SCN.nd, tostring(SCN.dk[1]), tostring(select(10, L.info()))))
+  end
+  -- (the pond comes first: decals are drawn in layers)
+  L.track(12)
+  _, _, _, _, _, _, SCN = L.scenery()
+  if props() ~= 3 or SCN.nd ~= 1 or SCN.nr ~= 0 then fail("scenery: format 4 track built wrong (" .. props() .. " props, " .. SCN.nd .. " decals)") end
+  L.track(11)
+  _, _, _, _, _, _, SCN = L.scenery()
+  if props() ~= 2 or SCN.nr ~= 1 or SCN.nd ~= 1 then
+    fail(string.format("scenery: a props section with an unknown kind should be left out alone (%d props, %d rails, %d decals)", props(), SCN.nr, SCN.nd))
+  end
+  -- contacts on track 9: angle mode, hovering, flown at things for a second
+  L.track(9) L.set("mode", 2) L.set("ai", 0) L.start(2)
+  local function fly(x, y, z, yaw, vx, vy, vz, secs, thr)
+    L.state(4) L.pose(x, y, z, yaw, 0, 0) L.vel(vx, vy, vz)
+    sticks.ail, sticks.ele, sticks.rud = 0, 0, 0
+    sticks.thr = thr or (hoverStick(1) * 2048 - 1024)
+    run(math.floor(secs * 20))
+    local t = { L.get() }
+    return t[1], t[2], t[3], t[16]
+  end
+  local px_ = fly(-17, 1, 30, -90, -10, 0, 0, 0.6)
+  if px_ < -20 then fail(string.format("scenery: through the fence at 1 m (x %.1f)", px_)) end
+  px_ = fly(-17, 3.5, 30, -90, -10, 0, 0, 0.6)
+  if px_ > -20 then fail(string.format("scenery: over the fence at 3.5 m should pass (x %.1f)", px_)) end
+  -- (moving, the hover throttle climbs: a little less, and from close by)
+  local thr = hoverStick(0.85) * 2048 - 1024
+  local hits = select(13, L.audio())
+  local _, _, pz_ = fly(35, 11.1, 46.5, 0, 0, 0, 6, 0.6, thr)
+  -- (a wire is thin: the quad strikes it with its props and tumbles round it, not on)
+  if pz_ > 49 or select(13, L.audio()) <= hits then
+    fail(string.format("scenery: through the power line's wire (z %.1f, %d hits)", pz_, select(13, L.audio()) - hits))
+  end
+  _, _, pz_ = fly(35, 6, 44, 0, 0, 0, 10, 1.5)
+  if pz_ < 56 then fail(string.format("scenery: under the power line should pass (z %.1f)", pz_)) end
+  _, _, pz_ = fly(0, 1.75, 68, 0, 0, 0, 6, 0.6, thr)
+  if pz_ > 70 then fail(string.format("scenery: through the banner (z %.1f)", pz_)) end
+  _, _, pz_ = fly(0, 0.6, 68, 0, 0, 0, 6, 0.8, thr)
+  if pz_ < 71 then fail(string.format("scenery: under the banner should pass (z %.1f)", pz_)) end
+  -- against the fence, the quad flies away from it again: flown into it and turned round where
+  -- it is, and half over its top wire (it used to stay stuck there: every move hit the wire)
+  local fx_ = fly(-19.2, 1, 30, -90, -6, 0, 0, 0.4, thr)
+  L.vel(6, 0, 0) run(8)
+  local gx_ = L.get()
+  if gx_ - fx_ < 1 then fail(string.format("scenery: from against the fence (x %.2f) the quad should fly away (x %.2f)", fx_, gx_)) end
+  gx_ = fly(-19.9, 2.1, 30, -90, 6, 0, 0, 0.4, thr)
+  if gx_ < -18.8 then fail(string.format("scenery: from the fence's top wire the quad should fly away (x %.2f)", gx_)) end
+  local _, gy_ = fly(-19.9, 2.1, 30, -90, 0, 3, 0, 0.4, thr)
+  if gy_ < 2.8 then fail(string.format("scenery: from the fence's top wire the quad should climb away (y %.2f)", gy_)) end
+  -- at race speed too (35 m/s: a substep is 0.35 m, more than the fence is thick), from start points
+  -- a few cm apart: the fence, the banner and a wire stop it, none is flown through
+  for _, r in ipairs({ { "fence", -20, 1, -90, 1 }, { "banner", 70, 1.75, 0, 3 }, { "power line wire", 48, 11.1, 0, 2 } }) do
+    local thru = 0
+    for k = 0, 7 do
+      local o = 1.5 + k * 0.06
+      local x, z = r[5] == 1 and r[2] + o or 35, r[5] == 1 and 30 or r[2] - o
+      if r[5] == 3 then x = 0 end
+      L.state(4) L.pose(x, r[3], z, r[4], 0, 0)
+      L.vel(r[5] == 1 and -35 or 0, 0, r[5] == 1 and 0 or 35)
+      sticks.ail, sticks.ele, sticks.rud, sticks.thr = 0, 0, 0, thr
+      run(4)
+      local t = { L.get() }
+      if (r[5] == 1 and t[1] < r[2] - 0.3) or (r[5] ~= 1 and t[3] > r[2] + 0.3) then thru = thru + 1 end
+    end
+    if thru > 0 then fail("scenery: at 35 m/s the quad went through the " .. r[1] .. " " .. thru .. " times of 8") end
+  end
+  local _, _, _, st = fly(40, 0.4, 0, 0, 0, -2, 0, 0.5, -1024)
+  local why = select(2, L.bat("s"))
+  if st ~= 5 or why ~= "SPLASH" then fail("scenery: landing in the pond should be a SPLASH (state " .. tostring(st) .. ", " .. tostring(why) .. ")") end
+  -- Freestyle: under the banner is a trick
+  L.start(3) run(2)
+  fly(0, 0.6, 67, 0, 0, 0, 8, 0.5, thr)
+  if L.msg() == nil or not string.find(L.msg(), "UNDER", 1, true) then fail("scenery: Freestyle under the banner should be UNDER (" .. tostring(L.msg()) .. ")") end
+  -- Night and Sky detail, every look
+  for c = 0, 5 do
+    L.set("colors", c) L.set("sky", c % 2)
+    fly(0, 3, -10, 0, 0, 0, 5, 0.3)
+  end
+  L.set("colors", 0) L.set("sky", 1)
+  -- the built-in tracks: a windsock each, a tent (theirs or the pilots' area's), trees off the scenery
+  local function sd(x, z, ax, az, bx, bz)
+    local dx, dz = bx - ax, bz - az
+    local l = dx * dx + dz * dz
+    local t = l > 0 and ((x - ax) * dx + (z - az) * dz) / l or 0
+    if t < 0 then t = 0 elseif t > 1 then t = 1 end
+    dx, dz = ax + dx * t - x, az + dz * t - z
+    return math.sqrt(dx * dx + dz * dz)
+  end
+  for t = 1, 8 do
+    L.track(t)
+    local np, qx, qz, _, _, qk
+    np, qx, qz, _, _, qk, SCN = L.scenery()
+    if props(11) ~= 1 or props(10) < 1 then fail("scenery: track " .. t .. " should have a windsock and a tent (" .. props(11) .. ", " .. props(10) .. ")") end
+    for i = 1, np do
+      if qk[i] == 1 then
+        for r = 1, SCN.nr do
+          if sd(qx[i], qz[i], SCN.rx1[r], SCN.rz1[r], SCN.rx2[r], SCN.rz2[r]) < 3.99 then fail("scenery: a tree on track " .. t .. " stands by a rail") end
+        end
+        for d = 1, SCN.nd do
+          local cx, cz, ux, uz = SCN.dx[d], SCN.dz[d], SCN.dux[d], SCN.duz[d]
+          local w = math.sqrt(SCN.dvx[d] ^ 2 + SCN.dvz[d] ^ 2) + 1.99
+          if sd(qx[i], qz[i], cx - ux, cz - uz, cx + ux, cz + uz) < w then fail("scenery: a tree on track " .. t .. " stands on a decal") end
+        end
+      end
+    end
+  end
+  print("scenery: formats 3 and 4 read, a broken section left out alone, fence, wire and banner stop the quad (over and under pass), " ..
+    "SPLASH, UNDER, every Colors look and Sky detail drawn, a windsock and tent on all eight tracks")
+  end
+  idleSticks()
+  for i = 1, 8 do SD[CT .. i .. ".txt"] = nil end
+end
+
 collectgarbage()
 print(string.format("%s %s %dx%d  frames %d  instr/frame (incl. mock lcd) avg %d max %d  tri rows avg %d max %d  rejected lines %d",
   _VERSION, kind, W, H, frames, math.floor(sumInstr / frames), maxInstr, math.floor(sumRows / frames), maxRows, stat.rejected))
@@ -1127,4 +1295,6 @@ for _, r in ipairs(results) do
     r.pos, r.nai + 1, r.aiDone, r.secs))
 end
 print("saved: " .. string.gsub(tostring(saved), "\n", ""))
+-- (again: the sections after the first check draw the scenery, Night and Sky detail too)
+if stat.rejected > 0 then fail(stat.rejected .. " lines in all would be rejected by the firmware") end
 print(fails == 0 and "ALL OK" or (fails .. " FAILURES"))

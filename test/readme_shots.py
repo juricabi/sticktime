@@ -74,6 +74,18 @@ with sync_playwright() as p:
     shot(page, "tx16s-settings")
     page.evaluate("sim.key('exit'); sim.step(2, 50)")
 
+    # the scenery (1.10.0): the Pro Track at Night, the gallery's Farm Field and Power Line
+    page.evaluate("sim.test('set', 'colors', 5)")
+    race_view(page, 8, 2, 16, -2, 1.0, 6, -4, 10)
+    shot(page, "tx16s-night")
+    page.evaluate("sim.test('set', 'colors', 0)")
+    for name, gate, args in (("farm-field", 4, (18, 3, 1.5, -6, -4, 10)), ("power-line", 2, (20, -1, 0.5, 4, -2, 9))):
+        page.evaluate("([t]) => sim.writeSD('/SCRIPTS/TOOLS/StickTimeTracks/c1.txt', t)", [(ROOT / "tracks" / f"{name}.txt").read_text()])
+        page.evaluate("sim.boot(); sim.pause(true); sim.app.ghost = false; sim.engine.displayDelay = false; sim.step(5, 50)")
+        race_view(page, 9, gate, *args)
+        shot(page, f"tx16s-{name}")
+    page.evaluate("sim.removeSD('/SCRIPTS/TOOLS/StickTimeTracks/c1.txt'); sim.boot(); sim.pause(true); sim.step(5, 50)")
+
     # NV14 portrait: hoop forest
     radio(page, "nv14")
     race_view(page, 5, 4, 7, 0.6, 0.2, 10, -4, 11, mode=1, ai=0)
