@@ -1205,6 +1205,23 @@ do
   if pz_ > 70 then fail(string.format("scenery: through the banner (z %.1f)", pz_)) end
   _, _, pz_ = fly(0, 0.6, 68, 0, 0, 0, 6, 0.8, thr)
   if pz_ < 71 then fail(string.format("scenery: under the banner should pass (z %.1f)", pz_)) end
+  -- the pilots' tent: open under its canopy, both ways; its legs and canopy stop the quad, which
+  -- lands on top of it
+  do
+    local np_, qx_, qz_, _, qh_, qk_ = L.scenery()
+    local ti = 0
+    for i = 1, np_ do if qk_[i] == 10 then ti = i end end
+    local tx, tz, e = qx_[ti], qz_[ti], qh_[ti] / 2.6
+    local x_ = fly(tx - 6, 0.8, tz, 90, 6, 0, 0, 2, thr)
+    local _, _, z_ = fly(tx, 0.8, tz - 6, 0, 0, 0, 6, 2, thr)
+    if x_ < tx + 3 or z_ < tz + 3 then fail(string.format("scenery: under the tent should pass (x %.1f, z %.1f of %.1f, %.1f)", x_, z_, tx, tz)) end
+    x_ = fly(tx + 1.45 * e - 4, 1, tz + 1.45 * e, 90, 6, 0, 0, 2, thr)
+    if x_ > tx - 1.45 * e then fail(string.format("scenery: a tent's leg should stop the quad (x %.2f)", x_)) end
+    x_ = fly(tx - 3, 2.2 * e, tz, 90, 6, 0, 0, 1, thr)             -- (from close by: moving, it climbs)
+    if x_ > tx - 1.5 * e then fail(string.format("scenery: a tent's canopy should stop the quad (x %.2f)", x_)) end
+    local _, y_ = fly(tx, 3.5 * e, tz, 0, 0, -2, 0, 2, -1024)
+    if y_ < 2.4 * e or y_ > 2.4 * e + 0.3 then fail(string.format("scenery: the quad should land on the tent (y %.2f)", y_)) end
+  end
   -- against the fence, the quad flies away from it again: flown into it and turned round where
   -- it is, and half over its top wire (it used to stay stuck there: every move hit the wire)
   local fx_ = fly(-19.2, 1, 30, -90, -6, 0, 0, 0.4, thr)

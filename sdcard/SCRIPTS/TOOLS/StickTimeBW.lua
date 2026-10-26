@@ -1,6 +1,6 @@
 local toolName = "TNS|StickTime BW|TNE"
 --[[ ======================================================================
-  StickTime BW v1.10.0  -  loader for black & white radios
+  StickTime BW v1.10.1  -  loader for black & white radios
 
   The game itself is in /SCRIPTS/TOOLS/StickTimeBW/ (copy that whole folder too):
   game.luac, the game precompiled for EdgeTX 2.11 and newer, and core.lua,
